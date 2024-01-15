@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<workspace>
+    <project>
+        <path>$WS_DIR$\project_config\cyt4bb7_cm_0_plus.ewp</path>
+    </project>
+    <project>
+        <path>$WS_DIR$\project_config\cyt4bb7_cm_7_0.ewp</path>
+    </project>
+    <project>
+        <path>$WS_DIR$\project_config\cyt4bb7_cm_7_1.ewp</path>
+    </project>
+    <batchBuild />
+</workspace>

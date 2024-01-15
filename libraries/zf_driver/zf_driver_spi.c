@@ -881,8 +881,6 @@ void spi_init (spi_index_enum spi_n, spi_mode_enum mode, uint32 baud, spi_clk_pi
     // 醒醒，模块号和端口都不对应怎么能初始化呢？
     zf_assert((uint8)spi_n == (uint8)clk_pin ? 1 : 0);
     zf_assert((uint8)clk_pin == (uint8)mosi_pin ? 1 : 0);
-    
-    Cy_SCB_SPI_DeInit(spi_module[spi_n]);
 
     spi_pin_cfg.driveMode = CY_GPIO_DM_STRONG_IN_OFF;
     spi_pin_cfg.hsiom = spi_get_mosi_hsiom(mosi_pin);
@@ -905,9 +903,9 @@ void spi_init (spi_index_enum spi_n, spi_mode_enum mode, uint32 baud, spi_clk_pi
         Cy_GPIO_Pin_Init(get_port(spi_get_cs_pin(cs_pin)), (spi_get_cs_pin(cs_pin) % 8), &spi_pin_cfg);
     }
     
-    Cy_SysClk_PeriphAssignDivider((en_clk_dst_t)((uint32)PCLK_SCB7_CLOCK + (uint32)spi_n), CY_SYSCLK_DIV_24_5_BIT, 0ul);
-    Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup((en_clk_dst_t)((uint32)PCLK_SCB7_CLOCK + (uint32)spi_n)), CY_SYSCLK_DIV_24_5_BIT, 0ul, ((divSetting_fp5 & 0x1FFFFFE0ul) >> 5ul), (divSetting_fp5 & 0x0000001Ful));
-    Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup((en_clk_dst_t)((uint32)PCLK_SCB7_CLOCK + (uint32)spi_n)), CY_SYSCLK_DIV_24_5_BIT, 0ul);
+    Cy_SysClk_PeriphAssignDivider((en_clk_dst_t)((uint32)PCLK_SCB7_CLOCK + (uint32)spi_n), CY_SYSCLK_DIV_24_5_BIT, 1ul);
+    Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup((en_clk_dst_t)((uint32)PCLK_SCB7_CLOCK + (uint32)spi_n)), CY_SYSCLK_DIV_24_5_BIT, 1ul, ((divSetting_fp5 & 0x1FFFFFE0ul) >> 5ul), (divSetting_fp5 & 0x0000001Ful));
+    Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup((en_clk_dst_t)((uint32)PCLK_SCB7_CLOCK + (uint32)spi_n)), CY_SYSCLK_DIV_24_5_BIT, 1ul);
     
     spi_config.spiMode                    = CY_SCB_SPI_MASTER     ;
     spi_config.subMode                    = CY_SCB_SPI_MOTOROLA   ;

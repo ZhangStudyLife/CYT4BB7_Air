@@ -54,9 +54,9 @@ int main(void)
     Cy_SysEnableApplCore(CORE_CM7_1, CY_CORTEX_M7_1_APPL_ADDR);         // 启动M7核心1
     // 此处编写用户初始化代码 
 
-    
-    
-    
+    // M0主要功能为“引导M7双核心启动” 不建议M0用于跑代码
+    // M0主要功能为“引导M7双核心启动”不建议M0用于跑代码
+    // M0主要功能为“引导M7双核心启动” 不建议M0用于跑代码
     
     
     

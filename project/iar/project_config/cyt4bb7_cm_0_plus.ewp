@@ -368,8 +368,8 @@
                     <state>$PROJ_DIR$\..\..\..\libraries\zf_driver</state>
                     <state>$PROJ_DIR$\..\..\..\libraries\zf_device</state>
                     <state>$PROJ_DIR$\..\..\..\libraries\zf_components</state>
-                    <state>$PROJ_DIR$\..\..\..\user</state>
-                    <state>$PROJ_DIR$\..\..\..\code</state>
+                    <state>$PROJ_DIR$\..\..\user</state>
+                    <state>$PROJ_DIR$\..\..\code</state>
                 </option>
                 <option>
                     <name>CCStdIncCheck</name>
@@ -701,7 +701,7 @@
             <data>
                 <extensions></extensions>
                 <cmdline></cmdline>
-                <hasPrio>48</hasPrio>
+                <hasPrio>1</hasPrio>
                 <buildSequence>inputOutputBased</buildSequence>
             </data>
         </settings>
@@ -1110,6 +1110,18 @@
     </configuration>
     <group>
         <name>code</name>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\本文件夹作用.txt</name>
+        </file>
+    </group>
+    <group>
+        <name>doc</name>
+        <file>
+            <name>$PROJ_DIR$\..\..\..\libraries\doc\GPL3_permission_statement.txt</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\..\libraries\doc\version.txt</name>
+        </file>
     </group>
     <group>
         <name>sdk</name>

@@ -55,21 +55,21 @@
 #if ABSOLUTE_ENCODER_USE_SOFT_SPI                                               // 这两段 颜色正常的才是正确的 颜色灰的就是没有用的
 //====================================================软件 SPI 驱动====================================================
 #define ABSOLUTE_ENCODER_SOFT_SPI_DELAY     (1)                                 // 软件 SPI 的时钟延时周期 数值越小 SPI 通信速率越快
-#define ABSOLUTE_ENCODER_SCLK_PIN           (P20_11)                            // 软件 SPI SCK 引脚
-#define ABSOLUTE_ENCODER_MOSI_PIN           (P20_14)                            // 软件 SPI MOSI 引脚
-#define ABSOLUTE_ENCODER_MISO_PIN           (P20_12)                            // 软件 SPI MISO 引脚
+#define ABSOLUTE_ENCODER_SCLK_PIN           (P02_2)                             // 软件 SPI SCK 引脚
+#define ABSOLUTE_ENCODER_MOSI_PIN           (P02_1)                             // 软件 SPI MOSI 引脚
+#define ABSOLUTE_ENCODER_MISO_PIN           (P02_0)                             // 软件 SPI MISO 引脚
 //====================================================软件 SPI 驱动====================================================
 #else
 //====================================================硬件 SPI 驱动====================================================
 #define ABSOLUTE_ENCODER_SPI_SPEED          (10 * 1000 * 1000)                  // 硬件 SPI 速率
-#define ABSOLUTE_ENCODER_SPI                (SPI_2           )                  // 硬件 SPI 号
-#define ABSOLUTE_ENCODER_SCLK_PIN           (SPI2_CLK_P15_2  )                  // 硬件 SPI SCK 引脚
-#define ABSOLUTE_ENCODER_MOSI_PIN           (SPI2_MOSI_P15_1 )                  // 硬件 SPI MOSI 引脚
-#define ABSOLUTE_ENCODER_MISO_PIN           (SPI2_MISO_P15_0 )                  // 硬件 SPI MISO 引脚
+#define ABSOLUTE_ENCODER_SPI                (SPI_0           )                  // 硬件 SPI 号
+#define ABSOLUTE_ENCODER_SCLK_PIN           (SPI0_CLK_P02_2 )                   // 硬件 SPI SCK 引脚
+#define ABSOLUTE_ENCODER_MOSI_PIN           (SPI0_MOSI_P02_1)                   // 硬件 SPI MOSI 引脚
+#define ABSOLUTE_ENCODER_MISO_PIN           (SPI0_MISO_P02_0)                   // 硬件 SPI MISO 引脚
 //====================================================硬件 SPI 驱动====================================================
 #endif
 
-#define ABSOLUTE_ENCODER_CS_PIN             (P15_3)                             // CS引脚定义
+#define ABSOLUTE_ENCODER_CS_PIN             (P02_3)                             // CS引脚定义
 #define ABSOLUTE_ENCODER_CSN(x)             ((x) ? (gpio_high(ABSOLUTE_ENCODER_CS_PIN)): (gpio_low(ABSOLUTE_ENCODER_CS_PIN)))
 
 #define ABSOLUTE_ENCODER_TIMEOUT_COUNT      (100)                               // 自检超时时间

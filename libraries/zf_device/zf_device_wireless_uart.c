@@ -212,8 +212,10 @@ uint32 wireless_uart_read_buffer (uint8 *buff, uint32 len)
 //-------------------------------------------------------------------------------------------------------------------
 void wireless_uart_callback (void)
 {
-    uart_query_byte(WIRELESS_UART_INDEX, &wireless_uart_data);
-    fifo_write_buffer(&wireless_uart_fifo, &wireless_uart_data, 1);
+    if(uart_query_byte(WIRELESS_UART_INDEX, &wireless_uart_data))
+    {
+        fifo_write_buffer(&wireless_uart_fifo, &wireless_uart_data, 1);
+    }
 #if WIRELESS_UART_AUTO_BAUD_RATE                                                // 开启自动波特率
     if(WIRELESS_UART_AUTO_BAUD_RATE_START == wireless_auto_baud_flag && 3 == fifo_used(&wireless_uart_fifo))
     {

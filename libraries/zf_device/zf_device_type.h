@@ -54,7 +54,6 @@ typedef enum
     WIRELESS_UART,                                                              // 无线串口
     BLUETOOTH_CH9141,                                                           // 蓝牙 CH9141
     WIFI_UART,                                                                  // 串口 WiFi
-    WIFI_SPI                                                                    // SPI WiFi
 }wireless_type_enum;
 
 typedef enum

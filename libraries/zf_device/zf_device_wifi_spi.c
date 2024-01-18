@@ -27,10 +27,10 @@
 * 开发环境          IAR 9.40.1
 * 适用平台          CYT4BB
 * 店铺链接          https://seekfree.taobao.com/
-*
+* 
 * 修改记录
 * 日期              作者                备注
-* 2024-01-12       pudding           first version
+* 2022-09-21        SeekFree            first version
 ********************************************************************************************************************/
 /*********************************************************************************************************************
 * 接线定义：
@@ -59,9 +59,9 @@
 
 #include "zf_device_wifi_spi.h"
 
-#define WIFI_CONNECT_TIME_OUT       50000       // 单位100微妙 50000等待5秒
-#define SOCKET_CONNECT_TIME_OUT     500000      // 单位100微妙
-#define OTHER_TIME_OUT              10000       // 单位100微妙
+#define WIFI_CONNECT_TIME_OUT       10000       // 单位毫秒
+#define SOCKET_CONNECT_TIME_OUT     50000       // 单位毫秒
+#define OTHER_TIME_OUT              1000        // 单位毫秒
 
 char wifi_spi_version[12];                      // 保存模块固件版本信息
 char wifi_spi_mac_addr[20];                     // 保存模块MAC地址信息
@@ -72,7 +72,7 @@ static uint8        wifi_spi_buffer[WIFI_SPI_RECVIVE_FIFO_SIZE];
 static volatile     wifi_spi_state_enum wifi_spi_mutex;
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     等待WIFI SPI就绪
-// 参数说明     wait_time       最大等待时间 单位100微妙
+// 参数说明     wait_time       最大等待时间 单位毫秒
 // 返回参数     uint8           状态 0-成功 1-错误
 // 使用示例     内部使用，用户无需关心
 // 备注信息     
@@ -80,10 +80,11 @@ static volatile     wifi_spi_state_enum wifi_spi_mutex;
 static uint8 wifi_spi_wait_idle (uint32 wait_time)
 {
     uint32 time = 0;
-
+    
+    wait_time = wait_time*100;
     while(0 == gpio_get_level(WIFI_SPI_INT_PIN))
     {
-        system_delay_us(100);
+        system_delay_us(10);
         time++;
         if(wait_time <= time)
         {
@@ -189,7 +190,8 @@ static uint8 wifi_spi_set_parameter (wifi_spi_packets_command_enum command, uint
     do
     {
         head.command = command;
-
+        head.length  = length;
+        
         // 等待从机准备就绪
         if(wifi_spi_wait_idle(wait_time))
         {
@@ -206,7 +208,7 @@ static uint8 wifi_spi_set_parameter (wifi_spi_packets_command_enum command, uint
         head.command = WIFI_SPI_DATA;
         head.length = 0;
         wifi_spi_transfer_command((wifi_spi_packets_struct *)&head, head.length);
-        
+        system_delay_us(20);
         if(WIFI_SPI_REPLY_OK == head.command)
         {
             return_state = 0;
@@ -238,7 +240,7 @@ static uint8 wifi_spi_get_parameter (wifi_spi_packets_command_enum command, wifi
             break;
         }
         read_data->head.command = command;
-        wifi_spi_write(&(read_data->head.command), sizeof(wifi_spi_head_struct), NULL, 0);
+        wifi_spi_write(&(read_data->head.command), WIFI_SPI_RECVIVE_SIZE, NULL, 0);
 
         if(wifi_spi_wait_idle(wait_time))
         {
@@ -318,15 +320,25 @@ static uint8 wifi_spi_get_ip_addr_port (void)
 // 参数说明     *wifi_ssid      WIFI名称
 // 参数说明     *pass_word      WIFI密码
 // 返回参数     uint8           状态 0-成功 1-错误
-// 使用示例     wifi_spi_connect_wifi_information("SEEKFREE","SEEKFREE123");
-// 备注信息     
+// 使用示例     wifi_spi_connect_wifi("SEEKFREE", "SEEKFREE123");
+// 备注信息     wifi_spi_connect_wifi("SEEKFREE", NULL); // 连接没有密码的WIFI热点
 //-------------------------------------------------------------------------------------------------------------------
-static uint8 wifi_spi_connect_wifi (char *wifi_ssid, char *pass_word)
+uint8 wifi_spi_connect_wifi (char *wifi_ssid, char *pass_word)
 {
     uint8 temp_buffer[64];
     uint16 length;
     
-    length = sprintf((char *)temp_buffer, "%s\r\n%s\r\n", wifi_ssid, pass_word);
+    if(NULL != pass_word)
+    {
+        // WIFI热点有密码发送热点名称与密码
+        length = sprintf((char *)temp_buffer, "%s\r\n%s\r\n", wifi_ssid, pass_word);
+    }
+    else
+    {
+        // WIFI热点没有密码只需要发送热点名称
+        length = sprintf((char *)temp_buffer, "%s\r\n", wifi_ssid);
+    }
+    
     return wifi_spi_set_parameter(WIFI_SPI_SET_WIFI_INFORMATION, temp_buffer, length, WIFI_CONNECT_TIME_OUT);
 }
 
@@ -337,16 +349,30 @@ static uint8 wifi_spi_connect_wifi (char *wifi_ssid, char *pass_word)
 // 参数说明     *port           目标端口号
 // 参数说明     *local_port     本机端口号
 // 返回参数     uint8           状态 0-成功 1-错误
-// 使用示例     wifi_spi_connect_socket_information("TCP", "192.168.2.5", "8080", "6060");
+// 使用示例     wifi_spi_socket_connect("TCP", "192.168.2.5", "8080", "6060");
 // 备注信息     
 //-------------------------------------------------------------------------------------------------------------------
-uint8 wifi_spi_connect_socket (char *transport_type, char *ip_addr, char *port, char *local_port)
+uint8 wifi_spi_socket_connect (char *transport_type, char *ip_addr, char *port, char *local_port)
 {
     uint8 temp_buffer[41];
     uint16 length;
     
     length = sprintf((char *)temp_buffer, "%s\r\n%s\r\n%s\r\n%s\r\n", transport_type, ip_addr, port, local_port);
     return wifi_spi_set_parameter(WIFI_SPI_SET_SOCKET_INFORMATION, temp_buffer, length, SOCKET_CONNECT_TIME_OUT);
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+// 函数简介     WIFI SPI 断开Socket连接
+// 参数说明     void            
+// 返回参数     uint8           状态 0-成功 1-错误
+// 使用示例     wifi_spi_socket_close();
+// 备注信息
+//-------------------------------------------------------------------------------------------------------------------
+uint8 wifi_spi_socket_close (void)
+{
+    wifi_spi_packets_struct temp_packets;
+
+    return wifi_spi_get_parameter(WIFI_SPI_CLOSE_SOCKET, &temp_packets, OTHER_TIME_OUT);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -566,7 +592,7 @@ uint32 wifi_spi_read_buffer (uint8 *buffer, uint32 length)
 // 参数说明     *pass_word      目标连接的 WiFi 的密码 字符串形式
 // 返回参数     uint8           模块初始化状态 0-成功 1-错误
 // 使用示例     wifi_spi_init("SEEKFREE", "SEEKFREE123");
-// 备注信息     
+// 备注信息     wifi_spi_init("SEEKFREE", NULL); // 连接没有密码的WIFI热点
 //-------------------------------------------------------------------------------------------------------------------
 uint8 wifi_spi_init (char *wifi_ssid, char *pass_word)
 {

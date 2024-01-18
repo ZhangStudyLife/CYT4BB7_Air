@@ -57,19 +57,19 @@
 #define DL1B_USE_SOFT_IIC           ( 1 )                                       // 默认使用软件 IIC 方式驱动 建议使用软件 IIC 方式
 #if DL1B_USE_SOFT_IIC                                                           // 这两段 颜色正常的才是正确的 颜色灰的就是没有用的
 //====================================================软件 IIC 驱动====================================================
-#define DL1B_SOFT_IIC_DELAY         ( 10 )                                      // 软件 IIC 的时钟延时周期 数值越小 IIC 通信速率越快
-#define DL1B_SCL_PIN                ( P10_2 )                                      // 软件 IIC SCL 引脚 连接 DL1B 的 SCL 引脚
-#define DL1B_SDA_PIN                ( P10_3 )                                      // 软件 IIC SDA 引脚 连接 DL1B 的 SDA 引脚
+#define DL1B_SOFT_IIC_DELAY         ( 100 )                                      // 软件 IIC 的时钟延时周期 数值越小 IIC 通信速率越快
+#define DL1B_SCL_PIN                (P19_0)                                      // 软件 IIC SCL 引脚 连接 DL1B 的 SCL 引脚
+#define DL1B_SDA_PIN                (P19_1)                                      // 软件 IIC SDA 引脚 连接 DL1B 的 SDA 引脚
 //====================================================软件 IIC 驱动====================================================
 #else
 #error "暂不支持硬件IIC通讯"
 #endif
 
-#define DL1B_XS_PIN                 ( P07_0 )
+#define DL1B_XS_PIN                 ( P07_2 )
 
 #define DL1B_INT_ENABLE             ( 0 )                                       // 是否启用 INT 引脚 启用则会自动更新数据
 #if DL1B_INT_ENABLE
-#define DL1B_INT_PIN                ( ERU_CH1_REQ10_P14_3 )
+#define DL1B_INT_PIN                ( P07_3 )
 #endif
 
 #define DL1B_TIMEOUT_COUNT          ( 1000 )                                    // DL1B 超时计数

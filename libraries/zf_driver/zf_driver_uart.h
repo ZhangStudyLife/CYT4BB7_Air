@@ -49,7 +49,7 @@ typedef enum                   // 枚举串口发送引脚 此枚举定义不允许用户修改
 
     UART3_TX_P17_2,             // 串口3 发送引脚可选范围
 
-    UART4_TX_P19_1,             // 串口4 发送引脚可选范围
+    UART4_TX_P14_1,             // 串口4 发送引脚可选范围
 }uart_tx_pin_enum;
 
 
@@ -64,7 +64,7 @@ typedef enum                   // 枚举串口接收引脚 此枚举定义不允许用户修改
 
     UART3_RX_P17_1,             // 串口3 接收引脚可选范围
 	
-    UART4_RX_P19_0,             // 串口4 接收引脚可选范围
+    UART4_RX_P14_0,             // 串口4 接收引脚可选范围
 }uart_rx_pin_enum;
 
 
@@ -90,6 +90,7 @@ uint8   uart_query_byte                     (uart_index_enum uartn, uint8 *dat);
 void    uart_tx_interrupt                   (uart_index_enum uartn, uint32 status);
 void    uart_rx_interrupt                   (uart_index_enum uartn, uint32 status);
 
+void    sbus_init                           (uart_index_enum uartn, uint32 baud, uart_tx_pin_enum tx_pin, uart_rx_pin_enum rx_pin);
 void    uart_init                           (uart_index_enum uartn, uint32 baud, uart_tx_pin_enum tx_pin, uart_rx_pin_enum rx_pin);
 //====================================================串口 基础函数====================================================
 

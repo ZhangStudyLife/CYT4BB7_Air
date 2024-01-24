@@ -93,7 +93,6 @@ static gpio_pin_enum get_pwm_pin (pwm_channel_enum pwm_channel)
         case TCPWM_CH22_P8_3  : pwm_pin = P08_3;   break;
         case TCPWM_CH22_P23_7 : pwm_pin = P23_7;   break;
         case TCPWM_CH24_P9_0  : pwm_pin = P09_0;   break;
-        case TCPWM_CH24_P23_5 : pwm_pin = P23_5;   break;
         case TCPWM_CH25_P9_1  : pwm_pin = P09_1;   break;
         case TCPWM_CH25_P23_4 : pwm_pin = P23_4;   break;
         case TCPWM_CH26_P19_1 : pwm_pin = P19_1;   break;
@@ -205,7 +204,6 @@ static en_hsiom_sel_t get_pwm_pin_hsiom (pwm_channel_enum pwm_channel)
         case TCPWM_CH22_P8_3  : pin_hsiom = P8_3_TCPWM0_LINE22;    break;
         case TCPWM_CH22_P23_7 : pin_hsiom = P23_7_TCPWM0_LINE22;   break;
         case TCPWM_CH24_P9_0  : pin_hsiom = P9_0_TCPWM0_LINE24;    break;
-        case TCPWM_CH24_P23_5 : pin_hsiom = P23_5_TCPWM0_LINE24;   break;
         case TCPWM_CH25_P9_1  : pin_hsiom = P9_1_TCPWM0_LINE25;    break;
         case TCPWM_CH25_P23_4 : pin_hsiom = P23_4_TCPWM0_LINE25;   break;
         case TCPWM_CH26_P19_1 : pin_hsiom = P19_1_TCPWM0_LINE26;   break;
@@ -317,7 +315,6 @@ static uint8 get_pwm_ch (pwm_channel_enum pwm_channel)
         case TCPWM_CH22_P8_3  : pwm_ch = 22;   break;
         case TCPWM_CH22_P23_7 : pwm_ch = 22;   break;
         case TCPWM_CH24_P9_0  : pwm_ch = 24;   break;
-        case TCPWM_CH24_P23_5 : pwm_ch = 24;   break;
         case TCPWM_CH25_P9_1  : pwm_ch = 25;   break;
         case TCPWM_CH25_P23_4 : pwm_ch = 25;   break;
         case TCPWM_CH26_P19_1 : pwm_ch = 26;   break;

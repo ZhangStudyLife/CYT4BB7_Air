@@ -112,11 +112,11 @@ static void get_uart_config(uart_config_struct *config_struct, uart_tx_pin_enum 
             config_struct->uart_pclk= PCLK_SCB3_CLOCK;
             config_struct->uart_irqn= scb_3_interrupt_IRQn;
         }break;
-        case  	UART4_TX_P19_1:
+        case  	UART4_TX_P14_1:
         {
-            config_struct->tx_port  = GPIO_PRT19;  	
+            config_struct->tx_port  = GPIO_PRT14;  	
             config_struct->tx_pin   = 1;      
-            config_struct->tx_hsiom = P19_1_SCB2_UART_TX; 
+            config_struct->tx_hsiom = P14_1_SCB2_UART_TX; 
             config_struct->uart_pclk= PCLK_SCB2_CLOCK;
             config_struct->uart_irqn= scb_2_interrupt_IRQn;
         }break;
@@ -156,11 +156,11 @@ static void get_uart_config(uart_config_struct *config_struct, uart_tx_pin_enum 
             config_struct->uart_pclk= PCLK_SCB3_CLOCK;
             config_struct->uart_irqn= scb_3_interrupt_IRQn;
         }break;
-        case  	UART4_RX_P19_0: 
+        case  	UART4_RX_P14_0: 
         {
-            config_struct->rx_port  = GPIO_PRT19;  	
+            config_struct->rx_port  = GPIO_PRT14;  	
             config_struct->rx_pin   = 0;      
-            config_struct->rx_hsiom = P19_0_SCB2_UART_RX; 
+            config_struct->rx_hsiom = P14_0_SCB2_UART_RX; 
             config_struct->uart_pclk= PCLK_SCB2_CLOCK;
             config_struct->uart_irqn= scb_2_interrupt_IRQn;
         }break;
@@ -336,7 +336,71 @@ void uart_rx_interrupt (uart_index_enum uart_n, uint32 status)
     }	
 }
 
+//-------------------------------------------------------------------------------------------------------------------
+//  函数简介      SBUS串口初始化
+//  参数说明      uartn           SBUS串口模块号(UART_0,UART_1,UART_2,UART_3)
+//  参数说明      baud            SBUS串口波特率
+//  参数说明      tx_pin          SBUS串口发送引脚
+//  参数说明      rx_pin          SBUS串口接收引脚
+//  返回参数      void
+//  使用示例      sbus_init(UART_4, 100000, UART4_TX_P14_1, UART4_RX_P14_0);       // 初始化串口4 波特率100000 发送引脚使用 14_1 接收引脚使用 P14_0
+//  备注信息
+//-------------------------------------------------------------------------------------------------------------------
+void sbus_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pin, uart_rx_pin_enum rx_pin)
+{
+    // 醒醒，串口号和端口都不对应怎么能初始化呢？
+	
+    zf_assert((uint8)uart_n == (uint8)tx_pin ? 1 : 0);
+    zf_assert((uint8)uart_n == (uint8)rx_pin ? 1 : 0);
+	
+    volatile stc_SCB_t*        scb_module;
+    uart_config_struct          uart_pin_config                 = {0};
+    cy_stc_gpio_pin_config_t    gpio_pin_config                 = {0};
+    cy_stc_scb_uart_config_t    g_stc_uart_config               = {0};
+    uint64_t                    targetFreq                      = 8 * baud;
+    uint64_t                    sourceFreq_fp5                  = ((uint64_t)UART_FREQ << 5ull);
+    uint32_t                    divSetting_fp5                  = (uint32_t)(sourceFreq_fp5 / targetFreq);
+    
+    get_uart_config(&uart_pin_config, tx_pin, rx_pin);
+    
+    gpio_pin_config.driveMode           = CY_GPIO_DM_HIGHZ;
+    gpio_pin_config.hsiom               = uart_pin_config.rx_hsiom;
+    Cy_GPIO_Pin_Init(uart_pin_config.rx_port, uart_pin_config.rx_pin, &gpio_pin_config);
+    
+    gpio_pin_config.driveMode           = CY_GPIO_DM_STRONG_IN_OFF;
+    gpio_pin_config.hsiom               = uart_pin_config.rx_hsiom;
+    Cy_GPIO_Pin_Init(uart_pin_config.tx_port, uart_pin_config.tx_pin, &gpio_pin_config);
 
+    
+    g_stc_uart_config.uartMode          = CY_SCB_UART_STANDARD;
+    g_stc_uart_config.oversample        = 8;
+    g_stc_uart_config.dataWidth         = 9;
+    g_stc_uart_config.stopBits          = CY_SCB_UART_STOP_BITS_1;
+    g_stc_uart_config.parity            = CY_SCB_UART_PARITY_EVEN;
+    g_stc_uart_config.ctsPolarity       = CY_SCB_UART_ACTIVE_LOW;  
+    g_stc_uart_config.rtsPolarity       = CY_SCB_UART_ACTIVE_LOW;
+      
+    scb_module = get_scb_module(uart_n);
+   
+    Cy_SCB_UART_DeInit(scb_module);
+    Cy_SCB_UART_Init(scb_module, &g_stc_uart_config, &uart_context[uart_n]);
+    Cy_SCB_UART_Enable(scb_module);  
+    
+    Cy_SysClk_PeriphAssignDivider(uart_pin_config.uart_pclk, CY_SYSCLK_DIV_24_5_BIT, 2ul);
+    Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup(uart_pin_config.uart_pclk), CY_SYSCLK_DIV_24_5_BIT, 2ul, ((divSetting_fp5 & 0x1FFFFFE0ul) >> 5ul), (divSetting_fp5 & 0x0000001Ful));
+    Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup(uart_pin_config.uart_pclk), CY_SYSCLK_DIV_24_5_BIT, 2ul);
+    
+    cy_stc_sysint_irq_t                 stc_sysint_irq_cfg_uart;
+    stc_sysint_irq_cfg_uart.sysIntSrc = uart_pin_config.uart_irqn;
+    stc_sysint_irq_cfg_uart.intIdx    = UART_USE_ISR;
+    stc_sysint_irq_cfg_uart.isEnabled = true;
+    Cy_SysInt_InitIRQ(&stc_sysint_irq_cfg_uart);
+    Cy_SysInt_SetSystemIrqVector(stc_sysint_irq_cfg_uart.sysIntSrc, (cy_systemIntr_Handler)uart_isr_func[uart_n]);
+    NVIC_EnableIRQ(stc_sysint_irq_cfg_uart.intIdx);
+    
+    uart_rx_interrupt(uart_n, 0);
+    uart_tx_interrupt(uart_n, 0);
+}
 
 //-------------------------------------------------------------------------------------------------------------------
 //  函数简介      串口初始化
@@ -344,7 +408,7 @@ void uart_rx_interrupt (uart_index_enum uart_n, uint32 status)
 //  参数说明      baud            串口波特率
 //  参数说明      tx_pin          串口发送引脚
 //  参数说明      rx_pin          串口接收引脚
-//  返回参数      uint32          实际波特率
+//  返回参数      void
 //  使用示例      uart_init(UART_0, 115200, UART0_TX_P0_1, UART0_RX_P0_0);       // 初始化串口0 波特率115200 发送引脚使用 P0_1 接收引脚使用 P0_0
 //  备注信息
 //-------------------------------------------------------------------------------------------------------------------
@@ -403,6 +467,8 @@ void uart_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pin, ua
     uart_rx_interrupt(uart_n, 0);
     uart_tx_interrupt(uart_n, 0);
 }
+
+
 
 
 

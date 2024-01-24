@@ -328,7 +328,7 @@
                 <option>
                     <name>CMSISDAPResetList</name>
                     <version>1</version>
-                    <state>4</state>
+                    <state>7</state>
                 </option>
                 <option>
                     <name>CMSISDAPHWResetDuration</name>

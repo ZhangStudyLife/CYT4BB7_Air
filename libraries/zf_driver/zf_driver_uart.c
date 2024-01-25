@@ -343,10 +343,10 @@ void uart_rx_interrupt (uart_index_enum uart_n, uint32 status)
 //  参数说明      tx_pin          SBUS串口发送引脚
 //  参数说明      rx_pin          SBUS串口接收引脚
 //  返回参数      void
-//  使用示例      sbus_init(UART_4, 100000, UART4_TX_P14_1, UART4_RX_P14_0);       // 初始化串口4 波特率100000 发送引脚使用 14_1 接收引脚使用 P14_0
+//  使用示例      uart_sbus_init(UART_4, 100000, UART4_TX_P14_1, UART4_RX_P14_0);       // 初始化串口4 波特率100000 发送引脚使用 14_1 接收引脚使用 P14_0
 //  备注信息
 //-------------------------------------------------------------------------------------------------------------------
-void sbus_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pin, uart_rx_pin_enum rx_pin)
+void uart_sbus_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pin, uart_rx_pin_enum rx_pin)
 {
     // 醒醒，串口号和端口都不对应怎么能初始化呢？
 	

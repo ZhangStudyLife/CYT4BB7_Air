@@ -2305,6 +2305,12 @@
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_type.h</name>
         </file>
         <file>
+            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_uart_receiver.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_uart_receiver.h</name>
+        </file>
+        <file>
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_virtual_oscilloscope.c</name>
         </file>
         <file>

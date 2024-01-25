@@ -43,6 +43,8 @@ typedef enum
     TC_TIME2_CH0,
     TC_TIME2_CH1,
     TC_TIME2_CH2,
+    TC_TIME2_CH3,
+    TC_TIME2_CH4,
 }timer_index_enum;
 
 typedef enum

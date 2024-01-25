@@ -54,6 +54,7 @@ typedef enum
     WIRELESS_UART,                                                              // 无线串口
     BLUETOOTH_CH9141,                                                           // 蓝牙 CH9141
     WIFI_UART,                                                                  // 串口 WiFi
+    RECEIVER_UART,                                                              // SBUS遥控器接收
 }wireless_type_enum;
 
 typedef enum
@@ -70,7 +71,7 @@ typedef void (*callback_function)(void);
 
 extern wireless_type_enum   wireless_type;
 extern callback_function    wireless_module_uart_handler;                       // 无线串口接收中断函数指针，根据初始化时设置的函数进行跳转
-extern callback_function    wireless_module_spi_handler;                        // WIFI SPI GPIO中断函数指针，根据初始化时设置的函数进行跳转
+extern callback_function    uart_receiver_handler;                              // SBUS串口接收机中断函数指针，根据初始化时设置的函数进行跳转
 
 extern camera_type_enum     camera_type;
 extern callback_function    camera_dma_handler;                                 // 串口通讯中断函数指针，根据初始化时设置的函数进行跳转

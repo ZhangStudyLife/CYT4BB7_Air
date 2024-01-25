@@ -90,7 +90,7 @@ uint8   uart_query_byte                     (uart_index_enum uartn, uint8 *dat);
 void    uart_tx_interrupt                   (uart_index_enum uartn, uint32 status);
 void    uart_rx_interrupt                   (uart_index_enum uartn, uint32 status);
 
-void    sbus_init                           (uart_index_enum uartn, uint32 baud, uart_tx_pin_enum tx_pin, uart_rx_pin_enum rx_pin);
+void    uart_sbus_init                      (uart_index_enum uartn, uint32 baud, uart_tx_pin_enum tx_pin, uart_rx_pin_enum rx_pin);
 void    uart_init                           (uart_index_enum uartn, uint32 baud, uart_tx_pin_enum tx_pin, uart_rx_pin_enum rx_pin);
 //====================================================´®¿Ú »ù´¡º¯Êı====================================================
 

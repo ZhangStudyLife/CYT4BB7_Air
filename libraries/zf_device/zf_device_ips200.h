@@ -88,7 +88,7 @@
 #define IPS200_RST_PIN_SPI              (P22_4)                                 // 单排针(SPI)液晶复位引脚定义
 #define IPS200_DC_PIN_SPI               (P22_3)                                 // 单排针(SPI)液晶命令位引脚定义
 #define IPS200_CS_PIN_SPI               (P12_3)                                 // 单排针(SPI)液晶片选引脚定义
-#define IPS200_BLk_PIN_SPI              (P12_0)                                 // 单排针(SPI)液晶背光引脚定义
+#define IPS200_BLk_PIN_SPI              (P11_0)                                 // 单排针(SPI)液晶背光引脚定义
 
 // 如果使用的是双排排针的两寸屏幕 并口驱动控制引脚 可以修改
 #define IPS200_RD_PIN_PARALLEL8         (P12_2)                                 // 双排针(并口)液晶读取位引脚定义
@@ -96,7 +96,7 @@
 #define IPS200_RST_PIN_PARALLEL8        (P22_3)                                 // 双排针(并口)液晶复位引脚定义
 #define IPS200_RS_PIN_PARALLEL8         (P22_4)                                 // 双排针(并口)液晶命令位引脚定义
 #define IPS200_CS_PIN_PARALLEL8         (P12_3)                                 // 双排针(并口)液晶片选引脚定义
-#define IPS200_BL_PIN_PARALLEL8         (P12_0)                                 // 双排针(并口)液晶背光引脚定义
+#define IPS200_BL_PIN_PARALLEL8         (P11_0)                                 // 双排针(并口)液晶背光引脚定义
 //并口驱动数据引脚 可以修改 如果你的屏幕是双排排针 这里的引脚用得到。
 #define IPS200_D0_PIN_PARALLEL8         (P13_0)                                	// 双排针(并口)液晶数据引脚D0
 #define IPS200_D1_PIN_PARALLEL8         (P13_1)                                	// 双排针(并口)液晶数据引脚D1

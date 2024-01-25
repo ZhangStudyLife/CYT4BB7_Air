@@ -74,7 +74,7 @@
 #define TFT180_RES_PIN                  (P22_4)                                 // 液晶复位引脚定义
 #define TFT180_DC_PIN                   (P22_3)                                 // 液晶命令位引脚定义
 #define TFT180_CS_PIN                   (P12_3)                                 // CS 片选引脚
-#define TFT180_BL_PIN                   (P12_0)                                 // 液晶背光引脚定义
+#define TFT180_BL_PIN                   (P11_0)                                 // 液晶背光引脚定义
 
 #define TFT180_DEFAULT_DISPLAY_DIR      (TFT180_PORTAIT)                        // 默认的显示方向
 #define TFT180_DEFAULT_PENCOLOR         (RGB565_RED)                            // 默认的画笔颜色

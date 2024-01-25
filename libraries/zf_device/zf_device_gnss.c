@@ -235,7 +235,7 @@ static uint8 gps_gnrmc_parse (char *line, gnss_info_struct *gnss)
 
     state = buf[get_parameter_index(2, buf)];
 
-    if('A' == state)                                                            // 如果数据有效 则解析数据
+    if('A' == state || 'D' == state)                                                            // 如果数据有效 则解析数据
     {
         return_state = 1;
         gnss->state = 1;

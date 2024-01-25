@@ -1448,6 +1448,27 @@
             <group>
                 <name>cmsis</name>
                 <group>
+                    <name>dsp</name>
+                    <file>
+                        <name>$PROJ_DIR$\..\..\..\libraries\sdk\common\hdr\cmsis\dsp\arm_common_tables.h</name>
+                    </file>
+                    <file>
+                        <name>$PROJ_DIR$\..\..\..\libraries\sdk\common\hdr\cmsis\dsp\arm_const_structs.h</name>
+                    </file>
+                    <file>
+                        <name>$PROJ_DIR$\..\..\..\libraries\sdk\common\hdr\cmsis\dsp\arm_helium_utils.h</name>
+                    </file>
+                    <file>
+                        <name>$PROJ_DIR$\..\..\..\libraries\sdk\common\hdr\cmsis\dsp\arm_math.h</name>
+                    </file>
+                    <file>
+                        <name>$PROJ_DIR$\..\..\..\libraries\sdk\common\hdr\cmsis\dsp\arm_mve_tables.h</name>
+                    </file>
+                    <file>
+                        <name>$PROJ_DIR$\..\..\..\libraries\sdk\common\hdr\cmsis\dsp\arm_vec_math.h</name>
+                    </file>
+                </group>
+                <group>
                     <name>include</name>
                     <file>
                         <name>$PROJ_DIR$\..\..\..\libraries\sdk\common\hdr\cmsis\include\cachel1_armv7.h</name>

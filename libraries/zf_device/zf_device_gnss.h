@@ -52,12 +52,12 @@
 //引脚配置
 //--------------------------------------------------------------------------------------------------
 #define GNSS_UART           (UART_2)
-#define GNSS_RX             (UART2_TX_P10_1)                                      // GPS RX引脚连接到单片机此
-#define GNSS_TX             (UART2_RX_P10_0)                                      // GPS TX串口引脚
+#define GNSS_RX             (UART2_TX_P10_1)                                    // GPS RX引脚连接到单片机此
+#define GNSS_TX             (UART2_RX_P10_0)                                    // GPS TX串口引脚
 
-#define ANGLE_TO_RAD(x)     ( (x) * PI / 180.0 )                                // 角度转换为弧度
-#define RAD_TO_ANGLE(x)     ( (x) * 180.0 / PI )                                // 弧度转换为角度
-#define PI                  ( 3.1415926535898 )
+#define ANGLE_TO_RAD(x)     ( (x) * GNSS_PI / 180.0 )                           // 角度转换为弧度
+#define RAD_TO_ANGLE(x)     ( (x) * 180.0 / GNSS_PI )                           // 弧度转换为角度
+#define GNSS_PI             ( 3.1415926535898 )
 
 typedef enum
 {

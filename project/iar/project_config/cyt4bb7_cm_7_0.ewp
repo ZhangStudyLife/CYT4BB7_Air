@@ -367,6 +367,7 @@
                     <state>$PROJ_DIR$\..\..\..\libraries\sdk\tviibh4m\src\mw</state>
                     <state>$PROJ_DIR$\..\..\..\libraries\sdk\tviibh4m\src\drivers</state>
                     <state>$PROJ_DIR$\..\..\..\libraries\sdk\tviibh4m\src\system</state>
+                    <state>$PROJ_DIR$\..\..\..\libraries\sdk\common\hdr\cmsis\dsp</state>
                     <state>$PROJ_DIR$\..\..\..\libraries\zf_common</state>
                     <state>$PROJ_DIR$\..\..\..\libraries\zf_driver</state>
                     <state>$PROJ_DIR$\..\..\..\libraries\zf_device</state>
@@ -840,6 +841,7 @@
                     <name>IlinkAdditionalLibs</name>
                     <state>$PROJ_DIR$\..\..\..\libraries\sdk\tviibh4m\src\drivers\crypto\libs\libcrypto_server_cm0plus_iar.a</state>
                     <state>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_config.a</state>
+                    <state>$PROJ_DIR$\..\..\..\libraries\sdk\common\hdr\cmsis\dsp\iar_cortexM7lf_math.a</state>
                 </option>
                 <option>
                     <name>IlinkOverrideProgramEntryLabel</name>
@@ -1132,6 +1134,27 @@
             <name>hdr</name>
             <group>
                 <name>cmsis</name>
+                <group>
+                    <name>dsp</name>
+                    <file>
+                        <name>$PROJ_DIR$\..\..\..\libraries\sdk\common\hdr\cmsis\dsp\arm_common_tables.h</name>
+                    </file>
+                    <file>
+                        <name>$PROJ_DIR$\..\..\..\libraries\sdk\common\hdr\cmsis\dsp\arm_const_structs.h</name>
+                    </file>
+                    <file>
+                        <name>$PROJ_DIR$\..\..\..\libraries\sdk\common\hdr\cmsis\dsp\arm_helium_utils.h</name>
+                    </file>
+                    <file>
+                        <name>$PROJ_DIR$\..\..\..\libraries\sdk\common\hdr\cmsis\dsp\arm_math.h</name>
+                    </file>
+                    <file>
+                        <name>$PROJ_DIR$\..\..\..\libraries\sdk\common\hdr\cmsis\dsp\arm_mve_tables.h</name>
+                    </file>
+                    <file>
+                        <name>$PROJ_DIR$\..\..\..\libraries\sdk\common\hdr\cmsis\dsp\arm_vec_math.h</name>
+                    </file>
+                </group>
                 <group>
                     <name>include</name>
                     <file>

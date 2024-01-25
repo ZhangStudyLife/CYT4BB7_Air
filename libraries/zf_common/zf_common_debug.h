@@ -100,6 +100,7 @@ void    debug_assert_handler           (uint8 pass, char *file, int line);
 void    debug_log_handler              (uint8 pass, char *str, char *file, int line);
 void    debug_output_struct_init       (debug_output_struct *info);
 void    debug_output_init              (debug_output_struct *info);
+void    debug_info_init                (void);
 void    debug_init                     (void);
 
 #endif

@@ -42,21 +42,16 @@
 // 本例程是开源库空工程 
 // 本例程是开源库空工程 
 
-// M0未添加外设模块层，如有需要可自行添加
-// M0未添加外设模块层，如有需要可自行添加
-// M0未添加外设模块层，如有需要可自行添加
-
 int main(void)
 {
     __enable_irq();
-    SystemInit();               // 系统初始化 对系统时钟、系统电源进行配置
+    SystemInit();                                                       // 系统初始化 对系统时钟、系统电源进行配置
+    debug_init();			                                // 初始化默认调试串口
     Cy_SysEnableApplCore(CORE_CM7_0, CY_CORTEX_M7_0_APPL_ADDR);         // 启动M7核心0
     Cy_SysEnableApplCore(CORE_CM7_1, CY_CORTEX_M7_1_APPL_ADDR);         // 启动M7核心1
     // 此处编写用户初始化代码 
 
-    // M0主要功能为“引导M7双核心启动” 不建议M0用于跑代码
-    // M0主要功能为“引导M7双核心启动” 不建议M0用于跑代码
-    // M0主要功能为“引导M7双核心启动” 不建议M0用于跑代码
+
     
     
     

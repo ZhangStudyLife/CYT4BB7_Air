@@ -427,6 +427,22 @@ void debug_output_init (debug_output_struct *info)
 }
 
 //-------------------------------------------------------------------------------------------------------------------
+// 函数简介     debug 串口信息初始化
+// 参数说明     void
+// 返回参数     void
+// 使用示例     debug_info_init();
+// 备注信息     由于4BB7的工程独立 变量也是独立的 所以需要单独初始化debug串口信息
+//-------------------------------------------------------------------------------------------------------------------
+void debug_info_init(void)
+{
+    debug_output_struct info;                   // 声明调试信息结构体
+    debug_output_struct_init(&info);            // 初始化断言调试信息
+    info.output_uart = debug_uart_str_output;   // 配置断言输出串口
+    debug_output_init(&info);
+}
+
+
+//-------------------------------------------------------------------------------------------------------------------
 // 函数简介     debug 串口初始化
 // 参数说明     void
 // 返回参数     void
@@ -435,10 +451,7 @@ void debug_output_init (debug_output_struct *info)
 //-------------------------------------------------------------------------------------------------------------------
 void debug_init (void)
 {
-    debug_output_struct info;                   // 声明调试信息结构体
-    debug_output_struct_init(&info);            // 初始化断言调试信息
-    info.output_uart = debug_uart_str_output;   // 配置断言输出串口
-    debug_output_init(&info);
+    debug_info_init();                          // debug 串口信息初始化
 
     uart_init(DEBUG_UART_INDEX,                 // 在 zf_common_debug.h 中查看对应值
               DEBUG_UART_BAUDRATE,              // 在 zf_common_debug.h 中查看对应值

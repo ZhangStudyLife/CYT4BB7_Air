@@ -35,7 +35,6 @@
 
 #include "sysclk/cy_sysclk.h"
 #include "tcpwm/cy_tcpwm_pwm.h"
-#include "sysint/cy_sysint.h"
 #include "zf_common_interrupt.h"
 #include "zf_driver_pit.h"
 
@@ -117,11 +116,7 @@ void pit_init (pit_index_enum pit_index, uint32 time)
     irq_cfg.sysIntSrc  = (cy_en_intr_t)((uint32)tcpwm_0_interrupts_512_IRQn + (uint32)pit_index); 
     irq_cfg.intIdx     = PIT_USE_ISR                                    ;
     irq_cfg.isEnabled  = true                                          ;
-    Cy_SysInt_InitIRQ(&irq_cfg);
-    Cy_SysInt_SetSystemIrqVector(irq_cfg.sysIntSrc, pit_isr_func[pit_index]);
-    NVIC_SetPriority(irq_cfg.intIdx, 3u);
-    NVIC_ClearPendingIRQ(irq_cfg.intIdx);
-    NVIC_EnableIRQ(irq_cfg.intIdx);
+    interrupt_init(&irq_cfg, pit_isr_func[pit_index], 3)                ;
     
     pit_config.period             = time * 8                           ;        // pit周期计算：时钟为8M 则计数8为1us
     pit_config.clockPrescaler     = CY_TCPWM_PRESCALER_DIVBY_1         ;

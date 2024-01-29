@@ -34,7 +34,7 @@
 ********************************************************************************************************************/
 
 #include "gpio/cy_gpio.h"
-#include "sysint/cy_sysint.h"
+#include "zf_common_interrupt.h"
 #include "zf_common_debug.h"
 #include "zf_driver_exti.h"
 
@@ -151,9 +151,5 @@ void exti_init (gpio_pin_enum exti_pin, exti_trigger_enum trigger)
     exti_irq_cfg.sysIntSrc  = (cy_en_intr_t)(ioss_interrupts_gpio_dpslp_0_IRQn + exti_pin / 8);
     exti_irq_cfg.intIdx     = EXTI_USE_ISR;
     exti_irq_cfg.isEnabled  = true;
-    
-    Cy_SysInt_InitIRQ(&exti_irq_cfg);
-    Cy_SysInt_SetSystemIrqVector(exti_irq_cfg.sysIntSrc, exti_isr_func[exti_pin / 8]);
-    NVIC_SetPriority(exti_irq_cfg.intIdx, 3ul);
-    NVIC_EnableIRQ(exti_irq_cfg.intIdx);
+    interrupt_init(&exti_irq_cfg, exti_isr_func[exti_pin / 8], 3)                ;
 }

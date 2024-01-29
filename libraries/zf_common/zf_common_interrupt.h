@@ -31,16 +31,20 @@
 * 修改记录
 * 日期              作者                备注
 * 2024-1-4       pudding            first version
+* 2024-1-29      pudding            新增中断优先级配置函数 封装中断初始化函数
 ********************************************************************************************************************/
 
 #ifndef _zf_common_interrupt_h_
 #define _zf_common_interrupt_h_
 
+#include "sysint/cy_sysint.h"
 #include "zf_common_typedef.h"
 
-void   interrupt_global_enable (uint32 primask);    // 全局中断使能
-uint32 interrupt_global_disable (void);             // 全局中断失能
-void   assert_interrupt_config  (void);             // 断言中断配置
+void   interrupt_global_enable  (uint32 primask);    // 全局中断使能
+uint32 interrupt_global_disable  (void);             // 全局中断失能
+void   assert_interrupt_config  (void);              // 断言中断配置
+void   interrupt_set_priority   (IRQn_Type irqn, uint8 priority);               // 中断优先级配置
+void   interrupt_init           (cy_stc_sysint_irq_t *isr_config, cy_systemIntr_Handler user_isr_func, uint8 priority); // 中断初始化函数
 
 #endif
 

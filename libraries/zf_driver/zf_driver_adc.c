@@ -31,6 +31,7 @@
 * 修改记录
 * 日期              作者                备注
 * 2024-1-8       pudding            first version
+* 2024-1-29      pudding            优化提高采集速度 单次采集时间0.525us左右
 ********************************************************************************************************************/
 
 #include "sysclk/cy_sysclk.h"
@@ -46,7 +47,7 @@
 #define DIV_ROUND_UP(a,b)                       (((a) + (b)/2) / (b))           // 分配系数计算 向上取整
 
 static vuint8 adc_resolution[ADC_CHANNEL_NUM];
-
+static volatile stc_PASS_SAR_t* sar_adc[3] = {PASS0_SAR0, PASS0_SAR1, PASS0_SAR2};
 
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     ADC 端口号获取
@@ -126,21 +127,15 @@ static gpio_pin_enum get_adc_pin(adc_channel_enum vadc_chn)
 uint16 adc_convert (adc_channel_enum adc_chn)
 {
     uint8 offset_temp;
-    volatile stc_PASS_SAR_t* sar_adc;
-    cy_stc_adc_ch_status_t adc_ch_status;
+    uint8 adc_port      = adc_chn / 32;
+    uint8 adc_channel   = adc_chn % 32;
     uint16 adc_data;
     
-    switch(adc_chn / 32)
-    {
-        case 0: sar_adc = PASS0_SAR0; break;
-        case 1: sar_adc = PASS0_SAR1; break;
-        case 2: sar_adc = PASS0_SAR2; break;
-        default: zf_assert(0); break;
-    }
-    
     offset_temp = 4 - (adc_resolution[adc_chn] * 2);
-    Cy_Adc_Channel_SoftwareTrigger(&sar_adc->CH[adc_chn % 32]);
-    Cy_Adc_Channel_GetResult(&sar_adc->CH[adc_chn % 32], &adc_data, &adc_ch_status);
+    
+    sar_adc[adc_port]->CH[adc_channel].unTR_CMD.stcField.u1START = 1ul;
+    
+    adc_data = sar_adc[adc_port]->CH[adc_channel].unRESULT.stcField.u16RESULT;
     
     adc_data = adc_data >> offset_temp;
     
@@ -192,23 +187,15 @@ void adc_init (adc_channel_enum adc_chn, adc_resolution_enum resolution)
     cy_stc_adc_config_t adc_config              = {0};
     adc_resolution[adc_chn]                     = resolution;
     cy_stc_adc_channel_config_t adc_channel_config;
-    volatile stc_PASS_SAR_t* sar_adc;
     
-    switch(adc_chn / 32)
-    {
-        case 0: sar_adc         = PASS0_SAR0; break;
-        case 1: sar_adc         = PASS0_SAR1; break;
-        case 2: sar_adc         = PASS0_SAR2; break;
-        default: zf_assert(0); break;
-    }
-    
-    Cy_Adc_Channel_DeInit(&sar_adc->CH[adc_chn % 32]);
+    Cy_Adc_Channel_DeInit(&sar_adc[adc_chn / 32]->CH[adc_chn % 32]);
     
     adc_pin_config.driveMode    = CY_GPIO_DM_ANALOG;
     Cy_GPIO_Pin_Init(get_port(get_adc_pin(adc_chn)), (get_adc_pin(adc_chn) % 8), &adc_pin_config);
     
     div_num = DIV_ROUND_UP(ADC_FREQ, ADC_OPERATION_FREQUENCY_MAX_IN_HZ);
     actual_adc_operation_freq = ADC_FREQ / div_num;
+    
     Cy_SysClk_PeriphAssignDivider((en_clk_dst_t)((adc_chn / 32) + PCLK_PASS0_CLOCK_SAR0), CY_SYSCLK_DIV_16_BIT, 0u);
     Cy_SysClk_PeriphSetDivider(Cy_SysClk_GetClockGroup((en_clk_dst_t)((adc_chn / 32) + PCLK_PASS0_CLOCK_SAR0)), CY_SYSCLK_DIV_16_BIT, 0u, (div_num - 1));
     Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup((en_clk_dst_t)((adc_chn / 32) + PCLK_PASS0_CLOCK_SAR0)), CY_SYSCLK_DIV_16_BIT, 0u);
@@ -217,7 +204,7 @@ void adc_init (adc_channel_enum adc_chn, adc_resolution_enum resolution)
     adc_config.sarMuxEnable             = true;
     adc_config.adcEnable                = true;
     adc_config.sarIpEnable              = true;
-    Cy_Adc_Init(sar_adc, &adc_config);
+    Cy_Adc_Init(sar_adc[adc_chn / 32], &adc_config);
     
     sampling_cycle = (uint32_t)DIV_ROUND_UP((ANALOG_IN_SAMPLING_TIME_MIN_IN_NS * (uint64_t)actual_adc_operation_freq), 1000000000ul);
     
@@ -228,8 +215,8 @@ void adc_init (adc_channel_enum adc_chn, adc_resolution_enum resolution)
     adc_channel_config.sampleTime       = sampling_cycle;
     adc_channel_config.isGroupEnd       = true;
     adc_channel_config.mask.grpDone     = true;
-    Cy_Adc_Channel_Init(&sar_adc->CH[adc_chn % 32], &adc_channel_config);
-    Cy_Adc_Channel_Enable(&sar_adc->CH[adc_chn % 32]);
-    Cy_Adc_Channel_SoftwareTrigger(&sar_adc->CH[adc_chn % 32]);
+    Cy_Adc_Channel_Init(&sar_adc[adc_chn / 32]->CH[adc_chn % 32], &adc_channel_config);
+    Cy_Adc_Channel_Enable(&sar_adc[adc_chn / 32]->CH[adc_chn % 32]);
+    Cy_Adc_Channel_SoftwareTrigger(&sar_adc[adc_chn / 32]->CH[adc_chn % 32]);
 }
 

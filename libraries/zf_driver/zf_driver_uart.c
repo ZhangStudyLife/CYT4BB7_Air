@@ -35,8 +35,8 @@
 
 #include "system/system_cyt4bb.h"
 #include "sysclk/cy_sysclk.h"
-#include "sysint/cy_sysint.h"
 #include "gpio/cy_gpio.h"
+#include "zf_common_interrupt.h"
 #include "zf_common_debug.h"
 #include "zf_driver_gpio.h"
 #include "zf_driver_uart.h"
@@ -456,13 +456,11 @@ void uart_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pin, ua
     Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup(uart_pin_config.uart_pclk), CY_SYSCLK_DIV_24_5_BIT, 0ul, ((divSetting_fp5 & 0x1FFFFFE0ul) >> 5ul), (divSetting_fp5 & 0x0000001Ful));
     Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup(uart_pin_config.uart_pclk), CY_SYSCLK_DIV_24_5_BIT, 0ul);
     
-    cy_stc_sysint_irq_t                 stc_sysint_irq_cfg_uart;
-    stc_sysint_irq_cfg_uart.sysIntSrc = uart_pin_config.uart_irqn;
-    stc_sysint_irq_cfg_uart.intIdx    = UART_USE_ISR;
-    stc_sysint_irq_cfg_uart.isEnabled = true;
-    Cy_SysInt_InitIRQ(&stc_sysint_irq_cfg_uart);
-    Cy_SysInt_SetSystemIrqVector(stc_sysint_irq_cfg_uart.sysIntSrc, (cy_systemIntr_Handler)uart_isr_func[uart_n]);
-    NVIC_EnableIRQ(stc_sysint_irq_cfg_uart.intIdx);
+    cy_stc_sysint_irq_t                 uart_irq_cfg;
+    uart_irq_cfg.sysIntSrc = uart_pin_config.uart_irqn;
+    uart_irq_cfg.intIdx    = UART_USE_ISR;
+    uart_irq_cfg.isEnabled = true;
+    interrupt_init(&uart_irq_cfg, uart_isr_func[uart_n], 7);
     
     uart_rx_interrupt(uart_n, 0);
     uart_tx_interrupt(uart_n, 0);

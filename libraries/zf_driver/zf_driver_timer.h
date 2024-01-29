@@ -43,14 +43,12 @@ typedef enum
     TC_TIME2_CH0,
     TC_TIME2_CH1,
     TC_TIME2_CH2,
-    TC_TIME2_CH3,
-    TC_TIME2_CH4,
 }timer_index_enum;
 
 typedef enum
 {
-    TIMER_US,                                                                   // 微秒计时 最大 65535
-    TIMER_MS,                                                                   // 毫秒计时 最大 65535
+    TIMER_US,                                                                   // 微秒计时 最大 4294967296
+    TIMER_MS,                                                                   // 毫秒计时 最大 4294967296
 }timer_mode_enum;
 
 

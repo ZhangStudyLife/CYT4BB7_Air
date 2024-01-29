@@ -31,6 +31,7 @@
 * 修改记录
 * 日期              作者                备注
 * 2024-1-4       pudding            first version
+* 2024-1-29      pudding            新增中断优先级配置函数 封装中断初始化函数
 ********************************************************************************************************************/
 
 #include "cmsis_compiler.h"
@@ -81,3 +82,35 @@ void assert_interrupt_config (void)
     interrupt_global_disable();                 // 全局中断失能
     pwm_all_channel_close();                    // 关闭PWM所有通道输出
 }
+
+//-------------------------------------------------------------------------------------------------------------------
+// 函数简介     指定中断设置优先级
+// 参数说明     irqn            指定中断号 可查看 isr.c 对应中断服务函数的标注
+// 参数说明     priority        中断优先级 0-7 越低越高
+// 返回参数     void
+// 使用示例     interrupt_set_priority(CPUIntIdx0_IRQn, 0);
+// 备注信息     
+//-------------------------------------------------------------------------------------------------------------------
+void interrupt_set_priority (IRQn_Type irqn, uint8 priority)
+{
+    NVIC_SetPriority(irqn, priority);
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+// 函数简介     中断组初始化
+// 参数说明     isr_config          中断配置参数结构体
+// 参数说明     user_isr_func       中断回调函数
+// 参数说明     priority            中断优先级
+// 返回参数     void        
+// 使用示例     interrupt_init(&irq_cfg, pit_isr_func[pit_index], 3);
+// 备注信息     
+//-------------------------------------------------------------------------------------------------------------------
+void interrupt_init (cy_stc_sysint_irq_t *isr_config, cy_systemIntr_Handler user_isr_func, uint8 priority)
+{
+    Cy_SysInt_InitIRQ(isr_config);
+    Cy_SysInt_SetSystemIrqVector(isr_config->sysIntSrc, user_isr_func);
+    interrupt_set_priority(isr_config->intIdx, priority);
+    NVIC_ClearPendingIRQ(isr_config->intIdx);
+    NVIC_EnableIRQ(isr_config->intIdx);
+}
+

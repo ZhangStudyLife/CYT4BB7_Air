@@ -50,7 +50,7 @@
 //-------------------------------------------------------------------------------------------------------------------
 //  函数简介     获取端口参数
 //  返回参数     gpio_pin_enum
-//  使用示例     get_pwm_pin(TCPWM_CH0_P3_1);
+//  使用示例     get_pwm_pin(TCPWM_CH00_P03_1);
 //  备注信息     内部调用
 //-------------------------------------------------------------------------------------------------------------------
 static gpio_pin_enum get_pwm_pin (pwm_channel_enum pwm_channel)
@@ -59,41 +59,41 @@ static gpio_pin_enum get_pwm_pin (pwm_channel_enum pwm_channel)
 
     switch(pwm_channel)
     {
-        case TCPWM_CH0_P3_1   : pwm_pin = P03_1;   break;
-        case TCPWM_CH0_P6_1   : pwm_pin = P06_1;   break;
-        case TCPWM_CH1_P3_0   : pwm_pin = P03_0;   break;
-        case TCPWM_CH1_P6_3   : pwm_pin = P06_3;   break;
-        case TCPWM_CH2_P6_5   : pwm_pin = P06_5;   break;
-        case TCPWM_CH3_P2_4   : pwm_pin = P02_4;   break;
-        case TCPWM_CH3_P6_7   : pwm_pin = P06_7;   break;
-        case TCPWM_CH4_P2_3   : pwm_pin = P02_3;   break;
-        case TCPWM_CH4_P4_0   : pwm_pin = P04_0;   break;
-        case TCPWM_CH5_P2_2   : pwm_pin = P02_2;   break;
-        case TCPWM_CH5_P4_1   : pwm_pin = P04_1;   break;
-        case TCPWM_CH6_P2_1   : pwm_pin = P02_1;   break;
-        case TCPWM_CH7_P2_0   : pwm_pin = P02_0;   break;
-        case TCPWM_CH9_P5_0   : pwm_pin = P05_0;   break;
-        case TCPWM_CH10_P5_1  : pwm_pin = P05_1;   break;
-        case TCPWM_CH11_P5_2  : pwm_pin = P05_2;   break;
-        case TCPWM_CH11_P1_1  : pwm_pin = P01_1;   break;
-        case TCPWM_CH12_P5_3  : pwm_pin = P05_3;   break;
-        case TCPWM_CH12_P1_0  : pwm_pin = P01_0;   break;
-        case TCPWM_CH13_P5_4  : pwm_pin = P05_4;   break;
-        case TCPWM_CH13_P0_3  : pwm_pin = P00_3;   break;
-        case TCPWM_CH14_P0_2  : pwm_pin = P00_2;   break;
-        case TCPWM_CH15_P7_1  : pwm_pin = P07_1;   break;
-        case TCPWM_CH16_P7_3  : pwm_pin = P07_3;   break;
-        case TCPWM_CH17_P7_5  : pwm_pin = P07_5;   break;
-        case TCPWM_CH17_P0_1  : pwm_pin = P00_1;   break;
-        case TCPWM_CH18_P7_7  : pwm_pin = P07_7;   break;
-        case TCPWM_CH18_P0_0  : pwm_pin = P00_0;   break;
-        case TCPWM_CH19_P8_0  : pwm_pin = P08_0;   break;
-        case TCPWM_CH20_P8_1  : pwm_pin = P08_1;   break;
-        case TCPWM_CH21_P8_2  : pwm_pin = P08_2;   break;
-        case TCPWM_CH22_P8_3  : pwm_pin = P08_3;   break;
+        case TCPWM_CH00_P03_1 : pwm_pin = P03_1;   break;
+        case TCPWM_CH00_P06_1 : pwm_pin = P06_1;   break;
+        case TCPWM_CH01_P03_0 : pwm_pin = P03_0;   break;
+        case TCPWM_CH01_P06_3 : pwm_pin = P06_3;   break;
+        case TCPWM_CH02_P06_5 : pwm_pin = P06_5;   break;
+        case TCPWM_CH03_P02_4 : pwm_pin = P02_4;   break;
+        case TCPWM_CH03_P06_7 : pwm_pin = P06_7;   break;
+        case TCPWM_CH04_P02_3 : pwm_pin = P02_3;   break;
+        case TCPWM_CH04_P04_0 : pwm_pin = P04_0;   break;
+        case TCPWM_CH05_P02_2 : pwm_pin = P02_2;   break;
+        case TCPWM_CH05_P04_1 : pwm_pin = P04_1;   break;
+        case TCPWM_CH06_P02_1 : pwm_pin = P02_1;   break;
+        case TCPWM_CH07_P02_0 : pwm_pin = P02_0;   break;
+        case TCPWM_CH09_P05_0 : pwm_pin = P05_0;   break;
+        case TCPWM_CH10_P05_1 : pwm_pin = P05_1;   break;
+        case TCPWM_CH11_P05_2 : pwm_pin = P05_2;   break;
+        case TCPWM_CH11_P01_1 : pwm_pin = P01_1;   break;
+        case TCPWM_CH12_P05_3 : pwm_pin = P05_3;   break;
+        case TCPWM_CH12_P01_0 : pwm_pin = P01_0;   break;
+        case TCPWM_CH13_P05_4 : pwm_pin = P05_4;   break;
+        case TCPWM_CH13_P00_3 : pwm_pin = P00_3;   break;
+        case TCPWM_CH14_P00_2 : pwm_pin = P00_2;   break;
+        case TCPWM_CH15_P07_1 : pwm_pin = P07_1;   break;
+        case TCPWM_CH16_P07_3 : pwm_pin = P07_3;   break;
+        case TCPWM_CH17_P07_5 : pwm_pin = P07_5;   break;
+        case TCPWM_CH17_P00_1 : pwm_pin = P00_1;   break;
+        case TCPWM_CH18_P07_7 : pwm_pin = P07_7;   break;
+        case TCPWM_CH18_P00_0 : pwm_pin = P00_0;   break;
+        case TCPWM_CH19_P08_0 : pwm_pin = P08_0;   break;
+        case TCPWM_CH20_P08_1 : pwm_pin = P08_1;   break;
+        case TCPWM_CH21_P08_2 : pwm_pin = P08_2;   break;
+        case TCPWM_CH22_P08_3 : pwm_pin = P08_3;   break;
         case TCPWM_CH22_P23_7 : pwm_pin = P23_7;   break;
-        case TCPWM_CH24_P9_0  : pwm_pin = P09_0;   break;
-        case TCPWM_CH25_P9_1  : pwm_pin = P09_1;   break;
+        case TCPWM_CH24_P09_0 : pwm_pin = P09_0;   break;
+        case TCPWM_CH25_P09_1 : pwm_pin = P09_1;   break;
         case TCPWM_CH25_P23_4 : pwm_pin = P23_4;   break;
         case TCPWM_CH26_P19_1 : pwm_pin = P19_1;   break;
         case TCPWM_CH27_P19_2 : pwm_pin = P19_2;   break;
@@ -161,7 +161,7 @@ static gpio_pin_enum get_pwm_pin (pwm_channel_enum pwm_channel)
 //-------------------------------------------------------------------------------------------------------------------
 //  函数简介     获取端口参数
 //  返回参数     gpio_pin_enum
-//  使用示例     get_pwm_pin(TCPWM_CH0_P3_1);
+//  使用示例     get_pwm_pin(TCPWM_CH00_P03_1);
 //  备注信息     内部调用
 //-------------------------------------------------------------------------------------------------------------------
 static en_hsiom_sel_t get_pwm_pin_hsiom (pwm_channel_enum pwm_channel)
@@ -170,41 +170,41 @@ static en_hsiom_sel_t get_pwm_pin_hsiom (pwm_channel_enum pwm_channel)
 
     switch(pwm_channel)
     {
-        case TCPWM_CH0_P3_1   : pin_hsiom = P3_1_TCPWM0_LINE0;     break;
-        case TCPWM_CH0_P6_1   : pin_hsiom = P6_1_TCPWM0_LINE0;     break;
-        case TCPWM_CH1_P3_0   : pin_hsiom = P3_0_TCPWM0_LINE1;     break;
-        case TCPWM_CH1_P6_3   : pin_hsiom = P6_3_TCPWM0_LINE1;     break;
-        case TCPWM_CH2_P6_5   : pin_hsiom = P6_5_TCPWM0_LINE2;     break;
-        case TCPWM_CH3_P2_4   : pin_hsiom = P2_4_TCPWM0_LINE3;     break;
-        case TCPWM_CH3_P6_7   : pin_hsiom = P6_7_TCPWM0_LINE3;     break;
-        case TCPWM_CH4_P2_3   : pin_hsiom = P2_3_TCPWM0_LINE4;     break;
-        case TCPWM_CH4_P4_0   : pin_hsiom = P4_0_TCPWM0_LINE4;     break;
-        case TCPWM_CH5_P2_2   : pin_hsiom = P2_2_TCPWM0_LINE5;     break;
-        case TCPWM_CH5_P4_1   : pin_hsiom = P4_1_TCPWM0_LINE5;     break;
-        case TCPWM_CH6_P2_1   : pin_hsiom = P2_1_TCPWM0_LINE6;     break;
-        case TCPWM_CH7_P2_0   : pin_hsiom = P2_0_TCPWM0_LINE7;     break;
-        case TCPWM_CH9_P5_0   : pin_hsiom = P5_0_TCPWM0_LINE9;     break;
-        case TCPWM_CH10_P5_1  : pin_hsiom = P5_1_TCPWM0_LINE10;    break;
-        case TCPWM_CH11_P5_2  : pin_hsiom = P5_2_TCPWM0_LINE11;    break;
-        case TCPWM_CH11_P1_1  : pin_hsiom = P1_1_TCPWM0_LINE11;    break;
-        case TCPWM_CH12_P5_3  : pin_hsiom = P5_3_TCPWM0_LINE12;    break;
-        case TCPWM_CH12_P1_0  : pin_hsiom = P1_0_TCPWM0_LINE12;    break;
-        case TCPWM_CH13_P5_4  : pin_hsiom = P5_4_TCPWM0_LINE13;    break;
-        case TCPWM_CH13_P0_3  : pin_hsiom = P0_3_TCPWM0_LINE13;    break;
-        case TCPWM_CH14_P0_2  : pin_hsiom = P0_2_TCPWM0_LINE14;    break;
-        case TCPWM_CH15_P7_1  : pin_hsiom = P7_1_TCPWM0_LINE15;    break;
-        case TCPWM_CH16_P7_3  : pin_hsiom = P7_3_TCPWM0_LINE16;    break;
-        case TCPWM_CH17_P7_5  : pin_hsiom = P7_5_TCPWM0_LINE17;    break;
-        case TCPWM_CH17_P0_1  : pin_hsiom = P0_1_TCPWM0_LINE17;    break;
-        case TCPWM_CH18_P7_7  : pin_hsiom = P7_7_TCPWM0_LINE18;    break;
-        case TCPWM_CH18_P0_0  : pin_hsiom = P0_0_TCPWM0_LINE18;    break;
-        case TCPWM_CH19_P8_0  : pin_hsiom = P8_0_TCPWM0_LINE19;    break;
-        case TCPWM_CH20_P8_1  : pin_hsiom = P8_1_TCPWM0_LINE20;    break;
-        case TCPWM_CH21_P8_2  : pin_hsiom = P8_2_TCPWM0_LINE21;    break;
-        case TCPWM_CH22_P8_3  : pin_hsiom = P8_3_TCPWM0_LINE22;    break;
+        case TCPWM_CH00_P03_1 : pin_hsiom = P3_1_TCPWM0_LINE0;     break;
+        case TCPWM_CH00_P06_1 : pin_hsiom = P6_1_TCPWM0_LINE0;     break;
+        case TCPWM_CH01_P03_0 : pin_hsiom = P3_0_TCPWM0_LINE1;     break;
+        case TCPWM_CH01_P06_3 : pin_hsiom = P6_3_TCPWM0_LINE1;     break;
+        case TCPWM_CH02_P06_5 : pin_hsiom = P6_5_TCPWM0_LINE2;     break;
+        case TCPWM_CH03_P02_4 : pin_hsiom = P2_4_TCPWM0_LINE3;     break;
+        case TCPWM_CH03_P06_7 : pin_hsiom = P6_7_TCPWM0_LINE3;     break;
+        case TCPWM_CH04_P02_3 : pin_hsiom = P2_3_TCPWM0_LINE4;     break;
+        case TCPWM_CH04_P04_0 : pin_hsiom = P4_0_TCPWM0_LINE4;     break;
+        case TCPWM_CH05_P02_2 : pin_hsiom = P2_2_TCPWM0_LINE5;     break;
+        case TCPWM_CH05_P04_1 : pin_hsiom = P4_1_TCPWM0_LINE5;     break;
+        case TCPWM_CH06_P02_1 : pin_hsiom = P2_1_TCPWM0_LINE6;     break;
+        case TCPWM_CH07_P02_0 : pin_hsiom = P2_0_TCPWM0_LINE7;     break;
+        case TCPWM_CH09_P05_0 : pin_hsiom = P5_0_TCPWM0_LINE9;     break;
+        case TCPWM_CH10_P05_1 : pin_hsiom = P5_1_TCPWM0_LINE10;    break;
+        case TCPWM_CH11_P05_2 : pin_hsiom = P5_2_TCPWM0_LINE11;    break;
+        case TCPWM_CH11_P01_1 : pin_hsiom = P1_1_TCPWM0_LINE11;    break;
+        case TCPWM_CH12_P05_3 : pin_hsiom = P5_3_TCPWM0_LINE12;    break;
+        case TCPWM_CH12_P01_0 : pin_hsiom = P1_0_TCPWM0_LINE12;    break;
+        case TCPWM_CH13_P05_4 : pin_hsiom = P5_4_TCPWM0_LINE13;    break;
+        case TCPWM_CH13_P00_3 : pin_hsiom = P0_3_TCPWM0_LINE13;    break;
+        case TCPWM_CH14_P00_2 : pin_hsiom = P0_2_TCPWM0_LINE14;    break;
+        case TCPWM_CH15_P07_1 : pin_hsiom = P7_1_TCPWM0_LINE15;    break;
+        case TCPWM_CH16_P07_3 : pin_hsiom = P7_3_TCPWM0_LINE16;    break;
+        case TCPWM_CH17_P07_5 : pin_hsiom = P7_5_TCPWM0_LINE17;    break;
+        case TCPWM_CH17_P00_1 : pin_hsiom = P0_1_TCPWM0_LINE17;    break;
+        case TCPWM_CH18_P07_7 : pin_hsiom = P7_7_TCPWM0_LINE18;    break;
+        case TCPWM_CH18_P00_0 : pin_hsiom = P0_0_TCPWM0_LINE18;    break;
+        case TCPWM_CH19_P08_0 : pin_hsiom = P8_0_TCPWM0_LINE19;    break;
+        case TCPWM_CH20_P08_1 : pin_hsiom = P8_1_TCPWM0_LINE20;    break;
+        case TCPWM_CH21_P08_2 : pin_hsiom = P8_2_TCPWM0_LINE21;    break;
+        case TCPWM_CH22_P08_3 : pin_hsiom = P8_3_TCPWM0_LINE22;    break;
         case TCPWM_CH22_P23_7 : pin_hsiom = P23_7_TCPWM0_LINE22;   break;
-        case TCPWM_CH24_P9_0  : pin_hsiom = P9_0_TCPWM0_LINE24;    break;
-        case TCPWM_CH25_P9_1  : pin_hsiom = P9_1_TCPWM0_LINE25;    break;
+        case TCPWM_CH24_P09_0 : pin_hsiom = P9_0_TCPWM0_LINE24;    break;
+        case TCPWM_CH25_P09_1 : pin_hsiom = P9_1_TCPWM0_LINE25;    break;
         case TCPWM_CH25_P23_4 : pin_hsiom = P23_4_TCPWM0_LINE25;   break;
         case TCPWM_CH26_P19_1 : pin_hsiom = P19_1_TCPWM0_LINE26;   break;
         case TCPWM_CH27_P19_2 : pin_hsiom = P19_2_TCPWM0_LINE27;   break;
@@ -272,7 +272,7 @@ static en_hsiom_sel_t get_pwm_pin_hsiom (pwm_channel_enum pwm_channel)
 //-------------------------------------------------------------------------------------------------------------------
 //  函数简介     获取端口通道号
 //  返回参数     cyhal_gpio_t
-//  使用示例     get_pwm_pin(TCPWM_CH0_P3_1);
+//  使用示例     get_pwm_pin(TCPWM_CH00_P03_1);
 //  备注信息     内部调用
 //-------------------------------------------------------------------------------------------------------------------
 static uint8 get_pwm_ch (pwm_channel_enum pwm_channel)
@@ -281,41 +281,41 @@ static uint8 get_pwm_ch (pwm_channel_enum pwm_channel)
 
     switch(pwm_channel)
     {
-        case TCPWM_CH0_P3_1   : pwm_ch = 0 ;   break;
-        case TCPWM_CH0_P6_1   : pwm_ch = 0 ;   break;
-        case TCPWM_CH1_P3_0   : pwm_ch = 1 ;   break;
-        case TCPWM_CH1_P6_3   : pwm_ch = 1 ;   break;
-        case TCPWM_CH2_P6_5   : pwm_ch = 2 ;   break;
-        case TCPWM_CH3_P2_4   : pwm_ch = 3 ;   break;
-        case TCPWM_CH3_P6_7   : pwm_ch = 3 ;   break;
-        case TCPWM_CH4_P2_3   : pwm_ch = 4 ;   break;
-        case TCPWM_CH4_P4_0   : pwm_ch = 4 ;   break;
-        case TCPWM_CH5_P2_2   : pwm_ch = 5 ;   break;
-        case TCPWM_CH5_P4_1   : pwm_ch = 5 ;   break;
-        case TCPWM_CH6_P2_1   : pwm_ch = 6 ;   break;
-        case TCPWM_CH7_P2_0   : pwm_ch = 7 ;   break;
-        case TCPWM_CH9_P5_0   : pwm_ch = 9 ;   break;
-        case TCPWM_CH10_P5_1  : pwm_ch = 10;   break;
-        case TCPWM_CH11_P5_2  : pwm_ch = 11;   break;
-        case TCPWM_CH11_P1_1  : pwm_ch = 11;   break;
-        case TCPWM_CH12_P5_3  : pwm_ch = 12;   break;
-        case TCPWM_CH12_P1_0  : pwm_ch = 12;   break;
-        case TCPWM_CH13_P5_4  : pwm_ch = 13;   break;
-        case TCPWM_CH13_P0_3  : pwm_ch = 13;   break;
-        case TCPWM_CH14_P0_2  : pwm_ch = 14;   break;
-        case TCPWM_CH15_P7_1  : pwm_ch = 15;   break;
-        case TCPWM_CH16_P7_3  : pwm_ch = 16;   break;
-        case TCPWM_CH17_P7_5  : pwm_ch = 17;   break;
-        case TCPWM_CH17_P0_1  : pwm_ch = 17;   break;
-        case TCPWM_CH18_P7_7  : pwm_ch = 18;   break;
-        case TCPWM_CH18_P0_0  : pwm_ch = 18;   break;
-        case TCPWM_CH19_P8_0  : pwm_ch = 19;   break;
-        case TCPWM_CH20_P8_1  : pwm_ch = 20;   break;
-        case TCPWM_CH21_P8_2  : pwm_ch = 21;   break;
-        case TCPWM_CH22_P8_3  : pwm_ch = 22;   break;
+        case TCPWM_CH00_P03_1 : pwm_ch = 0 ;   break;
+        case TCPWM_CH00_P06_1 : pwm_ch = 0 ;   break;
+        case TCPWM_CH01_P03_0 : pwm_ch = 1 ;   break;
+        case TCPWM_CH01_P06_3 : pwm_ch = 1 ;   break;
+        case TCPWM_CH02_P06_5 : pwm_ch = 2 ;   break;
+        case TCPWM_CH03_P02_4 : pwm_ch = 3 ;   break;
+        case TCPWM_CH03_P06_7 : pwm_ch = 3 ;   break;
+        case TCPWM_CH04_P02_3 : pwm_ch = 4 ;   break;
+        case TCPWM_CH04_P04_0 : pwm_ch = 4 ;   break;
+        case TCPWM_CH05_P02_2 : pwm_ch = 5 ;   break;
+        case TCPWM_CH05_P04_1 : pwm_ch = 5 ;   break;
+        case TCPWM_CH06_P02_1 : pwm_ch = 6 ;   break;
+        case TCPWM_CH07_P02_0 : pwm_ch = 7 ;   break;
+        case TCPWM_CH09_P05_0 : pwm_ch = 9 ;   break;
+        case TCPWM_CH10_P05_1 : pwm_ch = 10;   break;
+        case TCPWM_CH11_P05_2 : pwm_ch = 11;   break;
+        case TCPWM_CH11_P01_1 : pwm_ch = 11;   break;
+        case TCPWM_CH12_P05_3 : pwm_ch = 12;   break;
+        case TCPWM_CH12_P01_0 : pwm_ch = 12;   break;
+        case TCPWM_CH13_P05_4 : pwm_ch = 13;   break;
+        case TCPWM_CH13_P00_3 : pwm_ch = 13;   break;
+        case TCPWM_CH14_P00_2 : pwm_ch = 14;   break;
+        case TCPWM_CH15_P07_1 : pwm_ch = 15;   break;
+        case TCPWM_CH16_P07_3 : pwm_ch = 16;   break;
+        case TCPWM_CH17_P07_5 : pwm_ch = 17;   break;
+        case TCPWM_CH17_P00_1 : pwm_ch = 17;   break;
+        case TCPWM_CH18_P07_7 : pwm_ch = 18;   break;
+        case TCPWM_CH18_P00_0 : pwm_ch = 18;   break;
+        case TCPWM_CH19_P08_0 : pwm_ch = 19;   break;
+        case TCPWM_CH20_P08_1 : pwm_ch = 20;   break;
+        case TCPWM_CH21_P08_2 : pwm_ch = 21;   break;
+        case TCPWM_CH22_P08_3 : pwm_ch = 22;   break;
         case TCPWM_CH22_P23_7 : pwm_ch = 22;   break;
-        case TCPWM_CH24_P9_0  : pwm_ch = 24;   break;
-        case TCPWM_CH25_P9_1  : pwm_ch = 25;   break;
+        case TCPWM_CH24_P09_0 : pwm_ch = 24;   break;
+        case TCPWM_CH25_P09_1 : pwm_ch = 25;   break;
         case TCPWM_CH25_P23_4 : pwm_ch = 25;   break;
         case TCPWM_CH26_P19_1 : pwm_ch = 26;   break;
         case TCPWM_CH27_P19_2 : pwm_ch = 27;   break;
@@ -399,7 +399,7 @@ void pwm_all_channel_close (void)
 // 参数说明     pin             选择 PWM 引脚
 // 参数说明     duty            设置占空比
 // 返回参数     void
-// 使用示例     pwm_set_duty(TCPWM1_CH0_P3_1, 5000); // 设置占空比为百分之5000/PWM_DUTY_MAX*100
+// 使用示例     pwm_set_duty(TCPWM1_CH00_P03_1, 5000); // 设置占空比为百分之5000/PWM_DUTY_MAX*100
 // 备注信息     PWM_DUTY_MAX 宏定义在zf_driver_pwm.h  默认为10000
 //-------------------------------------------------------------------------------------------------------------------
 void pwm_set_duty (pwm_channel_enum pwmch, uint32 duty)
@@ -422,7 +422,7 @@ void pwm_set_duty (pwm_channel_enum pwmch, uint32 duty)
 // 参数说明     freq            设置频率 同个模块只有最后一次设置生效
 // 参数说明     duty            设置占空比
 // 返回参数     void
-// 使用示例     pwm_init(TCPWM_CH0_P3_1, 50, 1000);   // ATOM 0模块的通道7 使用P02_7引脚输出PWM  PWM频率50HZ  占空比百分之1000/PWM_DUTY_MAX*100
+// 使用示例     pwm_init(TCPWM_CH00_P03_1, 50, 1000);   // ATOM 0模块的通道7 使用P02_7引脚输出PWM  PWM频率50HZ  占空比百分之1000/PWM_DUTY_MAX*100
 // 备注信息     PWM_DUTY_MAX 宏定义在zf_driver_pwm.h  默认为10000
 //-------------------------------------------------------------------------------------------------------------------
 void pwm_init (pwm_channel_enum pwmch, uint32 freq, uint32 duty)

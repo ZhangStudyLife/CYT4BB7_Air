@@ -66,7 +66,7 @@ typedef struct
 
 void (*uart_isr_func[5])() = {uart0_isr, uart1_isr, uart2_isr, uart3_isr, uart4_isr};
 cy_stc_scb_uart_context_t  uart_context[5] = {0}; 
-
+volatile stc_SCB_t* scb_module[5] = {SCB0, SCB5, SCB4, SCB3, SCB2};
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介       获取串口配置信息
 // 参数说明       uart_n          串口模块号 参照 zf_driver_uart.h 内 uart_index_enum 枚举体定义
@@ -80,7 +80,7 @@ static void get_uart_config(uart_config_struct *config_struct, uart_tx_pin_enum 
 {
     switch(tx_pin)
     {
-        case  	UART0_TX_P0_1:
+        case  	UART0_TX_P00_1:
         {
             config_struct->tx_port  = GPIO_PRT0 ;  	
             config_struct->tx_pin   = 1;      
@@ -88,7 +88,7 @@ static void get_uart_config(uart_config_struct *config_struct, uart_tx_pin_enum 
             config_struct->uart_pclk= PCLK_SCB0_CLOCK;
             config_struct->uart_irqn= scb_0_interrupt_IRQn;
         }break;
-        case	UART1_TX_P4_1:
+        case	UART1_TX_P04_1:
         {
             config_struct->tx_port  = GPIO_PRT4 ;  	
             config_struct->tx_pin   = 1;      
@@ -124,7 +124,7 @@ static void get_uart_config(uart_config_struct *config_struct, uart_tx_pin_enum 
     }
     switch(rx_pin)
     {
-        case  	UART0_RX_P0_0:
+        case  	UART0_RX_P00_0:
         {
             config_struct->rx_port  = GPIO_PRT0 ;  	
             config_struct->rx_pin   = 0;      
@@ -132,7 +132,7 @@ static void get_uart_config(uart_config_struct *config_struct, uart_tx_pin_enum 
             config_struct->uart_pclk= PCLK_SCB0_CLOCK;
             config_struct->uart_irqn= scb_0_interrupt_IRQn;
         }break;
-        case	UART1_RX_P4_0: 
+        case	UART1_RX_P04_0: 
         {
             config_struct->rx_port  = GPIO_PRT4 ;  	
             config_struct->rx_pin   = 0;      
@@ -200,8 +200,8 @@ volatile stc_SCB_t* get_scb_module(uart_index_enum uart_n)
 //-------------------------------------------------------------------------------------------------------------------
 void uart_write_byte (uart_index_enum uart_n, const uint8 dat)
 {
-    Cy_SCB_WriteTxFifo(get_scb_module(uart_n), dat);	
-    while(Cy_SCB_IsTxComplete(get_scb_module(uart_n)) == 0);
+    Cy_SCB_WriteTxFifo(scb_module[uart_n], dat);	
+    while(Cy_SCB_IsTxComplete(scb_module[uart_n]) == 0);
 }
 
 
@@ -251,9 +251,8 @@ void uart_write_string (uart_index_enum uart_n, const char *str)
 //-------------------------------------------------------------------------------------------------------------------
 uint8 uart_read_byte (uart_index_enum uart_n)
 {
-    volatile stc_SCB_t* scb_module = get_scb_module(uart_n);
-    while(Cy_SCB_GetNumInRxFifo(scb_module) == 0);
-    return (uint8)Cy_SCB_ReadRxFifo(scb_module);	
+    while(Cy_SCB_GetNumInRxFifo(scb_module[uart_n]) == 0);
+    return (uint8)Cy_SCB_ReadRxFifo(scb_module[uart_n]);	
 }
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介       读取串口接收的数据（查询接收）
@@ -266,11 +265,10 @@ uint8 uart_read_byte (uart_index_enum uart_n)
 uint8 uart_query_byte (uart_index_enum uart_n, uint8 *dat)
 {
     uint8 return_data = 0;
-    volatile stc_SCB_t* scb_module = get_scb_module(uart_n);
     
-    if(Cy_SCB_GetNumInRxFifo(scb_module))
+    if(Cy_SCB_GetNumInRxFifo(scb_module[uart_n]))
     {
-        *dat = (uint8_t)Cy_SCB_ReadRxFifo(scb_module);
+        *dat = (uint8_t)Cy_SCB_ReadRxFifo(scb_module[uart_n]);
         return_data = 1;
     }
     else
@@ -290,22 +288,21 @@ uint8 uart_query_byte (uart_index_enum uart_n, uint8 *dat)
 //-------------------------------------------------------------------------------------------------------------------
 void uart_tx_interrupt (uart_index_enum uart_n, uint32 status)
 {
-    volatile stc_SCB_t* scb_module = get_scb_module(uart_n);
     
-    Cy_SCB_SetTxInterruptMask(scb_module, Cy_SCB_GetTxInterruptMask(scb_module) & ~CY_SCB_UART_TX_TRIGGER);
-    Cy_SCB_SetTxInterruptMask(scb_module, Cy_SCB_GetTxInterruptMask(scb_module) & ~CY_SCB_UART_TX_NOT_FULL);
-    Cy_SCB_SetTxInterruptMask(scb_module, Cy_SCB_GetTxInterruptMask(scb_module) & ~CY_SCB_UART_TX_OVERFLOW);
-    Cy_SCB_SetTxInterruptMask(scb_module, Cy_SCB_GetTxInterruptMask(scb_module) & ~CY_SCB_UART_TX_UNDERFLOW);
-    Cy_SCB_SetTxInterruptMask(scb_module, Cy_SCB_GetTxInterruptMask(scb_module) & ~CY_SCB_UART_TX_EMPTY);
-    Cy_SCB_SetTxInterruptMask(scb_module, Cy_SCB_GetTxInterruptMask(scb_module) & ~CY_SCB_UART_TX_NACK);
-    Cy_SCB_SetTxInterruptMask(scb_module, Cy_SCB_GetTxInterruptMask(scb_module) & ~CY_SCB_UART_TX_ARB_LOST);
+    Cy_SCB_SetTxInterruptMask(scb_module[uart_n], Cy_SCB_GetTxInterruptMask(scb_module[uart_n]) & ~CY_SCB_UART_TX_TRIGGER);
+    Cy_SCB_SetTxInterruptMask(scb_module[uart_n], Cy_SCB_GetTxInterruptMask(scb_module[uart_n]) & ~CY_SCB_UART_TX_NOT_FULL);
+    Cy_SCB_SetTxInterruptMask(scb_module[uart_n], Cy_SCB_GetTxInterruptMask(scb_module[uart_n]) & ~CY_SCB_UART_TX_OVERFLOW);
+    Cy_SCB_SetTxInterruptMask(scb_module[uart_n], Cy_SCB_GetTxInterruptMask(scb_module[uart_n]) & ~CY_SCB_UART_TX_UNDERFLOW);
+    Cy_SCB_SetTxInterruptMask(scb_module[uart_n], Cy_SCB_GetTxInterruptMask(scb_module[uart_n]) & ~CY_SCB_UART_TX_EMPTY);
+    Cy_SCB_SetTxInterruptMask(scb_module[uart_n], Cy_SCB_GetTxInterruptMask(scb_module[uart_n]) & ~CY_SCB_UART_TX_NACK);
+    Cy_SCB_SetTxInterruptMask(scb_module[uart_n], Cy_SCB_GetTxInterruptMask(scb_module[uart_n]) & ~CY_SCB_UART_TX_ARB_LOST);
     if(status)
     {
-        Cy_SCB_SetTxInterruptMask(scb_module, Cy_SCB_GetRxInterruptMask(scb_module) | CY_SCB_UART_TX_DONE);
+        Cy_SCB_SetTxInterruptMask(scb_module[uart_n], Cy_SCB_GetRxInterruptMask(scb_module[uart_n]) | CY_SCB_UART_TX_DONE);
     }
     else
     {
-        Cy_SCB_SetTxInterruptMask(scb_module, Cy_SCB_GetRxInterruptMask(scb_module) & ~CY_SCB_UART_TX_DONE);
+        Cy_SCB_SetTxInterruptMask(scb_module[uart_n], Cy_SCB_GetRxInterruptMask(scb_module[uart_n]) & ~CY_SCB_UART_TX_DONE);
     }	
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -318,21 +315,19 @@ void uart_tx_interrupt (uart_index_enum uart_n, uint32 status)
 //-------------------------------------------------------------------------------------------------------------------
 void uart_rx_interrupt (uart_index_enum uart_n, uint32 status)
 {
-    volatile stc_SCB_t* scb_module = get_scb_module(uart_n);
-    
-    Cy_SCB_SetRxInterruptMask(scb_module, Cy_SCB_GetRxInterruptMask(scb_module) & ~CY_SCB_UART_RX_TRIGGER);
-    Cy_SCB_SetRxInterruptMask(scb_module, Cy_SCB_GetRxInterruptMask(scb_module) & ~CY_SCB_UART_RX_FULL);
-    Cy_SCB_SetRxInterruptMask(scb_module, Cy_SCB_GetRxInterruptMask(scb_module) & ~CY_SCB_UART_RX_OVERFLOW);
-    Cy_SCB_SetRxInterruptMask(scb_module, Cy_SCB_GetRxInterruptMask(scb_module) & ~CY_SCB_UART_RX_ERR_FRAME);
-    Cy_SCB_SetRxInterruptMask(scb_module, Cy_SCB_GetRxInterruptMask(scb_module) & ~CY_SCB_UART_RX_ERR_PARITY);
-    Cy_SCB_SetRxInterruptMask(scb_module, Cy_SCB_GetRxInterruptMask(scb_module) & ~CY_SCB_UART_RX_BREAK_DETECT);
+    Cy_SCB_SetRxInterruptMask(scb_module[uart_n], Cy_SCB_GetRxInterruptMask(scb_module[uart_n]) & ~CY_SCB_UART_RX_TRIGGER);
+    Cy_SCB_SetRxInterruptMask(scb_module[uart_n], Cy_SCB_GetRxInterruptMask(scb_module[uart_n]) & ~CY_SCB_UART_RX_FULL);
+    Cy_SCB_SetRxInterruptMask(scb_module[uart_n], Cy_SCB_GetRxInterruptMask(scb_module[uart_n]) & ~CY_SCB_UART_RX_OVERFLOW);
+    Cy_SCB_SetRxInterruptMask(scb_module[uart_n], Cy_SCB_GetRxInterruptMask(scb_module[uart_n]) & ~CY_SCB_UART_RX_ERR_FRAME);
+    Cy_SCB_SetRxInterruptMask(scb_module[uart_n], Cy_SCB_GetRxInterruptMask(scb_module[uart_n]) & ~CY_SCB_UART_RX_ERR_PARITY);
+    Cy_SCB_SetRxInterruptMask(scb_module[uart_n], Cy_SCB_GetRxInterruptMask(scb_module[uart_n]) & ~CY_SCB_UART_RX_BREAK_DETECT);
     if(status)
     {
-        Cy_SCB_SetRxInterruptMask(scb_module, Cy_SCB_GetRxInterruptMask(scb_module) | CY_SCB_UART_RX_NOT_EMPTY);
+        Cy_SCB_SetRxInterruptMask(scb_module[uart_n], Cy_SCB_GetRxInterruptMask(scb_module[uart_n]) | CY_SCB_UART_RX_NOT_EMPTY);
     }
     else
     {
-        Cy_SCB_SetRxInterruptMask(scb_module, Cy_SCB_GetRxInterruptMask(scb_module) & ~CY_SCB_UART_RX_NOT_EMPTY);
+        Cy_SCB_SetRxInterruptMask(scb_module[uart_n], Cy_SCB_GetRxInterruptMask(scb_module[uart_n]) & ~CY_SCB_UART_RX_NOT_EMPTY);
     }	
 }
 
@@ -353,7 +348,6 @@ void uart_sbus_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pi
     zf_assert((uint8)uart_n == (uint8)tx_pin ? 1 : 0);
     zf_assert((uint8)uart_n == (uint8)rx_pin ? 1 : 0);
 	
-    volatile stc_SCB_t*        scb_module;
     uart_config_struct          uart_pin_config                 = {0};
     cy_stc_gpio_pin_config_t    gpio_pin_config                 = {0};
     cy_stc_scb_uart_config_t    g_stc_uart_config               = {0};
@@ -379,12 +373,10 @@ void uart_sbus_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pi
     g_stc_uart_config.parity            = CY_SCB_UART_PARITY_EVEN;
     g_stc_uart_config.ctsPolarity       = CY_SCB_UART_ACTIVE_LOW;  
     g_stc_uart_config.rtsPolarity       = CY_SCB_UART_ACTIVE_LOW;
-      
-    scb_module = get_scb_module(uart_n);
    
-    Cy_SCB_UART_DeInit(scb_module);
-    Cy_SCB_UART_Init(scb_module, &g_stc_uart_config, &uart_context[uart_n]);
-    Cy_SCB_UART_Enable(scb_module);  
+    Cy_SCB_UART_DeInit(scb_module[uart_n]);
+    Cy_SCB_UART_Init(scb_module[uart_n], &g_stc_uart_config, &uart_context[uart_n]);
+    Cy_SCB_UART_Enable(scb_module[uart_n]);  
     
     Cy_SysClk_PeriphAssignDivider(uart_pin_config.uart_pclk, CY_SYSCLK_DIV_24_5_BIT, 2ul);
     Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup(uart_pin_config.uart_pclk), CY_SYSCLK_DIV_24_5_BIT, 2ul, ((divSetting_fp5 & 0x1FFFFFE0ul) >> 5ul), (divSetting_fp5 & 0x0000001Ful));
@@ -409,7 +401,7 @@ void uart_sbus_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pi
 //  参数说明      tx_pin          串口发送引脚
 //  参数说明      rx_pin          串口接收引脚
 //  返回参数      void
-//  使用示例      uart_init(UART_0, 115200, UART0_TX_P0_1, UART0_RX_P0_0);       // 初始化串口0 波特率115200 发送引脚使用 P0_1 接收引脚使用 P0_0
+//  使用示例      uart_init(UART_0, 115200, UART0_TX_P00_1, UART0_RX_P00_0);       // 初始化串口0 波特率115200 发送引脚使用 P0_1 接收引脚使用 P0_0
 //  备注信息
 //-------------------------------------------------------------------------------------------------------------------
 void uart_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pin, uart_rx_pin_enum rx_pin)
@@ -418,8 +410,7 @@ void uart_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pin, ua
 	
     zf_assert((uint8)uart_n == (uint8)tx_pin ? 1 : 0);
     zf_assert((uint8)uart_n == (uint8)rx_pin ? 1 : 0);
-	
-    volatile stc_SCB_t*        scb_module;
+    
     uart_config_struct          uart_pin_config                 = {0};
     cy_stc_gpio_pin_config_t    gpio_pin_config                 = {0};
     cy_stc_scb_uart_config_t    g_stc_uart_config               = {0};
@@ -445,12 +436,10 @@ void uart_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pin, ua
     g_stc_uart_config.parity            = CY_SCB_UART_PARITY_NONE;
     g_stc_uart_config.ctsPolarity       = CY_SCB_UART_ACTIVE_LOW;  
     g_stc_uart_config.rtsPolarity       = CY_SCB_UART_ACTIVE_LOW;
-      
-    scb_module = get_scb_module(uart_n);
-   
-    Cy_SCB_UART_DeInit(scb_module);
-    Cy_SCB_UART_Init(scb_module, &g_stc_uart_config, &uart_context[uart_n]);
-    Cy_SCB_UART_Enable(scb_module);  
+    
+    Cy_SCB_UART_DeInit(scb_module[uart_n]);
+    Cy_SCB_UART_Init(scb_module[uart_n], &g_stc_uart_config, &uart_context[uart_n]);
+    Cy_SCB_UART_Enable(scb_module[uart_n]);  
     
     Cy_SysClk_PeriphAssignDivider(uart_pin_config.uart_pclk, CY_SYSCLK_DIV_24_5_BIT, 0ul);
     Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup(uart_pin_config.uart_pclk), CY_SYSCLK_DIV_24_5_BIT, 0ul, ((divSetting_fp5 & 0x1FFFFFE0ul) >> 5ul), (divSetting_fp5 & 0x0000001Ful));

@@ -61,34 +61,34 @@ static gpio_pin_enum get_adc_pin(adc_channel_enum vadc_chn)
     gpio_pin_enum adc_pin;
     switch(vadc_chn)
     {
-        case ADC0_CH0_P6_0	: adc_pin = P06_0; break;
-        case ADC0_CH1_P6_1	: adc_pin = P06_1; break;
-        case ADC0_CH2_P6_2	: adc_pin = P06_2; break;
-        case ADC0_CH3_P6_3	: adc_pin = P06_3; break;
-        case ADC0_CH4_P6_4	: adc_pin = P06_4; break;
-        case ADC0_CH5_P6_5	: adc_pin = P06_5; break;
-        case ADC0_CH6_P6_6	: adc_pin = P06_6; break;
-        case ADC0_CH7_P6_7	: adc_pin = P06_7; break;
-        case ADC0_CH16_P7_0	: adc_pin = P07_0; break;
-        case ADC0_CH17_P7_1	: adc_pin = P07_1; break;
-        case ADC0_CH18_P7_2	: adc_pin = P07_2; break;
-        case ADC0_CH19_P7_3	: adc_pin = P07_3; break;
-        case ADC0_CH20_P7_4	: adc_pin = P07_4; break;
-        case ADC0_CH21_P7_5	: adc_pin = P07_5; break;
-        case ADC0_CH22_P7_6	: adc_pin = P07_6; break;
-        case ADC0_CH23_P7_7	: adc_pin = P07_7; break;
-        case ADC0_CH24_P8_1	: adc_pin = P08_1; break;
-        case ADC0_CH25_P8_2	: adc_pin = P08_2; break;
-        case ADC0_CH26_P8_3	: adc_pin = P08_3; break;
-        case ADC0_CH28_P9_0	: adc_pin = P09_0; break;
-        case ADC0_CH29_P9_1	: adc_pin = P09_1; break;
-        case ADC1_CH0_P10_4	: adc_pin = P10_4; break;
-        case ADC1_CH4_P12_0	: adc_pin = P12_0; break;
-        case ADC1_CH5_P12_1	: adc_pin = P12_1; break;
-        case ADC1_CH6_P12_2	: adc_pin = P12_2; break;
-        case ADC1_CH7_P12_3	: adc_pin = P12_3; break;
-        case ADC1_CH8_P12_4	: adc_pin = P12_4; break;
-        case ADC1_CH9_P12_5	: adc_pin = P12_5; break;
+        case ADC0_CH00_P06_0	: adc_pin = P06_0; break;
+        case ADC0_CH01_P06_1	: adc_pin = P06_1; break;
+        case ADC0_CH02_P06_2	: adc_pin = P06_2; break;
+        case ADC0_CH03_P06_3	: adc_pin = P06_3; break;
+        case ADC0_CH04_P06_4	: adc_pin = P06_4; break;
+        case ADC0_CH05_P06_5	: adc_pin = P06_5; break;
+        case ADC0_CH06_P06_6	: adc_pin = P06_6; break;
+        case ADC0_CH07_P06_7	: adc_pin = P06_7; break;
+        case ADC0_CH16_P07_0	: adc_pin = P07_0; break;
+        case ADC0_CH17_P07_1	: adc_pin = P07_1; break;
+        case ADC0_CH18_P07_2	: adc_pin = P07_2; break;
+        case ADC0_CH19_P07_3	: adc_pin = P07_3; break;
+        case ADC0_CH20_P07_4	: adc_pin = P07_4; break;
+        case ADC0_CH21_P07_5	: adc_pin = P07_5; break;
+        case ADC0_CH22_P07_6	: adc_pin = P07_6; break;
+        case ADC0_CH23_P07_7	: adc_pin = P07_7; break;
+        case ADC0_CH24_P08_1	: adc_pin = P08_1; break;
+        case ADC0_CH25_P08_2	: adc_pin = P08_2; break;
+        case ADC0_CH26_P08_3	: adc_pin = P08_3; break;
+        case ADC0_CH28_P09_0	: adc_pin = P09_0; break;
+        case ADC0_CH29_P09_1	: adc_pin = P09_1; break;
+        case ADC1_CH00_P10_4	: adc_pin = P10_4; break;
+        case ADC1_CH04_P12_0	: adc_pin = P12_0; break;
+        case ADC1_CH05_P12_1	: adc_pin = P12_1; break;
+        case ADC1_CH06_P12_2	: adc_pin = P12_2; break;
+        case ADC1_CH07_P12_3	: adc_pin = P12_3; break;
+        case ADC1_CH08_P12_4	: adc_pin = P12_4; break;
+        case ADC1_CH09_P12_5	: adc_pin = P12_5; break;
         case ADC1_CH12_P13_0	: adc_pin = P13_0; break;
         case ADC1_CH13_P13_1	: adc_pin = P13_1; break;
         case ADC1_CH14_P13_2	: adc_pin = P13_2; break;
@@ -104,14 +104,14 @@ static gpio_pin_enum get_adc_pin(adc_channel_enum vadc_chn)
         case ADC1_CH28_P15_0	: adc_pin = P15_0; break;
         case ADC1_CH29_P15_1	: adc_pin = P15_1; break;
         case ADC1_CH30_P15_2	: adc_pin = P15_2; break;
-        case ADC2_CH0_P18_0	: adc_pin = P18_0; break;
-        case ADC2_CH1_P18_1	: adc_pin = P18_1; break;
-        case ADC2_CH2_P18_2	: adc_pin = P18_2; break;
-        case ADC2_CH3_P18_3	: adc_pin = P18_3; break;
-        case ADC2_CH4_P18_4	: adc_pin = P18_4; break;
-        case ADC2_CH5_P18_5	: adc_pin = P18_5; break;
-        case ADC2_CH6_P18_6	: adc_pin = P18_6; break;
-        case ADC2_CH7_P18_7	: adc_pin = P18_7; break;
+        case ADC2_CH00_P18_0	: adc_pin = P18_0; break;
+        case ADC2_CH01_P18_1	: adc_pin = P18_1; break;
+        case ADC2_CH02_P18_2	: adc_pin = P18_2; break;
+        case ADC2_CH03_P18_3	: adc_pin = P18_3; break;
+        case ADC2_CH04_P18_4	: adc_pin = P18_4; break;
+        case ADC2_CH05_P18_5	: adc_pin = P18_5; break;
+        case ADC2_CH06_P18_6	: adc_pin = P18_6; break;
+        case ADC2_CH07_P18_7	: adc_pin = P18_7; break;
         default:break;
     }
     return adc_pin;
@@ -121,7 +121,7 @@ static gpio_pin_enum get_adc_pin(adc_channel_enum vadc_chn)
 // 函数简介     ADC 转换一次
 // 参数说明     ch              选择 ADC 通道 (详见 zf_driver_adc.h 中枚举 adc_channel_enum 定义)
 // 返回参数     uint16          转换的 ADC 值
-// 使用示例     adc_convert(ADC0_CH0_P6_0);
+// 使用示例     adc_convert(ADC0_CH00_P06_0);
 // 备注信息
 //-------------------------------------------------------------------------------------------------------------------
 uint16 adc_convert (adc_channel_enum adc_chn)
@@ -147,7 +147,7 @@ uint16 adc_convert (adc_channel_enum adc_chn)
 // 参数说明     ch              选择 ADC 通道 (详见 zf_driver_adc.h 中枚举 adc_channel_enum 定义)
 // 参数说明     count           均值滤波次数
 // 返回参数     uint16          转换的 ADC 值
-// 使用示例     adc_mean_filter_convert(ADC0_CH0_P6_0, 5);                        // 采集5次 然后返回平均值
+// 使用示例     adc_mean_filter_convert(ADC0_CH00_P06_0, 5);                        // 采集5次 然后返回平均值
 // 备注信息
 //-------------------------------------------------------------------------------------------------------------------
 uint16 adc_mean_filter_convert (adc_channel_enum vadc_chn, uint8 count)
@@ -175,7 +175,7 @@ uint16 adc_mean_filter_convert (adc_channel_enum vadc_chn, uint8 count)
 // 参数说明     ch              选择 ADC 通道 (详见 zf_driver_adc.h 中枚举 adc_channel_enum 定义)
 // 参数说明     resolution      选择选择通道分辨率(如果同一个 ADC 模块初始化时设置了不同的分辨率 则最后一个初始化的分辨率生效)
 // 返回参数     void
-// 使用示例     adc_init(ADC0_CH0_P6_0, ADC_12BIT);                                // 初始化 A0 为 ADC1 的 channel0 输入功能 分辨率为8位
+// 使用示例     adc_init(ADC0_CH00_P06_0, ADC_12BIT);                                // 初始化 A0 为 ADC1 的 channel0 输入功能 分辨率为8位
 // 备注信息
 //-------------------------------------------------------------------------------------------------------------------
 void adc_init (adc_channel_enum adc_chn, adc_resolution_enum resolution)

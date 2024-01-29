@@ -51,8 +51,8 @@
 #include "zf_device_type.h"
 
 //=================================================定义 TSL1401 基本配置================================================
-#define TSL1401_AO_PIN          (ADC0_CH0_P6_0)                                   // 对应第一个 TSL1401 的 AO 引脚
-#define TSL1401_AO_PIN1         (ADC0_CH1_P6_1)                                   // 对应第二个 TSL1401 的 AO 引脚
+#define TSL1401_AO_PIN          (ADC0_CH00_P06_0)                               // 对应第一个 TSL1401 的 AO 引脚
+#define TSL1401_AO_PIN1         (ADC0_CH01_P06_1)                               // 对应第二个 TSL1401 的 AO 引脚
 // TSL1401 的控制引脚定义 多个 TSL1401 建议将控制引脚直接并联
 #define TSL1401_CLK_PIN         (P18_0)                                         // TSL1401 的 CLK 引脚定义
 #define TSL1401_SI_PIN          (P18_1)                                         // TSL1401 的 SI 引脚定义

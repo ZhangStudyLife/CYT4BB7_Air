@@ -149,7 +149,7 @@ static uint8 soft_iic_wait_ack (soft_iic_info_struct *soft_iic_obj)
     }
     gpio_low(soft_iic_obj->scl_pin);                                            // SCL 低电平
 #if SOFT_IIC_SDA_IO_SWITCH
-    gpio_set_dir((gpio_pin_enum)soft_iic_obj->sda_pin, GPO, GPO_OPEN_DTAIN);
+    gpio_set_dir((gpio_pin_enum)soft_iic_obj->sda_pin, GPO, GPO_PUSH_PULL);
 #endif
     soft_iic_delay(soft_iic_obj->delay);
 
@@ -211,7 +211,7 @@ static uint8 soft_iic_read_data (soft_iic_info_struct *soft_iic_obj, uint8 ack)
     }
     gpio_low(soft_iic_obj->scl_pin);                                            // SCL 低电平
 #if SOFT_IIC_SDA_IO_SWITCH
-    gpio_set_dir((gpio_pin_enum)soft_iic_obj->sda_pin, GPO, GPO_OPEN_DTAIN);
+    gpio_set_dir((gpio_pin_enum)soft_iic_obj->sda_pin, GPO, GPO_PUSH_PULL);
 #endif
     soft_iic_delay(soft_iic_obj->delay);
     soft_iic_send_ack(soft_iic_obj, ack);
@@ -702,5 +702,5 @@ void soft_iic_init (soft_iic_info_struct *soft_iic_obj, uint8 addr, uint32 delay
     soft_iic_obj->addr = addr;
     soft_iic_obj->delay = delay;
     gpio_init(scl_pin, GPO, GPIO_HIGH, GPO_PUSH_PULL);                          // 提取对应IO索引 AF功能编码
-    gpio_init(sda_pin, GPO, GPIO_HIGH, GPO_OPEN_DTAIN);                         // 提取对应IO索引 AF功能编码
+    gpio_init(sda_pin, GPO, GPIO_HIGH, GPO_PUSH_PULL);                         // 提取对应IO索引 AF功能编码
 }

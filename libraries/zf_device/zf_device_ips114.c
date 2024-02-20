@@ -64,6 +64,7 @@ static uint16                   ips114_bgcolor      = IPS114_DEFAULT_BGCOLOR;   
 static ips114_dir_enum          ips114_display_dir  = IPS114_DEFAULT_DISPLAY_DIR;       // 显示方向
 static ips114_font_size_enum    ips114_display_font = IPS114_DEFAULT_DISPLAY_FONT;      // 显示字体类型
 
+static uint16 data_buffer[240];
 #if IPS114_USE_SOFT_SPI
 static soft_spi_info_struct             ips114_spi;
 //-------------------------------------------------------------------------------------------------------------------
@@ -83,7 +84,7 @@ static soft_spi_info_struct             ips114_spi;
 // 使用示例     ips114_write_8bit_data_array(data, len);
 // 备注信息     内部调用
 //-------------------------------------------------------------------------------------------------------------------
-#define ips114_write_8bit_data_array(data, len)     (soft_spi_write_8bit_array(&ips114_spi, (data), (len)))
+#define ips114_write_8bit_data_array(data, len)     (soft_spi_write_8bit(&ips114_spi, (data), (len)))
 
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     IPS114 软件 SPI 写 16bit 数据
@@ -270,18 +271,17 @@ static void ips114_debug_init (void)
 //-------------------------------------------------------------------------------------------------------------------
 void ips114_clear (void)
 {
-    uint16 color_buffer[240];
     uint32 i = 0, j = 0;
 
     IPS114_CS(0);
     ips114_set_region(0, 0, ips114_width_max - 1, ips114_height_max - 1);
     for(i = 0; i < ips114_width_max; i ++)
     {
-        color_buffer[i] = ips114_bgcolor;
+        data_buffer[i] = ips114_bgcolor;
     }
     for (j = 0; j < ips114_height_max; j ++)
     {
-        ips114_write_16bit_data_array(color_buffer, ips114_width_max);
+        ips114_write_16bit_data_array(data_buffer, ips114_width_max);
     }
     IPS114_CS(1);
 }
@@ -295,18 +295,17 @@ void ips114_clear (void)
 //-------------------------------------------------------------------------------------------------------------------
 void ips114_full (const uint16 color)
 {
-    uint16 color_buffer[240];
     uint32 i = 0, j = 0;
 
     IPS114_CS(0);
     ips114_set_region(0, 0, ips114_width_max - 1, ips114_height_max - 1);
     for(i = 0; i < ips114_width_max; i ++)
     {
-        color_buffer[i] = color;
+        data_buffer[i] = color;
     }
     for (j = 0; j < ips114_height_max; j ++)
     {
-        ips114_write_16bit_data_array(color_buffer, ips114_width_max);
+        ips114_write_16bit_data_array(data_buffer, ips114_width_max);
     }
     IPS114_CS(1);
 }
@@ -712,7 +711,6 @@ void ips114_show_binary_image (uint16 x, uint16 y, const uint8 *image, uint16 wi
     uint32 i = 0, j = 0;
     uint8 temp = 0;
     uint32 width_index = 0;
-    uint16 data_buffer[240];
     const uint8 *image_temp;
 
     IPS114_CS(0);
@@ -766,7 +764,6 @@ void ips114_show_gray_image (uint16 x, uint16 y, const uint8 *image, uint16 widt
 
     uint32 i = 0, j = 0;
     uint16 color = 0,temp = 0;
-    uint16 data_buffer[240];
     const uint8 *image_temp;
 
     IPS114_CS(0);
@@ -825,7 +822,6 @@ void ips114_show_rgb565_image (uint16 x, uint16 y, const uint16 *image, uint16 w
     zf_assert(NULL != image);
 
     uint32 i = 0, j = 0;
-    uint16 data_buffer[240];
     const uint16 *image_temp;
 
     IPS114_CS(0);
@@ -873,7 +869,6 @@ void ips114_show_wave (uint16 x, uint16 y, const uint16 *wave, uint16 width, uin
 
     uint32 i = 0, j = 0;
     uint32 width_index = 0, value_max_index = 0;
-    uint16 data_buffer[240];
 
     IPS114_CS(0);
     ips114_set_region(x, y, x + dis_width - 1, y + dis_value_max - 1);          // 设置显示区域

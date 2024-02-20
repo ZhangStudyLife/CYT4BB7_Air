@@ -492,7 +492,7 @@ uint8 wifi_uart_reset (void)
     gpio_set_level(WIFI_UART_RST_PIN, 0);
     system_delay_ms(50);
     gpio_set_level(WIFI_UART_RST_PIN, 1);
-    system_delay_ms(200);
+    system_delay_ms(50);
     wifi_uart_clear_receive_buffer();                                           // 清空WiFi接收缓冲区
     return_state = wifi_uart_wait_ack("ready", WAIT_TIME_OUT);
     wifi_uart_clear_receive_buffer();                                           // 清空WiFi接收缓冲区
@@ -1086,8 +1086,10 @@ uint32 wifi_uart_read_buffer (uint8 *buffer, uint32 len)
 //--------------------------------------------------------------------------------------------------
 void wifi_uart_callback (void)
 {
-    uart_query_byte(WIFI_UART_INDEX, &wifi_uart_data);                          // 读取串口数据
-    fifo_write_buffer(&wifi_uart_fifo, &wifi_uart_data, 1);                     // 存入 FIFO
+    if(uart_query_byte(WIFI_UART_INDEX, &wifi_uart_data))                          // 读取串口数据
+    {
+        fifo_write_buffer(&wifi_uart_fifo, &wifi_uart_data, 1);                     // 存入 FIFO
+    }
 }
 
 //-------------------------------------------------------------------------------------------------------------------

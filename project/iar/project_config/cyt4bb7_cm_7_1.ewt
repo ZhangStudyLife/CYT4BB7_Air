@@ -2158,7 +2158,7 @@
     <group>
         <name>user</name>
         <file>
-            <name>$PROJ_DIR$\..\..\user\isr.c</name>
+            <name>$PROJ_DIR$\..\..\user\cm7_1_isr.c</name>
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\user\main_cm7_1.c</name>

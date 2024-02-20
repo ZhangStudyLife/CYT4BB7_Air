@@ -42,7 +42,7 @@
 #include "zf_driver_uart.h"
 
 #define UART_FREQ       CY_INITIAL_TARGET_PERI_FREQ                             // 串口模块时钟 默认80M
-#define UART_USE_ISR    CPUIntIdx0_IRQn
+#define UART_USE_ISR    CPUIntIdx3_IRQn
 
 
 

@@ -207,8 +207,10 @@ uint32 bluetooth_ch9141_read_buffer (uint8 *buff, uint32 len)
 //-------------------------------------------------------------------------------------------------------------------
 void bluetooth_ch9141_uart_callback (void)
 {
-    uart_query_byte(BLUETOOTH_CH9141_INDEX, &bluetooth_ch9141_data);            // 读取串口数据
-    fifo_write_buffer(&bluetooth_ch9141_fifo, &bluetooth_ch9141_data, 1);       // 存入 FIFO
+    if(uart_query_byte(BLUETOOTH_CH9141_INDEX, &bluetooth_ch9141_data))            // 读取串口数据
+    {
+        fifo_write_buffer(&bluetooth_ch9141_fifo, &bluetooth_ch9141_data, 1);       // 存入 FIFO
+    }
 }
 
 //-------------------------------------------------------------------------------------------------------------------

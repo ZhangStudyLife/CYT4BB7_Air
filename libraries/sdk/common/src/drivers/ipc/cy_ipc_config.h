@@ -75,9 +75,9 @@
    or somewhere else
 */
 
-#define CY_IPC_INTR_PIPE_CPU_INT_IDX_EP0     CPUIntIdx3_IRQn    /**< CPU Interrupt Index, used in the EP0 CPU */
+#define CY_IPC_INTR_PIPE_CPU_INT_IDX_EP0     CPUIntIdx4_IRQn    /**< CPU Interrupt Index, used in the EP0 CPU */
 #define CY_IPC_INTR_PIPE_EP0                 6                  /**< IPC Interrupt Structure Index, used as notifier for EP0 */
-#define CY_IPC_INTR_PIPE_CPU_INT_IDX_EP1     CPUIntIdx3_IRQn    /**< CPU Interrupt Index, used in the EP1 CPU */
+#define CY_IPC_INTR_PIPE_CPU_INT_IDX_EP1     CPUIntIdx4_IRQn    /**< CPU Interrupt Index, used in the EP1 CPU */
 #define CY_IPC_INTR_PIPE_EP1                 7                  /**< IPC Interrupt Structure Index, used as notifier for EP1 */
 
 

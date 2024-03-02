@@ -31,6 +31,7 @@
 * 修改记录
 * 日期              作者                备注
 * 2024-1-9       pudding            first version
+* 2024-3-2       pudding            修复PIT使能函数失效的问题
 ********************************************************************************************************************/
 
 #include "sysclk/cy_sysclk.h"
@@ -80,7 +81,9 @@ void pit_disable (pit_index_enum pit_index)
 //-------------------------------------------------------------------------------------------------------------------
 void pit_enable (pit_index_enum pit_index)
 {
+    Cy_Tcpwm_Counter_SetCounter((volatile stc_TCPWM_GRP_CNT_t*) &TCPWM0->GRP[2].CNT[pit_index], 0);
     Cy_Tcpwm_Counter_Enable((volatile stc_TCPWM_GRP_CNT_t*) &TCPWM0->GRP[2].CNT[pit_index]);
+    Cy_Tcpwm_TriggerStart((volatile stc_TCPWM_GRP_CNT_t*) &TCPWM0->GRP[2].CNT[pit_index]);  
 }
 
 //-------------------------------------------------------------------------------------------------------------------

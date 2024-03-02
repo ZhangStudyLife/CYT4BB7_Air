@@ -31,6 +31,7 @@
 * 修改记录
 * 日期              作者                备注
 * 2024-1-5       pudding            first version
+* 2024-3-2       pudding            修复多个串口波特率差距过大导致波特率异常的问题
 ********************************************************************************************************************/
 
 #include "system/system_cyt4bb.h"
@@ -378,9 +379,9 @@ void uart_sbus_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pi
     Cy_SCB_UART_Init(scb_module[uart_n], &g_stc_uart_config, &uart_context[uart_n]);
     Cy_SCB_UART_Enable(scb_module[uart_n]);  
     
-    Cy_SysClk_PeriphAssignDivider(uart_pin_config.uart_pclk, CY_SYSCLK_DIV_24_5_BIT, 2ul);
-    Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup(uart_pin_config.uart_pclk), CY_SYSCLK_DIV_24_5_BIT, 2ul, ((divSetting_fp5 & 0x1FFFFFE0ul) >> 5ul), (divSetting_fp5 & 0x0000001Ful));
-    Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup(uart_pin_config.uart_pclk), CY_SYSCLK_DIV_24_5_BIT, 2ul);
+    Cy_SysClk_PeriphAssignDivider(uart_pin_config.uart_pclk, CY_SYSCLK_DIV_24_5_BIT, (uint8)uart_n);
+    Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup(uart_pin_config.uart_pclk), CY_SYSCLK_DIV_24_5_BIT, (uint8)uart_n, ((divSetting_fp5 & 0x1FFFFFE0ul) >> 5ul), (divSetting_fp5 & 0x0000001Ful));
+    Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup(uart_pin_config.uart_pclk), CY_SYSCLK_DIV_24_5_BIT, (uint8)uart_n);
     
     cy_stc_sysint_irq_t                 stc_sysint_irq_cfg_uart;
     stc_sysint_irq_cfg_uart.sysIntSrc = uart_pin_config.uart_irqn;
@@ -441,9 +442,9 @@ void uart_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pin, ua
     Cy_SCB_UART_Init(scb_module[uart_n], &g_stc_uart_config, &uart_context[uart_n]);
     Cy_SCB_UART_Enable(scb_module[uart_n]);  
     
-    Cy_SysClk_PeriphAssignDivider(uart_pin_config.uart_pclk, CY_SYSCLK_DIV_24_5_BIT, 0ul);
-    Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup(uart_pin_config.uart_pclk), CY_SYSCLK_DIV_24_5_BIT, 0ul, ((divSetting_fp5 & 0x1FFFFFE0ul) >> 5ul), (divSetting_fp5 & 0x0000001Ful));
-    Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup(uart_pin_config.uart_pclk), CY_SYSCLK_DIV_24_5_BIT, 0ul);
+    Cy_SysClk_PeriphAssignDivider(uart_pin_config.uart_pclk, CY_SYSCLK_DIV_24_5_BIT, (uint8)uart_n);
+    Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup(uart_pin_config.uart_pclk), CY_SYSCLK_DIV_24_5_BIT, (uint8)uart_n, ((divSetting_fp5 & 0x1FFFFFE0ul) >> 5ul), (divSetting_fp5 & 0x0000001Ful));
+    Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup(uart_pin_config.uart_pclk), CY_SYSCLK_DIV_24_5_BIT, (uint8)uart_n);
     
     cy_stc_sysint_irq_t                 uart_irq_cfg;
     uart_irq_cfg.sysIntSrc = uart_pin_config.uart_irqn;

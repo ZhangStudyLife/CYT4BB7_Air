@@ -31,6 +31,7 @@
 * 修改记录
 * 日期              作者                备注
 * 2024-1-8       pudding            first version
+* 2024-3-2       pudding            修复最大占空比更改无效的bug
 ********************************************************************************************************************/
 
 #include "sysclk/cy_sysclk.h"
@@ -409,7 +410,7 @@ void pwm_set_duty (pwm_channel_enum pwmch, uint32 duty)
   
     period = TCPWM0->GRP[0].CNT[get_pwm_ch(pwmch)].unPERIOD.u32Register;
     
-    compare = period * duty / 10000;
+    compare = period * duty / PWM_DUTY_MAX;
   
     TCPWM0->GRP[0].CNT[get_pwm_ch(pwmch)].unCC0_BUFF.u32Register = compare;
 
@@ -463,7 +464,7 @@ void pwm_init (pwm_channel_enum pwmch, uint32 freq, uint32 duty)
     tcpwm_pwm_config.cc1MatchMode       = CY_TCPWM_PWM_TR_CTRL2_NO_CHANGE       ;
     tcpwm_pwm_config.runMode            = CY_TCPWM_PWM_CONTINUOUS               ;
     tcpwm_pwm_config.period             = ((PWM_CLK_FREQ / (0x01 << tcpwm_pwm_config.clockPrescaler) / freq) - 1);
-    tcpwm_pwm_config.compare0           = (tcpwm_pwm_config.period + 1) * duty / 10000;
+    tcpwm_pwm_config.compare0           = (tcpwm_pwm_config.period + 1) * duty / PWM_DUTY_MAX;
     tcpwm_pwm_config.killMode           = CY_TCPWM_PWM_STOP_ON_KILL             ;
     tcpwm_pwm_config.countInputMode     = CY_TCPWM_INPUT_LEVEL                  ;
     tcpwm_pwm_config.countInput         = 1uL                                   ;

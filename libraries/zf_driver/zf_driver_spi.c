@@ -31,6 +31,7 @@
 * 修改记录
 * 日期              作者                备注
 * 2024-1-9       pudding            first version
+* 2024-3-6       pudding            修复与串口的时钟冲突问题
 ********************************************************************************************************************/
 
 #include "scb/cy_scb_spi.h"
@@ -903,9 +904,9 @@ void spi_init (spi_index_enum spi_n, spi_mode_enum mode, uint32 baud, spi_clk_pi
         Cy_GPIO_Pin_Init(get_port(spi_get_cs_pin(cs_pin)), (spi_get_cs_pin(cs_pin) % 8), &spi_pin_cfg);
     }
     
-    Cy_SysClk_PeriphAssignDivider((en_clk_dst_t)((uint32)PCLK_SCB7_CLOCK + (uint32)spi_n), CY_SYSCLK_DIV_24_5_BIT, 1ul);
-    Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup((en_clk_dst_t)((uint32)PCLK_SCB7_CLOCK + (uint32)spi_n)), CY_SYSCLK_DIV_24_5_BIT, 1ul, ((divSetting_fp5 & 0x1FFFFFE0ul) >> 5ul), (divSetting_fp5 & 0x0000001Ful));
-    Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup((en_clk_dst_t)((uint32)PCLK_SCB7_CLOCK + (uint32)spi_n)), CY_SYSCLK_DIV_24_5_BIT, 1ul);
+    Cy_SysClk_PeriphAssignDivider((en_clk_dst_t)((uint32)PCLK_SCB7_CLOCK + (uint32)spi_n), CY_SYSCLK_DIV_24_5_BIT, ((uint8)spi_n + 4));
+    Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup((en_clk_dst_t)((uint32)PCLK_SCB7_CLOCK + (uint32)spi_n)), CY_SYSCLK_DIV_24_5_BIT, ((uint8)spi_n + 4), ((divSetting_fp5 & 0x1FFFFFE0ul) >> 5ul), (divSetting_fp5 & 0x0000001Ful));
+    Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup((en_clk_dst_t)((uint32)PCLK_SCB7_CLOCK + (uint32)spi_n)), CY_SYSCLK_DIV_24_5_BIT, ((uint8)spi_n + 4));
     
     spi_config.spiMode                    = CY_SCB_SPI_MASTER     ;
     spi_config.subMode                    = CY_SCB_SPI_MOTOROLA   ;

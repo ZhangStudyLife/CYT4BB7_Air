@@ -109,6 +109,7 @@ static soft_iic_info_struct imu963ra_iic_struct;
 static void imu963ra_write_acc_gyro_register (uint8 reg, uint8 data)
 {
     IMU963RA_CS(0);
+    
     spi_write_8bit_register(IMU963RA_SPI, reg | IMU963RA_SPI_W, data);
 
     IMU963RA_CS(1);
@@ -125,6 +126,7 @@ static uint8 imu963ra_read_acc_gyro_register (uint8 reg)
 {
     uint8 data = 0;
     IMU963RA_CS(0);
+    
     data = spi_read_8bit_register(IMU963RA_SPI, reg | IMU963RA_SPI_R);
 
     IMU963RA_CS(1);
@@ -143,6 +145,7 @@ static uint8 imu963ra_read_acc_gyro_register (uint8 reg)
 static void imu963ra_read_acc_gyro_registers (uint8 reg, uint8 *data, uint32 len)
 {
     IMU963RA_CS(0);
+    
     spi_read_8bit_registers(IMU963RA_SPI, reg | IMU963RA_SPI_R, data, len);
 
     IMU963RA_CS(1);

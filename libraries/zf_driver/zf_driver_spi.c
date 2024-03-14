@@ -927,9 +927,16 @@ void spi_init (spi_index_enum spi_n, spi_mode_enum mode, uint32 baud, spi_clk_pi
     Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup((en_clk_dst_t)((uint32)PCLK_SCB7_CLOCK + (uint32)spi_n)), CY_SYSCLK_DIV_24_5_BIT, ((uint8)spi_n + 4), ((divSetting_fp5 & 0x1FFFFFE0ul) >> 5ul), (divSetting_fp5 & 0x0000001Ful));
     Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup((en_clk_dst_t)((uint32)PCLK_SCB7_CLOCK + (uint32)spi_n)), CY_SYSCLK_DIV_24_5_BIT, ((uint8)spi_n + 4));
     
+    switch(mode)
+    {
+        case SPI_MODE0:spi_config.sclkMode = CY_SCB_SPI_CPHA0_CPOL0;      break;
+        case SPI_MODE1:spi_config.sclkMode = CY_SCB_SPI_CPHA0_CPOL1;      break;
+        case SPI_MODE2:spi_config.sclkMode = CY_SCB_SPI_CPHA1_CPOL0;      break;
+        case SPI_MODE3:spi_config.sclkMode = CY_SCB_SPI_CPHA1_CPOL1;      break;
+    }
+    
     spi_config.spiMode                    = CY_SCB_SPI_MASTER     ;
     spi_config.subMode                    = CY_SCB_SPI_MOTOROLA   ;
-    spi_config.sclkMode                   = CY_SCB_SPI_CPHA0_CPOL0;
     spi_config.oversample                 = 4                     ;
     spi_config.rxDataWidth                = 8                     ;
     spi_config.txDataWidth                = 8                     ;

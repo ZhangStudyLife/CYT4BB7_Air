@@ -87,7 +87,8 @@ extern "C" {
 *******************************************************************************/
 #define CY_SYS_PLL400M_0_160MHz                 (160000000UL)
 #define CY_SYS_PLL400M_0_250MHz                 (250000000UL)
-
+#define CY_SYS_PLL400M_0_400MHz                 (400000000UL)
+  
 #define CY_SYS_PLL400M_0_FREQ                   SYSTEM_CLOCK_250M
 
 #if (CY_SYS_VCCD_SOURCE == CY_SYS_VCCD_INTERNAL) && (CY_SYS_PLL400M_0_FREQ != CY_SYS_PLL400M_0_160MHz)

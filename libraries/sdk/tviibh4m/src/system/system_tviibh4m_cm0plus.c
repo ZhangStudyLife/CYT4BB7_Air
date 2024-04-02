@@ -27,6 +27,13 @@
     #define CY_SYSTEM_PLL0_CONFIG_REFDIV      (4UL)
     #define CY_SYSTEM_PLL0_CONFIG_FEEDBACKDIV (125UL)
     #define CY_SYSTEM_PLL0_CONFIG_OUTDIV      (2UL)
+  #elif (CY_SYS_PLL400M_0_FREQ == CY_SYS_PLL400M_0_400MHz)
+    // PLL_OUT = 16,000,000(Feco) / 4 * 200 / 2 = 400,000,000Hz
+    // Restriction: 400,000,000 <= Fvco <= 800,000,000
+    // This time, Fvco = 16,000,000 * 200 / 4 = 800,000,000.
+    #define CY_SYSTEM_PLL0_CONFIG_REFDIV      (4UL)
+    #define CY_SYSTEM_PLL0_CONFIG_FEEDBACKDIV (200UL)
+    #define CY_SYSTEM_PLL0_CONFIG_OUTDIV      (2UL)
   #else
     // PLL_OUT = 16,000,000(Feco) / 1 * 30 / 3 = 160,000,000Hz
     // Restriction: 400,000,000 <= Fvco <= 800,000,000

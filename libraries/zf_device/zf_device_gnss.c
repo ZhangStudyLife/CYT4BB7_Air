@@ -551,7 +551,7 @@ void gnss_uart_callback (void)
 // 函数简介     GPS初始化
 // 参数说明     void
 // 返回参数     void
-// 使用示例     gps_init();
+// 使用示例     gnss_init(TAU1201);
 // 备注信息     
 //-------------------------------------------------------------------------------------------------------------------
 void gnss_init (gps_device_enum gps_device)

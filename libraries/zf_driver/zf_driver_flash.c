@@ -37,6 +37,7 @@
 #include "zf_common_debug.h"
 #include "zf_driver_flash.h"
 
+
 flash_data_union flash_union_buffer[FLASH_PAGE_LENGTH];                    // FLASH 操作的数据缓冲区
 static vuint8 flash_init_flag = 0;
 
@@ -88,10 +89,15 @@ void flash_read_page(uint32 sector_num, uint32 page_num, uint32 *buf, uint32 len
     zf_assert(FLASH_PAGE_NUM > page_num);
     zf_assert(FLASH_PAGE_LENGTH >= len);
     zf_assert(flash_init_flag);				// 用户未初始化flash则断言报错
-	
+
+    uint32 * flash_addr = (uint32 *)FLASH_BASE_ADDR;
+    flash_addr = flash_addr + (page_num * FLASH_PAGE_SIZE / FLASH_DATA_SIZE);
+#if CY_CORE_CM7_0 || CY_CORE_CM7_1
+    SCB_InvalidateDCache_by_Addr(flash_addr, len * FLASH_DATA_SIZE);
+#endif
     for(data_cont = 0; data_cont < len; data_cont ++)
     {
-        *buf ++ = *((uint32 *)((FLASH_BASE_ADDR + page_num * FLASH_PAGE_SIZE) + (data_cont * FLASH_DATA_SIZE)));
+        *buf ++ = *(flash_addr + (data_cont * FLASH_DATA_SIZE));
     }
 }
 
@@ -119,6 +125,7 @@ void flash_write_page (uint32 sector_num, uint32 page_num, const uint32 *buf, ui
     
     for(int i = 0; i < len; i ++)
     {
+      
         Cy_FlashWriteWork(flash_addr, buf, CY_FLASH_DRIVER_BLOCKING);
         flash_addr += 4;
         buf += 1;
@@ -140,12 +147,14 @@ void flash_read_page_to_buffer (uint32 sector_num, uint32 page_num, uint32 len)
     zf_assert(FLASH_PAGE_LENGTH >= len);
     zf_assert(flash_init_flag);				// 用户未初始化flash则断言报错
 	
-    uint32_t* flash_addr = (uint32_t*)(page_num * FLASH_PAGE_SIZE + FLASH_BASE_ADDR);
-    
+    uint32 * flash_addr = (uint32 *)FLASH_BASE_ADDR;
+    flash_addr = flash_addr + (page_num * FLASH_PAGE_SIZE / FLASH_DATA_SIZE);
+#if CY_CORE_CM7_0 || CY_CORE_CM7_1
+    SCB_InvalidateDCache_by_Addr(flash_addr, len * FLASH_DATA_SIZE);
+#endif    
     for(data_cont = 0; data_cont < len; data_cont ++)
     {
         flash_union_buffer[data_cont].uint32_type = flash_addr[data_cont];
-        
     }
 }
 

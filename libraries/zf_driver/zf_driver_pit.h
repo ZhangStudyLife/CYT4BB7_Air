@@ -31,6 +31,7 @@
 * 修改记录
 * 日期              作者                备注
 * 2024-1-9       pudding            first version
+* 2024-5-14      pudding            新增12个PIT周期中断
 ********************************************************************************************************************/
 
 #ifndef _zf_driver_pit_h_
@@ -40,9 +41,22 @@
 
 typedef enum // 枚举通道号
 {
-    PIT_CH0,
+    PIT_CH0,            // 通道0 - 通道3 支持周期中断范围： 10us - 536s
     PIT_CH1,
     PIT_CH2,
+    
+    PIT_CH10,           // 通道10 - 通道21 支持周期中断范围： 10us - 1s
+    PIT_CH11,
+    PIT_CH12,
+    PIT_CH13,
+    PIT_CH14,
+    PIT_CH15,
+    PIT_CH16,
+    PIT_CH17,
+    PIT_CH18,
+    PIT_CH19,
+    PIT_CH20,
+    PIT_CH21,
 }pit_index_enum;
 
 

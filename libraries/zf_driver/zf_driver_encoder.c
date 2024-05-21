@@ -31,6 +31,7 @@
 * 修改记录
 * 日期              作者                备注
 * 2023-11-30       pudding            first version
+* 2023-05-21       pudding            新增支持正交编码器
 ********************************************************************************************************************/
 
 #include "sysclk/cy_sysclk.h"
@@ -142,7 +143,9 @@ int16 encoder_get_count (encoder_index_enum encoder_n)
     }
     else
     {
-        encoder_data = (int16)Cy_Tcpwm_QuadDec_GetCounter(encoder_module[encoder_n]);
+        encoder_data = (int16)(0x00008000 - Cy_Tcpwm_QuadDec_GetCounter(encoder_module[encoder_n]));
+        Cy_Tcpwm_QuadDec_SetCounter(encoder_module[encoder_n], 0x00008000);
+        
     }
     return encoder_data;
 }
@@ -178,14 +181,12 @@ void encoder_quad_init (encoder_index_enum encoder_n, encoder_channel1_enum ch1_
 {
     cy_stc_gpio_pin_config_t  pwm_pin_config    = {0};
     cy_stc_tcpwm_quaddec_config_t encoder_quad_config;
-
-    Cy_Tcpwm_QuadDec_DeInit(encoder_module[encoder_n]);
     
-    pwm_pin_config.driveMode                    = CY_GPIO_DM_STRONG_IN_OFF;
+    pwm_pin_config.driveMode                    = CY_GPIO_DM_HIGHZ;
     pwm_pin_config.hsiom                        = get_ch1_hsiom(ch1_pin);
     Cy_GPIO_Pin_Init(get_port(get_ch1_pin(ch1_pin)), (get_ch1_pin(ch1_pin) % 8), &pwm_pin_config);
     
-    pwm_pin_config.driveMode                    = CY_GPIO_DM_STRONG_IN_OFF;
+    pwm_pin_config.driveMode                    = CY_GPIO_DM_HIGHZ;
     pwm_pin_config.hsiom                        = get_ch2_hsiom(ch2_pin);
     Cy_GPIO_Pin_Init(get_port(get_ch2_pin(ch2_pin)), (get_ch2_pin(ch2_pin) % 8), &pwm_pin_config);
     
@@ -194,20 +195,23 @@ void encoder_quad_init (encoder_index_enum encoder_n, encoder_channel1_enum ch1_
     Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup(encoder_clk[encoder_n]), CY_SYSCLK_DIV_16_BIT, 0ul);
    
     
-    memset(&encoder_quad_config, 0, sizeof(encoder_quad_config));
+    Cy_Tcpwm_QuadDec_DeInit(encoder_module[encoder_n]);
     
-    encoder_quad_config.encoding_mode           = CY_TCPWM_QUADDEC_X4           ;
+    encoder_quad_config.encoding_mode           = CY_TCPWM_QUADDEC_X1           ;
     encoder_quad_config.range_mode              = CY_TCPWM_QUADDEC_RANGE_0      ;
-    encoder_quad_config.indexInputMode          = CY_TCPWM_INPUT_LEVEL          ;
+    encoder_quad_config.interruptSources        = CY_TCPWM_INT_NONE             ;
+    encoder_quad_config.indexInputMode          = CY_TCPWM_INPUT_RISING_EDGE    ;
+    encoder_quad_config.indexInput              = CY_TCPWM_INPUT0               ;
+    encoder_quad_config.stopInputMode           = CY_TCPWM_INPUT_LEVEL          ;
+    encoder_quad_config.stopInput               = CY_TCPWM_INPUT0               ;
     encoder_quad_config.phiAInput               = CY_TCPWM_INPUT_TRIG0          ;
-    encoder_quad_config.phiBInput               = CY_TCPWM_INPUT_TRIG0          ;
-    encoder_quad_config.trigger0EventCfg        = CY_TCPWM_COUNTER_DISABLED     ;
-    encoder_quad_config.trigger1EventCfg        = CY_TCPWM_COUNTER_DISABLED     ;
-    encoder_quad_config.debug_pause             = 1uL                           ;
+    encoder_quad_config.phiBInput               = CY_TCPWM_INPUT_TRIG1          ;  
     
     Cy_Tcpwm_QuadDec_Init(encoder_module[encoder_n], &encoder_quad_config);
     Cy_Tcpwm_QuadDec_Enable(encoder_module[encoder_n]);
-                  
+    Cy_Tcpwm_TriggerStart(encoder_module[encoder_n]);
+    Cy_Tcpwm_TriggerReloadOrIndex(encoder_module[encoder_n]);
+    
     encoder_mode[encoder_n]  = 0;
 }       
 

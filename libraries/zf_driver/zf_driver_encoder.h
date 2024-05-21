@@ -31,6 +31,7 @@
 * 修改记录
 * 日期              作者                备注
 * 2023-11-30       pudding            first version
+* 2023-05-21       pudding            新增支持正交编码器
 ********************************************************************************************************************/
 
 #ifndef _zf_driver_encoder_h_
@@ -68,7 +69,7 @@ typedef enum  // 枚举 定时器编号
 int16 encoder_get_count     (encoder_index_enum encoder_n);
 void  encoder_clear_count   (encoder_index_enum encoder_n);
 
-//void  encoder_quad_init     (encoder_index_enum encoder_n, encoder_channel1_enum count_pin, encoder_channel2_enum dir_pin);
+void  encoder_quad_init     (encoder_index_enum encoder_n, encoder_channel1_enum count_pin, encoder_channel2_enum dir_pin);
 void  encoder_dir_init      (encoder_index_enum encoder_n, encoder_channel1_enum ch1_pin, encoder_channel2_enum ch2_pin);
 //====================================================编码器 基础函数====================================================
 

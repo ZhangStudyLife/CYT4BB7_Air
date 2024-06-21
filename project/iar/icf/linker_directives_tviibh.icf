@@ -329,3 +329,9 @@ place in SFLASH_TOC2        {readonly section .sflash_toc2};
 
 place in WORK_FLASH         {readonly section .work_flash};
 
+define symbol __ICFEDIT_region_RAM_start__ = 0x28001000;
+define symbol __ICFEDIT_region_RAM_size_   = 0x00002000;
+define region ICFEDIT_region_RAM                      = mem:[from __ICFEDIT_region_RAM_start__           size __ICFEDIT_region_RAM_size_          ];
+
+place in ICFEDIT_region_RAM         {section .global_ram_data};
+

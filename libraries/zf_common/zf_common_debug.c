@@ -36,6 +36,7 @@
 #include "zf_common_interrupt.h"
 #include "zf_common_fifo.h"
 #include "zf_driver_uart.h"
+#include "zf_driver_delay.h"
 #include "zf_common_debug.h"
 
 static debug_output_struct  debug_output_info;
@@ -461,6 +462,10 @@ void debug_init (void)
     fifo_init(&debug_uart_fifo, FIFO_DATA_8BIT, debug_uart_buffer, DEBUG_RING_BUFFER_LEN);
     uart_rx_interrupt(DEBUG_UART_INDEX, 1);                                     // 使能对应串口接收中断
 #endif
+
+#if !CY_CORE_CM7_0 && !CY_CORE_CM7_1    
+    system_delay_ms(100);                                               // 上电延时 等待外设上电完成
+#endif    
 }
 
 

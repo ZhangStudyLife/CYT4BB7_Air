@@ -44,7 +44,6 @@
 
 int main(void)
 {
-    __enable_irq();
     SystemInit();                                                       // 系统初始化 对系统时钟、系统电源进行配置
     debug_init();			                                // 初始化默认调试串口
     Cy_SysEnableApplCore(CORE_CM7_0, CY_CORTEX_M7_0_APPL_ADDR);         // 启动M7核心0

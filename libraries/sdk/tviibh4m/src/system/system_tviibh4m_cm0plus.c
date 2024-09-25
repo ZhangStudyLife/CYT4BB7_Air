@@ -149,6 +149,8 @@ uint32_t cy_delay32kMs    = 0UL;
 *******************************************************************************/
 void SystemInit (void)
 {
+    __enable_irq();
+    
 #if defined(CY_SYSTEM_WDT_DISABLE)
     /* disable WDT */
     Cy_WDT_Disable();

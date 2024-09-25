@@ -52,6 +52,7 @@ typedef enum
 {
     NO_WIRELESS = 0,                                                            // 无设备
     WIRELESS_UART,                                                              // 无线串口
+    BLE6A20,                                                                    // 蓝牙串口
     BLUETOOTH_CH9141,                                                           // 蓝牙 CH9141
     WIFI_UART,                                                                  // 串口 WiFi
     RECEIVER_UART,                                                              // SBUS遥控器接收

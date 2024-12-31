@@ -1917,12 +1917,6 @@
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_ble6a20.h</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_bluetooth_ch9141.c</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_bluetooth_ch9141.h</name>
-        </file>
-        <file>
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_config.h</name>
         </file>
         <file>
@@ -1978,12 +1972,6 @@
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_key.h</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_mpu6050.c</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_mpu6050.h</name>
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_mt9v03x.c</name>

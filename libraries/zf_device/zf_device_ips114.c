@@ -856,7 +856,7 @@ void ips114_show_rgb565_image (uint16 x, uint16 y, const uint16 *image, uint16 w
 // 参数说明     dis_width       波形显示宽度 参数范围 [0, ips114_width_max]
 // 参数说明     dis_value_max   波形显示最大值 参数范围 [0, ips114_height_max]
 // 返回参数     void
-// 使用示例     ips114_show_wave(56,35,data,128,64,128,64);
+// 使用示例     ips114_show_wave(0,0,tsl1401_data[0],128,256,128,64);
 // 备注信息
 //-------------------------------------------------------------------------------------------------------------------
 void ips114_show_wave (uint16 x, uint16 y, const uint16 *wave, uint16 width, uint16 value_max, uint16 dis_width, uint16 dis_value_max)

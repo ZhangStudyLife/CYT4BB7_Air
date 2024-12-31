@@ -36,7 +36,7 @@
 * 接线定义：
 *                  ------------------------------------
 *                  模块管脚             单片机管脚
-*                  // 双排排针 并口两寸屏 硬件引脚
+*                  // 八位并口 并口两寸屏 硬件引脚
 *                  RD                 查看 zf_device_ips200.h 中 IPS200_RD_PIN_PARALLEL8     宏定义
 *                  WR                 查看 zf_device_ips200.h 中 IPS200_WR_PIN_PARALLEL8     宏定义
 *                  RS                 查看 zf_device_ips200.h 中 IPS200_RS_PIN_PARALLEL8     宏定义
@@ -47,7 +47,7 @@
 *                  VCC                3.3V电源
 *                  GND                电源地
 *
-*                  // 单排排针 SPI 两寸屏 硬件引脚
+*                  // SPI 串口 SPI 两寸屏 硬件引脚
 *                  SCL                查看 zf_device_ips200.h 中 IPS200_SCL_PIN_SPI  宏定义
 *                  SDA                查看 zf_device_ips200.h 中 IPS200_SDA_PIN_SPI  宏定义
 *                  RST                查看 zf_device_ips200.h 中 IPS200_RST_PIN_SPI  宏定义
@@ -69,14 +69,14 @@
 #define IPS200_USE_SOFT_SPI             (0 )                                    // 默认使用硬件 SPI 方式驱动 建议使用硬件 SPI 方式驱动
 #if IPS200_USE_SOFT_SPI                                                         // 这两段 颜色正常的才是正确的 颜色灰的就是没有用的
 //====================================================软件 SPI 驱动====================================================
-// 如果使用的是单排排针的两寸屏幕 SPI 驱动控制引脚 可以修改
+// 如果使用的是SPI 串口的两寸屏幕 SPI 驱动控制引脚 可以修改
 #define IPS200_SOFT_SPI_DELAY           (0 )                                    // 软件 SPI 的时钟延时周期 数值越小 SPI 通信速率越快
 #define IPS200_SCL_PIN                  (P12_2)                                 // 软件 SPI SCK 引脚
 #define IPS200_SDA_PIN                  (P12_1)                                 // 软件 SPI MOSI 引脚
 //====================================================软件 SPI 驱动====================================================
 #else
 //====================================================硬件 SPI 驱动====================================================
-// 如果使用的是单排排针的两寸屏幕 SPI 驱动控制引脚 可以修改
+// 如果使用的是SPI 串口的两寸屏幕 SPI 驱动控制引脚 可以修改
 #define IPS200_SPI_SPEED                (30*1000*1000	)                       // 硬件 SPI 速率
 #define IPS200_SPI                      (SPI_1			)                       // 硬件 SPI 号
 #define IPS200_SCL_PIN_SPI              (SPI1_CLK_P12_2	)                       // 硬件 SPI SCK 引脚
@@ -84,28 +84,28 @@
 #define IPS200_SDA_IN_PIN_SPI           (SPI_MISO_NULL	)                       // 硬件 SPI MISO 引脚  IPS没有MISO引脚，但是这里任然需要定义，在spi的初始化时需要使用
 //====================================================硬件 SPI 驱动====================================================
 #endif
-// 如果使用的是单排排针的两寸屏幕 SPI 驱动控制引脚 可以修改
-#define IPS200_RST_PIN_SPI              (P22_4)                                 // 单排针(SPI)液晶复位引脚定义
-#define IPS200_DC_PIN_SPI               (P22_3)                                 // 单排针(SPI)液晶命令位引脚定义
-#define IPS200_CS_PIN_SPI               (P12_3)                                 // 单排针(SPI)液晶片选引脚定义
-#define IPS200_BLk_PIN_SPI              (P11_0)                                 // 单排针(SPI)液晶背光引脚定义
+// 如果使用的是SPI 串口的两寸屏幕 SPI 驱动控制引脚 可以修改
+#define IPS200_RST_PIN_SPI              (P22_4)                                 // (SPI串口)液晶复位引脚定义
+#define IPS200_DC_PIN_SPI               (P22_3)                                 // (SPI串口)液晶命令位引脚定义
+#define IPS200_CS_PIN_SPI               (P12_3)                                 // (SPI串口)液晶片选引脚定义
+#define IPS200_BLk_PIN_SPI              (P11_0)                                 // (SPI串口)液晶背光引脚定义
 
-// 如果使用的是双排排针的两寸屏幕 并口驱动控制引脚 可以修改
-#define IPS200_RD_PIN_PARALLEL8         (P12_2)                                 // 双排针(并口)液晶读取位引脚定义
-#define IPS200_WR_PIN_PARALLEL8         (P12_1)                                 // 双排针(并口)液晶写入位引脚定义
-#define IPS200_RST_PIN_PARALLEL8        (P22_3)                                 // 双排针(并口)液晶复位引脚定义
-#define IPS200_RS_PIN_PARALLEL8         (P22_4)                                 // 双排针(并口)液晶命令位引脚定义
-#define IPS200_CS_PIN_PARALLEL8         (P12_3)                                 // 双排针(并口)液晶片选引脚定义
-#define IPS200_BL_PIN_PARALLEL8         (P11_0)                                 // 双排针(并口)液晶背光引脚定义
-//并口驱动数据引脚 可以修改 如果你的屏幕是双排排针 这里的引脚用得到。
-#define IPS200_D0_PIN_PARALLEL8         (P13_0)                                	// 双排针(并口)液晶数据引脚D0
-#define IPS200_D1_PIN_PARALLEL8         (P13_1)                                	// 双排针(并口)液晶数据引脚D1
-#define IPS200_D2_PIN_PARALLEL8         (P13_2)                                	// 双排针(并口)液晶数据引脚D2
-#define IPS200_D3_PIN_PARALLEL8         (P13_3)                                	// 双排针(并口)液晶数据引脚D3
-#define IPS200_D4_PIN_PARALLEL8         (P13_4)                                	// 双排针(并口)液晶数据引脚D4
-#define IPS200_D5_PIN_PARALLEL8         (P13_5)                                	// 双排针(并口)液晶数据引脚D5
-#define IPS200_D6_PIN_PARALLEL8         (P13_6)                                	// 双排针(并口)液晶数据引脚D6
-#define IPS200_D7_PIN_PARALLEL8         (P13_7)                                	// 双排针(并口)液晶数据引脚D7
+// 如果使用的是八位并口的两寸屏幕 并口驱动控制引脚 可以修改
+#define IPS200_RD_PIN_PARALLEL8         (P12_2)                                 // (八位并口)液晶读取位引脚定义
+#define IPS200_WR_PIN_PARALLEL8         (P12_1)                                 // (八位并口)液晶写入位引脚定义
+#define IPS200_RST_PIN_PARALLEL8        (P22_3)                                 // (八位并口)液晶复位引脚定义
+#define IPS200_RS_PIN_PARALLEL8         (P22_4)                                 // (八位并口)液晶命令位引脚定义
+#define IPS200_CS_PIN_PARALLEL8         (P12_3)                                 // (八位并口)液晶片选引脚定义
+#define IPS200_BL_PIN_PARALLEL8         (P11_0)                                 // (八位并口)液晶背光引脚定义
+//并口驱动数据引脚 可以修改 如果你的屏幕是八位并口 这里的引脚用得到。               
+#define IPS200_D0_PIN_PARALLEL8         (P13_0)                                	// (八位并口)液晶数据引脚D0
+#define IPS200_D1_PIN_PARALLEL8         (P13_1)                                	// (八位并口)液晶数据引脚D1
+#define IPS200_D2_PIN_PARALLEL8         (P13_2)                                	// (八位并口)液晶数据引脚D2
+#define IPS200_D3_PIN_PARALLEL8         (P13_3)                                	// (八位并口)液晶数据引脚D3
+#define IPS200_D4_PIN_PARALLEL8         (P13_4)                                	// (八位并口)液晶数据引脚D4
+#define IPS200_D5_PIN_PARALLEL8         (P13_5)                                	// (八位并口)液晶数据引脚D5
+#define IPS200_D6_PIN_PARALLEL8         (P13_6)                                	// (八位并口)液晶数据引脚D6
+#define IPS200_D7_PIN_PARALLEL8         (P13_7)                                	// (八位并口)液晶数据引脚D7
 
 #define IPS200_DEFAULT_DISPLAY_DIR      (IPS200_PORTAIT)                        // 默认的显示方向
 #define IPS200_DEFAULT_PENCOLOR         (RGB565_RED    )                        // 默认的画笔颜色

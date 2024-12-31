@@ -38,9 +38,9 @@
 #include "zf_common_debug.h"
 #include "zf_driver_uart.h"
 #include "zf_device_wireless_uart.h"
-#include "zf_device_bluetooth_ch9141.h"
 #include "zf_device_wifi_uart.h"
 #include "zf_device_wifi_spi.h"
+#include "zf_device_ble6a20.h"
 #include "seekfree_assistant.h"
 
 #include "seekfree_assistant_interface.h"
@@ -100,10 +100,10 @@ ZF_WEAK void seekfree_assistant_interface_init (seekfree_assistant_transfer_devi
             seekfree_assistant_receive_callback = wireless_uart_read_buffer;
         }break;
         
-        case SEEKFREE_ASSISTANT_CH9141:
+        case SEEKFREE_ASSISTANT_BLE6A20:
         {
-            seekfree_assistant_transfer_callback = bluetooth_ch9141_send_buffer;
-            seekfree_assistant_receive_callback = bluetooth_ch9141_read_buffer;
+            seekfree_assistant_transfer_callback = ble6a20_send_buffer;
+            seekfree_assistant_receive_callback = ble6a20_read_buffer;
         }break;
         
         case SEEKFREE_ASSISTANT_WIFI_UART:

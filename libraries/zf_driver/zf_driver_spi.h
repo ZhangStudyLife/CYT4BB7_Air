@@ -42,6 +42,7 @@ typedef enum        				// SPIÄ£¿éºÅ
     SPI_0,
     SPI_1,
     SPI_2,
+    SPI_3,
 }spi_index_enum;
 
 typedef enum        				// Ã¶¾Ù SPI Ä£Ê½ ´ËÃ¶¾Ù¶¨Òå²»ÔÊÐíÓÃ»§ÐÞ¸Ä
@@ -59,6 +60,8 @@ typedef enum                           	// Ã¶¾ÙSPI CLKÒý½Å ´ËÃ¶¾Ù¶¨Òå²»ÔÊÐíÓÃ»§Ð
     SPI1_CLK_P12_2,             		// SPI1 CLK Òý½Å¿ÉÑ¡·¶Î§
 	
     SPI2_CLK_P15_2,				// SPI2 CLK Òý½Å¿ÉÑ¡·¶Î§
+    
+    SPI3_CLK_P03_2,				// SPI3 CLK Òý½Å¿ÉÑ¡·¶Î§
 }spi_clk_pin_enum;
 
 typedef enum                       		// Ã¶¾ÙSPI MOSIÒý½Å ´ËÃ¶¾Ù¶¨Òå²»ÔÊÐíÓÃ»§ÐÞ¸Ä
@@ -68,6 +71,8 @@ typedef enum                       		// Ã¶¾ÙSPI MOSIÒý½Å ´ËÃ¶¾Ù¶¨Òå²»ÔÊÐíÓÃ»§ÐÞ¸
     SPI1_MOSI_P12_1,                  	        // SPI1 MOSIÒý½Å¿ÉÑ¡·¶Î§
   
     SPI2_MOSI_P15_1,                  	        // SPI2 MOSIÒý½Å¿ÉÑ¡·¶Î§
+    
+    SPI3_MOSI_P03_1,                  	        // SPI3 MOSIÒý½Å¿ÉÑ¡·¶Î§
 }spi_mosi_pin_enum;
 
 typedef enum             			// Ã¶¾ÙSPI MISOÒý½Å ´ËÃ¶¾Ù¶¨Òå²»ÔÊÐíÓÃ»§ÐÞ¸Ä
@@ -77,6 +82,8 @@ typedef enum             			// Ã¶¾ÙSPI MISOÒý½Å ´ËÃ¶¾Ù¶¨Òå²»ÔÊÐíÓÃ»§ÐÞ¸Ä
     SPI1_MISO_P12_0,              		// SPI1 MISOÒý½Å¿ÉÑ¡·¶Î§
 
     SPI2_MISO_P15_0, 				// SPI2 MISOÒý½Å¿ÉÑ¡·¶Î§
+    
+    SPI3_MISO_P03_0, 				// SPI3 MISOÒý½Å¿ÉÑ¡·¶Î§
 	
     SPI_MISO_NULL,
 }spi_miso_pin_enum;
@@ -92,6 +99,9 @@ typedef enum                       		// Ã¶¾ÙSPI CSÒý½Å ´ËÃ¶¾Ù¶¨Òå²»ÔÊÐíÓÃ»§ÐÞ¸Ä
     SPI2_CS0_P15_3,                 	        // SPI2 CS0 Òý½Å¿ÉÑ¡·¶Î§
     SPI2_CS3_P05_1,
 	
+    SPI3_CS0_P03_3,                             // SPI3 CS0 Òý½Å¿ÉÑ¡·¶Î§
+    SPI3_CS1_P03_4,
+    
     SPI_CS_NULL,
 }spi_cs_pin_enum;
 

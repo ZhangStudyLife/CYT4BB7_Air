@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sessionSetup>
+<partner><name>Partner0</name><workspace>$WS_PATH$</workspace><project>$PROJ_PATH$</project><config>Debug</config><numberOfCores>1</numberOfCores></partner>
+<partner><name>Partner1</name><workspace>$WS_DIR$\project_config\cyt4bb7_cm_7_1.eww</workspace><project>cyt4bb7_cm_7_1</project><config>Debug</config><numberOfCores>1</numberOfCores><attachToRunningTarget>true</attachToRunningTarget></partner>
+</sessionSetup>

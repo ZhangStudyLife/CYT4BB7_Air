@@ -120,7 +120,7 @@
                 </option>
                 <option>
                     <name>OCImagesPath1</name>
-                    <state>$PROJ_DIR$\Debug_m7_1\Exe\cyt4bb7_cm_7_1.hex</state>
+                    <state>$PROJ_DIR$\cyt4bb7_cm_7_0.ewx</state>
                 </option>
                 <option>
                     <name>OCImagesSuppressCheck2</name>
@@ -156,7 +156,7 @@
                 </option>
                 <option>
                     <name>OCImagesUse1</name>
-                    <state>0</state>
+                    <state>1</state>
                 </option>
                 <option>
                     <name>OCImagesUse2</name>
@@ -216,7 +216,7 @@
                 </option>
                 <option>
                     <name>OCMulticoreSessionFile</name>
-                    <state>$PROJ_DIR$\cm0plus_cm7_0_cm7_1_debug.xml</state>
+                    <state>$PROJ_DIR$\cm7_0_cm7_1_debug.xml</state>
                 </option>
                 <option>
                     <name>OCTpiuBaseOption</name>

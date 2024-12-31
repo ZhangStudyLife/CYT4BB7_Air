@@ -1914,22 +1914,10 @@
     <group>
         <name>zf_device</name>
         <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_absolute_encoder.c</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_absolute_encoder.h</name>
-        </file>
-        <file>
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_ble6a20.c</name>
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_ble6a20.h</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_bluetooth_ch9141.c</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_bluetooth_ch9141.h</name>
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_config.h</name>
@@ -1989,10 +1977,16 @@
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_key.h</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_mpu6050.c</name>
+            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_menc15a.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_mpu6050.h</name>
+            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_menc15a.h</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_mt9v03x.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_mt9v03x.h</name>
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_oled.c</name>
@@ -2023,12 +2017,6 @@
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_uart_receiver.h</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_virtual_oscilloscope.c</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_virtual_oscilloscope.h</name>
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_wifi_spi.c</name>

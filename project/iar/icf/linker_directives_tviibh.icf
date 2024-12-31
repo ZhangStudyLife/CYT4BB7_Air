@@ -321,7 +321,7 @@ if(isdefinedsymbol(_CORE_cm7_0_) || isdefinedsymbol(_CORE_cm7_1_))
     define exported symbol __ecc_init_itcm_end_address   = end(SELF_ITCM);
 }    
 
-place in SFLASH_UF_ROWS     {readonly section .sflash_uf_rows};
+place in SFLASH_UF_ROWS     {readonly section .sflash_uf_rows}; 
 place in SFLASH_NAR         {readonly section .sflash_nar};
 place in SFLASH_PKEY        {readonly section .sflash_pkey};
 place in SFLASH_APP_PROT    {readonly section .sflash_app_prot};

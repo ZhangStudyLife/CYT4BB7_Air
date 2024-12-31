@@ -38,7 +38,7 @@
 #include "zf_common_debug.h"
 #include "zf_driver_exti.h"
 
-#define EXTI_USE_ISR    CPUIntIdx1_IRQn
+#define EXTI_USE_ISR    CPUIntIdx7_IRQn
 
 
 void gpio_0_exti_isr();

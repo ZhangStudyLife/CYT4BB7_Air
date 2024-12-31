@@ -135,6 +135,8 @@ uint16 adc_convert (adc_channel_enum adc_chn)
     
     sar_adc[adc_port]->CH[adc_channel].unTR_CMD.stcField.u1START = 1ul;
     
+    while(sar_adc[adc_port]->unSTATUS.stcField.u1BUSY);
+    
     adc_data = sar_adc[adc_port]->CH[adc_channel].unRESULT.stcField.u16RESULT;
     
     adc_data = adc_data >> offset_temp;

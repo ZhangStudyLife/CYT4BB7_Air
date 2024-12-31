@@ -170,22 +170,6 @@ uint32 wireless_uart_send_string (const char *str)
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-// 函数简介     无线转串口模块 发送摄像头图像至上位机查看图像
-// 参数说明     *image_addr     需要发送的图像地址
-// 参数说明     image_size      图像的大小
-// 返回参数     void
-// 使用示例     wireless_uart_send_image(&mt9v03x_image[0][0], MT9V03X_IMAGE_SIZE);
-// 备注信息     
-//-------------------------------------------------------------------------------------------------------------------
-void wireless_uart_send_image (const uint8 *image_addr, uint32 image_size)
-{
-//    zf_assert(NULL != image_addr);
-//    extern uint8 camera_send_image_frame_header[4];
-//    wireless_uart_send_buffer(camera_send_image_frame_header, 4);
-//    wireless_uart_send_buffer((uint8 *)image_addr, image_size);
-}
-
-//-------------------------------------------------------------------------------------------------------------------
 // 函数简介     无线转串口模块 读取缓冲
 // 参数说明     *buff           接收缓冲区
 // 参数说明     len             读取数据长度

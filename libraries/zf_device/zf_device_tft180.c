@@ -261,7 +261,7 @@ static void tft180_debug_init (void)
 //-------------------------------------------------------------------------------------------------------------------
 void tft180_clear (void)
 {
-    uint16 color_buffer[160];
+    uint16 color_buffer[tft180_width_max];
     uint16 i = 0, j = 0;
 
     TFT180_CS(0);
@@ -286,7 +286,7 @@ void tft180_clear (void)
 //-------------------------------------------------------------------------------------------------------------------
 void tft180_full (const uint16 color)
 {
-    uint16 color_buffer[160];
+    uint16 color_buffer[tft180_width_max];
     uint16 i = 0, j = 0;
 
     TFT180_CS(0);
@@ -704,7 +704,7 @@ void tft180_show_binary_image (uint16 x, uint16 y, const uint8 *image, uint16 wi
     uint32 i = 0, j = 0;
     uint8 temp = 0;
     uint32 width_index = 0;
-    uint16 data_buffer[160];
+    uint16 data_buffer[tft180_width_max];
     const uint8 *image_temp;
 
     TFT180_CS(0);
@@ -758,7 +758,7 @@ void tft180_show_gray_image (uint16 x, uint16 y, const uint8 *image, uint16 widt
 
     uint32 i = 0, j = 0;
     uint16 color = 0,temp = 0;
-    uint16 data_buffer[160];
+    uint16 data_buffer[tft180_width_max];
     const uint8 *image_temp;
 
     TFT180_CS(0);
@@ -817,7 +817,7 @@ void tft180_show_rgb565_image (uint16 x, uint16 y, const uint16 *image, uint16 w
     zf_assert(NULL != image);
 
     uint32 i = 0, j = 0;
-    uint16 data_buffer[160];
+    uint16 data_buffer[tft180_width_max];
     const uint16 *image_temp;
 
     TFT180_CS(0);
@@ -865,7 +865,7 @@ void tft180_show_wave (uint16 x, uint16 y, const uint16 *wave, uint16 width, uin
 
     uint32 i = 0, j = 0;
     uint32 width_index = 0, value_max_index = 0;
-    uint16 data_buffer[160];
+    uint16 data_buffer[tft180_width_max];
 
     TFT180_CS(0);
     tft180_set_region(x, y, x + dis_width - 1, y + dis_value_max - 1);          // …Ë÷√œ‘ æ«¯”Ú

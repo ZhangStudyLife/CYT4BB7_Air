@@ -390,7 +390,7 @@ static void ips200_debug_init (void)
 //-------------------------------------------------------------------------------------------------------------------
 void ips200_clear (void)
 {
-    uint16 color_buffer[240];
+    uint16 color_buffer[ips200_width_max];
     uint16 i = 0, j = 0;
 
     if(IPS200_TYPE_SPI == ips200_display_type)
@@ -421,7 +421,7 @@ void ips200_clear (void)
 //-------------------------------------------------------------------------------------------------------------------
 void ips200_full (const uint16 color)
 {
-    uint16 color_buffer[240];
+    uint16 color_buffer[ips200_width_max];
     uint16 i = 0, j = 0;
 
     if(IPS200_TYPE_SPI == ips200_display_type)
@@ -856,7 +856,7 @@ void ips200_show_binary_image (uint16 x, uint16 y, const uint8 *image, uint16 wi
     uint32 i = 0, j = 0;
     uint8 temp = 0;
     uint32 width_index = 0;
-    uint16 data_buffer[240];
+    uint16 data_buffer[ips200_width_max];
     const uint8 *image_temp;
 
     if(IPS200_TYPE_SPI == ips200_display_type)
@@ -916,7 +916,7 @@ void ips200_show_gray_image (uint16 x, uint16 y, const uint8 *image, uint16 widt
 
     uint32 i = 0, j = 0;
     uint16 color = 0,temp = 0;
-    uint16 data_buffer[240];
+    uint16 data_buffer[ips200_width_max];
     const uint8 *image_temp;
 
     if(IPS200_TYPE_SPI == ips200_display_type)
@@ -981,7 +981,7 @@ void ips200_show_rgb565_image (uint16 x, uint16 y, const uint16 *image, uint16 w
     zf_assert(NULL != image);
 
     uint32 i = 0, j = 0;
-    uint16 data_buffer[240];
+    uint16 data_buffer[ips200_width_max];
     const uint16 *image_temp;
 
     if(IPS200_TYPE_SPI == ips200_display_type)
@@ -1035,7 +1035,7 @@ void ips200_show_wave (uint16 x, uint16 y, const uint16 *wave, uint16 width, uin
 
     uint32 i = 0, j = 0;
     uint32 width_index = 0, value_max_index = 0;
-    uint16 data_buffer[240];
+    uint16 data_buffer[ips200_width_max];
 
     if(IPS200_TYPE_SPI == ips200_display_type)
     {

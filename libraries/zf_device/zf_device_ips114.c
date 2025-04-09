@@ -64,7 +64,7 @@ static uint16                   ips114_bgcolor      = IPS114_DEFAULT_BGCOLOR;   
 static ips114_dir_enum          ips114_display_dir  = IPS114_DEFAULT_DISPLAY_DIR;       // 显示方向
 static ips114_font_size_enum    ips114_display_font = IPS114_DEFAULT_DISPLAY_FONT;      // 显示字体类型
 
-static uint16 data_buffer[240];
+
 #if IPS114_USE_SOFT_SPI
 static soft_spi_info_struct             ips114_spi;
 //-------------------------------------------------------------------------------------------------------------------
@@ -271,17 +271,18 @@ static void ips114_debug_init (void)
 //-------------------------------------------------------------------------------------------------------------------
 void ips114_clear (void)
 {
+    uint16 color_buffer[ips114_width_max];
     uint32 i = 0, j = 0;
 
     IPS114_CS(0);
     ips114_set_region(0, 0, ips114_width_max - 1, ips114_height_max - 1);
     for(i = 0; i < ips114_width_max; i ++)
     {
-        data_buffer[i] = ips114_bgcolor;
+        color_buffer[i] = ips114_bgcolor;
     }
     for (j = 0; j < ips114_height_max; j ++)
     {
-        ips114_write_16bit_data_array(data_buffer, ips114_width_max);
+        ips114_write_16bit_data_array(color_buffer, ips114_width_max);
     }
     IPS114_CS(1);
 }
@@ -291,21 +292,22 @@ void ips114_clear (void)
 // 参数说明     color           颜色格式 RGB565 或者可以使用 zf_common_font.h 内 rgb565_color_enum 枚举值或者自行写入
 // 返回参数     void
 // 使用示例     ips114_full(RGB565_BLACK);
-// 备注信息
+// 备注信息     
 //-------------------------------------------------------------------------------------------------------------------
 void ips114_full (const uint16 color)
 {
+    uint16 color_buffer[ips114_width_max];
     uint32 i = 0, j = 0;
 
     IPS114_CS(0);
     ips114_set_region(0, 0, ips114_width_max - 1, ips114_height_max - 1);
     for(i = 0; i < ips114_width_max; i ++)
     {
-        data_buffer[i] = color;
+        color_buffer[i] = color;
     }
     for (j = 0; j < ips114_height_max; j ++)
     {
-        ips114_write_16bit_data_array(data_buffer, ips114_width_max);
+        ips114_write_16bit_data_array(color_buffer, ips114_width_max);
     }
     IPS114_CS(1);
 }
@@ -370,7 +372,7 @@ void ips114_set_color (const uint16 pen, const uint16 bgcolor)
 // 参数说明     color           颜色格式 RGB565 或者可以使用 zf_common_font.h 内 rgb565_color_enum 枚举值或者自行写入
 // 返回参数     void
 // 使用示例     ips114_draw_point(0, 0, RGB565_RED);            // 坐标 0,0 画一个红色的点
-// 备注信息
+// 备注信息     
 //-------------------------------------------------------------------------------------------------------------------
 void ips114_draw_point (uint16 x, uint16 y, const uint16 color)
 {
@@ -394,7 +396,7 @@ void ips114_draw_point (uint16 x, uint16 y, const uint16 color)
 // 参数说明     color           颜色格式 RGB565 或者可以使用 zf_common_font.h 内 rgb565_color_enum 枚举值或者自行写入
 // 返回参数     void
 // 使用示例     ips114_draw_line(0, 0, 10, 10, RGB565_RED);     // 坐标 0,0 到 10,10 画一条红色的线
-// 备注信息
+// 备注信息     
 //-------------------------------------------------------------------------------------------------------------------
 void ips114_draw_line (uint16 x_start, uint16 y_start, uint16 x_end, uint16 y_end, const uint16 color)
 {
@@ -457,7 +459,7 @@ void ips114_draw_line (uint16 x_start, uint16 y_start, uint16 x_end, uint16 y_en
 // 参数说明     dat             需要显示的字符
 // 返回参数     void
 // 使用示例     ips114_show_char(0, 0, 'x');                    // 坐标 0,0 写一个字符 x
-// 备注信息
+// 备注信息     
 //-------------------------------------------------------------------------------------------------------------------
 void ips114_show_char (uint16 x, uint16 y, const char dat)
 {
@@ -544,7 +546,7 @@ void ips114_show_char (uint16 x, uint16 y, const char dat)
 // 参数说明     dat             需要显示的字符串
 // 返回参数     void
 // 使用示例     ips114_show_string(0, 0, "seekfree");
-// 备注信息
+// 备注信息     
 //-------------------------------------------------------------------------------------------------------------------
 void ips114_show_string (uint16 x, uint16 y, const char dat[])
 {
@@ -613,7 +615,7 @@ void ips114_show_int (uint16 x, uint16 y, const int32 dat, uint8 num)
 // 参数说明     num             需要显示的位数 最高10位  不包含正负号
 // 返回参数     void
 // 使用示例     ips114_show_uint(0, 0, x, 3);                   // x 可以为 uint32 uint16 uint8 类型
-// 备注信息
+// 备注信息     
 //-------------------------------------------------------------------------------------------------------------------
 void ips114_show_uint (uint16 x, uint16 y, const uint32 dat, uint8 num)
 {
@@ -648,7 +650,7 @@ void ips114_show_uint (uint16 x, uint16 y, const uint32 dat, uint8 num)
 // 参数说明     x               坐标x方向的起点 参数范围 [0, ips114_width_max-1]
 // 参数说明     y               坐标y方向的起点 参数范围 [0, ips114_height_max-1]
 // 参数说明     dat             需要显示的变量 数据类型 double
-// 参数说明     num             整数位显示长度   最高8位
+// 参数说明     num             整数位显示长度   最高8位  
 // 参数说明     pointnum        小数位显示长度   最高6位
 // 返回参数     void
 // 使用示例     ips114_show_float(0, 0, x, 2, 3);               // 显示浮点数 整数显示 2 位 小数显示 3 位
@@ -711,6 +713,7 @@ void ips114_show_binary_image (uint16 x, uint16 y, const uint8 *image, uint16 wi
     uint32 i = 0, j = 0;
     uint8 temp = 0;
     uint32 width_index = 0;
+    uint16 data_buffer[dis_width];
     const uint8 *image_temp;
 
     IPS114_CS(0);
@@ -764,6 +767,7 @@ void ips114_show_gray_image (uint16 x, uint16 y, const uint8 *image, uint16 widt
 
     uint32 i = 0, j = 0;
     uint16 color = 0,temp = 0;
+    uint16 data_buffer[dis_width];
     const uint8 *image_temp;
 
     IPS114_CS(0);
@@ -774,7 +778,7 @@ void ips114_show_gray_image (uint16 x, uint16 y, const uint8 *image, uint16 widt
         image_temp = image + j * height / dis_height * width;                   // 直接对 image 操作会 Hardfault 暂时不知道为什么
         for(i = 0; i < dis_width; i ++)
         {
-            temp = *(image_temp + i * width / dis_width);               // 读取像素点
+            temp = *(image_temp + i * width / dis_width);                       // 读取像素点
             if(threshold == 0)
             {
                 color = (0x001f & ((temp) >> 3)) << 11;
@@ -822,17 +826,18 @@ void ips114_show_rgb565_image (uint16 x, uint16 y, const uint16 *image, uint16 w
     zf_assert(NULL != image);
 
     uint32 i = 0, j = 0;
+    uint16 data_buffer[dis_width];
     const uint16 *image_temp;
 
     IPS114_CS(0);
-    ips114_set_region(x, y, x + dis_width - 1, y + dis_height - 1);                 // 设置显示区域
+    ips114_set_region(x, y, x + dis_width - 1, y + dis_height - 1);             // 设置显示区域
 
     for(j = 0; j < dis_height; j ++)
     {
         image_temp = image + j * height / dis_height * width;                   // 直接对 image 操作会 Hardfault 暂时不知道为什么
         for(i = 0; i < dis_width; i ++)
         {
-            data_buffer[i] = *(image_temp + i * width / dis_width); // 读取像素点
+            data_buffer[i] = *(image_temp + i * width / dis_width);             // 读取像素点
         }
         if(color_mode)
         {
@@ -856,8 +861,8 @@ void ips114_show_rgb565_image (uint16 x, uint16 y, const uint16 *image, uint16 w
 // 参数说明     dis_width       波形显示宽度 参数范围 [0, ips114_width_max]
 // 参数说明     dis_value_max   波形显示最大值 参数范围 [0, ips114_height_max]
 // 返回参数     void
-// 使用示例     ips114_show_wave(0,0,tsl1401_data[0],128,256,128,64);
-// 备注信息
+// 使用示例     ips114_show_wave(56,35,data,128,64,128,64);
+// 备注信息     
 //-------------------------------------------------------------------------------------------------------------------
 void ips114_show_wave (uint16 x, uint16 y, const uint16 *wave, uint16 width, uint16 value_max, uint16 dis_width, uint16 dis_value_max)
 {
@@ -869,6 +874,7 @@ void ips114_show_wave (uint16 x, uint16 y, const uint16 *wave, uint16 width, uin
 
     uint32 i = 0, j = 0;
     uint32 width_index = 0, value_max_index = 0;
+    uint16 data_buffer[dis_width];
 
     IPS114_CS(0);
     ips114_set_region(x, y, x + dis_width - 1, y + dis_value_max - 1);          // 设置显示区域
@@ -886,7 +892,7 @@ void ips114_show_wave (uint16 x, uint16 y, const uint16 *wave, uint16 width, uin
     {
         width_index = i * width / dis_width;
         value_max_index = *(wave + width_index) * (dis_value_max - 1) / value_max;
-        ips114_draw_point((uint16)(i + x), (uint16)((dis_value_max - 1) - value_max_index + y), ips114_pencolor);
+        ips114_draw_point(i + x, (dis_value_max - 1) - value_max_index + y, ips114_pencolor);
     }
 }
 
@@ -946,6 +952,7 @@ void ips114_show_chinese (uint16 x, uint16 y, uint8 size, const uint8 *chinese_b
     }
     IPS114_CS(1);
 }
+
 
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     1.14寸 IPS液晶初始化

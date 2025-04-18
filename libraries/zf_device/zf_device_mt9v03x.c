@@ -65,6 +65,8 @@ void camera_finish_callback(void)
 {
     Cy_Tcpwm_Counter_ClearTC_Intr(TCPWM0_GRP0_CNT59);
 
+    SCB_InvalidateDCache_by_Addr(mt9v03x_image_temp[0], MT9V03X_IMAGE_SIZE);
+
     memcpy(mt9v03x_image[0], mt9v03x_image_temp[0], MT9V03X_IMAGE_SIZE);
     
     mt9v03x_finish_flag = 1;
@@ -171,10 +173,7 @@ uint8 mt9v03x_sccb_init (void)
 uint8 mt9v03x_init (void)
 {
     uint8 return_state  = 0;
-
-    SCB_DisableICache();
-    SCB_DisableDCache(); 
-
+    
     do
     {
         return_state = mt9v03x_sccb_init();

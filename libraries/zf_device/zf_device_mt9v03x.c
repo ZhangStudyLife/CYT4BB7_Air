@@ -58,13 +58,19 @@
 vuint8 mt9v03x_finish_flag = 0;                                                 // 一场图像采集完成标志位
 uint8 mt9v03x_image[MT9V03X_H][MT9V03X_W];     
 
+static uint8 perfect_proportion = 0;
+
 #pragma location = 0x28026024                                                   // 将下面这个数组定义到指定的RAM地址
 __no_init uint8  mt9v03x_image_temp[MT9V03X_H][MT9V03X_W];                      
+#pragma location = 0x28006bf0
+__no_init uint16 mt9v03x_h_num;
+#pragma location = 0x28006bf2
+__no_init uint16 mt9v03x_w_num;
 
 void camera_finish_callback(void)
-{
+{  
     Cy_Tcpwm_Counter_ClearTC_Intr(TCPWM0_GRP0_CNT59);
-
+    
     SCB_InvalidateDCache_by_Addr(mt9v03x_image_temp[0], MT9V03X_IMAGE_SIZE);
 
     memcpy(mt9v03x_image[0], mt9v03x_image_temp[0], MT9V03X_IMAGE_SIZE);
@@ -150,8 +156,8 @@ uint8 mt9v03x_sccb_init (void)
             {MT9V03X_AUTO_EXP,          MT9V03X_AUTO_EXP_DEF},                  // 自动曝光设置
             {MT9V03X_EXP_TIME,          MT9V03X_EXP_TIME_DEF},                  // 曝光时间
             {MT9V03X_FPS,               MT9V03X_FPS_DEF},                       // 图像帧率
-            {MT9V03X_SET_COL,           MT9V03X_W},                             // 图像列数量
-            {MT9V03X_SET_ROW,           MT9V03X_H},                             // 图像行数量
+            {MT9V03X_SET_COL,           MT9V03X_W * (perfect_proportion + 1)},  // 图像列数量
+            {MT9V03X_SET_ROW,           MT9V03X_H * (perfect_proportion + 1)},  // 图像行数量
             {MT9V03X_LR_OFFSET,         MT9V03X_LR_OFFSET_DEF},                 // 图像左右偏移量
             {MT9V03X_UD_OFFSET,         MT9V03X_UD_OFFSET_DEF},                 // 图像上下偏移量
             {MT9V03X_GAIN,              MT9V03X_GAIN_DEF},                      // 图像增益
@@ -174,6 +180,17 @@ uint8 mt9v03x_init (void)
 {
     uint8 return_state  = 0;
     
+    SCB_DisableICache();
+    SCB_DisableDCache(); 
+    
+    mt9v03x_h_num = MT9V03X_H;
+    mt9v03x_w_num = MT9V03X_W;
+    
+    if(mt9v03x_h_num == 60 && mt9v03x_w_num == 94)      // 完美缩减比例 可采集到完整比例图像
+    {
+        perfect_proportion = 1;
+    }
+    
     do
     {
         return_state = mt9v03x_sccb_init();
@@ -187,5 +204,8 @@ uint8 mt9v03x_init (void)
         
     }while(0);
 
+    SCB_EnableICache();
+    SCB_EnableICache(); 
+    
     return return_state;
 }

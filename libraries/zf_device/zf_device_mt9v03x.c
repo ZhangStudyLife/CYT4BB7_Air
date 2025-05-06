@@ -205,7 +205,7 @@ uint8 mt9v03x_init (void)
     }while(0);
 
     SCB_EnableICache();
-    SCB_EnableICache(); 
+    SCB_EnableDCache(); 
     
     return return_state;
 }

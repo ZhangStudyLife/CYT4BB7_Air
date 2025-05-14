@@ -85,6 +85,7 @@
 #include "zf_device_imu963ra.h"
 #include "zf_device_ips114.h"
 #include "zf_device_ips200.h"
+#include "zf_device_ips200pro.h"
 #include "zf_device_key.h"
 #include "zf_device_menc15a.h"
 #include "zf_device_oled.h"

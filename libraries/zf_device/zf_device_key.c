@@ -76,7 +76,7 @@ void key_scanner (void)
         }
         else                                                                    // °´¼üÊÍ·Å
         {
-            if((KEY_LONG_PRESS != key_state[i]) && (KEY_MAX_SHOCK_PERIOD / scanner_period <= key_press_time[i]))
+            if((KEY_LONG_PRESS != key_state[i]) && (KEY_MAX_SHOCK_PERIOD <= key_press_time[i]) && (KEY_LONG_PRESS_PERIOD > key_press_time[i]))
             {
                 key_state[i] = KEY_SHORT_PRESS;
             }

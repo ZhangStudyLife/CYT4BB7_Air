@@ -2281,6 +2281,12 @@
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_ips200.h</name>
         </file>
         <file>
+            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_ips200pro.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_ips200pro.h</name>
+        </file>
+        <file>
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_key.c</name>
         </file>
         <file>

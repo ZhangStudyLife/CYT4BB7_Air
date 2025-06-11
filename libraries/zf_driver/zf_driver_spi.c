@@ -933,9 +933,9 @@ void spi_init (spi_index_enum spi_n, spi_mode_enum mode, uint32 baud, spi_clk_pi
         Cy_GPIO_Pin_Init(get_port(spi_get_cs_pin(cs_pin)), (spi_get_cs_pin(cs_pin) % 8), &spi_pin_cfg);
     }
     
-    Cy_SysClk_PeriphAssignDivider((en_clk_dst_t)((uint32)PCLK_SCB6_CLOCK + ((uint32)spi_n < 3 ? (uint32)spi_n + 1 : 0)), CY_SYSCLK_DIV_24_5_BIT, ((uint8)spi_n + 4));
-    Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup((en_clk_dst_t)((uint32)PCLK_SCB6_CLOCK + ((uint32)spi_n < 3 ? (uint32)spi_n + 1 : 0))), CY_SYSCLK_DIV_24_5_BIT, ((uint8)spi_n + 4), ((divSetting_fp5 & 0x1FFFFFE0ul) >> 5ul), (divSetting_fp5 & 0x0000001Ful));
-    Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup((en_clk_dst_t)((uint32)PCLK_SCB6_CLOCK + ((uint32)spi_n < 3 ? (uint32)spi_n + 1 : 0))), CY_SYSCLK_DIV_24_5_BIT, ((uint8)spi_n + 4));
+    Cy_SysClk_PeriphAssignDivider((en_clk_dst_t)((uint32)PCLK_SCB6_CLOCK + ((uint32)spi_n < 3 ? (uint32)spi_n + 1 : 0)), CY_SYSCLK_DIV_24_5_BIT, ((uint8)spi_n + 5));
+    Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup((en_clk_dst_t)((uint32)PCLK_SCB6_CLOCK + ((uint32)spi_n < 3 ? (uint32)spi_n + 1 : 0))), CY_SYSCLK_DIV_24_5_BIT, ((uint8)spi_n + 5), ((divSetting_fp5 & 0x1FFFFFE0ul) >> 5ul), (divSetting_fp5 & 0x0000001Ful));
+    Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup((en_clk_dst_t)((uint32)PCLK_SCB6_CLOCK + ((uint32)spi_n < 3 ? (uint32)spi_n + 1 : 0))), CY_SYSCLK_DIV_24_5_BIT, ((uint8)spi_n + 5));
     
     switch(mode)
     {

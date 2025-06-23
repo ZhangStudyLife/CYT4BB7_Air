@@ -30,7 +30,8 @@
 * 
 * 修改记录
 * 日期              作者                备注
-* 2024-01-18        SeekFree            first version
+* 2024-01-18        pudding            first version
+* 2025-06-23        pudding            修复部分情况下握手异常的问题
 ********************************************************************************************************************/
 /*********************************************************************************************************************
 * 接线定义：
@@ -47,7 +48,6 @@
 *                   其余引脚悬空
 *                   ------------------------------------
 *********************************************************************************************************************/
-
 #include "stdio.h"
 #include "zf_common_clock.h"
 #include "zf_common_debug.h"
@@ -75,7 +75,7 @@ static volatile     wifi_spi_state_enum wifi_spi_mutex;
 // 参数说明     wait_time       最大等待时间 单位毫秒
 // 返回参数     uint8           状态 0-成功 1-错误
 // 使用示例     内部使用，用户无需关心
-// 备注信息     
+// 备注信息
 //-------------------------------------------------------------------------------------------------------------------
 static uint8 wifi_spi_wait_idle (uint32 wait_time)
 {
@@ -100,13 +100,13 @@ static uint8 wifi_spi_wait_idle (uint32 wait_time)
 // 参数说明     length1         第一组数据长度
 // 参数说明     *buffer2        第二组需要发送的数据缓冲区地址
 // 参数说明     length2         第二组数据长度
-// 返回参数     void           
+// 返回参数     void
 // 使用示例     内部使用，用户无需关心
-// 备注信息     
+// 备注信息
 //-------------------------------------------------------------------------------------------------------------------
 static void wifi_spi_write (const uint8 *buffer1, uint16 length1, const uint8 *buffer2, uint16 length2)
 {
-    gpio_set_level(WIFI_SPI_CS_PIN, 0);
+    gpio_low(WIFI_SPI_CS_PIN);
     if(NULL != buffer1)
     {
         spi_write_8bit_array(WIFI_SPI_INDEX, buffer1, length1);
@@ -115,20 +115,20 @@ static void wifi_spi_write (const uint8 *buffer1, uint16 length1, const uint8 *b
     {
         spi_write_8bit_array(WIFI_SPI_INDEX, buffer2, length2);
     }
-    gpio_set_level(WIFI_SPI_CS_PIN, 1);
+    gpio_high(WIFI_SPI_CS_PIN);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     WIFI SPI 发送与接收同时进行（命令收发）
 // 参数说明     *packets        发送与接收的地址
 // 参数说明     length          需要接收的长度
-// 返回参数     void           
+// 返回参数     void
 // 使用示例     内部使用，用户无需关心
-// 备注信息     
+// 备注信息
 //-------------------------------------------------------------------------------------------------------------------
 static void wifi_spi_transfer_command (wifi_spi_packets_struct *packets, uint16 length)
 {
-    gpio_set_level(WIFI_SPI_CS_PIN, 0);
+    gpio_low(WIFI_SPI_CS_PIN);
     
     spi_transfer_8bit(WIFI_SPI_INDEX, (uint8 *)&(packets->head), (uint8 *)&(packets->head), sizeof(wifi_spi_head_struct));
     
@@ -137,7 +137,7 @@ static void wifi_spi_transfer_command (wifi_spi_packets_struct *packets, uint16 
         spi_transfer_8bit(WIFI_SPI_INDEX, (const uint8 *)(packets->buffer), packets->buffer, length);
     }
     
-    gpio_set_level(WIFI_SPI_CS_PIN, 1);
+    gpio_high(WIFI_SPI_CS_PIN);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -145,13 +145,13 @@ static void wifi_spi_transfer_command (wifi_spi_packets_struct *packets, uint16 
 // 参数说明     *write_data     发送的数据缓冲区地址
 // 参数说明     *read_data      接收到的数据的存储地址
 // 参数说明     length          需要接收的长度
-// 返回参数     void           
+// 返回参数     void
 // 使用示例     内部使用，用户无需关心
-// 备注信息     
+// 备注信息
 //-------------------------------------------------------------------------------------------------------------------
 static void wifi_spi_transfer_data (const uint8 *write_data, wifi_spi_packets_struct *read_data, uint16 length)
 {
-    gpio_set_level(WIFI_SPI_CS_PIN, 0);
+    gpio_low(WIFI_SPI_CS_PIN);
     
     read_data->head.command = WIFI_SPI_DATA;
     read_data->head.length  = length;
@@ -169,7 +169,7 @@ static void wifi_spi_transfer_data (const uint8 *write_data, wifi_spi_packets_st
         memcpy(read_data->buffer, write_data, length);
         spi_transfer_8bit(WIFI_SPI_INDEX, read_data->buffer, read_data->buffer, WIFI_SPI_RECVIVE_SIZE);
     }
-    gpio_set_level(WIFI_SPI_CS_PIN, 1);
+    gpio_high(WIFI_SPI_CS_PIN);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -180,7 +180,7 @@ static void wifi_spi_transfer_data (const uint8 *write_data, wifi_spi_packets_st
 // 参数说明     wait_time       最大等待时间 单位100微妙
 // 返回参数     uint8           状态 0-成功 1-错误
 // 使用示例     内部使用，用户无需关心
-// 备注信息     
+// 备注信息
 //-------------------------------------------------------------------------------------------------------------------
 static uint8 wifi_spi_set_parameter (wifi_spi_packets_command_enum command, uint8 *buffer, uint16 length, uint32 wait_time)
 {
@@ -225,7 +225,7 @@ static uint8 wifi_spi_set_parameter (wifi_spi_packets_command_enum command, uint
 // 参数说明     wait_time       最大等待时间 单位100微妙
 // 返回参数     uint8           状态 0-成功 1-错误
 // 使用示例     内部使用，用户无需关心
-// 备注信息     
+// 备注信息
 //-------------------------------------------------------------------------------------------------------------------
 static uint8 wifi_spi_get_parameter (wifi_spi_packets_command_enum command, wifi_spi_packets_struct *read_data, uint32 wait_time)
 {
@@ -258,7 +258,7 @@ static uint8 wifi_spi_get_parameter (wifi_spi_packets_command_enum command, wifi
 // 函数简介     WIFI SPI 固件版本获取
 // 参数说明     void            端口号
 // 返回参数     uint8           状态 0-成功 1-错误
-// 使用示例     
+// 使用示例
 // 备注信息     调用函数之后，固件版本信息以字符串形式保存在wifi_spi_version数组中
 //-------------------------------------------------------------------------------------------------------------------
 static uint8 wifi_spi_get_version (void)
@@ -271,6 +271,8 @@ static uint8 wifi_spi_get_version (void)
     {
         memcpy(wifi_spi_version, temp_packets.buffer, temp_packets.head.length);
     }
+    return_state = (return_state == 0) ? (WIFI_SPI_REPLY_VERSION != temp_packets.head.command) : 1;
+
     return return_state;
 }
 
@@ -278,7 +280,7 @@ static uint8 wifi_spi_get_version (void)
 // 函数简介     WIFI SPI MAC地址获取
 // 参数说明     void            端口号
 // 返回参数     uint8           状态 0-成功 1-错误
-// 使用示例     
+// 使用示例
 // 备注信息     调用函数之后，MAC地址信息以字符串形式保存在wifi_spi_mac_addr数组中
 //-------------------------------------------------------------------------------------------------------------------
 static uint8 wifi_spi_get_mac_addr (void)
@@ -291,6 +293,8 @@ static uint8 wifi_spi_get_mac_addr (void)
     {
         memcpy(wifi_spi_mac_addr, temp_packets.buffer, temp_packets.head.length);
     }
+    return_state = (return_state == 0) ? (WIFI_SPI_REPLY_MAC_ADDR != temp_packets.head.command) : 1;
+
     return return_state;
 }
 
@@ -298,7 +302,7 @@ static uint8 wifi_spi_get_mac_addr (void)
 // 函数简介     WIFI SPI IP地址与端口号获取
 // 参数说明     void            端口号
 // 返回参数     uint8           状态 0-成功 1-错误
-// 使用示例     
+// 使用示例
 // 备注信息     调用函数之后，IP地址与端口号信息以字符串形式保存在wifi_spi_ip_addr_port数组中
 //              需要在连接Socket之后调用此函数才能正常获取信息
 //-------------------------------------------------------------------------------------------------------------------
@@ -312,6 +316,8 @@ static uint8 wifi_spi_get_ip_addr_port (void)
     {
         memcpy(wifi_spi_ip_addr_port, temp_packets.buffer, temp_packets.head.length);
     }
+    return_state = (return_state == 0) ? (WIFI_SPI_REPLY_IP_ADDR != temp_packets.head.command) : 1;
+
     return return_state;
 }
 
@@ -320,26 +326,32 @@ static uint8 wifi_spi_get_ip_addr_port (void)
 // 参数说明     *wifi_ssid      WIFI名称
 // 参数说明     *pass_word      WIFI密码
 // 返回参数     uint8           状态 0-成功 1-错误
-// 使用示例     wifi_spi_connect_wifi("SEEKFREE", "SEEKFREE123");
-// 备注信息     wifi_spi_connect_wifi("SEEKFREE", NULL); // 连接没有密码的WIFI热点
+// 使用示例     wifi_spi_wifi_connect("SEEKFREE", "SEEKFREE123");
+// 备注信息     wifi_spi_wifi_connect("SEEKFREE", NULL); // 连接没有密码的WIFI热点
 //-------------------------------------------------------------------------------------------------------------------
-uint8 wifi_spi_connect_wifi (char *wifi_ssid, char *pass_word)
+uint8 wifi_spi_wifi_connect (char *wifi_ssid, char *pass_word)
 {
+    uint8 return_state;
     uint8 temp_buffer[64];
     uint16 length;
     
     if(NULL != pass_word)
     {
         // WIFI热点有密码发送热点名称与密码
-        length = sprintf((char *)temp_buffer, "%s\r\n%s\r\n", wifi_ssid, pass_word);
+        length = (uint16)sprintf((char *)temp_buffer, "%s\r\n%s\r\n", wifi_ssid, pass_word);
     }
     else
     {
         // WIFI热点没有密码只需要发送热点名称
-        length = sprintf((char *)temp_buffer, "%s\r\n", wifi_ssid);
+        length = (uint16)sprintf((char *)temp_buffer, "%s\r\n", wifi_ssid);
     }
-    
-    return wifi_spi_set_parameter(WIFI_SPI_SET_WIFI_INFORMATION, temp_buffer, length, WIFI_CONNECT_TIME_OUT);
+
+    return_state = wifi_spi_set_parameter(WIFI_SPI_SET_WIFI_INFORMATION, temp_buffer, length, WIFI_CONNECT_TIME_OUT);
+
+    // 本机IP地址与端口号信息以字符串形式保存在wifi_spi_ip_addr_port数组中
+    wifi_spi_get_ip_addr_port();
+
+    return return_state;
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -350,25 +362,32 @@ uint8 wifi_spi_connect_wifi (char *wifi_ssid, char *pass_word)
 // 参数说明     *local_port     本机端口号
 // 返回参数     uint8           状态 0-成功 1-错误
 // 使用示例     wifi_spi_socket_connect("TCP", "192.168.2.5", "8080", "6060");
-// 备注信息     
+// 备注信息
 //-------------------------------------------------------------------------------------------------------------------
 uint8 wifi_spi_socket_connect (char *transport_type, char *ip_addr, char *port, char *local_port)
 {
+    uint8 return_state;
     uint8 temp_buffer[41];
     uint16 length;
     
-    length = sprintf((char *)temp_buffer, "%s\r\n%s\r\n%s\r\n%s\r\n", transport_type, ip_addr, port, local_port);
-    return wifi_spi_set_parameter(WIFI_SPI_SET_SOCKET_INFORMATION, temp_buffer, length, SOCKET_CONNECT_TIME_OUT);
+    length = (uint16)sprintf((char *)temp_buffer, "%s\r\n%s\r\n%s\r\n%s\r\n", transport_type, ip_addr, port, local_port);
+
+    return_state = wifi_spi_set_parameter(WIFI_SPI_SET_SOCKET_INFORMATION, temp_buffer, length, SOCKET_CONNECT_TIME_OUT);
+
+    // 本机IP地址与端口号信息以字符串形式保存在wifi_spi_ip_addr_port数组中
+    wifi_spi_get_ip_addr_port();
+
+    return return_state;
 }
 
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     WIFI SPI 断开Socket连接
-// 参数说明     void            
+// 参数说明     void
 // 返回参数     uint8           状态 0-成功 1-错误
-// 使用示例     wifi_spi_socket_close();
+// 使用示例     wifi_spi_socket_disconnect();
 // 备注信息
 //-------------------------------------------------------------------------------------------------------------------
-uint8 wifi_spi_socket_close (void)
+uint8 wifi_spi_socket_disconnect (void)
 {
     wifi_spi_packets_struct temp_packets;
 
@@ -377,10 +396,10 @@ uint8 wifi_spi_socket_close (void)
 
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     WIFI SPI 软复位
-// 参数说明     void            
+// 参数说明     void
 // 返回参数     uint8           状态 0-成功 1-错误
-// 使用示例     
-// 备注信息     
+// 使用示例
+// 备注信息
 //-------------------------------------------------------------------------------------------------------------------
 uint8 wifi_spi_reset (void)
 {
@@ -406,7 +425,7 @@ uint8 wifi_spi_reset (void)
 // 函数简介     WIFI SPI UDP模式时立即发送函数
 // 参数说明     void
 // 返回参数     uint8           状态 0-成功 1-错误
-// 使用示例     
+// 使用示例
 // 备注信息     在UDP模式下模块收到数据后会等待2毫秒，2毫秒后未收到数据则将数据通过socket发送到网络，如果希望立即发送则在数据传输完毕后调用此函数
 //-------------------------------------------------------------------------------------------------------------------
 uint8 wifi_spi_udp_send_now (void)
@@ -471,7 +490,7 @@ uint8 wifi_spi_udp_send_now (void)
 // 参数说明     length          发送长度
 // 返回参数     uint32          剩余未发送的长度
 // 使用示例     wifi_spi_send_buffer(buffer, 100);
-// 备注信息     
+// 备注信息
 //-------------------------------------------------------------------------------------------------------------------
 uint32 wifi_spi_send_buffer (const uint8 *buffer, uint32 length)
 {
@@ -486,7 +505,7 @@ uint32 wifi_spi_send_buffer (const uint8 *buffer, uint32 length)
         
         while(length)
         {
-            send_length = length > WIFI_SPI_TRANSFER_SIZE ? WIFI_SPI_TRANSFER_SIZE : length;
+            send_length = length > WIFI_SPI_TRANSFER_SIZE ? (uint16)WIFI_SPI_TRANSFER_SIZE : (uint16)length;
             
             if(wifi_spi_wait_idle(OTHER_TIME_OUT))
             {
@@ -542,7 +561,7 @@ uint32 wifi_spi_send_buffer (const uint8 *buffer, uint32 length)
 // 参数说明     length          读取数据长度
 // 返回参数     uint32          实际读取数据长度
 // 使用示例     wifi_spi_read_buffer(buffer, 100);
-// 备注信息     
+// 备注信息
 //-------------------------------------------------------------------------------------------------------------------
 uint32 wifi_spi_read_buffer (uint8 *buffer, uint32 length)
 {
@@ -599,7 +618,7 @@ uint8 wifi_spi_init (char *wifi_ssid, char *pass_word)
     uint8 return_state = 0;
     
     fifo_init(&wifi_spi_fifo, FIFO_DATA_8BIT, wifi_spi_buffer, WIFI_SPI_RECVIVE_FIFO_SIZE);
-    spi_init(WIFI_SPI_INDEX, SPI_MODE3, WIFI_SPI_SPEED, WIFI_SPI_SCK_PIN, WIFI_SPI_MOSI_PIN, WIFI_SPI_MISO_PIN, SPI_CS_NULL);//硬件SPI初始化
+    spi_init(WIFI_SPI_INDEX, SPI_MODE0, WIFI_SPI_SPEED, WIFI_SPI_SCK_PIN, WIFI_SPI_MOSI_PIN, WIFI_SPI_MISO_PIN, SPI_CS_NULL);//硬件SPI初始化
     gpio_init(WIFI_SPI_CS_PIN,  GPO, 1, GPO_PUSH_PULL);
     gpio_init(WIFI_SPI_RST_PIN, GPO, 1, GPO_PUSH_PULL);
     gpio_init(WIFI_SPI_INT_PIN, GPI, 0, GPI_PULL_DOWN);
@@ -615,14 +634,25 @@ uint8 wifi_spi_init (char *wifi_ssid, char *pass_word)
 
     do
     {
-        return_state = wifi_spi_connect_wifi(wifi_ssid, pass_word);
+        // 固件版本信息以字符串形式保存在wifi_spi_version数组中
+        return_state = wifi_spi_get_version();
+        if(return_state)
+        {
+            break;
+        }
+
+        // MAC地址信息以字符串形式保存在wifi_spi_mac_addr数组中
+        wifi_spi_get_mac_addr();
+
+
+        return_state = wifi_spi_wifi_connect(wifi_ssid, pass_word);
         if(return_state)
         {
             break;
         }
         
     #if(1 == WIFI_SPI_AUTO_CONNECT)
-        return_state = wifi_spi_connect_socket("TCP", WIFI_SPI_TARGET_IP, WIFI_SPI_TARGET_PORT, WIFI_SPI_LOCAL_PORT);
+        return_state = wifi_spi_socket_connect("TCP", WIFI_SPI_TARGET_IP, WIFI_SPI_TARGET_PORT, WIFI_SPI_LOCAL_PORT);
         if(return_state)
         {
             break;
@@ -630,21 +660,12 @@ uint8 wifi_spi_init (char *wifi_ssid, char *pass_word)
     #endif
         
     #if(2 == WIFI_SPI_AUTO_CONNECT)
-        return_state = wifi_spi_connect_socket("UDP", WIFI_SPI_TARGET_IP, WIFI_SPI_TARGET_PORT, WIFI_SPI_LOCAL_PORT);
+        return_state = wifi_spi_socket_connect("UDP", WIFI_SPI_TARGET_IP, WIFI_SPI_TARGET_PORT, WIFI_SPI_LOCAL_PORT);
         if(return_state)
         {
             break;
         }
     #endif
-        
-        // 固件版本信息以字符串形式保存在wifi_spi_version数组中
-        wifi_spi_get_version();
-        
-        // MAC地址信息以字符串形式保存在wifi_spi_mac_addr数组中
-        wifi_spi_get_mac_addr();
-
-        // 本机IP地址与端口号信息以字符串形式保存在wifi_spi_ip_addr_port数组中
-        wifi_spi_get_ip_addr_port();       
     }while(0);
 
     return return_state;

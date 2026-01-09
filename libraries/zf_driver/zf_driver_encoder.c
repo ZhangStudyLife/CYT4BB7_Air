@@ -143,9 +143,7 @@ int16 encoder_get_count (encoder_index_enum encoder_n)
     }
     else
     {
-        encoder_data = (int16)(0x00008000 - Cy_Tcpwm_QuadDec_GetCounter(encoder_module[encoder_n]));
-        Cy_Tcpwm_QuadDec_SetCounter(encoder_module[encoder_n], 0x00008000);
-        
+        encoder_data = (int16)(0x00008000 - Cy_Tcpwm_QuadDec_GetCounter(encoder_module[encoder_n]));        
     }
     return encoder_data;
 }

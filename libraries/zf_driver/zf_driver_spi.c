@@ -540,6 +540,11 @@ uint8 spi_read_8bit (spi_index_enum spi_n)
         gpio_low(cs_pin_save[spi_n]);
     }
     
+    if(Cy_SCB_SPI_GetNumInRxFifo(spi_module[spi_n]) != 0)                       // 判断接收缓冲区是否有数据
+    {
+        Cy_SCB_SPI_ClearRxFifo(spi_module[spi_n]);				// 清除接收缓冲区
+    }
+    
     Cy_SCB_WriteTxFifo(spi_module[spi_n], 0);                                   // 发送空数据
     while(Cy_SCB_IsTxComplete(spi_module[spi_n]) == 0);                         // 等待数据发送完成
     while(Cy_SCB_SPI_GetNumInRxFifo(spi_module[spi_n]) == 0);		        // 等待接收到数据
@@ -572,6 +577,11 @@ void spi_read_8bit_array (spi_index_enum spi_n, uint8 *data, uint32 len)
     if(cs_pin_save[spi_n] != SPI_CS_NULL)					// 若CS不为空 则拉低CS
     {
         gpio_low(cs_pin_save[spi_n]);
+    }
+    
+    if(Cy_SCB_SPI_GetNumInRxFifo(spi_module[spi_n]) != 0)                       // 判断接收缓冲区是否有数据
+    {
+        Cy_SCB_SPI_ClearRxFifo(spi_module[spi_n]);				// 清除接收缓冲区
     }
     
     do{
@@ -609,6 +619,11 @@ uint16 spi_read_16bit (spi_index_enum spi_n)
         gpio_low(cs_pin_save[spi_n]);
     }
     
+    if(Cy_SCB_SPI_GetNumInRxFifo(spi_module[spi_n]) != 0)                       // 判断接收缓冲区是否有数据
+    {
+        Cy_SCB_SPI_ClearRxFifo(spi_module[spi_n]);				// 清除接收缓冲区
+    }
+    
     Cy_SCB_WriteTxFifo(spi_module[spi_n], 0);                                   // 发送空数据
     while(Cy_SCB_IsTxComplete(spi_module[spi_n]) == 0);                         // 等待数据发送完成
     while(Cy_SCB_SPI_GetNumInRxFifo(spi_module[spi_n]) == 0);		        // 等待接收到数据
@@ -640,6 +655,11 @@ void spi_read_16bit_array (spi_index_enum spi_n, uint16 *data, uint32 len)
     if(cs_pin_save[spi_n] != SPI_CS_NULL)					// 若CS不为空 则拉低CS
     {
         gpio_low(cs_pin_save[spi_n]);
+    }
+    
+    if(Cy_SCB_SPI_GetNumInRxFifo(spi_module[spi_n]) != 0)                       // 判断接收缓冲区是否有数据
+    {
+        Cy_SCB_SPI_ClearRxFifo(spi_module[spi_n]);				// 清除接收缓冲区
     }
     
     do{
@@ -674,6 +694,11 @@ uint8 spi_read_8bit_register (spi_index_enum spi_n, const uint8 register_name)
     if(cs_pin_save[spi_n] != SPI_CS_NULL)					// 若CS不为空 则拉低CS
     {
         gpio_low(cs_pin_save[spi_n]);
+    }
+    
+    if(Cy_SCB_SPI_GetNumInRxFifo(spi_module[spi_n]) != 0)                       // 判断接收缓冲区是否有数据
+    {
+        Cy_SCB_SPI_ClearRxFifo(spi_module[spi_n]);				// 清除接收缓冲区
     }
     
     Cy_SCB_WriteTxFifo(spi_module[spi_n], register_name);                       // 发送寄存器地址
@@ -715,6 +740,11 @@ void spi_read_8bit_registers (spi_index_enum spi_n, const uint8 register_name, u
         gpio_low(cs_pin_save[spi_n]);
     }
     
+    if(Cy_SCB_SPI_GetNumInRxFifo(spi_module[spi_n]) != 0)                       // 判断接收缓冲区是否有数据
+    {
+        Cy_SCB_SPI_ClearRxFifo(spi_module[spi_n]);				// 清除接收缓冲区
+    }
+    
     Cy_SCB_WriteTxFifo(spi_module[spi_n], register_name);                       // 发送寄存器地址
     while(Cy_SCB_SPI_GetNumInRxFifo(spi_module[spi_n]) == 0);		        // 等待接收到数据  
     
@@ -751,6 +781,11 @@ uint16 spi_read_16bit_register (spi_index_enum spi_n, const uint16 register_name
     if(cs_pin_save[spi_n] != SPI_CS_NULL)					// 若CS不为空 则拉低CS
     {
         gpio_low(cs_pin_save[spi_n]);
+    }
+    
+    if(Cy_SCB_SPI_GetNumInRxFifo(spi_module[spi_n]) != 0)                       // 判断接收缓冲区是否有数据
+    {
+        Cy_SCB_SPI_ClearRxFifo(spi_module[spi_n]);				// 清除接收缓冲区
     }
     
     Cy_SCB_WriteTxFifo(spi_module[spi_n], register_name);                       // 发送寄存器地址
@@ -797,6 +832,11 @@ void spi_read_16bit_registers (spi_index_enum spi_n, const uint16 register_name,
         gpio_low(cs_pin_save[spi_n]);
     }
     
+    if(Cy_SCB_SPI_GetNumInRxFifo(spi_module[spi_n]) != 0)                       // 判断接收缓冲区是否有数据
+    {
+        Cy_SCB_SPI_ClearRxFifo(spi_module[spi_n]);				// 清除接收缓冲区
+    }
+    
     Cy_SCB_WriteTxFifo(spi_module[spi_n], register_name);                       // 发送寄存器地址
     while(Cy_SCB_IsTxComplete(spi_module[spi_n]) == 0);                         // 等待数据发送完成
     while(Cy_SCB_SPI_GetNumInRxFifo(spi_module[spi_n]) == 0);		        // 等待接收到数据  
@@ -836,7 +876,10 @@ void spi_transfer_8bit (spi_index_enum spi_n, const uint8 *write_buffer, uint8 *
         gpio_low(cs_pin_save[spi_n]);
     }
     
-    Cy_SCB_SPI_ClearRxFifo(spi_module[spi_n]);					// 清除接收缓冲区
+    if(Cy_SCB_SPI_GetNumInRxFifo(spi_module[spi_n]) != 0)                       // 判断接收缓冲区是否有数据
+    {
+        Cy_SCB_SPI_ClearRxFifo(spi_module[spi_n]);				// 清除接收缓冲区
+    }
     
     do{
         Cy_SCB_WriteTxFifo(spi_module[spi_n], *write_buffer ++);                // 发送数据
@@ -871,7 +914,10 @@ void spi_transfer_16bit (spi_index_enum spi_n, const uint16 *write_buffer, uint1
         gpio_low(cs_pin_save[spi_n]);
     }
     
-    Cy_SCB_SPI_ClearRxFifo(spi_module[spi_n]);					// 清除接收缓冲区
+    if(Cy_SCB_SPI_GetNumInRxFifo(spi_module[spi_n]) != 0)                       // 判断接收缓冲区是否有数据
+    {
+        Cy_SCB_SPI_ClearRxFifo(spi_module[spi_n]);				// 清除接收缓冲区
+    }
     
     do{
         Cy_SCB_WriteTxFifo(spi_module[spi_n], *write_buffer ++);                // 发送数据

@@ -363,7 +363,7 @@ void uart_sbus_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pi
     Cy_GPIO_Pin_Init(uart_pin_config.rx_port, uart_pin_config.rx_pin, &gpio_pin_config);
     
     gpio_pin_config.driveMode           = CY_GPIO_DM_STRONG_IN_OFF;
-    gpio_pin_config.hsiom               = uart_pin_config.rx_hsiom;
+    gpio_pin_config.hsiom               = uart_pin_config.tx_hsiom;
     Cy_GPIO_Pin_Init(uart_pin_config.tx_port, uart_pin_config.tx_pin, &gpio_pin_config);
 
     
@@ -426,7 +426,7 @@ void uart_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pin, ua
     Cy_GPIO_Pin_Init(uart_pin_config.rx_port, uart_pin_config.rx_pin, &gpio_pin_config);
     
     gpio_pin_config.driveMode           = CY_GPIO_DM_STRONG_IN_OFF;
-    gpio_pin_config.hsiom               = uart_pin_config.rx_hsiom;
+    gpio_pin_config.hsiom               = uart_pin_config.tx_hsiom;
     Cy_GPIO_Pin_Init(uart_pin_config.tx_port, uart_pin_config.tx_pin, &gpio_pin_config);
 
     

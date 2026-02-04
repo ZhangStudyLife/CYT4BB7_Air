@@ -435,8 +435,8 @@ void uart_sbus_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pi
 {
     // 醒醒，串口号和端口都不对应怎么能初始化呢？
 	
-    zf_assert((uint8)uart_n == (uint8)tx_pin ? 1 : 0);
-    zf_assert((uint8)uart_n == (uint8)rx_pin ? 1 : 0);
+    zf_assert((uint8)uart_n == (uint8)(tx_pin / 0x10) ? 1 : 0);
+    zf_assert((uint8)uart_n == (uint8)(rx_pin / 0x10) ? 1 : 0);
 	
     uart_config_struct          uart_pin_config                 = {0};
     cy_stc_gpio_pin_config_t    gpio_pin_config                 = {0};
@@ -499,8 +499,8 @@ void uart_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pin, ua
 {
     // 醒醒，串口号和端口都不对应怎么能初始化呢？
 	
-    zf_assert((uint8)uart_n == (uint8)tx_pin ? 1 : 0);
-    zf_assert((uint8)uart_n == (uint8)rx_pin ? 1 : 0);
+    zf_assert((uint8)uart_n == (uint8)(tx_pin / 0x10) ? 1 : 0);
+    zf_assert((uint8)uart_n == (uint8)(rx_pin / 0x10) ? 1 : 0);
     
     uart_config_struct          uart_pin_config                 = {0};
     cy_stc_gpio_pin_config_t    gpio_pin_config                 = {0};

@@ -31,6 +31,9 @@
 * 修改记录
 * 日期              作者                备注
 * 2024-1-5       pudding            first version
+* 2024-3-2       pudding            修复多个串口波特率差距过大导致波特率异常的问题
+* 2025-2-4       pudding            优化串口中断逻辑，防止意外干扰导致的卡死问题，优化串口波特率计算逻辑
+* 2025-2-4       pudding            新增两个串口接口
 ********************************************************************************************************************/
 
 #ifndef _zf_driver_uart_h_
@@ -39,45 +42,62 @@
 #include "scb/cy_scb_uart.h"
 #include "zf_common_typedef.h"
 
-typedef enum                   // 枚举串口发送引脚 此枚举定义不允许用户修改
-{
-    UART0_TX_P00_1,             // 串口0 发送引脚
- 
-    UART1_TX_P04_1,             // 串口1 发送引脚
+typedef enum                           // 枚举串口发送引脚 此枚举定义不允许用户修改
+{       
+    UART0_TX_P00_1,                     // 串口0 发送引脚
+    
+    UART1_TX_P04_1,                     // 串口1 发送引脚
+    
+    UART2_TX_P10_1,                     // 串口2 发送引脚
 
-    UART2_TX_P10_1,             // 串口2 发送引脚可选范围
+    UART3_TX_P17_2, UART3_TX_P13_1,     // 串口3 发送引脚
 
-    UART3_TX_P17_2,             // 串口3 发送引脚可选范围
-
-    UART4_TX_P14_1,             // 串口4 发送引脚可选范围
+    UART4_TX_P14_1,                     // 串口4 发送引脚
+        
+    UART5_TX_P02_1,                     // 串口5 发送引脚
+        
+    UART6_TX_P03_1,                     // 串口6 发送引脚
 }uart_tx_pin_enum;
 
 
-typedef enum                   // 枚举串口接收引脚 此枚举定义不允许用户修改
-{
-
-    UART0_RX_P00_0,             // 串口0 接收引脚
- 
-    UART1_RX_P04_0,             // 串口1 接收引脚
-  
-    UART2_RX_P10_0,             // 串口2 接收引脚可选范围
-
-    UART3_RX_P17_1,             // 串口3 接收引脚可选范围
-	
-    UART4_RX_P14_0,             // 串口4 接收引脚可选范围
+typedef enum                           // 枚举串口接收引脚 此枚举定义不允许用户修改
+{       
+    UART0_RX_P00_0,                     // 串口0 接收引脚
+    
+    UART1_RX_P04_0,                     // 串口1 接收引脚
+    
+    UART2_RX_P10_0,                     // 串口2 接收引脚
+    
+    UART3_RX_P17_1, UART3_RX_P13_0,     // 串口3 接收引脚
+            
+    UART4_RX_P14_0,                     // 串口4 接收引脚
+        
+    UART5_RX_P02_0,                     // 串口5 接收引脚
+        
+    UART6_RX_P03_0,                     // 串口6 接收引脚
 }uart_rx_pin_enum;
 
 
-typedef enum                   // 枚举串口号 此枚举定义不允许用户修改
-{
-    UART_0,
-    UART_1,
-    UART_2,
-    UART_3,
-    UART_4,
+typedef enum                            // 枚举串口号 此枚举定义不允许用户修改
+{       
+    UART_0,                             // debug(库默认)
+    
+    UART_1,                             // 无线接口(库默认)
+    
+    UART_2,                             // GPS(库默认)
+    
+    UART_3,                             // 摄像头(库默认17.1 17.2   可使用13.0  13.1)
+    
+    UART_4,                             // 
+    
+    UART_5,                             // 注意：与SPI0资源冲突（当前库版本为WIFI-SPI使用SPI0）
+    
+    UART_6,                             // 注意：与SPI3资源冲突（当前库版本未使用SPI3）
 }uart_index_enum;
 
 volatile stc_SCB_t* get_scb_module(uart_index_enum uart_n);
+
+uint8   uart_isr_mask                       (uart_index_enum uart_n);
 
 //====================================================串口 基础函数====================================================
 void    uart_write_byte                     (uart_index_enum uartn, const uint8 dat);

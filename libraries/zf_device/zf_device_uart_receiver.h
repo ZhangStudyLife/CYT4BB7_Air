@@ -56,8 +56,8 @@
 #define REV_DATA_LEN                        ( 25   )            // SBUS帧长
 #define FRAME_STAR                          ( 0X0F )            // 帧头信息
 #define FRAME_END                           ( 0X00 )            // 帧尾信息
-#define SBUS_NORMAL_STATE                   ( 0X03 )            // 正常状态
-#define SBUS_ABNORMAL_STATE                 ( 0X0F )            // 失控状态
+#define SBUS_NORMAL_STATE                   ( 0X00 )            // 正常状态
+#define SBUS_ABNORMAL_STATE                 ( 0X04 )            // 失控状态
 
 typedef struct
 {

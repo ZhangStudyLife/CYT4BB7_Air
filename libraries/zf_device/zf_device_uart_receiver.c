@@ -86,7 +86,7 @@ static void uart_receiver_analysis (uart_receiver_struct *remote_data,uint8 * bu
     remote_data->channel[num++] = (buffer[5] >> 1 | buffer[6] << 7 ) & 0x07FF;
     remote_data->channel[num++] = (buffer[6] >> 4 | buffer[7] << 4 ) & 0x07FF;
     remote_data->channel[num++] = (buffer[7] >> 7 | buffer[8] << 1 | buffer[9] << 9 ) & 0x07FF;
-    remote_data->state = (SBUS_NORMAL_STATE == buffer[23]) ? 1 : 0;
+    remote_data->state = (SBUS_ABNORMAL_STATE == (buffer[23] & SBUS_ABNORMAL_STATE)) ? 0 : 1;
     uart_receiver.finsh_flag  = 1;
 }
 

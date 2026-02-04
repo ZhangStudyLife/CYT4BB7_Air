@@ -32,6 +32,7 @@
 * 日期              作者                备注
 * 2024-1-9       pudding            first version
 * 2024-3-6       pudding            修复与串口的时钟冲突问题
+* 2026-2-4       pudding            优化SPI时钟速率计算逻辑
 ********************************************************************************************************************/
 
 #include "scb/cy_scb_spi.h"
@@ -948,9 +949,10 @@ void spi_transfer_16bit (spi_index_enum spi_n, const uint16 *write_buffer, uint1
 //-------------------------------------------------------------------------------------------------------------------
 void spi_init (spi_index_enum spi_n, spi_mode_enum mode, uint32 baud, spi_clk_pin_enum clk_pin, spi_mosi_pin_enum mosi_pin, spi_miso_pin_enum miso_pin, spi_cs_pin_enum cs_pin)
 {
-    uint64_t                    targetFreq                      = 4 * baud;
-    uint64_t                    sourceFreq_fp5                  = ((uint64_t)SPI_FREQ << 5ull);
-    uint32_t                    divSetting_fp5                  = (uint32_t)(sourceFreq_fp5 / targetFreq);
+    uint16                      oversample_num                  = 4;
+    uint32                      targetFreq                      = oversample_num * baud;
+    uint32                      divSetting_int                  = SPI_FREQ / targetFreq;
+    uint32                      divSetting_float                = (uint32)((double)(SPI_FREQ - divSetting_int * targetFreq) / (double)targetFreq * 32.0f);
     cy_stc_gpio_pin_config_t    spi_pin_cfg                     = {0};
     cy_stc_scb_spi_config_t     spi_config                      = {0};
     
@@ -979,9 +981,9 @@ void spi_init (spi_index_enum spi_n, spi_mode_enum mode, uint32 baud, spi_clk_pi
         Cy_GPIO_Pin_Init(get_port(spi_get_cs_pin(cs_pin)), (spi_get_cs_pin(cs_pin) % 8), &spi_pin_cfg);
     }
     
-    Cy_SysClk_PeriphAssignDivider((en_clk_dst_t)((uint32)PCLK_SCB6_CLOCK + ((uint32)spi_n < 3 ? (uint32)spi_n + 1 : 0)), CY_SYSCLK_DIV_24_5_BIT, ((uint8)spi_n + 5));
-    Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup((en_clk_dst_t)((uint32)PCLK_SCB6_CLOCK + ((uint32)spi_n < 3 ? (uint32)spi_n + 1 : 0))), CY_SYSCLK_DIV_24_5_BIT, ((uint8)spi_n + 5), ((divSetting_fp5 & 0x1FFFFFE0ul) >> 5ul), (divSetting_fp5 & 0x0000001Ful));
-    Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup((en_clk_dst_t)((uint32)PCLK_SCB6_CLOCK + ((uint32)spi_n < 3 ? (uint32)spi_n + 1 : 0))), CY_SYSCLK_DIV_24_5_BIT, ((uint8)spi_n + 5));
+    Cy_SysClk_PeriphAssignDivider((en_clk_dst_t)((uint32)PCLK_SCB6_CLOCK + ((uint32)spi_n < 3 ? (uint32)spi_n + 1 : 0)), CY_SYSCLK_DIV_24_5_BIT, ((uint8)spi_n + 7));
+    Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup((en_clk_dst_t)((uint32)PCLK_SCB6_CLOCK + ((uint32)spi_n < 3 ? (uint32)spi_n + 1 : 0))), CY_SYSCLK_DIV_24_5_BIT, ((uint8)spi_n + 7), (divSetting_int - 1), divSetting_float);
+    Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup((en_clk_dst_t)((uint32)PCLK_SCB6_CLOCK + ((uint32)spi_n < 3 ? (uint32)spi_n + 1 : 0))), CY_SYSCLK_DIV_24_5_BIT, ((uint8)spi_n + 7));
     
     switch(mode)
     {

@@ -32,6 +32,8 @@
 * 日期              作者                备注
 * 2024-1-5       pudding            first version
 * 2024-3-2       pudding            修复多个串口波特率差距过大导致波特率异常的问题
+* 2025-2-4       pudding            优化串口中断逻辑，防止意外干扰导致的卡死问题，优化串口波特率计算逻辑
+* 2025-2-4       pudding            新增两个串口接口
 ********************************************************************************************************************/
 
 #include "system/system_cyt4bb.h"
@@ -52,6 +54,8 @@ void uart1_isr (void);
 void uart2_isr (void);
 void uart3_isr (void);
 void uart4_isr (void);
+void uart5_isr (void);
+void uart6_isr (void);
 
 typedef struct
 { 
@@ -65,9 +69,43 @@ typedef struct
     cy_en_intr_t                uart_irqn;
 }uart_config_struct;
 
-void (*uart_isr_func[5])() = {uart0_isr, uart1_isr, uart2_isr, uart3_isr, uart4_isr};
-cy_stc_scb_uart_context_t  uart_context[5] = {0}; 
-volatile stc_SCB_t* scb_module[5] = {SCB0, SCB5, SCB4, SCB3, SCB2};
+void (*uart_isr_func[7])() = {uart0_isr, uart1_isr, uart2_isr, uart3_isr, uart4_isr, uart5_isr, uart6_isr};
+cy_stc_scb_uart_context_t  uart_context[7] = {0}; 
+volatile stc_SCB_t* scb_module[7] = {SCB0, SCB5, SCB4, SCB3, SCB2, SCB7, SCB6};
+
+static uint8 uart_data_buffer[7] = {0};
+static uint8 uart_data_refresh[7] = {0};
+
+//-------------------------------------------------------------------------------------------------------------------
+// 函数简介       串口中断预处理 
+// 参数说明       uart_n         串口号
+// 返回参数       uint8          0：发送中断    1：接收中断  
+// 使用示例       uart_isr_mask(UART_0);                  
+// 备注信息       内部函数 用户无需关心
+//-------------------------------------------------------------------------------------------------------------------
+uint8 uart_isr_mask(uart_index_enum uart_n)
+{
+    uint8 isr_type = 1;                                                                     // 中断类型  0：发送中断   1：接收中断  
+  
+    if(Cy_SCB_GetRxInterruptMask(scb_module[uart_n]) & CY_SCB_UART_RX_NOT_EMPTY)            // 串口接收中断
+    {
+        if(Cy_SCB_GetNumInRxFifo(scb_module[uart_n]))
+        {
+            uart_data_buffer[uart_n]  = (uint8)Cy_SCB_ReadRxFifo(scb_module[uart_n]);
+            uart_data_refresh[uart_n] = 1;
+        }
+        Cy_SCB_ClearRxInterrupt(scb_module[uart_n], CY_SCB_UART_RX_NOT_EMPTY);              // 清除接收中断标志位
+    }
+    else if(Cy_SCB_GetTxInterruptMask(scb_module[uart_n]) & CY_SCB_UART_TX_DONE)            // 串口0发送中断
+    {           
+        Cy_SCB_ClearTxInterrupt(scb_module[uart_n], CY_SCB_UART_TX_DONE);                   // 清除接收中断标志位
+        
+        isr_type = 0;
+    }
+    
+    return isr_type;
+}
+
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介       获取串口配置信息
 // 参数说明       uart_n          串口模块号 参照 zf_driver_uart.h 内 uart_index_enum 枚举体定义
@@ -113,6 +151,14 @@ static void get_uart_config(uart_config_struct *config_struct, uart_tx_pin_enum 
             config_struct->uart_pclk= PCLK_SCB3_CLOCK;
             config_struct->uart_irqn= scb_3_interrupt_IRQn;
         }break;
+        case  	UART3_TX_P13_1: 
+        {
+            config_struct->tx_port  = GPIO_PRT13;  	
+            config_struct->tx_pin   = 1;      
+            config_struct->tx_hsiom = P13_1_SCB3_UART_TX; 
+            config_struct->uart_pclk= PCLK_SCB3_CLOCK;
+            config_struct->uart_irqn= scb_3_interrupt_IRQn;
+        }break;
         case  	UART4_TX_P14_1:
         {
             config_struct->tx_port  = GPIO_PRT14;  	
@@ -120,6 +166,22 @@ static void get_uart_config(uart_config_struct *config_struct, uart_tx_pin_enum 
             config_struct->tx_hsiom = P14_1_SCB2_UART_TX; 
             config_struct->uart_pclk= PCLK_SCB2_CLOCK;
             config_struct->uart_irqn= scb_2_interrupt_IRQn;
+        }break;
+        case  	UART5_TX_P02_1:
+        {
+            config_struct->tx_port  = GPIO_PRT2;  	
+            config_struct->tx_pin   = 1;      
+            config_struct->tx_hsiom = P2_1_SCB7_UART_TX; 
+            config_struct->uart_pclk= PCLK_SCB7_CLOCK;
+            config_struct->uart_irqn= scb_7_interrupt_IRQn;
+        }break;
+        case  	UART6_TX_P03_1:
+        {
+            config_struct->tx_port  = GPIO_PRT3;  	
+            config_struct->tx_pin   = 1;      
+            config_struct->tx_hsiom = P3_1_SCB6_UART_TX; 
+            config_struct->uart_pclk= PCLK_SCB6_CLOCK;
+            config_struct->uart_irqn= scb_6_interrupt_IRQn;
         }break;
         default: zf_assert(0);     break;
     }
@@ -157,6 +219,14 @@ static void get_uart_config(uart_config_struct *config_struct, uart_tx_pin_enum 
             config_struct->uart_pclk= PCLK_SCB3_CLOCK;
             config_struct->uart_irqn= scb_3_interrupt_IRQn;
         }break;
+        case  	UART3_RX_P13_0: 
+        {
+            config_struct->rx_port  = GPIO_PRT13;  	
+            config_struct->rx_pin   = 0;      
+            config_struct->rx_hsiom = P13_0_SCB3_UART_RX; 
+            config_struct->uart_pclk= PCLK_SCB3_CLOCK;
+            config_struct->uart_irqn= scb_3_interrupt_IRQn;
+        }break;
         case  	UART4_RX_P14_0: 
         {
             config_struct->rx_port  = GPIO_PRT14;  	
@@ -164,6 +234,22 @@ static void get_uart_config(uart_config_struct *config_struct, uart_tx_pin_enum 
             config_struct->rx_hsiom = P14_0_SCB2_UART_RX; 
             config_struct->uart_pclk= PCLK_SCB2_CLOCK;
             config_struct->uart_irqn= scb_2_interrupt_IRQn;
+        }break;
+        case  	UART5_RX_P02_0: 
+        {
+            config_struct->rx_port  = GPIO_PRT2;  	
+            config_struct->rx_pin   = 0;      
+            config_struct->rx_hsiom = P2_0_SCB7_UART_RX; 
+            config_struct->uart_pclk= PCLK_SCB7_CLOCK;
+            config_struct->uart_irqn= scb_7_interrupt_IRQn;
+        }break;
+        case  	UART6_RX_P03_0: 
+        {
+            config_struct->rx_port  = GPIO_PRT3;  	
+            config_struct->rx_pin   = 0;      
+            config_struct->rx_hsiom = P3_0_SCB6_UART_RX; 
+            config_struct->uart_pclk= PCLK_SCB6_CLOCK;
+            config_struct->uart_irqn= scb_6_interrupt_IRQn;
         }break;
         default: zf_assert(0);     break;
     }
@@ -186,6 +272,8 @@ volatile stc_SCB_t* get_scb_module(uart_index_enum uart_n)
         case UART_2: temp_module = SCB4; break;
         case UART_3: temp_module = SCB3; break;
         case UART_4: temp_module = SCB2; break;
+        case UART_5: temp_module = SCB7; break;
+        case UART_6: temp_module = SCB6; break;
         default: zf_assert(0);     break;
     }
     return temp_module;
@@ -252,8 +340,8 @@ void uart_write_string (uart_index_enum uart_n, const char *str)
 //-------------------------------------------------------------------------------------------------------------------
 uint8 uart_read_byte (uart_index_enum uart_n)
 {
-    while(Cy_SCB_GetNumInRxFifo(scb_module[uart_n]) == 0);
-    return (uint8)Cy_SCB_ReadRxFifo(scb_module[uart_n]);	
+    while(uart_data_refresh[uart_n] == 0);
+    return uart_data_buffer[uart_n];		
 }
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介       读取串口接收的数据（查询接收）
@@ -267,9 +355,10 @@ uint8 uart_query_byte (uart_index_enum uart_n, uint8 *dat)
 {
     uint8 return_data = 0;
     
-    if(Cy_SCB_GetNumInRxFifo(scb_module[uart_n]))
+    if(uart_data_refresh[uart_n])
     {
-        *dat = (uint8_t)Cy_SCB_ReadRxFifo(scb_module[uart_n]);
+        *dat = uart_data_buffer[uart_n];
+        uart_data_refresh[uart_n] = 0;
         return_data = 1;
     }
     else
@@ -352,9 +441,10 @@ void uart_sbus_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pi
     uart_config_struct          uart_pin_config                 = {0};
     cy_stc_gpio_pin_config_t    gpio_pin_config                 = {0};
     cy_stc_scb_uart_config_t    g_stc_uart_config               = {0};
-    uint64_t                    targetFreq                      = 8 * baud;
-    uint64_t                    sourceFreq_fp5                  = ((uint64_t)UART_FREQ << 5ull);
-    uint32_t                    divSetting_fp5                  = (uint32_t)(sourceFreq_fp5 / targetFreq);
+    uint16                      oversample_num                  = 8;
+    uint32                      targetFreq                      = oversample_num * baud;
+    uint32                      divSetting_int                  = UART_FREQ / targetFreq;
+    uint32                      divSetting_float                = (uint32)((double)(UART_FREQ - divSetting_int * targetFreq) / (double)targetFreq * 32.0f);
     
     get_uart_config(&uart_pin_config, tx_pin, rx_pin);
     
@@ -380,7 +470,7 @@ void uart_sbus_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pi
     Cy_SCB_UART_Enable(scb_module[uart_n]);  
     
     Cy_SysClk_PeriphAssignDivider(uart_pin_config.uart_pclk, CY_SYSCLK_DIV_24_5_BIT, (uint8)uart_n);
-    Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup(uart_pin_config.uart_pclk), CY_SYSCLK_DIV_24_5_BIT, (uint8)uart_n, ((divSetting_fp5 & 0x1FFFFFE0ul) >> 5ul), (divSetting_fp5 & 0x0000001Ful));
+    Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup(uart_pin_config.uart_pclk), CY_SYSCLK_DIV_24_5_BIT, (uint8)uart_n, (divSetting_int - 1), divSetting_float);
     Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup(uart_pin_config.uart_pclk), CY_SYSCLK_DIV_24_5_BIT, (uint8)uart_n);
     
     cy_stc_sysint_irq_t                 stc_sysint_irq_cfg_uart;
@@ -415,9 +505,11 @@ void uart_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pin, ua
     uart_config_struct          uart_pin_config                 = {0};
     cy_stc_gpio_pin_config_t    gpio_pin_config                 = {0};
     cy_stc_scb_uart_config_t    g_stc_uart_config               = {0};
-    uint64_t                    targetFreq                      = 8 * baud;
-    uint64_t                    sourceFreq_fp5                  = ((uint64_t)UART_FREQ << 5ull);
-    uint32_t                    divSetting_fp5                  = (uint32_t)(sourceFreq_fp5 / targetFreq);
+    
+    uint16                      oversample_num                  = 8;
+    uint32                      targetFreq                      = oversample_num * baud;
+    uint32                      divSetting_int                  = UART_FREQ / targetFreq;
+    uint32                      divSetting_float                = (uint32)((double)(UART_FREQ - divSetting_int * targetFreq) / (double)targetFreq * 32.0f);
     
     get_uart_config(&uart_pin_config, tx_pin, rx_pin);
     
@@ -443,7 +535,7 @@ void uart_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pin, ua
     Cy_SCB_UART_Enable(scb_module[uart_n]);  
     
     Cy_SysClk_PeriphAssignDivider(uart_pin_config.uart_pclk, CY_SYSCLK_DIV_24_5_BIT, (uint8)uart_n);
-    Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup(uart_pin_config.uart_pclk), CY_SYSCLK_DIV_24_5_BIT, (uint8)uart_n, ((divSetting_fp5 & 0x1FFFFFE0ul) >> 5ul), (divSetting_fp5 & 0x0000001Ful));
+    Cy_SysClk_PeriphSetFracDivider(Cy_SysClk_GetClockGroup(uart_pin_config.uart_pclk), CY_SYSCLK_DIV_24_5_BIT, (uint8)uart_n, (divSetting_int - 1), divSetting_float);
     Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup(uart_pin_config.uart_pclk), CY_SYSCLK_DIV_24_5_BIT, (uint8)uart_n);
     
     cy_stc_sysint_irq_t                 uart_irq_cfg;

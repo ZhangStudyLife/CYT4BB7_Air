@@ -74,6 +74,7 @@ void        soft_iic_read_16bit_registers   (soft_iic_info_struct *soft_iic_obj,
 
 void        soft_iic_transfer_8bit_array    (soft_iic_info_struct *soft_iic_obj, const uint8 *write_data, uint32 write_len, uint8 *read_data, uint32 read_len);
 void        soft_iic_transfer_16bit_array   (soft_iic_info_struct *soft_iic_obj, const uint16 *write_data, uint32 write_len, uint16 *read_data, uint32 read_len);
+uint8       soft_iic_probe_ack              (soft_iic_info_struct *soft_iic_obj, uint8 addr);
 
 void        soft_iic_sccb_write_register    (soft_iic_info_struct *soft_iic_obj, const uint8 register_name, uint8 data);
 uint8       soft_iic_sccb_read_register     (soft_iic_info_struct *soft_iic_obj, const uint8 register_name);
@@ -83,3 +84,4 @@ void        soft_iic_init                   (soft_iic_info_struct *soft_iic_obj,
 
 
 #endif
+

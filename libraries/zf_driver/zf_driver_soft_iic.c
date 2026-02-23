@@ -149,7 +149,7 @@ static uint8 soft_iic_wait_ack (soft_iic_info_struct *soft_iic_obj)
     }
     gpio_low(soft_iic_obj->scl_pin);                                            // SCL 低电平
 #if SOFT_IIC_SDA_IO_SWITCH
-    gpio_set_dir((gpio_pin_enum)soft_iic_obj->sda_pin, GPO, GPO_PUSH_PULL);
+    gpio_set_dir((gpio_pin_enum)soft_iic_obj->sda_pin, GPO, GPO_OPEN_DTAIN);
 #endif
     soft_iic_delay(soft_iic_obj->delay);
 
@@ -211,7 +211,7 @@ static uint8 soft_iic_read_data (soft_iic_info_struct *soft_iic_obj, uint8 ack)
     }
     gpio_low(soft_iic_obj->scl_pin);                                            // SCL 低电平
 #if SOFT_IIC_SDA_IO_SWITCH
-    gpio_set_dir((gpio_pin_enum)soft_iic_obj->sda_pin, GPO, GPO_PUSH_PULL);
+    gpio_set_dir((gpio_pin_enum)soft_iic_obj->sda_pin, GPO, GPO_OPEN_DTAIN);
 #endif
     soft_iic_delay(soft_iic_obj->delay);
     soft_iic_send_ack(soft_iic_obj, ack);
@@ -640,6 +640,24 @@ void soft_iic_transfer_16bit_array (soft_iic_info_struct *soft_iic_obj, const ui
 }
 
 //-------------------------------------------------------------------------------------------------------------------
+// 函数简介     软件 IIC 地址应答探测
+// 参数说明     *soft_iic_obj   软件 IIC 指定信息 可以参照 zf_driver_soft_iic.h 里的格式看看
+// 参数说明     addr            7bit 地址
+// 返回参数     uint8           1-应答 0-无应答
+// 使用示例     soft_iic_probe_ack(soft_iic_obj, 0x29);
+// 备注信息     
+//-------------------------------------------------------------------------------------------------------------------
+uint8 soft_iic_probe_ack (soft_iic_info_struct *soft_iic_obj, uint8 addr)
+{
+    zf_assert(NULL != soft_iic_obj);
+    uint8 ack = 0;
+    soft_iic_start(soft_iic_obj);
+    ack = soft_iic_send_data(soft_iic_obj, addr << 1);
+    soft_iic_stop(soft_iic_obj);
+    return ack;
+}
+
+//-------------------------------------------------------------------------------------------------------------------
 // 函数简介     软件 IIC 接口 SCCB 模式向传感器寄存器写 8bit 数据
 // 参数说明     *soft_iic_obj   软件 IIC 指定信息 可以参照 zf_driver_soft_iic.h 里的格式看看
 // 参数说明     register_name   传感器的寄存器地址
@@ -701,6 +719,8 @@ void soft_iic_init (soft_iic_info_struct *soft_iic_obj, uint8 addr, uint32 delay
     soft_iic_obj->sda_pin = sda_pin;
     soft_iic_obj->addr = addr;
     soft_iic_obj->delay = delay;
-    gpio_init(scl_pin, GPO, GPIO_HIGH, GPO_PUSH_PULL);                          // 提取对应IO索引 AF功能编码
-    gpio_init(sda_pin, GPO, GPIO_HIGH, GPO_PUSH_PULL);                         // 提取对应IO索引 AF功能编码
+    gpio_init(scl_pin, GPO, GPIO_HIGH, GPO_OPEN_DTAIN);                         // 提取对应IO索引 AF功能编码
+    gpio_init(sda_pin, GPO, GPIO_HIGH, GPO_OPEN_DTAIN);                         // 提取对应IO索引 AF功能编码
 }
+
+

@@ -37,13 +37,14 @@
 ********************************************************************************************************************/
 
 #include "zf_common_headfile.h"
-
+#include "../code/Estimation/Attitude/IMU_TOP.h"
 
 // **************************** PIT中断函数 ****************************
 void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数      
 {
     pit_isr_flag_clear(PIT_CH0);
   
+    IMU_Update_2kHz(); // 2kHz 更新 IMU 数据
     
     
 }

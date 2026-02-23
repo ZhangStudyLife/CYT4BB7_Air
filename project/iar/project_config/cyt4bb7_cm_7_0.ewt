@@ -1429,7 +1429,46 @@
     <group>
         <name>code</name>
         <group>
+            <name>Estimation</name>
+            <group>
+                <name>Attitude</name>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Attitude\IMU_Filtter.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Attitude\IMU_Filtter.h</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Attitude\IMU_TOP.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Attitude\IMU_TOP.h</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Attitude\MahonyAhrs.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Attitude\MahonyAhrs.h</name>
+                </file>
+                <configuration>
+                    <name>Debug</name>
+                </configuration>
+            </group>
+        </group>
+        <group>
             <name>HW_Drivers</name>
+            <group>
+                <name>BMP388</name>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\BMP388\BMP388.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\BMP388\BMP388.h</name>
+                </file>
+                <configuration>
+                    <name>Debug</name>
+                </configuration>
+            </group>
             <group>
                 <name>ICM42688</name>
                 <file>

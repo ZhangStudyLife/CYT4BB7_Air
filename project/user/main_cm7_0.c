@@ -66,9 +66,9 @@ int main(void)
         tof_read_data(&tof_data); // 读取 VL53L1X ToF 传感器数据
         PMW3901_Update(); // 更新 PMW3901 光流传感器数据
         BMP388_update(); // 读取 BMP388 气压传感器数据
-        printf("%d,%d,%f,%f\r\n",g_BMP388_data.raw_pressure, g_BMP388_data.raw_temperature, g_BMP388_data.pressure_pa, g_BMP388_data.temperature_c); // 打印 BMP388 气压和温度数据
+        // printf("%d,%d,%f,%f\r\n",g_BMP388_data.raw_pressure, g_BMP388_data.raw_temperature, g_BMP388_data.pressure_pa, g_BMP388_data.temperature_c); // 打印 BMP388 气压和温度数据
         // printf("%f,%f,%f,%f,%f,%f\r\n", ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z, g_imu_filter.gyro_filt_x, g_imu_filter.gyro_filt_y, g_imu_filter.gyro_filt_z); // 打印 IMU 滤波后的陀螺和加速度数据
-        
+        printf("%f,%f,%f\r\n", g_euler.roll, g_euler.pitch, g_euler.yaw); // 打印欧拉角数据
         // printf("%d,%d,%d,%d\r\n", tof_data.tof2_distance_mm, tof_data.tof3_distance_mm, tof_data.tof2_range_status, tof_data.tof3_range_status);
         system_delay_ms(20);
     }

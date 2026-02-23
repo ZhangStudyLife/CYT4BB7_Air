@@ -60,7 +60,8 @@ int main(void)
     while(true)
     {
         tof_read_data(&tof_data); // 读取 VL53L1X ToF 传感器数据
-        printf("%d,%d,%d,%d\r\n", tof_data.tof2_distance_mm, tof_data.tof3_distance_mm, tof_data.tof2_range_status, tof_data.tof3_range_status);
+        PMW3901_Update(); // 更新 PMW3901 光流传感器数据
+        // printf("%d,%d,%d,%d\r\n", tof_data.tof2_distance_mm, tof_data.tof3_distance_mm, tof_data.tof2_range_status, tof_data.tof3_range_status);
         system_delay_ms(20);
     }
 }

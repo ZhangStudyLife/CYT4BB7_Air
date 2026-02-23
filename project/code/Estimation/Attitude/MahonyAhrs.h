@@ -20,8 +20,8 @@
 #define RADIANS_TO_DEGREES                  (180.0f / 3.14159265359f)
 
 /* ======================== 融合参数（PX4风格） ======================== */
-#define MAHONY_KP_DEFAULT                   2.0f
-#define MAHONY_KI_DEFAULT                   0.03f
+#define MAHONY_KP_DEFAULT                   1.4f
+#define MAHONY_KI_DEFAULT                   0.015f
 
 /* 加速度可信区间与权重衰减带宽（单位 g） */
 #define MAHONY_ACCEL_MIN_MAGNITUDE          0.30f
@@ -32,6 +32,12 @@
 #define MAHONY_BIAS_LEARN_MAX_GYRO_DPS      25.0f
 #define MAHONY_BIAS_LEARN_MAX_ACC_ERR_G     0.20f
 #define MAHONY_BIAS_MAX_RAD_S               0.25f
+#define MAHONY_YAW_CORR_ENABLE              (0U)
+#define MAHONY_STATIC_GYRO_DPS_TH           1.5f
+#define MAHONY_STATIC_ACC_ERR_G_TH          0.08f
+#define MAHONY_STATIC_LOCK_COUNT            (200U)
+#define MAHONY_YAW_BIAS_LP_ALPHA            0.002f
+#define MAHONY_YAW_GZ_DEADBAND_DPS          0.05f
 
 /* 数值稳定阈值 */
 #define MAHONY_VECTOR_NORM_MIN              1e-6f
@@ -48,6 +54,7 @@ typedef struct
     float gyro_bias_x;
     float gyro_bias_y;
     float gyro_bias_z;
+    float gyro_bias_z_static;
 
     /* 积分反馈项（与 gyro_bias 保持一致） */
     float integral_fbx;
@@ -59,6 +66,8 @@ typedef struct
 
     uint32_t update_count;
     float accel_magnitude;
+    uint16_t static_count;
+    uint8_t is_static;
 
 } MahonyAhrs_t;
 

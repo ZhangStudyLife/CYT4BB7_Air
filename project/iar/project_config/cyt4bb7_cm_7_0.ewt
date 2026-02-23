@@ -1428,6 +1428,39 @@
     </configuration>
     <group>
         <name>code</name>
+        <group>
+            <name>HW_Drivers</name>
+            <group>
+                <name>ICM42688</name>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\ICM42688\ICM42688.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\ICM42688\ICM42688.h</name>
+                </file>
+            </group>
+            <group>
+                <name>PMW3901</name>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\PMW3901\PMW3901.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\PMW3901\PMW3901.h</name>
+                </file>
+            </group>
+            <group>
+                <name>VL53L1X</name>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\VL53L1X\VL53L1X.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\VL53L1X\VL53L1X.h</name>
+                </file>
+            </group>
+            <configuration>
+                <name>Debug</name>
+            </configuration>
+        </group>
         <file>
             <name>$PROJ_DIR$\..\..\code\本文件夹作用.txt</name>
         </file>

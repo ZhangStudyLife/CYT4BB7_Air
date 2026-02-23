@@ -34,6 +34,7 @@
 ********************************************************************************************************************/
 
 #include "zf_common_headfile.h"
+#include "../code/HW_Drivers/ICM42688/ICM42688.h"
 // 打开新的工程或者工程移动了位置务必执行以下操作
 // 第一步 关闭上面所有打开的文件
 // 第二步 project->clean  等待下方进度条走完
@@ -51,17 +52,17 @@ int main(void)
     debug_init();                       // 调试串口信息初始化
     // 此处编写用户代码 例如外设初始化代码等
     
-
+    ICM42688_Init(&ICM42688_CONFIG); // icm42688陀螺仪加速度计初始化
     
-    
+    ICM42688_Bias_Init(10000); // icm42688陀螺仪零偏初始化 200次采样平均
     // 此处编写用户代码 例如外设初始化代码等
     while(true)
     {
         // 此处编写需要循环执行的代码
-
-
+        ICM42688_Get_Data(); // 获取陀螺仪加速度计数据
+        printf("%f,%f,%f,%d,%d,%d\r\n",ICM42688.gyro_x,ICM42688.gyro_y,ICM42688.gyro_z,ICM42688_RAW.gyro_x_lsb,ICM42688_RAW.gyro_y_lsb,ICM42688_RAW.gyro_z_lsb);
       
-      
+      system_delay_ms(1);
         // 此处编写需要循环执行的代码
     }
 }

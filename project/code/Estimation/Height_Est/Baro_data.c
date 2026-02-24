@@ -13,6 +13,7 @@
 
 float g_baro_ref_pressure = 0.0f;
 float g_baro_altitude = 0.0f;
+uint8 g_baro_sample_new = 0U;
 
 static uint8 s_baro_inited = 0U;
 static uint8 s_baro_ref_valid = 0U;
@@ -158,6 +159,7 @@ void Baro_Init(void)
 
     g_baro_ref_pressure = 0.0f;
     g_baro_altitude = 0.0f;
+    g_baro_sample_new = 0U;
     s_baro_ref_valid = 0U;
     Baro_ClearFilterState();
 
@@ -184,6 +186,7 @@ void Baro_Calibrate(void)
         return;
     }
 
+    g_baro_sample_new = 0U;
     s_baro_ref_valid = 0U;
     Baro_ClearFilterState();
 
@@ -219,16 +222,22 @@ void Baro_Update(void)
     float altitude_innov_m;
     float altitude_alpha;
 
+    g_baro_sample_new = 0U;
+
     if (0U == s_baro_inited)
     {
         return;
     }
 
-    if (BMP388_RET_OK != BMP388_update())
+    if (BMP388_RET_OK != BMP388_update_nonblocking(&g_baro_sample_new))
     {
         return;
     }
 
+    if (0U == g_baro_sample_new)
+    {
+        return;
+    }
     pressure_filtered_pa = Baro_FilterPressure(g_BMP388_data.pressure_pa);
 
     if (0U == s_baro_ref_valid)
@@ -284,4 +293,9 @@ void Baro_Update(void)
     }
 
     g_baro_altitude = s_alt_lpf_m;
+}
+
+void Baro_update_100HZ(void)
+{
+    Baro_Update();
 }

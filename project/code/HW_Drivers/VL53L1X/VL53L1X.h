@@ -46,5 +46,6 @@ extern VL53L1X_diag_struct g_vl53l1x3_diag;
 
 uint8 VL53L1X_init_all(void);
 uint8 VL53L1X_read_data(VL53L1X_data_struct *data);
+void VL53L1X_recover_update_10HZ(void);
 
 #endif // _VL53L1X_DRIVER_H_

@@ -59,7 +59,7 @@ int main(void)
     Height_Est_Init();         // 高度估计初始化（TOF+Baro）
     PMW3901_Init();            // PMW3901 光流传感器初始化
     IMU_Init_All();            // ICM42688 IMU 初始化
-    crsf_init();                // CRSF 遥控协议初始化
+    crsf_init();               // CRSF 遥控协议初始化
     pit_us_init(PIT_CH0, 500); // PIT 定时器初始化 500us 中断周期 用于 IMU 2kHz 更新
     pit_ms_init(PIT_CH1, 10);  // 100Hz 节拍
 
@@ -67,10 +67,9 @@ int main(void)
     for (int i = 0; i < 100; i++)
     {
         Height_Est_update_100HZ(); // 100Hz 更新一次高度估计
-        system_delay_ms(50);
+        system_delay_ms(10);
     }
     printf("2");
-
 
     while (true)
     {
@@ -101,6 +100,3 @@ int main(void)
 }
 
 // **************************** 代码区域 ****************************
-
-
-

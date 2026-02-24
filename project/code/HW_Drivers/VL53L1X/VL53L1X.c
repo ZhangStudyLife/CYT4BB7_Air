@@ -583,6 +583,11 @@ static void VL53L1X_TryRecoverChannels(void)
     }
 }
 
+void VL53L1X_recover_update_10HZ(void)
+{
+    VL53L1X_TryRecoverChannels();
+}
+
 uint8 VL53L1X_read_data(VL53L1X_data_struct *data)
 {
     uint8 valid_mask = 0U;
@@ -617,7 +622,6 @@ uint8 VL53L1X_read_data(VL53L1X_data_struct *data)
 
     if ((VL53L1X2_init_flag == 0U) && (VL53L1X3_init_flag == 0U))
     {
-        VL53L1X_TryRecoverChannels();
         VL53L1X_data = *data;
         return 0U;
     }
@@ -750,7 +754,6 @@ uint8 VL53L1X_read_data(VL53L1X_data_struct *data)
         VL53L1X_DiagUpdateComm(&g_vl53l1x3_diag, (ack_mask & 0x02U) ? 1U : 0U);
     }
 
-    VL53L1X_TryRecoverChannels();
 
     VL53L1X_data = *data;
     return valid_mask;

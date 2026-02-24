@@ -664,3 +664,8 @@ void TOF_Update(void)
     g_tof_fused_valid = 1U;
     TOF_UpdateFusionUsage(selected_source);
 }
+
+void TOF_update_100HZ(void)
+{
+    TOF_Update();
+}

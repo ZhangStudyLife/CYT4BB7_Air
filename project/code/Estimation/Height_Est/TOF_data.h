@@ -20,6 +20,7 @@ extern uint8 g_tof_fused_source;
 
 void TOF_Init(void);
 void TOF_Update(void);
+void TOF_update_100HZ(void);
 void TOF_Calibrate(void);
 
 

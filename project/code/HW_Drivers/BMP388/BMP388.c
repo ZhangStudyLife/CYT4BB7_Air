@@ -67,6 +67,7 @@
 #define BMP388_POST_INIT_WAIT_US             (40000U)
 #define BMP388_CALIB_READ_RETRY              (3U)
 #define BMP388_STRICT_CRC_CHECK              (0U)
+#define BMP388_NONBLOCK_TIMEOUT_CALLS        (30U)
 
 #define BMP3_SET_BITS(reg_data, bitname, data) \
     ((reg_data & ~(bitname##_MSK)) | (((uint8)data << bitname##_POS) & bitname##_MSK))
@@ -89,6 +90,9 @@ volatile BMP388_device_t g_BMP388_dev =
     0U
 };
 volatile BMP388_data_t g_BMP388_data = {0};
+
+static uint8 s_bmp388_nonblock_waiting = 0U;
+static uint16 s_bmp388_nonblock_wait_calls = 0U;
 
 // 软件SPI单字节收发 CPOL=1 CPHA=1 模式3
 static uint8 BMP388_spi_transfer_byte(uint8 tx)
@@ -551,6 +555,31 @@ static uint64 BMP388_compensate_pressure(uint32 uncomp_press)
     return comp_press;
 }
 
+static uint8 BMP388_read_compensated_data(void)
+{
+    uint8 reg_data[BMP3_P_T_DATA_LEN] = {0};
+    uint32 uncomp_press = 0U;
+    uint32 uncomp_temp = 0U;
+    int64 comp_temp;
+    uint64 comp_press;
+
+    if (BMP388_RET_OK != BMP388_read_regs(BMP3_DATA_ADDR, reg_data, BMP3_P_T_DATA_LEN))
+    {
+        return BMP388_RET_ERR_TIMEOUT;
+    }
+
+    BMP388_parse_raw_data(reg_data, &uncomp_press, &uncomp_temp);
+    comp_temp = BMP388_compensate_temperature(uncomp_temp);
+    comp_press = BMP388_compensate_pressure(uncomp_press);
+
+    g_BMP388_data.raw_pressure = uncomp_press;
+    g_BMP388_data.raw_temperature = uncomp_temp;
+    g_BMP388_data.temperature_c = (float)comp_temp / 100.0f;
+    g_BMP388_data.pressure_pa = (float)comp_press / 100.0f;
+
+    return BMP388_RET_OK;
+}
+
 uint8 BMP388_init(void)
 {
     uint8 chip_id = 0U;
@@ -559,6 +588,8 @@ uint8 BMP388_init(void)
     memset((void *)&g_BMP388_calib, 0, sizeof(g_BMP388_calib));
     memset((void *)&g_BMP388_data, 0, sizeof(g_BMP388_data));
     g_BMP388_dev.inited = 0U;
+    s_bmp388_nonblock_waiting = 0U;
+    s_bmp388_nonblock_wait_calls = 0U;
 
     // 固定引脚初始化 SCK CS MOSI输出 MISO输入
     gpio_init(g_BMP388_dev.sck_pin, GPO, GPIO_HIGH, GPO_PUSH_PULL);
@@ -604,19 +635,17 @@ uint8 BMP388_init(void)
 
 uint8 BMP388_update(void)
 {
-    uint8 reg_data[BMP3_P_T_DATA_LEN] = {0};
     uint8 status = 0U;
     uint8 ret;
     uint32 timeout_us;
-    uint32 uncomp_press = 0U;
-    uint32 uncomp_temp = 0U;
-    int64 comp_temp;
-    uint64 comp_press;
 
     if (0U == g_BMP388_dev.inited)
     {
         return BMP388_RET_ERR_NOT_INIT;
     }
+
+    s_bmp388_nonblock_waiting = 0U;
+    s_bmp388_nonblock_wait_calls = 0U;
 
     // 触发一次forced测量
     ret = BMP388_set_op_mode(BMP3_OP_MODE_FORCED);
@@ -655,19 +684,70 @@ uint8 BMP388_update(void)
         return BMP388_RET_ERR_TIMEOUT;
     }
 
-    if (BMP388_RET_OK != BMP388_read_regs(BMP3_DATA_ADDR, reg_data, BMP3_P_T_DATA_LEN))
+    return BMP388_read_compensated_data();
+}
+
+uint8 BMP388_update_nonblocking(uint8 *is_new_sample)
+{
+    uint8 status = 0U;
+
+    if (0 != is_new_sample)
     {
+        *is_new_sample = 0U;
+    }
+
+    if (0U == g_BMP388_dev.inited)
+    {
+        s_bmp388_nonblock_waiting = 0U;
+        s_bmp388_nonblock_wait_calls = 0U;
+        return BMP388_RET_ERR_NOT_INIT;
+    }
+
+    if (0U == s_bmp388_nonblock_waiting)
+    {
+        if (BMP388_RET_OK != BMP388_set_op_mode(BMP3_OP_MODE_FORCED))
+        {
+            return BMP388_RET_ERR_CONFIG;
+        }
+
+        s_bmp388_nonblock_waiting = 1U;
+        s_bmp388_nonblock_wait_calls = 0U;
+        return BMP388_RET_OK;
+    }
+
+    if (BMP388_RET_OK != BMP388_read_reg(BMP3_STATUS_REG_ADDR, &status))
+    {
+        s_bmp388_nonblock_waiting = 0U;
+        s_bmp388_nonblock_wait_calls = 0U;
         return BMP388_RET_ERR_TIMEOUT;
     }
 
-    BMP388_parse_raw_data(reg_data, &uncomp_press, &uncomp_temp);
-    comp_temp = BMP388_compensate_temperature(uncomp_temp);
-    comp_press = BMP388_compensate_pressure(uncomp_press);
+    if ((status & (BMP3_DRDY_PRESS | BMP3_DRDY_TEMP)) == (BMP3_DRDY_PRESS | BMP3_DRDY_TEMP))
+    {
+        s_bmp388_nonblock_waiting = 0U;
+        s_bmp388_nonblock_wait_calls = 0U;
+        if (BMP388_RET_OK != BMP388_read_compensated_data())
+        {
+            return BMP388_RET_ERR_TIMEOUT;
+        }
+        if (0 != is_new_sample)
+        {
+            *is_new_sample = 1U;
+        }
+        return BMP388_RET_OK;
+    }
 
-    g_BMP388_data.raw_pressure = uncomp_press;
-    g_BMP388_data.raw_temperature = uncomp_temp;
-    g_BMP388_data.temperature_c = (float)comp_temp / 100.0f;
-    g_BMP388_data.pressure_pa = (float)comp_press / 100.0f;
+    if (s_bmp388_nonblock_wait_calls < 65535U)
+    {
+        s_bmp388_nonblock_wait_calls++;
+    }
+
+    if (s_bmp388_nonblock_wait_calls >= BMP388_NONBLOCK_TIMEOUT_CALLS)
+    {
+        s_bmp388_nonblock_waiting = 0U;
+        s_bmp388_nonblock_wait_calls = 0U;
+        return BMP388_RET_ERR_TIMEOUT;
+    }
 
     return BMP388_RET_OK;
 }

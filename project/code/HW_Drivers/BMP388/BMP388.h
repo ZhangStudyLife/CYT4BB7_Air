@@ -79,5 +79,6 @@ uint8 BMP388_init(void);
 
 // 更新 触发测量 读取原始值 补偿计算 输出温度和气压
 uint8 BMP388_update(void);
+uint8 BMP388_update_nonblocking(uint8 *is_new_sample);
 
 #endif /* BMP388_H_ */

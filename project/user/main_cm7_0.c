@@ -56,20 +56,20 @@ int main(void)
     debug_init();                       // 调试串口信息初始化
     // 此处编写用户代码 例如外设初始化代码等
     
-    uint8 tof_init_err = tof_init_all(); // VL53L1X ToF 传感器初始化
+    uint8 VL53L1X_init_err = VL53L1X_init_all(); // VL53L1X 传感器初始化
     PMW3901_Init(); // PMW3901 光流传感器初始化
     Baro_Init(); // BMP388 气压传感器初始化
     IMU_Init_All(); // ICM42688 IMU 初始化
     pit_us_init(PIT_CH0, 500); // PIT 定时器初始化 500us 中断周期 用于 IMU 2kHz 更新
     while(true)
     {
-        // tof_read_data(&tof_data); // 读取 VL53L1X ToF 传感器数据
+        // VL53L1X_read_data(&VL53L1X_data); // 读取 VL53L1X 传感器数据
         // PMW3901_Update(); // 更新 PMW3901 光流传感器数据
         Baro_Update(); // 更新 BMP388 气压传感器数据
         // printf("%d,%d,%f,%f\r\n",g_BMP388_data.raw_pressure, g_BMP388_data.raw_temperature, g_BMP388_data.pressure_pa, g_BMP388_data.temperature_c); // 打印 BMP388 气压和温度数据
         // printf("%f,%f,%f,%f,%f,%f\r\n", ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z, g_imu_filter.gyro_filt_x, g_imu_filter.gyro_filt_y, g_imu_filter.gyro_filt_z); // 打印 IMU 滤波后的陀螺和加速度数据
         printf("%f,%f,%f,%f\r\n", g_euler.roll, g_euler.pitch, g_euler.yaw, g_baro_altitude); // 打印欧拉角和气压高度数据
-        // printf("%d,%d,%d,%d\r\n", tof_data.tof2_distance_mm, tof_data.tof3_distance_mm, tof_data.tof2_range_status, tof_data.tof3_range_status);
+        // printf("%d,%d,%d,%d\r\n", VL53L1X_data.VL53L1X2_distance_mm, VL53L1X_data.VL53L1X3_distance_mm, VL53L1X_data.VL53L1X2_range_status, VL53L1X_data.VL53L1X3_range_status);
         system_delay_ms(20);
     }
 }

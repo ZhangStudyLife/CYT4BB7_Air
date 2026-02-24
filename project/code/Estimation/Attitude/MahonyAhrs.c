@@ -155,6 +155,13 @@ void MahonyAhrs_Update(MahonyAhrs_t *ahrs,
         ay = accel_y / accel_mag;
         az = accel_z / accel_mag;
 
+#if (MAHONY_INPUT_ACCEL_IS_SPECIFIC_FORCE != 0U)
+        /* 加速度计输出比力，方向与重力相反，这里转换为重力方向向量 */
+        ax = -ax;
+        ay = -ay;
+        az = -az;
+#endif
+
         half_vx = ahrs->q1 * ahrs->q3 - ahrs->q0 * ahrs->q2;
         half_vy = ahrs->q0 * ahrs->q1 + ahrs->q2 * ahrs->q3;
         half_vz = ahrs->q0 * ahrs->q0 - 0.5f + ahrs->q3 * ahrs->q3;

@@ -23,6 +23,9 @@
 #define MAHONY_KP_DEFAULT                   1.4f
 #define MAHONY_KI_DEFAULT                   0.015f
 
+/* 1: 输入加速度为比力（静止约 -1g），内部转换为重力方向用于校正 */
+#define MAHONY_INPUT_ACCEL_IS_SPECIFIC_FORCE (1U)
+
 /* 加速度可信区间与权重衰减带宽（单位 g） */
 #define MAHONY_ACCEL_MIN_MAGNITUDE          0.30f
 #define MAHONY_ACCEL_MAX_MAGNITUDE          3.00f

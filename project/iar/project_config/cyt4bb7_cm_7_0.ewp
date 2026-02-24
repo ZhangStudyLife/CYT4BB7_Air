@@ -1422,6 +1422,12 @@
                 <file>
                     <name>$PROJ_DIR$\..\..\code\Estimation\Height_Est\Baro_data.h</name>
                 </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Height_Est\TOF_data.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Height_Est\TOF_data.h</name>
+                </file>
                 <configuration>
                     <name>Debug</name>
                     <settings>

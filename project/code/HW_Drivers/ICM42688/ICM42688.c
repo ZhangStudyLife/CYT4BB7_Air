@@ -427,15 +427,30 @@ static void Set_ICM42688_LN_Mode(void)
  */
 void ICM42688_Get_Data(void)
 {
+    float gyro_x_raw;
+    float gyro_y_raw;
+    float gyro_z_raw;
+    float acc_x_raw;
+    float acc_y_raw;
+    float acc_z_raw;
+
     ICM42688_Read_Burst(&ICM42688_RAW);
 
-    ICM42688.gyro_x = ICM42688_RAW.gyro_x_lsb / Gyro_Sensitivity;
-    ICM42688.gyro_y = ICM42688_RAW.gyro_y_lsb / Gyro_Sensitivity;
-    ICM42688.gyro_z = ICM42688_RAW.gyro_z_lsb / Gyro_Sensitivity;
+    gyro_x_raw = ICM42688_RAW.gyro_x_lsb / Gyro_Sensitivity;
+    gyro_y_raw = ICM42688_RAW.gyro_y_lsb / Gyro_Sensitivity;
+    gyro_z_raw = ICM42688_RAW.gyro_z_lsb / Gyro_Sensitivity;
 
-    ICM42688.acc_x = ICM42688_RAW.acc_x_lsb / Acc_Sensitivity;
-    ICM42688.acc_y = ICM42688_RAW.acc_y_lsb / Acc_Sensitivity;
-    ICM42688.acc_z = ICM42688_RAW.acc_z_lsb / Acc_Sensitivity;
+    acc_x_raw = ICM42688_RAW.acc_x_lsb / Acc_Sensitivity;
+    acc_y_raw = ICM42688_RAW.acc_y_lsb / Acc_Sensitivity;
+    acc_z_raw = ICM42688_RAW.acc_z_lsb / Acc_Sensitivity;
+
+    ICM42688.gyro_x = ICM42688_SIGN_GX * gyro_x_raw;
+    ICM42688.gyro_y = ICM42688_SIGN_GY * gyro_y_raw;
+    ICM42688.gyro_z = ICM42688_SIGN_GZ * gyro_z_raw;
+
+    ICM42688.acc_x = ICM42688_SIGN_AX * acc_x_raw;
+    ICM42688.acc_y = ICM42688_SIGN_AY * acc_y_raw;
+    ICM42688.acc_z = ICM42688_SIGN_AZ * acc_z_raw;
 
     if (ICM42688_Bias_Init_Flag == 1)
     {
@@ -476,9 +491,9 @@ void ICM42688_Bias_Init(uint32 times)
         system_delay_us(500);
     }
 
-    ICM42688_Bias_gyro_x = ((float)sum_gyro_x / (float)times) / Gyro_Sensitivity;
-    ICM42688_Bias_gyro_y = ((float)sum_gyro_y / (float)times) / Gyro_Sensitivity;
-    ICM42688_Bias_gyro_z = ((float)sum_gyro_z / (float)times) / Gyro_Sensitivity;
+    ICM42688_Bias_gyro_x = ICM42688_SIGN_GX * (((float)sum_gyro_x / (float)times) / Gyro_Sensitivity);
+    ICM42688_Bias_gyro_y = ICM42688_SIGN_GY * (((float)sum_gyro_y / (float)times) / Gyro_Sensitivity);
+    ICM42688_Bias_gyro_z = ICM42688_SIGN_GZ * (((float)sum_gyro_z / (float)times) / Gyro_Sensitivity);
     ICM42688_Bias_Init_Flag = 1;
 }
 

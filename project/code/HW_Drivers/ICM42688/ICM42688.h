@@ -68,6 +68,13 @@
 #define SENSITIVITY_ICM42688_ACC_4G          8192
 #define SENSITIVITY_ICM42688_ACC_2G          16384
 
+#define ICM42688_SIGN_GX                      (1.0f)
+#define ICM42688_SIGN_GY                     (-1.0f)
+#define ICM42688_SIGN_GZ                     (-1.0f)
+#define ICM42688_SIGN_AX                      (1.0f)
+#define ICM42688_SIGN_AY                     (-1.0f)
+#define ICM42688_SIGN_AZ                     (-1.0f)
+
 /* 传感器原始数据（寄存器直接读出的 LSB 值） */
 typedef struct ICM42688_RAW_DATA {
     int16 acc_x_lsb;

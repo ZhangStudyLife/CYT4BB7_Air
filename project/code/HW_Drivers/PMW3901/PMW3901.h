@@ -14,6 +14,10 @@
 #define PMW3901_CS_Pin           (P03_3)
 #define PMW3901_SPI_SPEED        (2 * 1000 * 1000)
 
+/* Optical flow polarity mapped to body frame convention */
+#define PMW3901_SIGN_X           (1)
+#define PMW3901_SIGN_Y           (-1)
+
 // Set to 1 to verify register writes via readback.
 // Some PMW3901 registers are write-only on some boards, so 0 avoids false failures.
 #define PMW3901_VERIFY_WRITES    (1)

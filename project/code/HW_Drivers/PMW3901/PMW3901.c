@@ -288,6 +288,8 @@ void PMW3901_Update(void)
 
     pmw3901_motion_burst_read(&burst_data);
     g_pmw3901_raw = burst_data;
+    g_pmw3901_raw.deltaX = (int16)(PMW3901_SIGN_X * g_pmw3901_raw.deltaX);
+    g_pmw3901_raw.deltaY = (int16)(PMW3901_SIGN_Y * g_pmw3901_raw.deltaY);
 
     if (((g_pmw3901_raw.motion & PMW3901_MOTION_VALID_BIT) != 0U)
         && (g_pmw3901_raw.squal >= PMW3901_SQUAL_MIN_THRESHOLD))

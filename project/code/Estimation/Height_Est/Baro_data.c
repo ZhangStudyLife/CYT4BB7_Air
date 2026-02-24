@@ -1,9 +1,11 @@
 #include "Baro_data.h"
 
-#define BARO_PRESS_LPF_ALPHA            (0.18f)
-#define BARO_ALT_LPF_ALPHA              (0.10f)
-#define BARO_ALT_STEP_LIMIT_M           (0.02f)
-#define BARO_ZERO_DEADBAND_M            (0.01f)
+#define BARO_PRESS_LPF_ALPHA            (0.26f)
+#define BARO_ALT_LPF_ALPHA_SLOW         (0.14f)
+#define BARO_ALT_LPF_ALPHA_FAST         (0.35f)
+#define BARO_ALT_FAST_SWITCH_M          (0.08f)
+#define BARO_ALT_STEP_LIMIT_M           (0.04f)
+#define BARO_ZERO_DEADBAND_M            (0.006f)
 #define BARO_GROUND_ENTER_ABS_H_M       (0.20f)
 #define BARO_AIRBORNE_LATCH_ABS_H_M     (0.35f)
 #define BARO_GROUND_LOCK_FRAMES         (50U)
@@ -214,6 +216,8 @@ void Baro_Update(void)
     float pressure_filtered_pa;
     float altitude_raw_m;
     float abs_alt_m;
+    float altitude_innov_m;
+    float altitude_alpha;
 
     if (0U == s_baro_inited)
     {
@@ -240,7 +244,16 @@ void Baro_Update(void)
     altitude_raw_m = Baro_ClampStep(altitude_raw_m, s_prev_alt_raw_m, BARO_ALT_STEP_LIMIT_M);
     s_prev_alt_raw_m = altitude_raw_m;
 
-    s_alt_lpf_m += BARO_ALT_LPF_ALPHA * (altitude_raw_m - s_alt_lpf_m);
+    altitude_innov_m = altitude_raw_m - s_alt_lpf_m;
+    if (Baro_AbsFloat(altitude_innov_m) > BARO_ALT_FAST_SWITCH_M)
+    {
+        altitude_alpha = BARO_ALT_LPF_ALPHA_FAST;
+    }
+    else
+    {
+        altitude_alpha = BARO_ALT_LPF_ALPHA_SLOW;
+    }
+    s_alt_lpf_m += altitude_alpha * altitude_innov_m;
 
     abs_alt_m = Baro_AbsFloat(s_alt_lpf_m);
     if (abs_alt_m > BARO_AIRBORNE_LATCH_ABS_H_M)

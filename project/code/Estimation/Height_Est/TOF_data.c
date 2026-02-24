@@ -6,15 +6,19 @@
 
 #define TOF_MIN_VALID_MM                 (40U)
 #define TOF_MAX_VALID_MM                 (1300U)
-#define TOF_JUMP_REJECT_MM               (120U)
-#define TOF_STEP_LIMIT_MM                (80U)
-#define TOF_LPF_ALPHA                    (0.45f)
-#define TOF_MATCH_GATE_MM                (100U)
-#define TOF_INVALID_HOLD_FRAMES          (4U)
-#define TOF_SWITCH_CONFIRM_FRAMES        (2U)
 #define TOF_COS_TERM_MIN                 (0.35f)
-#define TOF_RAW_SAME_STREAK_TH           (30U)
-#define TOF_RAW_SAME_STREAK_PENALTY      (250U)
+
+#define TOF_AGREE_GATE_MM                (40U)
+#define TOF_SWITCH_CONFIRM_FRAMES        (3U)
+#define TOF_FUSED_HOLD_FRAMES            (4U)
+#define TOF_STEP_FAST_MM                 (28U)
+#define TOF_STEP_SAFE_MM                 (18U)
+
+#define TOF_SAME_VALUE_FRAMES_TH         (25U)
+#define TOF_SAME_VALUE_PENALTY_BASE      (120U)
+#define TOF_SAME_VALUE_PENALTY_STEP      (2U)
+#define TOF_SAME_VALUE_PENALTY_MAX       (400U)
+#define TOF_NOT_FRESH_PENALTY            (80U)
 
 #define TOF_CALIBRATION_SAMPLES          (100U)
 #define TOF_CALIBRATION_DT_MS            (10U)
@@ -26,20 +30,11 @@
 
 typedef struct
 {
-    uint8 has_value;
-    float value_mm;
-
-    uint8 has_last_raw;
-    uint16 last_raw_mm;
-
-    uint16 invalid_streak;
-    uint16 stable_valid_cnt;
-    uint16 last_delta_mm;
-    uint16 raw_same_streak;
-
-    uint8 raw_valid_now;
+    uint8 has_last_mm;
     uint8 fresh_now;
-    uint8 eligible_for_fusion;
+    uint16 last_mm;
+    uint16 invalid_streak;
+    uint16 same_value_streak;
 } TOFChannelState_t;
 
 uint16 g_tof_fused_height_mm = VL53L1X_INVALID_DISTANCE_MM;
@@ -55,11 +50,13 @@ uint8 g_tof_fused_source = TOF_SRC_NONE;
 static uint8 s_tof_inited = 0U;
 static int16 s_tof2_offset_mm = 0;
 static int16 s_tof3_offset_mm = 0;
+
 static TOFChannelState_t s_tof2_state = {0};
 static TOFChannelState_t s_tof3_state = {0};
 static uint8 s_selected_source = TOF_SRC_NONE;
 static uint8 s_pending_source = TOF_SRC_NONE;
 static uint8 s_pending_count = 0U;
+static uint8 s_fused_invalid_hold_count = 0U;
 
 static uint16 TOF_AbsDiffU16(uint16 a, uint16 b)
 {
@@ -117,8 +114,10 @@ static uint16 TOF_CompensateVerticalByAttitude(uint16 slant_mm)
     return (uint16)(vertical_mm + 0.5f);
 }
 
-static uint8 TOF_IsRawMeasurementValid(uint16 distance_mm, uint8 range_status, uint8 ready)
+static uint8 TOF_IsRawMeasurementValid(uint16 distance_mm, uint8 range_status, uint8 ready, uint8 fresh)
 {
+    (void)fresh;
+
     if (0U == ready)
     {
         return 0U;
@@ -139,24 +138,20 @@ static uint8 TOF_IsRawMeasurementValid(uint16 distance_mm, uint8 range_status, u
 
 static void TOF_ResetChannelState(TOFChannelState_t *state)
 {
-    state->has_value = 0U;
-    state->value_mm = 0.0f;
-    state->has_last_raw = 0U;
-    state->last_raw_mm = 0U;
-    state->invalid_streak = 0U;
-    state->stable_valid_cnt = 0U;
-    state->last_delta_mm = 0U;
-    state->raw_same_streak = 0U;
-    state->raw_valid_now = 0U;
+    if (0 == state)
+    {
+        return;
+    }
+
+    state->has_last_mm = 0U;
     state->fresh_now = 0U;
-    state->eligible_for_fusion = 0U;
+    state->last_mm = 0U;
+    state->invalid_streak = 0U;
+    state->same_value_streak = 0U;
 }
 
-static void TOF_ResetAllStates(void)
+static void TOF_ResetFusionState(void)
 {
-    TOF_ResetChannelState(&s_tof2_state);
-    TOF_ResetChannelState(&s_tof3_state);
-
     g_tof2_height_mm = VL53L1X_INVALID_DISTANCE_MM;
     g_tof3_height_mm = VL53L1X_INVALID_DISTANCE_MM;
     g_tof_fused_height_mm = VL53L1X_INVALID_DISTANCE_MM;
@@ -170,250 +165,147 @@ static void TOF_ResetAllStates(void)
     s_selected_source = TOF_SRC_NONE;
     s_pending_source = TOF_SRC_NONE;
     s_pending_count = 0U;
+    s_fused_invalid_hold_count = 0U;
 }
 
-static uint8 TOF_UpdateChannelState(TOFChannelState_t *state,
-                                    uint8 raw_valid,
-                                    uint8 raw_fresh,
-                                    uint16 raw_mm,
-                                    int16 offset_mm,
-                                    uint16 *output_mm)
+static void TOF_UpdateFusionUsage(uint8 source)
 {
-    uint16 candidate_mm;
+    g_tof_fused_source = source;
+    g_tof2_used_in_fusion = 0U;
+    g_tof3_used_in_fusion = 0U;
+
+    if (TOF_SRC_CH2 == source)
+    {
+        g_tof2_used_in_fusion = 1U;
+    }
+    else if (TOF_SRC_CH3 == source)
+    {
+        g_tof3_used_in_fusion = 1U;
+    }
+    else if (TOF_SRC_AVG == source)
+    {
+        g_tof2_used_in_fusion = 1U;
+        g_tof3_used_in_fusion = 1U;
+    }
+}
+
+static uint8 TOF_UpdateChannelObservation(TOFChannelState_t *state,
+                                          uint16 raw_mm,
+                                          uint8 range_status,
+                                          uint8 ready,
+                                          uint8 fresh,
+                                          int16 offset_mm,
+                                          uint16 *display_mm,
+                                          uint8 *display_valid,
+                                          uint16 *fusion_mm,
+                                          uint8 *fusion_valid)
+{
     uint16 corrected_mm;
-    uint16 prev_output_mm;
-    int32 delta_raw;
-    int32 candidate_i32;
-    float prev_value;
-    float target_value;
+    uint8 raw_valid;
 
-    if ((0 == state) || (0 == output_mm))
+    if ((0 == state) || (0 == display_mm) || (0 == display_valid) || (0 == fusion_mm) || (0 == fusion_valid))
     {
         return 0U;
     }
 
-    state->raw_valid_now = raw_valid;
-    state->fresh_now = raw_fresh;
-    state->eligible_for_fusion = 0U;
-
-    if (0U == raw_valid)
+    raw_valid = TOF_IsRawMeasurementValid(raw_mm, range_status, ready, fresh);
+    if (0U != raw_valid)
     {
-        if (state->invalid_streak < 65535U)
+        corrected_mm = TOF_ApplyOffsetClamp(TOF_CompensateVerticalByAttitude(raw_mm), offset_mm);
+
+        if ((0U != state->has_last_mm) && (corrected_mm == state->last_mm))
         {
-            state->invalid_streak++;
-        }
-        state->raw_same_streak = 0U;
-        if (state->stable_valid_cnt > 0U)
-        {
-            state->stable_valid_cnt--;
-        }
-
-        if ((state->has_value != 0U) && (state->invalid_streak <= TOF_INVALID_HOLD_FRAMES))
-        {
-            *output_mm = (uint16)(state->value_mm + 0.5f);
-            state->last_delta_mm = 0U;
-            state->eligible_for_fusion = (state->stable_valid_cnt > 0U) ? 1U : 0U;
-            return 1U;
-        }
-
-        return 0U;
-    }
-
-    if (0U == raw_fresh)
-    {
-        state->invalid_streak = 0U;
-        state->stable_valid_cnt = 0U;
-        state->raw_same_streak = 0U;
-
-        if (state->has_value != 0U)
-        {
-            *output_mm = (uint16)(state->value_mm + 0.5f);
-            state->last_delta_mm = 0U;
-            return 1U;
-        }
-
-        return 0U;
-    }
-
-    state->invalid_streak = 0U;
-    if (state->stable_valid_cnt < 65535U)
-    {
-        state->stable_valid_cnt++;
-    }
-
-    corrected_mm = TOF_ApplyOffsetClamp(TOF_CompensateVerticalByAttitude(raw_mm), offset_mm);
-    candidate_mm = corrected_mm;
-
-    if (0U == state->has_last_raw)
-    {
-        state->last_raw_mm = corrected_mm;
-        state->has_last_raw = 1U;
-        state->raw_same_streak = 0U;
-    }
-    else
-    {
-        if (corrected_mm == state->last_raw_mm)
-        {
-            if (state->raw_same_streak < 65535U)
+            if (state->same_value_streak < 65535U)
             {
-                state->raw_same_streak++;
+                state->same_value_streak++;
             }
         }
         else
         {
-            state->raw_same_streak = 0U;
+            state->same_value_streak = 0U;
         }
 
-        delta_raw = (int32)corrected_mm - (int32)state->last_raw_mm;
-        if (delta_raw > (int32)TOF_JUMP_REJECT_MM)
-        {
-            delta_raw = (int32)TOF_STEP_LIMIT_MM;
-        }
-        else if (delta_raw < -(int32)TOF_JUMP_REJECT_MM)
-        {
-            delta_raw = -(int32)TOF_STEP_LIMIT_MM;
-        }
+        state->last_mm = corrected_mm;
+        state->has_last_mm = 1U;
+        state->fresh_now = fresh;
+        state->invalid_streak = 0U;
 
-        candidate_i32 = (int32)state->last_raw_mm + delta_raw;
-        if (candidate_i32 < 0)
-        {
-            candidate_i32 = 0;
-        }
-        else if (candidate_i32 > 65535)
-        {
-            candidate_i32 = 65535;
-        }
-
-        candidate_mm = (uint16)candidate_i32;
-        state->last_raw_mm = candidate_mm;
-    }
-
-    if (0U == state->has_value)
-    {
-        state->value_mm = (float)candidate_mm;
-        state->has_value = 1U;
-        state->last_delta_mm = 0U;
-        state->eligible_for_fusion = 1U;
-        *output_mm = candidate_mm;
+        *display_mm = corrected_mm;
+        *display_valid = 1U;
+        *fusion_mm = corrected_mm;
+        *fusion_valid = 1U;
         return 1U;
     }
 
-    prev_output_mm = (uint16)(state->value_mm + 0.5f);
-    if (candidate_mm > (uint16)(prev_output_mm + TOF_STEP_LIMIT_MM))
+    if (state->invalid_streak < 65535U)
     {
-        candidate_mm = (uint16)(prev_output_mm + TOF_STEP_LIMIT_MM);
+        state->invalid_streak++;
     }
-    else if (prev_output_mm > (uint16)(candidate_mm + TOF_STEP_LIMIT_MM))
+    state->fresh_now = 0U;
+    state->same_value_streak = 0U;
+
+    *fusion_valid = 0U;
+    *fusion_mm = 0U;
+
+    if (0U != state->has_last_mm)
     {
-        candidate_mm = (uint16)(prev_output_mm - TOF_STEP_LIMIT_MM);
+        *display_mm = state->last_mm;
+        *display_valid = 1U;
+        return 1U;
     }
 
-    prev_value = state->value_mm;
-    target_value = (float)candidate_mm;
-    state->value_mm = prev_value + TOF_LPF_ALPHA * (target_value - prev_value);
-
-    *output_mm = (uint16)(state->value_mm + 0.5f);
-    state->last_delta_mm = TOF_AbsDiffU16(*output_mm, prev_output_mm);
-    state->eligible_for_fusion = 1U;
-    return 1U;
+    *display_mm = VL53L1X_INVALID_DISTANCE_MM;
+    *display_valid = 0U;
+    return 0U;
 }
 
-static uint16 TOF_ChannelScore(const TOFChannelState_t *state)
+static uint16 TOF_ChannelFrozenPenalty(const TOFChannelState_t *state)
 {
-    uint16 score = 0U;
-    uint16 stable_penalty = 0U;
-    uint16 delta_penalty = state->last_delta_mm;
-    uint16 same_streak_penalty = 0U;
+    uint16 penalty;
+    uint16 exceed;
 
-    if (delta_penalty > 400U)
+    if (0 == state)
     {
-        delta_penalty = 400U;
+        return 0U;
     }
 
-    if (state->stable_valid_cnt < 3U)
+    if (state->same_value_streak <= TOF_SAME_VALUE_FRAMES_TH)
     {
-        stable_penalty = (uint16)((3U - state->stable_valid_cnt) * 30U);
+        penalty = 0U;
     }
-
-    score = (uint16)(delta_penalty + stable_penalty);
-
-    if (state->raw_same_streak > TOF_RAW_SAME_STREAK_TH)
+    else
     {
-        same_streak_penalty = (uint16)(state->raw_same_streak - TOF_RAW_SAME_STREAK_TH);
-        if (same_streak_penalty > 100U)
+        exceed = (uint16)(state->same_value_streak - TOF_SAME_VALUE_FRAMES_TH);
+        penalty = (uint16)(TOF_SAME_VALUE_PENALTY_BASE + (uint16)(exceed * TOF_SAME_VALUE_PENALTY_STEP));
+        if (penalty > TOF_SAME_VALUE_PENALTY_MAX)
         {
-            same_streak_penalty = 100U;
+            penalty = TOF_SAME_VALUE_PENALTY_MAX;
         }
-        score = (uint16)(score + TOF_RAW_SAME_STREAK_PENALTY + (uint16)(same_streak_penalty * 2U));
-    }
-
-    if (0U == state->raw_valid_now)
-    {
-        score = (uint16)(score + 1000U);
     }
 
     if (0U == state->fresh_now)
     {
-        score = (uint16)(score + 500U);
+        penalty = (uint16)(penalty + TOF_NOT_FRESH_PENALTY);
     }
 
-    if (state->invalid_streak > 20U)
-    {
-        score = (uint16)(score + 400U);
-    }
-    else
-    {
-        score = (uint16)(score + (uint16)(state->invalid_streak * 20U));
-    }
-
-    return score;
+    return penalty;
 }
 
-static uint8 TOF_GetDesiredSource(uint8 ch2_eligible, uint8 ch3_eligible, uint16 diff_mm)
-{
-    uint16 score2;
-    uint16 score3;
-
-    if ((0U != ch2_eligible) && (0U != ch3_eligible))
-    {
-        if (diff_mm <= TOF_MATCH_GATE_MM)
-        {
-            return TOF_SRC_AVG;
-        }
-
-        score2 = TOF_ChannelScore(&s_tof2_state);
-        score3 = TOF_ChannelScore(&s_tof3_state);
-        return (score2 <= score3) ? TOF_SRC_CH2 : TOF_SRC_CH3;
-    }
-
-    if (0U != ch2_eligible)
-    {
-        return TOF_SRC_CH2;
-    }
-
-    if (0U != ch3_eligible)
-    {
-        return TOF_SRC_CH3;
-    }
-
-    return TOF_SRC_NONE;
-}
-
-static uint8 TOF_IsSourceAvailable(uint8 source, uint8 ch2_eligible, uint8 ch3_eligible, uint16 diff_mm)
+static uint8 TOF_IsSourceAvailable(uint8 source, uint8 ch2_valid, uint8 ch3_valid, uint16 diff_mm)
 {
     if (TOF_SRC_CH2 == source)
     {
-        return ch2_eligible;
+        return ch2_valid;
     }
 
     if (TOF_SRC_CH3 == source)
     {
-        return ch3_eligible;
+        return ch3_valid;
     }
 
     if (TOF_SRC_AVG == source)
     {
-        if ((0U != ch2_eligible) && (0U != ch3_eligible) && (diff_mm <= TOF_MATCH_GATE_MM))
+        if ((0U != ch2_valid) && (0U != ch3_valid) && (diff_mm <= TOF_AGREE_GATE_MM))
         {
             return 1U;
         }
@@ -423,7 +315,56 @@ static uint8 TOF_IsSourceAvailable(uint8 source, uint8 ch2_eligible, uint8 ch3_e
     return 0U;
 }
 
-static uint8 TOF_UpdateSelectedSource(uint8 desired_source, uint8 ch2_eligible, uint8 ch3_eligible, uint16 diff_mm)
+static uint8 TOF_GetDesiredSource(uint8 ch2_valid,
+                                  uint16 ch2_mm,
+                                  uint8 ch3_valid,
+                                  uint16 ch3_mm,
+                                  uint16 ref_mm,
+                                  uint16 *diff_mm)
+{
+    uint16 innovation2;
+    uint16 innovation3;
+    uint16 score2;
+    uint16 score3;
+
+    if (0 != diff_mm)
+    {
+        *diff_mm = 0U;
+    }
+
+    if ((0U != ch2_valid) && (0U != ch3_valid))
+    {
+        if (0 != diff_mm)
+        {
+            *diff_mm = TOF_AbsDiffU16(ch2_mm, ch3_mm);
+            if (*diff_mm <= TOF_AGREE_GATE_MM)
+            {
+                return TOF_SRC_AVG;
+            }
+        }
+
+        innovation2 = TOF_AbsDiffU16(ch2_mm, ref_mm);
+        innovation3 = TOF_AbsDiffU16(ch3_mm, ref_mm);
+
+        score2 = (uint16)(innovation2 + TOF_ChannelFrozenPenalty(&s_tof2_state));
+        score3 = (uint16)(innovation3 + TOF_ChannelFrozenPenalty(&s_tof3_state));
+        return (score2 <= score3) ? TOF_SRC_CH2 : TOF_SRC_CH3;
+    }
+
+    if (0U != ch2_valid)
+    {
+        return TOF_SRC_CH2;
+    }
+
+    if (0U != ch3_valid)
+    {
+        return TOF_SRC_CH3;
+    }
+
+    return TOF_SRC_NONE;
+}
+
+static uint8 TOF_UpdateSelectedSource(uint8 desired_source, uint8 ch2_valid, uint8 ch3_valid, uint16 diff_mm)
 {
     if (TOF_SRC_NONE == desired_source)
     {
@@ -433,7 +374,7 @@ static uint8 TOF_UpdateSelectedSource(uint8 desired_source, uint8 ch2_eligible, 
         return TOF_SRC_NONE;
     }
 
-    if (0U == TOF_IsSourceAvailable(s_selected_source, ch2_eligible, ch3_eligible, diff_mm))
+    if (0U == TOF_IsSourceAvailable(s_selected_source, ch2_valid, ch3_valid, diff_mm))
     {
         s_selected_source = desired_source;
         s_pending_source = TOF_SRC_NONE;
@@ -470,45 +411,24 @@ static uint8 TOF_UpdateSelectedSource(uint8 desired_source, uint8 ch2_eligible, 
     return s_selected_source;
 }
 
-static uint16 TOF_GetFusedHeightBySource(uint8 source)
+static uint16 TOF_GetSourceHeight(uint8 source, uint16 ch2_mm, uint16 ch3_mm)
 {
     if (TOF_SRC_CH2 == source)
     {
-        return g_tof2_height_mm;
+        return ch2_mm;
     }
 
     if (TOF_SRC_CH3 == source)
     {
-        return g_tof3_height_mm;
+        return ch3_mm;
     }
 
     if (TOF_SRC_AVG == source)
     {
-        return (uint16)(((uint32)g_tof2_height_mm + (uint32)g_tof3_height_mm) / 2U);
+        return (uint16)(((uint32)ch2_mm + (uint32)ch3_mm) / 2U);
     }
 
-    return g_tof_fused_height_mm;
-}
-
-static void TOF_UpdateFusionUsage(uint8 source)
-{
-    g_tof_fused_source = source;
-    g_tof2_used_in_fusion = 0U;
-    g_tof3_used_in_fusion = 0U;
-
-    if (TOF_SRC_CH2 == source)
-    {
-        g_tof2_used_in_fusion = 1U;
-    }
-    else if (TOF_SRC_CH3 == source)
-    {
-        g_tof3_used_in_fusion = 1U;
-    }
-    else if (TOF_SRC_AVG == source)
-    {
-        g_tof2_used_in_fusion = 1U;
-        g_tof3_used_in_fusion = 1U;
-    }
+    return 0U;
 }
 
 void TOF_Init(void)
@@ -517,11 +437,12 @@ void TOF_Init(void)
 
     s_tof2_offset_mm = 0;
     s_tof3_offset_mm = 0;
-    TOF_ResetAllStates();
+    TOF_ResetChannelState(&s_tof2_state);
+    TOF_ResetChannelState(&s_tof3_state);
+    TOF_ResetFusionState();
 
     init_err = VL53L1X_init_all();
     s_tof_inited = (init_err == (TOF_CH2_VALID_MASK | TOF_CH3_VALID_MASK)) ? 0U : 1U;
-
     if (0U == s_tof_inited)
     {
         return;
@@ -537,12 +458,12 @@ void TOF_Calibrate(void)
     uint32 sum3 = 0U;
     uint32 cnt2 = 0U;
     uint32 cnt3 = 0U;
-    int32 mean2;
-    int32 mean3;
-    int32 center;
     uint8 valid_mask;
     uint8 raw2_valid;
     uint8 raw3_valid;
+    int32 mean2;
+    int32 mean3;
+    int32 center;
     VL53L1X_data_struct data;
 
     if (0U == s_tof_inited)
@@ -552,26 +473,34 @@ void TOF_Calibrate(void)
 
     s_tof2_offset_mm = 0;
     s_tof3_offset_mm = 0;
-    TOF_ResetAllStates();
+    TOF_ResetChannelState(&s_tof2_state);
+    TOF_ResetChannelState(&s_tof3_state);
+    TOF_ResetFusionState();
 
     for (i = 0U; i < TOF_CALIBRATION_SAMPLES; ++i)
     {
         valid_mask = VL53L1X_read_data(&data);
         (void)valid_mask;
 
-        raw2_valid = TOF_IsRawMeasurementValid(data.VL53L1X2_distance_mm, data.VL53L1X2_range_status, g_vl53l1x2_diag.ready);
-        raw3_valid = TOF_IsRawMeasurementValid(data.VL53L1X3_distance_mm, data.VL53L1X3_range_status, g_vl53l1x3_diag.ready);
+        raw2_valid = TOF_IsRawMeasurementValid(data.VL53L1X2_distance_mm,
+                                               data.VL53L1X2_range_status,
+                                               g_vl53l1x2_diag.ready,
+                                               g_vl53l1x2_diag.is_fresh);
+        raw3_valid = TOF_IsRawMeasurementValid(data.VL53L1X3_distance_mm,
+                                               data.VL53L1X3_range_status,
+                                               g_vl53l1x3_diag.ready,
+                                               g_vl53l1x3_diag.is_fresh);
 
         if (0U != raw2_valid)
         {
             sum2 += TOF_CompensateVerticalByAttitude(data.VL53L1X2_distance_mm);
-            ++cnt2;
+            cnt2++;
         }
 
         if (0U != raw3_valid)
         {
             sum3 += TOF_CompensateVerticalByAttitude(data.VL53L1X3_distance_mm);
-            ++cnt3;
+            cnt3++;
         }
 
         system_delay_ms(TOF_CALIBRATION_DT_MS);
@@ -585,24 +514,31 @@ void TOF_Calibrate(void)
         s_tof2_offset_mm = (int16)(center - mean2);
         s_tof3_offset_mm = (int16)(center - mean3);
     }
+
+    TOF_ResetChannelState(&s_tof2_state);
+    TOF_ResetChannelState(&s_tof3_state);
+    TOF_ResetFusionState();
 }
 
 void TOF_Update(void)
 {
     uint8 valid_mask;
-    uint8 raw2_valid;
-    uint8 raw3_valid;
-    uint8 raw2_fresh;
-    uint8 raw3_fresh;
-    uint8 ch2_display;
-    uint8 ch3_display;
-    uint8 ch2_eligible;
-    uint8 ch3_eligible;
+    uint8 ch2_display_valid;
+    uint8 ch3_display_valid;
+    uint8 ch2_fusion_valid;
+    uint8 ch3_fusion_valid;
     uint8 desired_source;
     uint8 selected_source;
-    uint16 diff_mm = 0U;
-    uint16 ch2_mm = 0U;
-    uint16 ch3_mm = 0U;
+    uint16 ch2_display_mm;
+    uint16 ch3_display_mm;
+    uint16 ch2_fusion_mm;
+    uint16 ch3_fusion_mm;
+    uint16 source_mm;
+    uint16 ref_mm;
+    uint16 diff_mm;
+    uint16 step_limit;
+    int32 fused_delta;
+    int32 fused_next;
     VL53L1X_data_struct data;
 
     if (0U == s_tof_inited)
@@ -617,53 +553,114 @@ void TOF_Update(void)
     valid_mask = VL53L1X_read_data(&data);
     (void)valid_mask;
 
-    raw2_valid = TOF_IsRawMeasurementValid(data.VL53L1X2_distance_mm, data.VL53L1X2_range_status, g_vl53l1x2_diag.ready);
-    raw3_valid = TOF_IsRawMeasurementValid(data.VL53L1X3_distance_mm, data.VL53L1X3_range_status, g_vl53l1x3_diag.ready);
-    raw2_fresh = g_vl53l1x2_diag.is_fresh;
-    raw3_fresh = g_vl53l1x3_diag.is_fresh;
+    TOF_UpdateChannelObservation(&s_tof2_state,
+                                 data.VL53L1X2_distance_mm,
+                                 data.VL53L1X2_range_status,
+                                 g_vl53l1x2_diag.ready,
+                                 g_vl53l1x2_diag.is_fresh,
+                                 s_tof2_offset_mm,
+                                 &ch2_display_mm,
+                                 &ch2_display_valid,
+                                 &ch2_fusion_mm,
+                                 &ch2_fusion_valid);
 
-    ch2_display = TOF_UpdateChannelState(&s_tof2_state, raw2_valid, raw2_fresh, data.VL53L1X2_distance_mm, s_tof2_offset_mm, &ch2_mm);
-    ch3_display = TOF_UpdateChannelState(&s_tof3_state, raw3_valid, raw3_fresh, data.VL53L1X3_distance_mm, s_tof3_offset_mm, &ch3_mm);
+    TOF_UpdateChannelObservation(&s_tof3_state,
+                                 data.VL53L1X3_distance_mm,
+                                 data.VL53L1X3_range_status,
+                                 g_vl53l1x3_diag.ready,
+                                 g_vl53l1x3_diag.is_fresh,
+                                 s_tof3_offset_mm,
+                                 &ch3_display_mm,
+                                 &ch3_display_valid,
+                                 &ch3_fusion_mm,
+                                 &ch3_fusion_valid);
 
-    if (0U != ch2_display)
+    g_tof2_height_mm = (0U != ch2_display_valid) ? ch2_display_mm : VL53L1X_INVALID_DISTANCE_MM;
+    g_tof3_height_mm = (0U != ch3_display_valid) ? ch3_display_mm : VL53L1X_INVALID_DISTANCE_MM;
+    g_tof2_valid = ch2_fusion_valid;
+    g_tof3_valid = ch3_fusion_valid;
+
+    if (0U != g_tof_fused_valid)
     {
-        g_tof2_height_mm = ch2_mm;
+        ref_mm = g_tof_fused_height_mm;
     }
-    else if (0U == s_tof2_state.has_value)
+    else if ((0U != ch2_fusion_valid) && (0U != ch3_fusion_valid))
     {
-        g_tof2_height_mm = VL53L1X_INVALID_DISTANCE_MM;
+        ref_mm = (uint16)(((uint32)ch2_fusion_mm + (uint32)ch3_fusion_mm) / 2U);
     }
-
-    if (0U != ch3_display)
+    else if (0U != ch2_fusion_valid)
     {
-        g_tof3_height_mm = ch3_mm;
+        ref_mm = ch2_fusion_mm;
     }
-    else if (0U == s_tof3_state.has_value)
+    else
     {
-        g_tof3_height_mm = VL53L1X_INVALID_DISTANCE_MM;
+        ref_mm = ch3_fusion_mm;
     }
 
-    ch2_eligible = s_tof2_state.eligible_for_fusion;
-    ch3_eligible = s_tof3_state.eligible_for_fusion;
-    g_tof2_valid = ch2_eligible;
-    g_tof3_valid = ch3_eligible;
+    desired_source = TOF_GetDesiredSource(ch2_fusion_valid,
+                                          ch2_fusion_mm,
+                                          ch3_fusion_valid,
+                                          ch3_fusion_mm,
+                                          ref_mm,
+                                          &diff_mm);
 
-    if ((0U != ch2_eligible) && (0U != ch3_eligible))
-    {
-        diff_mm = TOF_AbsDiffU16(g_tof2_height_mm, g_tof3_height_mm);
-    }
-
-    desired_source = TOF_GetDesiredSource(ch2_eligible, ch3_eligible, diff_mm);
-    selected_source = TOF_UpdateSelectedSource(desired_source, ch2_eligible, ch3_eligible, diff_mm);
-
+    selected_source = TOF_UpdateSelectedSource(desired_source, ch2_fusion_valid, ch3_fusion_valid, diff_mm);
     if (TOF_SRC_NONE == selected_source)
     {
+        if ((0U != g_tof_fused_valid) && (s_fused_invalid_hold_count < TOF_FUSED_HOLD_FRAMES))
+        {
+            s_fused_invalid_hold_count++;
+            TOF_UpdateFusionUsage(TOF_SRC_NONE);
+            return;
+        }
+
         g_tof_fused_valid = 0U;
+        g_tof_fused_height_mm = VL53L1X_INVALID_DISTANCE_MM;
         TOF_UpdateFusionUsage(TOF_SRC_NONE);
         return;
     }
 
-    g_tof_fused_height_mm = TOF_GetFusedHeightBySource(selected_source);
+    s_fused_invalid_hold_count = 0U;
+    source_mm = TOF_GetSourceHeight(selected_source, ch2_fusion_mm, ch3_fusion_mm);
+
+    if (0U == g_tof_fused_valid)
+    {
+        g_tof_fused_height_mm = source_mm;
+        g_tof_fused_valid = 1U;
+        TOF_UpdateFusionUsage(selected_source);
+        return;
+    }
+
+    if ((0U != ch2_fusion_valid) && (0U != ch3_fusion_valid) && (diff_mm <= TOF_AGREE_GATE_MM))
+    {
+        step_limit = TOF_STEP_FAST_MM;
+    }
+    else
+    {
+        step_limit = TOF_STEP_SAFE_MM;
+    }
+
+    fused_delta = (int32)source_mm - (int32)g_tof_fused_height_mm;
+    if (fused_delta > (int32)step_limit)
+    {
+        fused_delta = (int32)step_limit;
+    }
+    else if (fused_delta < -(int32)step_limit)
+    {
+        fused_delta = -(int32)step_limit;
+    }
+
+    fused_next = (int32)g_tof_fused_height_mm + fused_delta;
+    if (fused_next < 0)
+    {
+        fused_next = 0;
+    }
+    else if (fused_next > 65535)
+    {
+        fused_next = 65535;
+    }
+
+    g_tof_fused_height_mm = (uint16)fused_next;
     g_tof_fused_valid = 1U;
     TOF_UpdateFusionUsage(selected_source);
 }

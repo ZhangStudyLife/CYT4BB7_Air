@@ -1518,6 +1518,21 @@
                 <name>Debug</name>
             </configuration>
         </group>
+        <group>
+            <name>Protocols</name>
+            <group>
+                <name>crsf</name>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\crsf\crsf.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\crsf\crsf.h</name>
+                </file>
+                <configuration>
+                    <name>Debug</name>
+                </configuration>
+            </group>
+        </group>
         <file>
             <name>$PROJ_DIR$\..\..\code\本文件夹作用.txt</name>
         </file>

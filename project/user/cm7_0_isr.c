@@ -38,7 +38,7 @@
 
 #include "zf_common_headfile.h"
 #include "../code/Estimation/Attitude/IMU_TOP.h"
-
+#include "../code/Protocols/crsf/crsf.h"
 // **************************** PIT中断函数 ****************************
 void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数      
 {
@@ -52,7 +52,7 @@ void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数
 void pit0_ch1_isr()                     // 定时器通道 1 周期中断服务函数      
 {
     pit_isr_flag_clear(PIT_CH1);
-    
+    crsf_uart_isr(); // 10ms 更新一次遥控数据
 }
 
 void pit0_ch2_isr()                     // 定时器通道 2 周期中断服务函数      

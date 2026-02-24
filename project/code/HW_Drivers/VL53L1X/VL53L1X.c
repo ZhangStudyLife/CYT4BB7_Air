@@ -26,6 +26,9 @@
 #define DL1B_RESULT__FINAL_CROSSTALK_CORRECTED_RANGE_MM_SD0     ( 0x0096 )
 #define DL1B_FIRMWARE__SYSTEM_STATUS                            ( 0x00E5 )
 
+#define VL53L1X_STALE_FRAME_TH                                  ( 80U )
+#define VL53L1X_COMM_FAIL_REINIT_TH                             ( 5U )
+
 static soft_iic_info_struct VL53L1X2_iic_struct;
 static soft_iic_info_struct VL53L1X3_iic_struct;
 
@@ -39,6 +42,16 @@ VL53L1X_data_struct VL53L1X_data =
     0xFF,
     0xFF
 };
+
+VL53L1X_diag_struct g_vl53l1x2_diag = {0};
+VL53L1X_diag_struct g_vl53l1x3_diag = {0};
+
+static uint16 s_vl53l1x2_last_distance = VL53L1X_INVALID_DISTANCE_MM;
+static uint16 s_vl53l1x3_last_distance = VL53L1X_INVALID_DISTANCE_MM;
+static uint8 s_vl53l1x2_has_last_distance = 0U;
+static uint8 s_vl53l1x3_has_last_distance = 0U;
+static uint8 s_vl53l1x2_last_ready = 0U;
+static uint8 s_vl53l1x3_last_ready = 0U;
 
 static void VL53L1X_soft_iic_pin_config(gpio_pin_enum scl_pin, gpio_pin_enum sda_pin)
 {
@@ -452,138 +465,293 @@ static uint8 VL53L1X3_init(void)
 uint8 VL53L1X_init_all(void)
 {
     uint8 err = 0;
-    if(VL53L1X2_init()) { err |= (1U << 0); }
-    if(VL53L1X3_init()) { err |= (1U << 1); }
+
+    memset(&g_vl53l1x2_diag, 0, sizeof(g_vl53l1x2_diag));
+    memset(&g_vl53l1x3_diag, 0, sizeof(g_vl53l1x3_diag));
+    s_vl53l1x2_has_last_distance = 0U;
+    s_vl53l1x3_has_last_distance = 0U;
+    s_vl53l1x2_last_ready = 0U;
+    s_vl53l1x3_last_ready = 0U;
+
+    if (VL53L1X2_init())
+    {
+        err |= (1U << 0);
+    }
+
+    if (VL53L1X3_init())
+    {
+        err |= (1U << 1);
+    }
+
     return err;
+}
+
+static void VL53L1X_DiagPrepareFrame(VL53L1X_diag_struct *diag)
+{
+    diag->ack_ok = 0U;
+    diag->ready = 0U;
+    diag->range_ok = 0U;
+    diag->is_fresh = 0U;
+}
+
+static void VL53L1X_DiagUpdateComm(VL53L1X_diag_struct *diag, uint8 ack_ok)
+{
+    diag->ack_ok = ack_ok;
+
+    if (0U != ack_ok)
+    {
+        if (diag->comm_fail_count > 0U)
+        {
+            diag->comm_fail_count--;
+        }
+    }
+    else if (diag->comm_fail_count < 65535U)
+    {
+        diag->comm_fail_count++;
+    }
+}
+
+static uint8 VL53L1X_UpdateFreshness(VL53L1X_diag_struct *diag,
+                                     uint8 ready,
+                                     uint8 distance_valid,
+                                     uint16 distance_mm,
+                                     uint16 *last_distance,
+                                     uint8 *has_last_distance,
+                                     uint8 *last_ready)
+{
+    if ((0U == ready) || (0U == distance_valid))
+    {
+        diag->is_fresh = 0U;
+        if (0U == ready)
+        {
+            *last_ready = 0U;
+        }
+        return 0U;
+    }
+
+    if (0U == *has_last_distance)
+    {
+        *has_last_distance = 1U;
+        *last_distance = distance_mm;
+        *last_ready = ready;
+        diag->stale_count = 0U;
+        diag->is_fresh = 1U;
+        return 1U;
+    }
+
+    if ((distance_mm != *last_distance) || ((0U == *last_ready) && (0U != ready)))
+    {
+        *last_distance = distance_mm;
+        *last_ready = ready;
+        diag->stale_count = 0U;
+        diag->is_fresh = 1U;
+        return 1U;
+    }
+
+    if (diag->stale_count < 65535U)
+    {
+        diag->stale_count++;
+    }
+
+    *last_ready = ready;
+    diag->is_fresh = (diag->stale_count < VL53L1X_STALE_FRAME_TH) ? 1U : 0U;
+    return diag->is_fresh;
+}
+
+static void VL53L1X_TryRecoverChannels(void)
+{
+    if ((g_vl53l1x2_diag.comm_fail_count >= VL53L1X_COMM_FAIL_REINIT_TH) || (VL53L1X2_init_flag == 0U))
+    {
+        if (0U == VL53L1X2_init())
+        {
+            g_vl53l1x2_diag.comm_fail_count = 0U;
+            g_vl53l1x2_diag.stale_count = 0U;
+            s_vl53l1x2_has_last_distance = 0U;
+            s_vl53l1x2_last_ready = 0U;
+        }
+    }
+
+    if ((g_vl53l1x3_diag.comm_fail_count >= VL53L1X_COMM_FAIL_REINIT_TH) || (VL53L1X3_init_flag == 0U))
+    {
+        if (0U == VL53L1X3_init())
+        {
+            g_vl53l1x3_diag.comm_fail_count = 0U;
+            g_vl53l1x3_diag.stale_count = 0U;
+            s_vl53l1x3_has_last_distance = 0U;
+            s_vl53l1x3_last_ready = 0U;
+        }
+    }
 }
 
 uint8 VL53L1X_read_data(VL53L1X_data_struct *data)
 {
-    uint8 valid_mask = 0;
-    uint8 ack_mask = 0;
-    uint8 VL53L1X2_ready = 0;
-    uint8 VL53L1X3_ready = 0;
-    uint8 VL53L1X2_tio_status = 0;
-    uint8 VL53L1X3_tio_status = 0;
-    uint8 VL53L1X2_range_status = 0xFF;
-    uint8 VL53L1X3_range_status = 0xFF;
-    uint8 VL53L1X2_distance_buffer[2] = {0xFF, 0xFF};
-    uint8 VL53L1X3_distance_buffer[2] = {0xFF, 0xFF};
+    uint8 valid_mask = 0U;
+    uint8 ack_mask;
+    uint8 ack2;
+    uint8 ack3;
+    uint8 VL53L1X2_ready;
+    uint8 VL53L1X3_ready;
+    uint8 VL53L1X2_tio_status = 0U;
+    uint8 VL53L1X3_tio_status = 0U;
+    uint8 VL53L1X2_range_status = 0xFFU;
+    uint8 VL53L1X3_range_status = 0xFFU;
+    uint8 VL53L1X2_distance_buffer[2] = {0xFFU, 0xFFU};
+    uint8 VL53L1X3_distance_buffer[2] = {0xFFU, 0xFFU};
     uint16 VL53L1X2_distance_temp = VL53L1X_INVALID_DISTANCE_MM;
     uint16 VL53L1X3_distance_temp = VL53L1X_INVALID_DISTANCE_MM;
+    uint8 ch2_distance_valid = 0U;
+    uint8 ch3_distance_valid = 0U;
 
-    if(NULL == data)
+    if (NULL == data)
     {
-        return 0;
+        return 0U;
     }
+
+    VL53L1X_DiagPrepareFrame(&g_vl53l1x2_diag);
+    VL53L1X_DiagPrepareFrame(&g_vl53l1x3_diag);
 
     data->VL53L1X2_distance_mm = VL53L1X_INVALID_DISTANCE_MM;
     data->VL53L1X3_distance_mm = VL53L1X_INVALID_DISTANCE_MM;
-    data->VL53L1X2_range_status = 0xFF;
-    data->VL53L1X3_range_status = 0xFF;
+    data->VL53L1X2_range_status = 0xFFU;
+    data->VL53L1X3_range_status = 0xFFU;
 
-    if(!(VL53L1X2_init_flag || VL53L1X3_init_flag))
+    if ((VL53L1X2_init_flag == 0U) && (VL53L1X3_init_flag == 0U))
     {
+        VL53L1X_TryRecoverChannels();
         VL53L1X_data = *data;
-        return 0;
+        return 0U;
     }
 
     VL53L1X_soft_iic_pin_config(VL53L1X2_SCL_PIN, VL53L1X2_SDA_PIN);
     VL53L1X_soft_iic_pin_config(VL53L1X3_SCL_PIN, VL53L1X3_SDA_PIN);
 
-    ack_mask = VL53L1X_dual_read_reg_8bit_array(DL1B_GPIO__TIO_HV_STATUS, &VL53L1X2_tio_status, &VL53L1X3_tio_status, 1);
-    if(!(ack_mask & 0x01))
+    ack_mask = VL53L1X_dual_read_reg_8bit_array(DL1B_GPIO__TIO_HV_STATUS, &VL53L1X2_tio_status, &VL53L1X3_tio_status, 1U);
+    ack2 = (ack_mask & 0x01U) ? 1U : 0U;
+    ack3 = (ack_mask & 0x02U) ? 1U : 0U;
+    VL53L1X_DiagUpdateComm(&g_vl53l1x2_diag, ack2);
+    VL53L1X_DiagUpdateComm(&g_vl53l1x3_diag, ack3);
+
+    if (0U == ack2)
     {
-        VL53L1X2_tio_status = 0;
-    }
-    if(!(ack_mask & 0x02))
-    {
-        VL53L1X3_tio_status = 0;
+        VL53L1X2_tio_status = 0U;
     }
 
-    VL53L1X2_ready = (VL53L1X2_init_flag && (0 != VL53L1X2_tio_status)) ? 1 : 0;
-    VL53L1X3_ready = (VL53L1X3_init_flag && (0 != VL53L1X3_tio_status)) ? 1 : 0;
-
-    if(!(VL53L1X2_ready || VL53L1X3_ready))
+    if (0U == ack3)
     {
-        VL53L1X_data = *data;
-        return 0;
+        VL53L1X3_tio_status = 0U;
     }
 
-    (void)VL53L1X_dual_write_reg_8bit(DL1B_SYSTEM__INTERRUPT_CLEAR, 0x01);
+    VL53L1X2_ready = ((VL53L1X2_init_flag != 0U) && (VL53L1X2_tio_status != 0U)) ? 1U : 0U;
+    VL53L1X3_ready = ((VL53L1X3_init_flag != 0U) && (VL53L1X3_tio_status != 0U)) ? 1U : 0U;
+    g_vl53l1x2_diag.ready = VL53L1X2_ready;
+    g_vl53l1x3_diag.ready = VL53L1X3_ready;
 
-    ack_mask = VL53L1X_dual_read_reg_8bit_array(DL1B_RESULT__RANGE_STATUS, &VL53L1X2_range_status, &VL53L1X3_range_status, 1);
-    if(!(ack_mask & 0x01))
+    if ((VL53L1X2_ready != 0U) || (VL53L1X3_ready != 0U))
     {
-        VL53L1X2_range_status = 0xFF;
-    }
-    if(!(ack_mask & 0x02))
-    {
-        VL53L1X3_range_status = 0xFF;
+        ack_mask = VL53L1X_dual_read_reg_8bit_array(DL1B_RESULT__RANGE_STATUS, &VL53L1X2_range_status, &VL53L1X3_range_status, 1U);
+        ack2 = (ack_mask & 0x01U) ? 1U : 0U;
+        ack3 = (ack_mask & 0x02U) ? 1U : 0U;
+        VL53L1X_DiagUpdateComm(&g_vl53l1x2_diag, ack2);
+        VL53L1X_DiagUpdateComm(&g_vl53l1x3_diag, ack3);
+
+        if ((0U == ack2) || (0U == VL53L1X2_ready))
+        {
+            VL53L1X2_range_status = 0xFFU;
+        }
+
+        if ((0U == ack3) || (0U == VL53L1X3_ready))
+        {
+            VL53L1X3_range_status = 0xFFU;
+        }
+
+        ack_mask = VL53L1X_dual_read_reg_8bit_array(DL1B_RESULT__FINAL_CROSSTALK_CORRECTED_RANGE_MM_SD0,
+                                                    VL53L1X2_distance_buffer,
+                                                    VL53L1X3_distance_buffer,
+                                                    2U);
+        ack2 = (ack_mask & 0x01U) ? 1U : 0U;
+        ack3 = (ack_mask & 0x02U) ? 1U : 0U;
+        VL53L1X_DiagUpdateComm(&g_vl53l1x2_diag, ack2);
+        VL53L1X_DiagUpdateComm(&g_vl53l1x3_diag, ack3);
+
+        if ((0U == ack2) || (0U == VL53L1X2_ready))
+        {
+            VL53L1X2_distance_buffer[0] = 0xFFU;
+            VL53L1X2_distance_buffer[1] = 0xFFU;
+        }
+
+        if ((0U == ack3) || (0U == VL53L1X3_ready))
+        {
+            VL53L1X3_distance_buffer[0] = 0xFFU;
+            VL53L1X3_distance_buffer[1] = 0xFFU;
+        }
     }
 
-    ack_mask = VL53L1X_dual_read_reg_8bit_array(DL1B_RESULT__FINAL_CROSSTALK_CORRECTED_RANGE_MM_SD0, VL53L1X2_distance_buffer, VL53L1X3_distance_buffer, 2);
-    if(!(ack_mask & 0x01))
-    {
-        VL53L1X2_distance_buffer[0] = 0xFF;
-        VL53L1X2_distance_buffer[1] = 0xFF;
-    }
-    if(!(ack_mask & 0x02))
-    {
-        VL53L1X3_distance_buffer[0] = 0xFF;
-        VL53L1X3_distance_buffer[1] = 0xFF;
-    }
-
-    if(VL53L1X2_ready && (0x89 == VL53L1X2_range_status))
+    if ((VL53L1X2_ready != 0U) && (0x89U == VL53L1X2_range_status))
     {
         VL53L1X2_distance_temp = (uint16)(((uint16)VL53L1X2_distance_buffer[0] << 8) | VL53L1X2_distance_buffer[1]);
-        if(VL53L1X2_distance_temp <= 4000)
+        if (VL53L1X2_distance_temp <= 4000U)
         {
-            if(VL53L1X2_distance_temp > VL53L1X_VALID_RANGE_MAX)
+            if (VL53L1X2_distance_temp > VL53L1X_VALID_RANGE_MAX)
             {
                 VL53L1X2_distance_temp = (uint16)VL53L1X_VALID_RANGE_MAX;
             }
+
             data->VL53L1X2_distance_mm = VL53L1X2_distance_temp;
-            valid_mask |= (1U << 0);
+            ch2_distance_valid = 1U;
+            g_vl53l1x2_diag.range_ok = 1U;
         }
-        else
-        {
-            data->VL53L1X2_distance_mm = VL53L1X_INVALID_DISTANCE_MM;
-        }
-    }
-    else
-    {
-        data->VL53L1X2_distance_mm = VL53L1X_INVALID_DISTANCE_MM;
-        VL53L1X2_range_status = 0xFF;
     }
 
-    if(VL53L1X3_ready && (0x89 == VL53L1X3_range_status))
+    if ((VL53L1X3_ready != 0U) && (0x89U == VL53L1X3_range_status))
     {
         VL53L1X3_distance_temp = (uint16)(((uint16)VL53L1X3_distance_buffer[0] << 8) | VL53L1X3_distance_buffer[1]);
-        if(VL53L1X3_distance_temp <= 4000)
+        if (VL53L1X3_distance_temp <= 4000U)
         {
-            if(VL53L1X3_distance_temp > VL53L1X_VALID_RANGE_MAX)
+            if (VL53L1X3_distance_temp > VL53L1X_VALID_RANGE_MAX)
             {
                 VL53L1X3_distance_temp = (uint16)VL53L1X_VALID_RANGE_MAX;
             }
+
             data->VL53L1X3_distance_mm = VL53L1X3_distance_temp;
-            valid_mask |= (1U << 1);
-        }
-        else
-        {
-            data->VL53L1X3_distance_mm = VL53L1X_INVALID_DISTANCE_MM;
+            ch3_distance_valid = 1U;
+            g_vl53l1x3_diag.range_ok = 1U;
         }
     }
-    else
+
+    if (0U != VL53L1X_UpdateFreshness(&g_vl53l1x2_diag,
+                                      VL53L1X2_ready,
+                                      ch2_distance_valid,
+                                      data->VL53L1X2_distance_mm,
+                                      &s_vl53l1x2_last_distance,
+                                      &s_vl53l1x2_has_last_distance,
+                                      &s_vl53l1x2_last_ready))
     {
-        data->VL53L1X3_distance_mm = VL53L1X_INVALID_DISTANCE_MM;
-        VL53L1X3_range_status = 0xFF;
+        valid_mask |= (1U << 0);
+    }
+
+    if (0U != VL53L1X_UpdateFreshness(&g_vl53l1x3_diag,
+                                      VL53L1X3_ready,
+                                      ch3_distance_valid,
+                                      data->VL53L1X3_distance_mm,
+                                      &s_vl53l1x3_last_distance,
+                                      &s_vl53l1x3_has_last_distance,
+                                      &s_vl53l1x3_last_ready))
+    {
+        valid_mask |= (1U << 1);
     }
 
     data->VL53L1X2_range_status = VL53L1X2_range_status;
     data->VL53L1X3_range_status = VL53L1X3_range_status;
 
-    VL53L1X_data = *data;
+    if ((VL53L1X2_ready != 0U) || (VL53L1X3_ready != 0U))
+    {
+        ack_mask = VL53L1X_dual_write_reg_8bit(DL1B_SYSTEM__INTERRUPT_CLEAR, 0x01U);
+        VL53L1X_DiagUpdateComm(&g_vl53l1x2_diag, (ack_mask & 0x01U) ? 1U : 0U);
+        VL53L1X_DiagUpdateComm(&g_vl53l1x3_diag, (ack_mask & 0x02U) ? 1U : 0U);
+    }
 
+    VL53L1X_TryRecoverChannels();
+
+    VL53L1X_data = *data;
     return valid_mask;
 }

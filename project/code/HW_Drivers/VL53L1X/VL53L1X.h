@@ -30,7 +30,19 @@ typedef struct
     uint8  VL53L1X3_range_status;
 } VL53L1X_data_struct;
 
+typedef struct
+{
+    uint8 ack_ok;
+    uint8 ready;
+    uint8 range_ok;
+    uint8 is_fresh;
+    uint16 stale_count;
+    uint16 comm_fail_count;
+} VL53L1X_diag_struct;
+
 extern VL53L1X_data_struct VL53L1X_data;
+extern VL53L1X_diag_struct g_vl53l1x2_diag;
+extern VL53L1X_diag_struct g_vl53l1x3_diag;
 
 uint8 VL53L1X_init_all(void);
 uint8 VL53L1X_read_data(VL53L1X_data_struct *data);

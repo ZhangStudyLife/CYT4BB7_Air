@@ -35,9 +35,8 @@
 
 #include "zf_common_headfile.h"
 #include "../code/HW_Drivers/ICM42688/ICM42688.h"
-#include "../code/Estimation/Height_Est/TOF_data.h"
 #include "../code/HW_Drivers/PMW3901/PMW3901.h"
-#include "../code/Estimation/Height_Est/Baro_data.h"
+#include "../code/Estimation/Height_Est/Height_Est.h"
 #include "../code/Estimation/Attitude/IMU_TOP.h"
 #include "../code/Protocols/crsf/crsf.h"
 // 打开新的工程或者工程移动了位置务必执行以下操作
@@ -49,6 +48,7 @@
 // 本例程是开源库空工程 可用作移植或者测试各类内外设
 
 // **************************** 代码区域 ****************************
+volatile uint8 g_height_est_tick_100hz = 0U;
 
 int main(void)
 {
@@ -56,35 +56,51 @@ int main(void)
     debug_init();                  // 调试串口信息初始化
     // 此处编写用户代码 例如外设初始化代码等
 
-    TOF_Init();                // VL53L1X TOF 传感器初始化
+    Height_Est_Init();         // 高度估计初始化（TOF+Baro）
     PMW3901_Init();            // PMW3901 光流传感器初始化
-    Baro_Init();               // BMP388 气压传感器初始化
     IMU_Init_All();            // ICM42688 IMU 初始化
     crsf_init();                // CRSF 遥控协议初始化
     pit_us_init(PIT_CH0, 500); // PIT 定时器初始化 500us 中断周期 用于 IMU 2kHz 更新
-    pit_ms_init(PIT_CH1, 10);
+    pit_ms_init(PIT_CH1, 10);  // 100Hz 节拍
+
+    printf("1");
+    for (int i = 0; i < 100; i++)
+    {
+        Height_Est_update_100HZ(); // 100Hz 更新一次高度估计
+        system_delay_ms(50);
+    }
+    printf("2");
+
+
     while (true)
     {
+        if (g_height_est_tick_100hz > 0U)
+        {
+            g_height_est_tick_100hz = 0U;
+            Height_Est_update_100HZ();
+        }
+        // printf("%d,%f\r\n",g_height_est_mm, g_height_vz_mps); // 打印高度估计结果
         // VL53L1X_read_data(&VL53L1X_data); // 读取 VL53L1X 传感器数据
-        PMW3901_Update(); // 更新 PMW3901 光流传感器数据
-        // Baro_Update(); // 更新 BMP388 气压传感器数据
-        TOF_Update(); // 更新 VL53L1X TOF 传感器数据
-        printf("%d,%d,%d,%d,%d,%d\r\n",
-               VL53L1X_data.VL53L1X2_distance_mm,
-               VL53L1X_data.VL53L1X3_distance_mm,
-               g_tof2_height_mm,
-               g_tof3_height_mm,
-               g_tof_fused_height_mm,
-               g_tof_fused_source);
-
-        printf("%d,%d,%d,%d\r\n", CRSF_STD[0], CRSF_STD[1], CRSF_STD[2], CRSF_STD[3]);
+        // PMW3901_Update(); // 更新 PMW3901 光流传感器数据
+        // printf("%d,%d,%d,%d,%d,%d\r\n",
+        //        VL53L1X_data.VL53L1X2_distance_mm,
+        //        VL53L1X_data.VL53L1X3_distance_mm,
+        //        g_tof2_height_mm,
+        //        g_tof3_height_mm,
+        //        g_tof_fused_height_mm,
+        //        g_tof_fused_source);
+        // crsf_send_25hz(); // 25Hz 发送一次遥控数据
+        // printf("%d,%d,%d,%d\r\n", CRSF_STD[0], CRSF_STD[1], CRSF_STD[2], CRSF_STD[3]);
         // printf("%d,%d,%f,%f\r\n",g_BMP388_data.raw_pressure, g_BMP388_data.raw_temperature, g_BMP388_data.pressure_pa, g_BMP388_data.temperature_c); // 打印 BMP388 气压和温度数据
         // printf("%f,%f,%f,%f,%f,%f\r\n", ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z, ICM42688.acc_x, ICM42688.acc_y, ICM42688.acc_z); // 打印 IMU 滤波后的陀螺和加速度数据
         // printf("%f,%f,%f,%f\r\n", g_euler.roll, g_euler.pitch, g_euler.yaw, g_baro_altitude); // 打印欧拉角和气压高度数据
         // printf("%d,%d,%d,%d\r\n", VL53L1X_data.VL53L1X2_distance_mm, VL53L1X_data.VL53L1X3_distance_mm, VL53L1X_data.VL53L1X2_range_status, VL53L1X_data.VL53L1X3_range_status);
         // printf("%d,%d,%d,%d\r\n", g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY, g_pmw3901_raw.squal, g_pmw3901_raw.observation); // 打印 PMW3901 光流数据
-        system_delay_ms(20);
+        system_delay_ms(1);
     }
 }
 
 // **************************** 代码区域 ****************************
+
+
+

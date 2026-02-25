@@ -22,10 +22,10 @@ extern "C" {
 #define POS_EST_FLOW_HEIGHT_MIN_M              (0.08f)
 #define POS_EST_FLOW_HEIGHT_MAX_M              (2.00f)
 #define POS_EST_FLOW_VEL_MAX_MPS               (1.50f)
-#define POS_EST_FLOW_VEL_LPF_ALPHA             (0.20f)
-#define POS_EST_FLOW_INNOV_GATE_MPS            (1.80f)
+#define POS_EST_FLOW_VEL_LPF_ALPHA             (0.38f)
+#define POS_EST_FLOW_INNOV_GATE_MPS            (2.20f)
 #define POS_EST_FLOW_DEAD_MAX_S                (0.30f)
-#define POS_EST_FLOW_DEAD_VEL_DAMP_RATIO       (0.98f)
+#define POS_EST_FLOW_DEAD_VEL_DAMP_RATIO       (0.985f)
 
 #define POS_EST_TILT_TAN_LIMIT                 (0.80f)
 #define POS_EST_K_PIX_TO_M_AT_1M_DEFAULT       (0.00210f)
@@ -34,9 +34,17 @@ extern "C" {
 #define POS_EST_K_DTILT_Y_PITCH_DEFAULT        (3.0f)
 #define POS_EST_K_DTILT_Y_ROLL_DEFAULT         (-439.0f)
 
-#define POS_EST_W_V_DEFAULT                    (0.35f)
-#define POS_EST_W_P_DEFAULT                    (0.12f)
+#define POS_EST_W_V_DEFAULT                    (0.68f)
+#define POS_EST_W_P_DEFAULT                    (0.24f)
 #define POS_EST_K_B_DEFAULT                    (0.02f)
+
+#define POS_EST_ACC_LPF_ALPHA_250HZ            (0.08f)
+#define POS_EST_ACC_VIBE_RC_250HZ              (0.08f)
+#define POS_EST_ACC_WEIGHT_MIN                 (0.25f)
+#define POS_EST_ACC_WEIGHT_MAX                 (1.00f)
+#define POS_EST_ACC_VIBE_LOW                   (0.20f)
+#define POS_EST_ACC_VIBE_HIGH                  (1.80f)
+#define POS_EST_CORR_BOOST_MAX                 (2.20f)
 
 #define POS_EST_STATIC_ACCEL_TH_MPS2           (0.10f)
 #define POS_EST_STATIC_GYRO_TH_DPS             (2.00f)

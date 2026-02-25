@@ -10,6 +10,10 @@ typedef struct
 {
     float accel_bias_x_mps2;
     float accel_bias_y_mps2;
+    float accel_lpf_x_mps2;
+    float accel_lpf_y_mps2;
+    float accel_vibe_metric;
+    float acc_weight_xy;
     float flow_vx_lpf_mps;
     float flow_vy_lpf_mps;
     float flow_pos_x_m;
@@ -79,6 +83,10 @@ void Pos_Est_Init(void)
 {
     s_pos_est_state.accel_bias_x_mps2 = 0.0f;
     s_pos_est_state.accel_bias_y_mps2 = 0.0f;
+    s_pos_est_state.accel_lpf_x_mps2 = 0.0f;
+    s_pos_est_state.accel_lpf_y_mps2 = 0.0f;
+    s_pos_est_state.accel_vibe_metric = 0.0f;
+    s_pos_est_state.acc_weight_xy = POS_EST_ACC_WEIGHT_MAX;
     s_pos_est_state.flow_vx_lpf_mps = 0.0f;
     s_pos_est_state.flow_vy_lpf_mps = 0.0f;
     s_pos_est_state.flow_pos_x_m = 0.0f;
@@ -108,6 +116,11 @@ void Pos_Est_Update_250HZ(void)
 {
     float accel_x_mps2;
     float accel_y_mps2;
+    float accel_hp_x_mps2;
+    float accel_hp_y_mps2;
+    float vibe_inst;
+    float rc_alpha;
+    float vibe_norm;
     float body_gx_dps;
     float body_gy_dps;
     float body_gz_dps;
@@ -140,8 +153,27 @@ void Pos_Est_Update_250HZ(void)
                        -POS_EST_ACCEL_BIAS_MAX_MPS2,
                        POS_EST_ACCEL_BIAS_MAX_MPS2);
 
+    s_pos_est_state.accel_lpf_x_mps2 +=
+        POS_EST_ACC_LPF_ALPHA_250HZ * (accel_x_mps2 - s_pos_est_state.accel_lpf_x_mps2);
+    s_pos_est_state.accel_lpf_y_mps2 +=
+        POS_EST_ACC_LPF_ALPHA_250HZ * (accel_y_mps2 - s_pos_est_state.accel_lpf_y_mps2);
+    accel_hp_x_mps2 = accel_x_mps2 - s_pos_est_state.accel_lpf_x_mps2;
+    accel_hp_y_mps2 = accel_y_mps2 - s_pos_est_state.accel_lpf_y_mps2;
+    vibe_inst = Pos_Est_Absf(accel_hp_x_mps2) + Pos_Est_Absf(accel_hp_y_mps2);
+    rc_alpha = POS_EST_DT_250HZ_S / (POS_EST_ACC_VIBE_RC_250HZ + POS_EST_DT_250HZ_S);
+    s_pos_est_state.accel_vibe_metric +=
+        rc_alpha * (vibe_inst - s_pos_est_state.accel_vibe_metric);
+    vibe_norm = (s_pos_est_state.accel_vibe_metric - POS_EST_ACC_VIBE_LOW) /
+                (POS_EST_ACC_VIBE_HIGH - POS_EST_ACC_VIBE_LOW);
+    vibe_norm = Pos_Est_Clampf(vibe_norm, 0.0f, 1.0f);
+    s_pos_est_state.acc_weight_xy =
+        POS_EST_ACC_WEIGHT_MAX -
+        (POS_EST_ACC_WEIGHT_MAX - POS_EST_ACC_WEIGHT_MIN) * vibe_norm;
+
     ax_use_mps2 = accel_x_mps2 - s_pos_est_state.accel_bias_x_mps2;
     ay_use_mps2 = accel_y_mps2 - s_pos_est_state.accel_bias_y_mps2;
+    ax_use_mps2 *= s_pos_est_state.acc_weight_xy;
+    ay_use_mps2 *= s_pos_est_state.acc_weight_xy;
 
     g_pos_est_output.velocity_x_mps += ax_use_mps2 * POS_EST_DT_250HZ_S;
     g_pos_est_output.velocity_y_mps += ay_use_mps2 * POS_EST_DT_250HZ_S;
@@ -166,6 +198,7 @@ void Pos_Est_Update_250HZ(void)
 void Pos_Est_Update_100HZ(void)
 {
     float height_m;
+    float flow_quality_scale;
     float roll_rad;
     float pitch_rad;
     float tan_pitch;
@@ -185,6 +218,9 @@ void Pos_Est_Update_100HZ(void)
     float evy;
     float epx;
     float epy;
+    float corr_boost;
+    float vel_gain;
+    float pos_gain;
 
     PMW3901_Update();
 
@@ -222,12 +258,17 @@ void Pos_Est_Update_100HZ(void)
         return;
     }
 
+    flow_quality_scale = 1.0f;
     if (g_pmw3901_raw.squal < POS_EST_FLOW_SQUAL_MIN)
     {
-        s_pos_est_state.prev_tan_pitch = tan_pitch;
-        s_pos_est_state.prev_tan_roll = tan_roll;
-        Pos_Est_HandleFlowInvalid(POS_EST_FLOW_GATE_SQUAL_LOW);
-        return;
+        if (g_pmw3901_raw.squal < (POS_EST_FLOW_SQUAL_MIN / 2U))
+        {
+            s_pos_est_state.prev_tan_pitch = tan_pitch;
+            s_pos_est_state.prev_tan_roll = tan_roll;
+            Pos_Est_HandleFlowInvalid(POS_EST_FLOW_GATE_SQUAL_LOW);
+            return;
+        }
+        flow_quality_scale = 0.5f;
     }
 
     if ((g_pmw3901_raw.deltaX > POS_EST_FLOW_PIX_MAX) ||
@@ -252,7 +293,6 @@ void Pos_Est_Update_100HZ(void)
     pix_x = (float)g_pmw3901_raw.deltaY;
     pix_y = (float)g_pmw3901_raw.deltaX;
 
-    // 使用 dTan 去耦：补偿旋转引入的伪光流，避免静态倾角持续注入速度
     pix_x_corr = pix_x +
                  POS_EST_K_DTILT_X_PITCH_DEFAULT * dtan_pitch +
                  POS_EST_K_DTILT_X_ROLL_DEFAULT * dtan_roll;
@@ -263,7 +303,6 @@ void Pos_Est_Update_100HZ(void)
     meter_per_count = POS_EST_K_PIX_TO_M_AT_1M_DEFAULT * height_m;
     flow_vx_raw_mps = (pix_x_corr * meter_per_count) / POS_EST_DT_100HZ_S;
     flow_vy_raw_mps = (pix_y_corr * meter_per_count) / POS_EST_DT_100HZ_S;
-    // printf("%f,%f,%f,%f,%f,%f\r\n",pix_x_corr, pix_y_corr,pix_x,pix_y,dtan_pitch,dtan_roll);
     flow_vx_raw_mps = Pos_Est_Clampf(flow_vx_raw_mps,
                                      -POS_EST_FLOW_VEL_MAX_MPS,
                                      POS_EST_FLOW_VEL_MAX_MPS);
@@ -304,10 +343,15 @@ void Pos_Est_Update_100HZ(void)
     epx = s_pos_est_state.flow_pos_x_m - g_pos_est_output.position_x_m;
     epy = s_pos_est_state.flow_pos_y_m - g_pos_est_output.position_y_m;
 
-    g_pos_est_output.velocity_x_mps += POS_EST_W_V_DEFAULT * evx;
-    g_pos_est_output.velocity_y_mps += POS_EST_W_V_DEFAULT * evy;
-    g_pos_est_output.position_x_m += POS_EST_W_P_DEFAULT * epx;
-    g_pos_est_output.position_y_m += POS_EST_W_P_DEFAULT * epy;
+    corr_boost = 1.0f / Pos_Est_Clampf(s_pos_est_state.acc_weight_xy, 0.01f, 1.0f);
+    corr_boost = Pos_Est_Clampf(corr_boost, 1.0f, POS_EST_CORR_BOOST_MAX);
+    vel_gain = POS_EST_W_V_DEFAULT * flow_quality_scale * corr_boost;
+    pos_gain = POS_EST_W_P_DEFAULT * flow_quality_scale * corr_boost;
+
+    g_pos_est_output.velocity_x_mps += vel_gain * evx;
+    g_pos_est_output.velocity_y_mps += vel_gain * evy;
+    g_pos_est_output.position_x_m += pos_gain * epx;
+    g_pos_est_output.position_y_m += pos_gain * epy;
 
     s_pos_est_state.accel_bias_x_mps2 += POS_EST_K_B_DEFAULT * evx * POS_EST_DT_100HZ_S;
     s_pos_est_state.accel_bias_y_mps2 += POS_EST_K_B_DEFAULT * evy * POS_EST_DT_100HZ_S;

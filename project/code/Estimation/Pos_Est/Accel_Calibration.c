@@ -51,6 +51,13 @@
 #define ACCEL_CALIBRATION_QUALITY_ALPHA_STATIC   (0.0020f)
 #define ACCEL_CALIBRATION_QUALITY_ALPHA_DYNAMIC  (0.0120f)
 
+/* 静止重锁定：抑制长时间静止时姿态/重力解耦误差导致的慢漂 */
+#define ACCEL_CALIBRATION_STATIC_RELOCK_ENABLE        (1U)
+#define ACCEL_CALIBRATION_STATIC_RELOCK_ALPHA         (0.0010f)
+#define ACCEL_CALIBRATION_STATIC_RELOCK_GYRO_MAX_DPS  (0.35f)
+#define ACCEL_CALIBRATION_STATIC_RELOCK_ACC_ERR_MAX_G (0.025f)
+#define ACCEL_CALIBRATION_STATIC_RELOCK_TRIM_MAX_G    (0.60f)
+
 #define IMU_CALIB_GYRO_TARGET_VALID_SAMPLES      (120000U)
 #define IMU_CALIB_GYRO_TIMEOUT_SAMPLES           (600000U)
 #define IMU_CALIB_GYRO_STATIC_MAX_DPS            (1.5f)
@@ -143,6 +150,10 @@ typedef struct
 
 AccelCalibration_t g_accel_calibration = {0};
 static IMUCalibRuntime_t s_imu_calib = {0};
+#if ACCEL_CALIBRATION_STATIC_RELOCK_ENABLE
+static float s_static_relock_trim_g[3] = {0.0f, 0.0f, 0.0f};
+static uint8_t s_static_relock_trim_ready = 0U;
+#endif
 
 /* ========================= 基础工具函数 ========================= */
 
@@ -479,6 +490,92 @@ static bool static_calibration_sample_valid(const float accel_body_g[3],
 
     return true;
 }
+
+#if ACCEL_CALIBRATION_STATIC_RELOCK_ENABLE
+static bool static_relock_sample_valid(const float accel_corrected_body_g[3],
+                                       const float gyro_body_dps[3])
+{
+    float accel_norm_g;
+    float gyro_norm_dps;
+
+    if ((accel_corrected_body_g == NULL) || (gyro_body_dps == NULL))
+    {
+        return false;
+    }
+
+    accel_norm_g = vec3_norm(accel_corrected_body_g[0],
+                             accel_corrected_body_g[1],
+                             accel_corrected_body_g[2]);
+    gyro_norm_dps = vec3_norm(gyro_body_dps[0],
+                              gyro_body_dps[1],
+                              gyro_body_dps[2]);
+
+    if (!is_finitef_local(accel_norm_g) || !is_finitef_local(gyro_norm_dps))
+    {
+        return false;
+    }
+
+    if (gyro_norm_dps > ACCEL_CALIBRATION_STATIC_RELOCK_GYRO_MAX_DPS)
+    {
+        return false;
+    }
+
+    if (fabsf_local(accel_norm_g - 1.0f) > ACCEL_CALIBRATION_STATIC_RELOCK_ACC_ERR_MAX_G)
+    {
+        return false;
+    }
+
+    if (g_mahony_ahrs.is_static == 0U)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+static void static_relock_update_trim(const float accel_corrected_body_g[3],
+                                      const float gyro_body_dps[3],
+                                      float gravity_x_g,
+                                      float gravity_y_g,
+                                      float gravity_z_g)
+{
+    float residual_g[3];
+    uint8_t i;
+
+    if (!static_relock_sample_valid(accel_corrected_body_g, gyro_body_dps))
+    {
+        return;
+    }
+
+    residual_g[0] = accel_corrected_body_g[0] - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gravity_x_g;
+    residual_g[1] = accel_corrected_body_g[1] - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gravity_y_g;
+    residual_g[2] = accel_corrected_body_g[2] - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gravity_z_g;
+
+    if (s_static_relock_trim_ready == 0U)
+    {
+        s_static_relock_trim_g[0] = clampf_local(residual_g[0],
+                                                 -ACCEL_CALIBRATION_STATIC_RELOCK_TRIM_MAX_G,
+                                                 ACCEL_CALIBRATION_STATIC_RELOCK_TRIM_MAX_G);
+        s_static_relock_trim_g[1] = clampf_local(residual_g[1],
+                                                 -ACCEL_CALIBRATION_STATIC_RELOCK_TRIM_MAX_G,
+                                                 ACCEL_CALIBRATION_STATIC_RELOCK_TRIM_MAX_G);
+        s_static_relock_trim_g[2] = clampf_local(residual_g[2],
+                                                 -ACCEL_CALIBRATION_STATIC_RELOCK_TRIM_MAX_G,
+                                                 ACCEL_CALIBRATION_STATIC_RELOCK_TRIM_MAX_G);
+        s_static_relock_trim_ready = 1U;
+        return;
+    }
+
+    for (i = 0U; i < 3U; i++)
+    {
+        s_static_relock_trim_g[i] += ACCEL_CALIBRATION_STATIC_RELOCK_ALPHA *
+                                     (residual_g[i] - s_static_relock_trim_g[i]);
+        s_static_relock_trim_g[i] = clampf_local(s_static_relock_trim_g[i],
+                                                 -ACCEL_CALIBRATION_STATIC_RELOCK_TRIM_MAX_G,
+                                                 ACCEL_CALIBRATION_STATIC_RELOCK_TRIM_MAX_G);
+    }
+}
+#endif
 
 #if ACCEL_CALIBRATION_ENABLE_ONLINE_TRIM
 static void update_bias_online(const float accel_body_g[3],
@@ -1586,6 +1683,13 @@ void AccelCalibration_Reset(void)
     g_accel_calibration.accel_scale[2] = 1.0f;
 
     g_accel_calibration.gravity_mps2 = ACCEL_CALIBRATION_GRAVITY_MSS;
+
+#if ACCEL_CALIBRATION_STATIC_RELOCK_ENABLE
+    s_static_relock_trim_g[0] = 0.0f;
+    s_static_relock_trim_g[1] = 0.0f;
+    s_static_relock_trim_g[2] = 0.0f;
+    s_static_relock_trim_ready = 0U;
+#endif
 }
 
 void AccelCalibration_SetImuToBodyMatrix(const float matrix[3][3])
@@ -1875,6 +1979,9 @@ void AccelCalibration_Update2kHz(void)
     float accel_body_real_mps2[3];
     float accel_level_mps2[3];
     float accel_down_mps2;
+    float trim_x_g = 0.0f;
+    float trim_y_g = 0.0f;
+    float trim_z_g = 0.0f;
 
     /* ===================== 重要函数：实时2kHz更新 ===================== */
     sanitize_scale();
@@ -1931,15 +2038,28 @@ void AccelCalibration_Update2kHz(void)
         g_accel_calibration.accel_corrected_body_g,
         g_accel_calibration.gyro_raw_body_dps);
 
+#if ACCEL_CALIBRATION_STATIC_RELOCK_ENABLE
+    static_relock_update_trim(
+        g_accel_calibration.accel_corrected_body_g,
+        g_accel_calibration.gyro_raw_body_dps,
+        gravity_x_g,
+        gravity_y_g,
+        gravity_z_g);
+
+    trim_x_g = s_static_relock_trim_g[0];
+    trim_y_g = s_static_relock_trim_g[1];
+    trim_z_g = s_static_relock_trim_g[2];
+#endif
+
     /* 去除重力，得到真实机体线加速度 */
     accel_body_real_mps2[0] =
-        (g_accel_calibration.accel_corrected_body_g[0] - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gravity_x_g) *
+        (g_accel_calibration.accel_corrected_body_g[0] - trim_x_g - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gravity_x_g) *
         g_accel_calibration.gravity_mps2;
     accel_body_real_mps2[1] =
-        (g_accel_calibration.accel_corrected_body_g[1] - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gravity_y_g) *
+        (g_accel_calibration.accel_corrected_body_g[1] - trim_y_g - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gravity_y_g) *
         g_accel_calibration.gravity_mps2;
     accel_body_real_mps2[2] =
-        (g_accel_calibration.accel_corrected_body_g[2] - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gravity_z_g) *
+        (g_accel_calibration.accel_corrected_body_g[2] - trim_z_g - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gravity_z_g) *
         g_accel_calibration.gravity_mps2;
 
     g_accel_calibration.accel_real_body_mps2[0] = accel_body_real_mps2[0];
@@ -2105,6 +2225,14 @@ bool AccelCalibration_LoadParams(const AccelCalibrationParams_t *params)
     g_accel_calibration.imu_to_body_identity = matrix_is_identity(g_accel_calibration.imu_to_body);
     clamp_bias();
     sanitize_scale();
+
+#if ACCEL_CALIBRATION_STATIC_RELOCK_ENABLE
+    s_static_relock_trim_g[0] = 0.0f;
+    s_static_relock_trim_g[1] = 0.0f;
+    s_static_relock_trim_g[2] = 0.0f;
+    s_static_relock_trim_ready = 0U;
+#endif
+
     g_accel_calibration.is_calibrated = true;
     return true;
 }

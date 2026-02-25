@@ -22,10 +22,11 @@ extern uint8 g_height_est_source;
 
 void Height_Est_Init(void);
 void Height_Est_Reset(void);
-void Height_Est_update_100HZ(void);
+void Height_Est_Update_100HZ(void);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* HEIGHT_EST_H_ */
+

@@ -45,14 +45,14 @@ static const CRSF_ChannelConfig CRSF_CHANNEL_CONFIG[CRSF_CH_COUNT] =
 	{CRSF_CH_TYPE_NONE,        0,   0,   0,   0, 0}                                                           // CH9 Unused
 };
 
-extern volatile uint16_t CRSF_CH[CRSF_CH_COUNT];            // 接收的通道数据 0-2047 对应 11 位有效数据
+extern volatile uint16_t CRSF_CH[CRSF_CH_COUNT];            // 接收的通道数据 0-2047 对应 11 位有效数�?
 extern volatile int16_t CRSF_STD[CRSF_CH_COUNT];             // 标准化通道数据
-extern volatile uint32_t CRSF_LAST_UPDATE_TIME;             // 上次更新通道数据的时间 用于判断接收超时
-extern volatile uint8_t CRSF_LINK_UP;                       // 接收链接状态 0表示链接断开 1表示链接正常
+extern volatile uint32_t CRSF_LAST_UPDATE_TIME;             // 上次更新通道数据的时�?用于判断接收超时
+extern volatile uint8_t CRSF_LINK_UP;                       // 接收链接状�?0表示链接断开 1表示链接正常
 
 void crsf_init(void);
 
-void crsf_uart_isr(void);
+void CRSF_Update_100HZ(void);
 
 void crsf_send_25hz(void);
 
@@ -63,3 +63,4 @@ void crsf_send_25hz(void);
 
 
 #endif
+

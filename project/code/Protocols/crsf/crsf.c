@@ -191,7 +191,7 @@ static void crsf_rx_byte(uint8_t byte)
     }
 }
 
-void crsf_uart_isr(void)
+void CRSF_Update_100HZ(void)
 {
     volatile stc_SCB_t *crsf_scb = get_scb_module(CRSF_UART_INDEX);
 
@@ -260,3 +260,4 @@ void crsf_send_25hz(void)
 
     crsf_send_attitude(pitch, roll, yaw);
 }
+

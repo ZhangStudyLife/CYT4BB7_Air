@@ -1,16 +1,16 @@
-ï»¿/********************************************************************
- * æ–‡ä»¶å  : Accel_Calibration.h
- * è¯´æ˜    : ICM42688 åŠ é€Ÿåº¦è®¡æ ¡å‡†ä¸å‚å‘åŠ é€Ÿåº¦é¢„å¤„ç†
+/********************************************************************
+ * ÎÄ¼şÃû  : Accel_Calibration.h
+ * ËµÃ÷    : ICM42688 ¼ÓËÙ¶È¼ÆĞ£×¼Óë´¹Ïò¼ÓËÙ¶ÈÔ¤´¦Àí
  *
- * åæ ‡ä¸ææ€§è§„èŒƒï¼ˆAGENTS.mdï¼‰ï¼š
- * 1. æœºä½“ç³»é‡‡ç”¨ FRDï¼š+X å‰ï¼Œ+Y å³ï¼Œ+Z ä¸‹ã€‚
- * 2. åŠ é€Ÿåº¦è®¡æ¯”åŠ›ï¼š+ax å‘å‰åŠ é€Ÿï¼Œ+ay å‘å³åŠ é€Ÿï¼Œ+az å‘ä¸‹åŠ é€Ÿã€‚
- *    é™æ­¢å¹³æ”¾æ—¶çš„ az ç¬¦å·ç”± ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN é…ç½®ï¼Œ
- *    å½“å‰é»˜è®¤æŒ‰ azâ‰ˆ-1g å¤„ç†ã€‚
- * 3. é™€èºè§’é€Ÿåº¦ï¼šgx>0 å³æ»šï¼Œgy>0 æŠ¬å¤´ï¼Œgz>0 ä¿¯è§†é¡ºæ—¶é’ˆã€‚
- * 4. æœ¬æ¨¡å— Down å‘è¾“å‡ºï¼ˆNEDï¼‰ï¼šGetAccelDown* ä¸º Down æ­£æ–¹å‘ã€‚
- * 5. æœ¬æ¨¡å— Up å‘è¾“å‡ºï¼šGetVerticalAccelUpMps2 ä¸º Up æ­£æ–¹å‘ï¼Œä¸” Up = -Downã€‚
- * 6. IMU åˆ°æœºä½“æ—‹è½¬çŸ©é˜µè¯­ä¹‰ï¼šv_body = R_imu_to_body * v_imuã€‚
+ * ×ø±êÓë¼«ĞÔ¹æ·¶£¨AGENTS.md£©£º
+ * 1. »úÌåÏµ²ÉÓÃ FRD£º+X Ç°£¬+Y ÓÒ£¬+Z ÏÂ¡£
+ * 2. ¼ÓËÙ¶È¼Æ±ÈÁ¦£º+ax ÏòÇ°¼ÓËÙ£¬+ay ÏòÓÒ¼ÓËÙ£¬+az ÏòÏÂ¼ÓËÙ¡£
+ *    ¾²Ö¹Æ½·ÅÊ±µÄ az ·ûºÅÓÉ ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN ÅäÖÃ£¬
+ *    µ±Ç°Ä¬ÈÏ°´ az¡Ö-1g ´¦Àí¡£
+ * 3. ÍÓÂİ½ÇËÙ¶È£ºgx>0 ÓÒ¹ö£¬gy>0 Ì§Í·£¬gz>0 ¸©ÊÓË³Ê±Õë¡£
+ * 4. ±¾Ä£¿é Down ÏòÊä³ö£¨NED£©£ºGetAccelDown* Îª Down Õı·½Ïò¡£
+ * 5. ±¾Ä£¿é Up ÏòÊä³ö£ºGetVerticalAccelUpMps2 Îª Up Õı·½Ïò£¬ÇÒ Up = -Down¡£
+ * 6. IMU µ½»úÌåĞı×ª¾ØÕóÓïÒå£ºv_body = R_imu_to_body * v_imu¡£
  ********************************************************************/
 
 #ifndef ACCEL_CALIBRATION_H_
@@ -30,19 +30,19 @@ extern "C" {
 #define ACCEL_CALIBRATION_STD_G_WARN_MAX         (0.050f)
 #define ACCEL_CALIBRATION_STD_G_FAIL_MAX         (0.080f)
 
-/* æ¯”åŠ›é™æ­¢ç¬¦å·çº¦å®šï¼š
- * +1.0f: é™æ­¢å¹³æ”¾ azâ‰ˆ+1g
- * -1.0f: é™æ­¢å¹³æ”¾ azâ‰ˆ-1g
+/* ±ÈÁ¦¾²Ö¹·ûºÅÔ¼¶¨£º
+ * +1.0f: ¾²Ö¹Æ½·Å az¡Ö+1g
+ * -1.0f: ¾²Ö¹Æ½·Å az¡Ö-1g
  */
 #define ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN (-1.0f)
 
-/* æ°´å¹³åŒ–è¾“å‡ºæ˜¯å¦ä½¿ç”¨ yawï¼š
- * 0U: ä»… roll/pitchï¼ˆæŒ‰å½“å‰éœ€æ±‚ï¼‰
- * 1U: roll/pitch/yaw å…¨è¡¥å¿
+/* Ë®Æ½»¯Êä³öÊÇ·ñÊ¹ÓÃ yaw£º
+ * 0U: ½ö roll/pitch£¨°´µ±Ç°ĞèÇó£©
+ * 1U: roll/pitch/yaw È«²¹³¥
  */
 #define ACCEL_CALIBRATION_LEVEL_USE_YAW          (0U)
 
-/* æ–¹å‘ç¬¦å·æ ‡è®°ï¼ˆç”¨äºå¯è¯»æ€§ä¸è”è°ƒæ£€æŸ¥ï¼‰ */
+/* ·½Ïò·ûºÅ±ê¼Ç£¨ÓÃÓÚ¿É¶ÁĞÔÓëÁªµ÷¼ì²é£© */
 #define ACCEL_CALIBRATION_BODY_AXIS_X_FORWARD    (+1.0f)
 #define ACCEL_CALIBRATION_BODY_AXIS_Y_RIGHT      (+1.0f)
 #define ACCEL_CALIBRATION_BODY_AXIS_Z_DOWN       (+1.0f)
@@ -54,34 +54,34 @@ typedef struct
     bool is_calibrated;
     uint16_t sample_count;
 
-    /* æœºä½“ç³»æ ¡å‡†å‚æ•°ï¼šcorrected = (raw - bias) * scale */
+    /* »úÌåÏµĞ£×¼²ÎÊı£ºcorrected = (raw - bias) * scale */
     float accel_bias_g[3];
     float accel_scale[3];
 
-    /* æœºä½“ç³»åŸå§‹å€¼/æ ¡æ­£å€¼ */
+    /* »úÌåÏµÔ­Ê¼Öµ/Ğ£ÕıÖµ */
     float accel_raw_body_g[3];
     float accel_corrected_body_g[3];
     float gyro_raw_body_dps[3];
 
-    /* æœºä½“ç³»çº¿åŠ é€Ÿåº¦ï¼ˆå»é‡åŠ›åï¼‰ï¼Œå•ä½ m/s^2 */
+    /* »úÌåÏµÏß¼ÓËÙ¶È£¨È¥ÖØÁ¦ºó£©£¬µ¥Î» m/s^2 */
     float accel_real_body_mps2[3];
 
-    /* åœ°é¢æ°´å¹³ç³»çº¿åŠ é€Ÿåº¦ï¼ˆå»é‡åŠ›åï¼‰ï¼Œé»˜è®¤ä»…è¡¥å¿ roll/pitchï¼‰ */
+    /* µØÃæË®Æ½ÏµÏß¼ÓËÙ¶È£¨È¥ÖØÁ¦ºó£©£¬Ä¬ÈÏ½ö²¹³¥ roll/pitch£© */
     float accel_level_mps2[3];
 
-    /* å‚å‘åŠ é€Ÿåº¦è¾“å‡º */
+    /* ´¹Ïò¼ÓËÙ¶ÈÊä³ö */
     float accel_down_for_ekf_mps2;
     float accel_down_for_output_mps2;
 
-    /* å‚å‘ç§¯åˆ†çŠ¶æ€ï¼ˆUp ä¸ºæ­£ï¼‰ */
+    /* ´¹Ïò»ı·Ö×´Ì¬£¨Up ÎªÕı£© */
     float vel_up_mps;
     float pos_up_m;
 
-    /* IMU -> Body æ—‹è½¬çŸ©é˜µ */
+    /* IMU -> Body Ğı×ª¾ØÕó */
     float imu_to_body[3][3];
     bool imu_to_body_identity;
 
-    /* è¿è¡Œè´¨é‡æŒ‡æ ‡ */
+    /* ÔËĞĞÖÊÁ¿Ö¸±ê */
     float accel_norm_mean_g;
     float accel_norm_std_g;
 
@@ -121,7 +121,7 @@ extern AccelCalibration_t g_accel_calibration;
 void AccelCalibration_Init(void);
 void AccelCalibration_Reset(void);
 bool AccelCalibration_Start(void);
-void AccelCalibration_Update2kHz(void);
+void AccelCalibration_Update_2000HZ(void);
 
 void AccelCalibration_SetImuToBodyMatrix(const float matrix[3][3]);
 void AccelCalibration_SetImuToBodyEulerDeg(float roll_deg, float pitch_deg, float yaw_deg);
@@ -138,13 +138,14 @@ float AccelCalibration_GetAccelDownMps2(void);
 float AccelCalibration_GetAccelDownForEkfMps2(void);
 float AccelCalibration_GetAccelDownForOutputMps2(void);
 
-/* æœºä½“ç³»çº¿åŠ é€Ÿåº¦ï¼ˆå»é‡åŠ›ï¼‰ï¼Œé™æ­¢åº”æ¥è¿‘ 0,0,0 */
+/* »úÌåÏµÏß¼ÓËÙ¶È£¨È¥ÖØÁ¦£©£¬¾²Ö¹Ó¦½Ó½ü 0,0,0 */
 void AccelCalibration_GetBodyAccelMps2(float *ax, float *ay, float *az);
+/* »úÌåÏµÍÓÂİ½ÇËÙ¶È£¬µ¥Î» dps */
 void AccelCalibration_GetBodyGyroDps(float *gx, float *gy, float *gz);
-/* æœºä½“ç³»æ ¡å‡†åæ¯”åŠ›ï¼ˆå•ä½ gï¼Œæœªå»é‡åŠ›ï¼‰ï¼Œä¾›å§¿æ€è§£ç®—ä½¿ç”¨ */
+/* »úÌåÏµĞ£×¼ºó±ÈÁ¦£¨µ¥Î» g£¬Î´È¥ÖØÁ¦£©£¬¹©×ËÌ¬½âËãÊ¹ÓÃ */
 void AccelCalibration_GetCorrectedSpecificForceG(float *ax_g, float *ay_g, float *az_g);
 
-/* åœ°é¢æ°´å¹³ç³»çº¿åŠ é€Ÿåº¦ï¼ˆå»é‡åŠ›ï¼‰ */
+/* µØÃæË®Æ½ÏµÏß¼ÓËÙ¶È£¨È¥ÖØÁ¦£© */
 void AccelCalibration_GetLevelAccelMps2(float *ax_level, float *ay_level, float *az_level);
 void AccelCalibration_GetHorizontalAccelMps2(float *ax_h, float *ay_h);
 
@@ -152,7 +153,7 @@ bool AccelCalibration_LoadParams(const AccelCalibrationParams_t *params);
 void AccelCalibration_GetParams(AccelCalibrationParams_t *params);
 
 void IMUCalib_Init(void);
-void IMUCalib_Update2kHz(void);
+void IMUCalib_Update_2000HZ(void);
 void IMUCalib_CommandPoll(void);
 uint8_t IMUCalib_LoadFromFlashAndApply(void);
 uint8_t IMUCalib_SaveCurrentToFlash(void);
@@ -164,3 +165,4 @@ uint8_t IMUCalib_IsBusy(void);
 #endif
 
 #endif /* ACCEL_CALIBRATION_H_ */
+

@@ -1,10 +1,10 @@
-ï»¿/********************************************************************
- * æ–‡ä»¶å  : accel_calibration.c
- * è¯´æ˜    : ICM42688 åŠ é€Ÿåº¦æ ‡å®šä¸å‚å‘åŠ é€Ÿåº¦é¢„å¤„ç†
- * æ ¸å¿ƒæµç¨‹: rotate -> bias/scale -> å»é‡åŠ› -> å‚å‘æŠ•å½± -> ä½é€š -> ç§¯åˆ†
- * å…³é”®å…¥å£:
- *   1) AccelCalibration_Start()      å¯åŠ¨é™æ­¢æ ‡å®š
- *   2) AccelCalibration_Update2kHz() å®æ—¶æ›´æ–°ï¼ˆ2kHzï¼‰
+/********************************************************************
+ * ÎÄ¼şÃû  : accel_calibration.c
+ * ËµÃ÷    : ICM42688 ¼ÓËÙ¶È±ê¶¨Óë´¹Ïò¼ÓËÙ¶ÈÔ¤´¦Àí
+ * ºËĞÄÁ÷³Ì: rotate -> bias/scale -> È¥ÖØÁ¦ -> ´¹ÏòÍ¶Ó° -> µÍÍ¨ -> »ı·Ö
+ * ¹Ø¼üÈë¿Ú:
+ *   1) AccelCalibration_Start()      Æô¶¯¾²Ö¹±ê¶¨
+ *   2) AccelCalibration_Update_2000HZ() ÊµÊ±¸üĞÂ£¨2kHz£©
  ********************************************************************/
 
 #include "Accel_Calibration.h"
@@ -26,7 +26,7 @@
 #define CALIB_MAX_TRY_SAMPLES                    (6000U)
 #define ACCEL_DOWN_SIGN_FOR_EKF                  (+1.0f)
 
-/* AP é£æ ¼ï¼šåˆ†çª—å£æ”¶æ•›åˆ¤å®š */
+/* AP ·ç¸ñ£º·Ö´°¿ÚÊÕÁ²ÅĞ¶¨ */
 #define ACCEL_CALIBRATION_WINDOW_SAMPLES         (400U)
 #define ACCEL_CALIBRATION_MAX_WINDOWS            (24U)
 #define ACCEL_CALIBRATION_CONVERGE_WINDOWS       (3U)
@@ -37,7 +37,7 @@
 #define ACCEL_CALIBRATION_CONVERGE_BIAS_DELTA_G  (0.004f)
 #define ACCEL_CALIBRATION_CONVERGE_ACC_STD_G     (0.025f)
 
-/* åœ¨çº¿å¾®è°ƒï¼šé»˜è®¤å…³é—­ï¼Œä¸“æ³¨â€œä¸€æ¬¡æ€§æ ¡å‡†â€å‚æ•°ç¨³å®šæ€§ */
+/* ÔÚÏßÎ¢µ÷£ºÄ¬ÈÏ¹Ø±Õ£¬×¨×¢¡°Ò»´ÎĞÔĞ£×¼¡±²ÎÊıÎÈ¶¨ĞÔ */
 #define ACCEL_CALIBRATION_ENABLE_ONLINE_TRIM      (0U)
 #define ACCEL_CALIBRATION_ONLINE_BIAS_ALPHA      (0.0025f)
 #define ACCEL_CALIBRATION_ONLINE_GYRO_MAX_DPS    (1.2f)
@@ -51,7 +51,7 @@
 #define ACCEL_CALIBRATION_QUALITY_ALPHA_STATIC   (0.0020f)
 #define ACCEL_CALIBRATION_QUALITY_ALPHA_DYNAMIC  (0.0120f)
 
-/* é™æ­¢é‡é”å®šï¼šæŠ‘åˆ¶é•¿æ—¶é—´é™æ­¢æ—¶å§¿æ€/é‡åŠ›è§£è€¦è¯¯å·®å¯¼è‡´çš„æ…¢æ¼‚ */
+/* ¾²Ö¹ÖØËø¶¨£ºÒÖÖÆ³¤Ê±¼ä¾²Ö¹Ê±×ËÌ¬/ÖØÁ¦½âñîÎó²îµ¼ÖÂµÄÂıÆ¯ */
 #define ACCEL_CALIBRATION_STATIC_RELOCK_ENABLE        (1U)
 #define ACCEL_CALIBRATION_STATIC_RELOCK_ALPHA         (0.0010f)
 #define ACCEL_CALIBRATION_STATIC_RELOCK_GYRO_MAX_DPS  (0.35f)
@@ -155,7 +155,7 @@ static float s_static_relock_trim_g[3] = {0.0f, 0.0f, 0.0f};
 static uint8_t s_static_relock_trim_ready = 0U;
 #endif
 
-/* ========================= åŸºç¡€å·¥å…·å‡½æ•° ========================= */
+/* ========================= »ù´¡¹¤¾ßº¯Êı ========================= */
 
 static float clampf_local(float v, float min_v, float max_v)
 {
@@ -217,7 +217,7 @@ static void mat3_mul_vec(const float matrix[3][3], const float vec_in[3], float 
 
 static bool euler_ready(void)
 {
-    /* ç”¨ sin^2+cos^2â‰ˆ1 åˆ¤æ–­å§¿æ€ä¸‰è§’é‡æ˜¯å¦æœ‰æ•ˆï¼Œé¿å…æœªåˆå§‹åŒ–å§¿æ€å‚ä¸è®¡ç®— */
+    /* ÓÃ sin^2+cos^2¡Ö1 ÅĞ¶Ï×ËÌ¬Èı½ÇÁ¿ÊÇ·ñÓĞĞ§£¬±ÜÃâÎ´³õÊ¼»¯×ËÌ¬²ÎÓë¼ÆËã */
     const float s2r = g_euler.sin_roll * g_euler.sin_roll;
     const float c2r = g_euler.cos_roll * g_euler.cos_roll;
     const float s2p = g_euler.sin_pitch * g_euler.sin_pitch;
@@ -244,7 +244,7 @@ static void get_gravity_body_g(float *gx, float *gy, float *gz)
         return;
     }
 
-    /* å•ä½å‘é‡ï¼ˆgï¼‰ï¼šé‡åŠ›åœ¨æœºä½“ç³»çš„åˆ†é‡ */
+    /* µ¥Î»ÏòÁ¿£¨g£©£ºÖØÁ¦ÔÚ»úÌåÏµµÄ·ÖÁ¿ */
     *gx = -g_euler.sin_pitch;
     *gy = g_euler.sin_roll * g_euler.cos_pitch;
     *gz = g_euler.cos_roll * g_euler.cos_pitch;
@@ -252,7 +252,7 @@ static void get_gravity_body_g(float *gx, float *gy, float *gz)
 
 static float calc_accel_down_from_body(const float accel_body_mps2[3])
 {
-    /* ä½¿ç”¨å§¿æ€çŸ©é˜µç¬¬ä¸‰è¡Œï¼Œå°†æœºä½“ç³»åŠ é€Ÿåº¦æŠ•å½±åˆ° NED çš„ Down è½´ */
+    /* Ê¹ÓÃ×ËÌ¬¾ØÕóµÚÈıĞĞ£¬½«»úÌåÏµ¼ÓËÙ¶ÈÍ¶Ó°µ½ NED µÄ Down Öá */
     const float sin_pitch = g_euler.sin_pitch;
     const float cos_pitch = g_euler.cos_pitch;
     const float sin_roll = g_euler.sin_roll;
@@ -305,7 +305,7 @@ static void rotate_body_linear_to_level(const float accel_body_mps2[3], float ac
     r32 = cos_roll * sin_pitch * sin_yaw - sin_roll * cos_yaw;
     r33 = cos_roll * cos_pitch;
 #else
-    /* yaw=0: ä»…è¡¥å¿ roll/pitchï¼Œæ»¡è¶³å½“å‰â€œå€¾æ–œè§£è€¦â€éœ€æ±‚ */
+    /* yaw=0: ½ö²¹³¥ roll/pitch£¬Âú×ãµ±Ç°¡°ÇãĞ±½âñî¡±ĞèÇó */
     r11 = cos_pitch;
     r12 = 0.0f;
     r13 = -sin_pitch;
@@ -326,7 +326,7 @@ static void rotate_body_linear_to_level(const float accel_body_mps2[3], float ac
 
 static void sanitize_scale(void)
 {
-    /* é˜²æ­¢ scale éæ³•ï¼ˆNaN/Inf/è¿‡å°ï¼‰ï¼Œå¹¶é™åˆ¶åœ¨å®‰å…¨èŒƒå›´ */
+    /* ·ÀÖ¹ scale ·Ç·¨£¨NaN/Inf/¹ıĞ¡£©£¬²¢ÏŞÖÆÔÚ°²È«·¶Î§ */
     uint8_t i;
     for (i = 0U; i < 3U; i++)
     {
@@ -380,7 +380,7 @@ static void apply_uniform_scale(float scale)
 
 static bool imu_sample_valid(float ax, float ay, float az, float gx, float gy, float gz)
 {
-    /* ç»Ÿä¸€æ ·æœ¬æœ‰æ•ˆæ€§é—¨é™ï¼šæ•°å€¼æœ‰æ•ˆ + é‡ç¨‹åˆç† + å§¿æ€å¯ç”¨ */
+    /* Í³Ò»Ñù±¾ÓĞĞ§ĞÔÃÅÏŞ£ºÊıÖµÓĞĞ§ + Á¿³ÌºÏÀí + ×ËÌ¬¿ÉÓÃ */
     if (!is_finitef_local(ax) || !is_finitef_local(ay) || !is_finitef_local(az) ||
         !is_finitef_local(gx) || !is_finitef_local(gy) || !is_finitef_local(gz))
     {
@@ -402,7 +402,7 @@ static bool imu_sample_valid(float ax, float ay, float az, float gx, float gy, f
 
 static void rotate_imu_to_body(const float vec_in[3], float vec_out[3])
 {
-    /* åæ ‡ç»Ÿä¸€ï¼šåç»­æ‰€æœ‰æ ‡å®šä¸ä¼°è®¡éƒ½åœ¨æœºä½“ç³»ä¸‹å®Œæˆ */
+    /* ×ø±êÍ³Ò»£ººóĞøËùÓĞ±ê¶¨Óë¹À¼Æ¶¼ÔÚ»úÌåÏµÏÂÍê³É */
     if (g_accel_calibration.imu_to_body_identity)
     {
         vec_out[0] = vec_in[0];
@@ -451,7 +451,7 @@ static bool static_calibration_sample_valid(const float accel_body_g[3],
                                             float *acc_norm_g,
                                             float *gyro_norm_dps)
 {
-    /* å¯åŠ¨æ ‡å®šä»…æ¥å—â€œè¿‘ä¼¼é™æ­¢â€æ ·æœ¬ï¼š|a|â‰ˆ1g ä¸”è§’é€Ÿåº¦å¾ˆå° */
+    /* Æô¶¯±ê¶¨½ö½ÓÊÜ¡°½üËÆ¾²Ö¹¡±Ñù±¾£º|a|¡Ö1g ÇÒ½ÇËÙ¶ÈºÜĞ¡ */
     float accel_norm;
     float gyro_norm;
 
@@ -584,7 +584,7 @@ static void update_bias_online(const float accel_body_g[3],
                                float gravity_y_g,
                                float gravity_z_g)
 {
-    /* åœ¨çº¿æ…¢é€Ÿ bias å¾®è°ƒï¼šåªåœ¨é™æ­¢çª—å£å†…ç”Ÿæ•ˆï¼Œé˜²æ­¢åŠ¨æ€è¯¯ä¿®æ­£ */
+    /* ÔÚÏßÂıËÙ bias Î¢µ÷£ºÖ»ÔÚ¾²Ö¹´°¿ÚÄÚÉúĞ§£¬·ÀÖ¹¶¯Ì¬ÎóĞŞÕı */
     float target_bias[3];
     float accel_norm;
     float gyro_norm;
@@ -628,7 +628,7 @@ static void update_bias_online(const float accel_body_g[3],
 
 static void update_scale_online(const float accel_body_g[3], const float gyro_body_dps[3])
 {
-    /* åœ¨çº¿æ…¢é€Ÿ scale å¾®è°ƒï¼šè®©å»åç½®åçš„ |a| é€æ­¥é€¼è¿‘ 1g */
+    /* ÔÚÏßÂıËÙ scale Î¢µ÷£ºÈÃÈ¥Æ«ÖÃºóµÄ |a| Öğ²½±Æ½ü 1g */
     float accel_unbiased_g[3];
     float accel_norm_g;
     float gyro_norm_dps;
@@ -679,7 +679,7 @@ static void update_scale_online(const float accel_body_g[3], const float gyro_bo
 
 static void update_runtime_quality(const float accel_corrected_body_g[3], const float gyro_body_dps[3])
 {
-    /* è¿è¡Œè´¨é‡è¯„ä¼°ï¼šç»Ÿè®¡ |a| çš„å‡å€¼å’Œâ€œè¿‘ä¼¼æ ‡å‡†å·®â€ç”¨äºå¥åº·åº¦è§‚å¯Ÿ */
+    /* ÔËĞĞÖÊÁ¿ÆÀ¹À£ºÍ³¼Æ |a| µÄ¾ùÖµºÍ¡°½üËÆ±ê×¼²î¡±ÓÃÓÚ½¡¿µ¶È¹Û²ì */
     float accel_norm_g;
     float gyro_norm_dps;
     float mean;
@@ -1660,7 +1660,7 @@ static void imu_calib_print_boot_reminder(void)
 
 void AccelCalibration_Init(void)
 {
-    /* åˆå§‹åŒ–ç­‰ä»·äºå¤ä½ */
+    /* ³õÊ¼»¯µÈ¼ÛÓÚ¸´Î» */
     AccelCalibration_Reset();
 }
 
@@ -1672,7 +1672,7 @@ void AccelCalibration_Reset(void)
     uint8_t i;
     uint8_t j;
 
-    /* é‡è¦ï¼šå¤ä½æ—¶ä¿ç•™å·²æœ‰å®‰è£…çŸ©é˜µï¼Œé¿å…é‡å¤é…ç½® IMU å®‰è£…æ–¹å‘ */
+    /* ÖØÒª£º¸´Î»Ê±±£ÁôÒÑÓĞ°²×°¾ØÕó£¬±ÜÃâÖØ¸´ÅäÖÃ IMU °²×°·½Ïò */
     memcpy(saved_matrix, g_accel_calibration.imu_to_body, sizeof(saved_matrix));
 
     for (i = 0U; i < 3U; i++)
@@ -1726,7 +1726,7 @@ void AccelCalibration_SetImuToBodyMatrix(const float matrix[3][3])
 
 void AccelCalibration_SetImuToBodyEulerDeg(float roll_deg, float pitch_deg, float yaw_deg)
 {
-    /* ZYX æ¬§æ‹‰è§’è½¬æ—‹è½¬çŸ©é˜µï¼ˆyaw->pitch->rollï¼‰ */
+    /* ZYX Å·À­½Ç×ªĞı×ª¾ØÕó£¨yaw->pitch->roll£© */
     const float roll = roll_deg * DEG_TO_RAD;
     const float pitch = pitch_deg * DEG_TO_RAD;
     const float yaw = yaw_deg * DEG_TO_RAD;
@@ -1753,11 +1753,11 @@ void AccelCalibration_SetImuToBodyEulerDeg(float roll_deg, float pitch_deg, floa
     g_accel_calibration.imu_to_body_identity = matrix_is_identity(g_accel_calibration.imu_to_body);
 }
 
-/* ========================= é‡è¦å‡½æ•°ï¼šå¯åŠ¨æ ‡å®š =========================
- * AP é£æ ¼ï¼šé™æ­¢çª—å£æ‰¹é‡æ ¡å‡†ã€‚
- * - æ¯ä¸ªçª—å£æ”¶é›†å›ºå®šæ•°é‡é™æ­¢æ ·æœ¬
- * - ç”¨çª—å£å†…ç¨³å®šæ€§å’Œ bias å¤§å°è¯„åˆ†ï¼Œé€‰æœ€ä¼˜çª—å£
- * - è¿ç»­å¤šä¸ªçª—å£æ”¶æ•›åˆ™åˆ¤å®šæ ‡å®šæˆåŠŸ
+/* ========================= ÖØÒªº¯Êı£ºÆô¶¯±ê¶¨ =========================
+ * AP ·ç¸ñ£º¾²Ö¹´°¿ÚÅúÁ¿Ğ£×¼¡£
+ * - Ã¿¸ö´°¿ÚÊÕ¼¯¹Ì¶¨ÊıÁ¿¾²Ö¹Ñù±¾
+ * - ÓÃ´°¿ÚÄÚÎÈ¶¨ĞÔºÍ bias ´óĞ¡ÆÀ·Ö£¬Ñ¡×îÓÅ´°¿Ú
+ * - Á¬Ğø¶à¸ö´°¿ÚÊÕÁ²ÔòÅĞ¶¨±ê¶¨³É¹¦
  */
 bool AccelCalibration_Start(void)
 {
@@ -1777,7 +1777,7 @@ bool AccelCalibration_Start(void)
     float global_mean_norm = 0.0f;
     float global_m2_norm = 0.0f;
 
-    /* æ¯æ¬¡å¯åŠ¨æ ‡å®šå‰æ¸…ç©ºå†å²çŠ¶æ€ */
+    /* Ã¿´ÎÆô¶¯±ê¶¨Ç°Çå¿ÕÀúÊ·×´Ì¬ */
     AccelCalibration_Reset();
 
     for (window_idx = 0U;
@@ -1809,8 +1809,8 @@ bool AccelCalibration_Start(void)
             float accel_norm_g;
             float gyro_norm_dps;
 
-            /* è¯»å–ä¸€å¸§ IMU 2kHz æ•°æ® */
-            IMU_Update_2kHz();
+            /* ¶ÁÈ¡Ò»Ö¡ IMU 2kHz Êı¾İ */
+            IMU_Update_2000HZ();
             window_tries++;
             total_tries++;
 
@@ -1822,7 +1822,7 @@ bool AccelCalibration_Start(void)
             gyro_sensor_dps[1] = g_imu_filter.gyro_filt_y;
             gyro_sensor_dps[2] = g_imu_filter.gyro_filt_z;
 
-            /* å…ˆåšåŸºç¡€æœ‰æ•ˆæ€§ç­›é€‰ */
+            /* ÏÈ×ö»ù´¡ÓĞĞ§ĞÔÉ¸Ñ¡ */
             if (!imu_sample_valid(accel_sensor_g[0], accel_sensor_g[1], accel_sensor_g[2],
                                   gyro_sensor_dps[0], gyro_sensor_dps[1], gyro_sensor_dps[2]))
             {
@@ -1833,7 +1833,7 @@ bool AccelCalibration_Start(void)
             rotate_imu_to_body(accel_sensor_g, accel_body_g);
             rotate_imu_to_body(gyro_sensor_dps, gyro_body_dps);
 
-            /* å†åšé™æ­¢æ¡ä»¶ç­›é€‰ï¼ˆ|a|â‰ˆ1g ä¸”è§’é€Ÿåº¦å°ï¼‰ */
+            /* ÔÙ×ö¾²Ö¹Ìõ¼şÉ¸Ñ¡£¨|a|¡Ö1g ÇÒ½ÇËÙ¶ÈĞ¡£© */
             if (!static_calibration_sample_valid(accel_body_g, gyro_body_dps, &accel_norm_g, &gyro_norm_dps))
             {
                 g_accel_calibration.invalid_sample_count++;
@@ -1842,7 +1842,7 @@ bool AccelCalibration_Start(void)
 
             get_gravity_body_g(&gx, &gy, &gz);
 
-            /* åœ¨æœºä½“ç³»ä¸‹ä¼°è®¡ bias = measured - static_sign * gravity */
+            /* ÔÚ»úÌåÏµÏÂ¹À¼Æ bias = measured - static_sign * gravity */
             window_bias_sum_x += (accel_body_g[0] - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gx);
             window_bias_sum_y += (accel_body_g[1] - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gy);
             window_bias_sum_z += (accel_body_g[2] - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gz);
@@ -1871,7 +1871,7 @@ bool AccelCalibration_Start(void)
             current_bias[1] = window_bias_sum_y / (float)window_valid;
             current_bias[2] = window_bias_sum_z / (float)window_valid;
 
-                /* è¯„åˆ†è¶Šå°è¶Šå¥½ï¼šåŠ é€Ÿåº¦æ³¢åŠ¨å°ã€è§’é€Ÿåº¦æ³¢åŠ¨å°ã€bias å° */
+                /* ÆÀ·ÖÔ½Ğ¡Ô½ºÃ£º¼ÓËÙ¶È²¨¶¯Ğ¡¡¢½ÇËÙ¶È²¨¶¯Ğ¡¡¢bias Ğ¡ */
                 score = window_acc_std +
                     0.25f * window_gyro_std +
                     0.50f * vec3_norm(current_bias[0], current_bias[1], current_bias[2]);
@@ -1912,7 +1912,7 @@ bool AccelCalibration_Start(void)
             selected_bias[2] = current_bias[2];
             have_prev_window = true;
 
-            /* è¿ç»­æ”¶æ•›çª—å£è¾¾åˆ°é˜ˆå€¼åç»“æŸ */
+            /* Á¬ĞøÊÕÁ²´°¿Ú´ïµ½ãĞÖµºó½áÊø */
             if ((total_valid_samples >= ACCEL_CALIBRATION_SAMPLES) &&
                 (converged_windows >= ACCEL_CALIBRATION_CONVERGE_WINDOWS))
             {
@@ -1928,7 +1928,7 @@ bool AccelCalibration_Start(void)
         return false;
     }
 
-    /* æœªä¸¥æ ¼æ”¶æ•›æ—¶ï¼Œé€€åŒ–ä¸ºä½¿ç”¨â€œæœ€ä½³çª—å£â€ç»“æœ */
+    /* Î´ÑÏ¸ñÊÕÁ²Ê±£¬ÍË»¯ÎªÊ¹ÓÃ¡°×î¼Ñ´°¿Ú¡±½á¹û */
     if (!converged && have_best_window)
     {
         selected_bias[0] = best_bias[0];
@@ -1942,7 +1942,7 @@ bool AccelCalibration_Start(void)
     clamp_bias();
 
     {
-        /* å¯åŠ¨ scale åˆå€¼ï¼šè®©å…¨å±€å¹³å‡æ¨¡é•¿å°½é‡æ¥è¿‘ 1g */
+        /* Æô¶¯ scale ³õÖµ£ºÈÃÈ«¾ÖÆ½¾ùÄ£³¤¾¡Á¿½Ó½ü 1g */
         float startup_scale = 1.0f;
 
         if (is_finitef_local(global_mean_norm) && (global_mean_norm > 0.2f))
@@ -1966,7 +1966,7 @@ bool AccelCalibration_Start(void)
     }
 
     {
-        /* æ ¹æ®æ ‡å®šé˜¶æ®µè§‚æµ‹åˆ°çš„å¹³å‡æ¨¡é•¿ï¼Œå¾®è°ƒé‡åŠ›å¸¸æ•° */
+        /* ¸ù¾İ±ê¶¨½×¶Î¹Û²âµ½µÄÆ½¾ùÄ£³¤£¬Î¢µ÷ÖØÁ¦³£Êı */
         const float g_est = global_mean_norm * ACCEL_CALIBRATION_GRAVITY_MSS;
         if (is_finitef_local(g_est) && (g_est > 6.0f) && (g_est < 13.0f))
         {
@@ -1979,7 +1979,7 @@ bool AccelCalibration_Start(void)
     }
 
     {
-        /* æœ€ç»ˆé€šè¿‡æ¡ä»¶ï¼šæ”¶æ•›ï¼Œæˆ–â€œæœ€ä½³çª—å£ + æ ·æœ¬è¶³å¤Ÿ + è´¨é‡è¾¾æ ‡â€ */
+        /* ×îÖÕÍ¨¹ıÌõ¼ş£ºÊÕÁ²£¬»ò¡°×î¼Ñ´°¿Ú + Ñù±¾×ã¹» + ÖÊÁ¿´ï±ê¡± */
         const bool quality_ok = (g_accel_calibration.accel_norm_std_g <= ACCEL_CALIBRATION_START_ACCEPT_STD_G);
         const bool enough_samples = (total_valid_samples >= (ACCEL_CALIBRATION_SAMPLES / 2U));
         const bool calibrated = converged || (have_best_window && enough_samples && quality_ok);
@@ -1990,7 +1990,7 @@ bool AccelCalibration_Start(void)
     }
 }
 
-void AccelCalibration_Update2kHz(void)
+void AccelCalibration_Update_2000HZ(void)
 {
     float accel_sensor_g[3];
     float gyro_sensor_dps[3];
@@ -2004,7 +2004,7 @@ void AccelCalibration_Update2kHz(void)
     float trim_y_g = 0.0f;
     float trim_z_g = 0.0f;
 
-    /* ===================== é‡è¦å‡½æ•°ï¼šå®æ—¶2kHzæ›´æ–° ===================== */
+    /* ===================== ÖØÒªº¯Êı£ºÊµÊ±2kHz¸üĞÂ ===================== */
     sanitize_scale();
 
     accel_sensor_g[0] = g_imu_filter.acc_filt_x;
@@ -2017,7 +2017,7 @@ void AccelCalibration_Update2kHz(void)
 
     if (!imu_sample_valid(accel_sensor_g[0], accel_sensor_g[1], accel_sensor_g[2], gyro_sensor_dps[0], gyro_sensor_dps[1], gyro_sensor_dps[2]))
     {
-        /* æ— æ•ˆæ ·æœ¬å¤„ç†ï¼šå¹³æ»‘è¡°å‡ï¼Œé˜²æ­¢ç§¯åˆ†çªå˜ */
+        /* ÎŞĞ§Ñù±¾´¦Àí£ºÆ½»¬Ë¥¼õ£¬·ÀÖ¹»ı·ÖÍ»±ä */
         g_accel_calibration.invalid_sample_count++;
         g_accel_calibration.realtime_sample_valid = 0U;
 
@@ -2035,7 +2035,7 @@ void AccelCalibration_Update2kHz(void)
     rotate_imu_to_body(accel_sensor_g, g_accel_calibration.accel_raw_body_g);
     rotate_imu_to_body(gyro_sensor_dps, g_accel_calibration.gyro_raw_body_dps);
 
-    /* åœ¨çº¿å¾®è°ƒï¼ˆä»…æ»¡è¶³é™æ­¢é—¨é™æ—¶æœ‰æ•ˆï¼‰ */
+    /* ÔÚÏßÎ¢µ÷£¨½öÂú×ã¾²Ö¹ÃÅÏŞÊ±ÓĞĞ§£© */
     get_gravity_body_g(&gravity_x_g, &gravity_y_g, &gravity_z_g);
 #if ACCEL_CALIBRATION_ENABLE_ONLINE_TRIM
     update_bias_online(
@@ -2049,7 +2049,7 @@ void AccelCalibration_Update2kHz(void)
         g_accel_calibration.gyro_raw_body_dps);
 #endif
 
-    /* å…³é”®ä¿®æ­£ï¼šraw -> (raw - bias) * scale */
+    /* ¹Ø¼üĞŞÕı£ºraw -> (raw - bias) * scale */
     g_accel_calibration.accel_corrected_body_g[0] =
         (g_accel_calibration.accel_raw_body_g[0] - g_accel_calibration.accel_bias_g[0]) * g_accel_calibration.accel_scale[0];
     g_accel_calibration.accel_corrected_body_g[1] =
@@ -2073,7 +2073,7 @@ void AccelCalibration_Update2kHz(void)
     trim_z_g = s_static_relock_trim_g[2];
 #endif
 
-    /* å»é™¤é‡åŠ›ï¼Œå¾—åˆ°çœŸå®æœºä½“çº¿åŠ é€Ÿåº¦ */
+    /* È¥³ıÖØÁ¦£¬µÃµ½ÕæÊµ»úÌåÏß¼ÓËÙ¶È */
     accel_body_real_mps2[0] =
         (g_accel_calibration.accel_corrected_body_g[0] - trim_x_g - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gravity_x_g) *
         g_accel_calibration.gravity_mps2;
@@ -2093,10 +2093,10 @@ void AccelCalibration_Update2kHz(void)
     g_accel_calibration.accel_level_mps2[1] = accel_level_mps2[1];
     g_accel_calibration.accel_level_mps2[2] = accel_level_mps2[2];
 
-    /* æŠ•å½±åˆ° Down è½´å¹¶ç»Ÿä¸€ç¬¦å·ï¼ˆä¾› EKFï¼‰ */
+    /* Í¶Ó°µ½ Down Öá²¢Í³Ò»·ûºÅ£¨¹© EKF£© */
     accel_down_mps2 = ACCEL_DOWN_SIGN_FOR_EKF * calc_accel_down_from_body(accel_body_real_mps2);
 
-    /* ä¸¤è·¯ä½é€šï¼šEKF æ›´å¿«ï¼Œè¾“å‡ºæ›´ç¨³ */
+    /* Á½Â·µÍÍ¨£ºEKF ¸ü¿ì£¬Êä³ö¸üÎÈ */
     g_accel_calibration.accel_down_for_ekf_mps2 =
         ACC_DOWN_LPF_ALPHA_EKF * accel_down_mps2 +
         (1.0f - ACC_DOWN_LPF_ALPHA_EKF) * g_accel_calibration.accel_down_for_ekf_mps2;
@@ -2105,7 +2105,7 @@ void AccelCalibration_Update2kHz(void)
         ACC_DOWN_LPF_ALPHA_OUTPUT * accel_down_mps2 +
         (1.0f - ACC_DOWN_LPF_ALPHA_OUTPUT) * g_accel_calibration.accel_down_for_output_mps2;
 
-    /* å‚å‘ç§¯åˆ†ï¼ˆå‘ä¸Šä¸ºæ­£ï¼‰ */
+    /* ´¹Ïò»ı·Ö£¨ÏòÉÏÎªÕı£© */
     g_accel_calibration.vel_up_mps += (-g_accel_calibration.accel_down_for_ekf_mps2) * ACCEL_CALIBRATION_DT_S;
     g_accel_calibration.pos_up_m += g_accel_calibration.vel_up_mps * ACCEL_CALIBRATION_DT_S;
     g_accel_calibration.realtime_sample_valid = 1U;
@@ -2344,7 +2344,7 @@ uint8_t IMUCalib_IsBusy(void)
     return s_imu_calib.busy;
 }
 
-void IMUCalib_Update2kHz(void)
+void IMUCalib_Update_2000HZ(void)
 {
     int32_t ret;
 
@@ -2484,4 +2484,5 @@ void IMUCalib_CommandPoll(void)
         }
     }
 }
+
 

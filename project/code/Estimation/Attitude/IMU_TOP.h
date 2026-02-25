@@ -10,7 +10,7 @@
 extern "C" {
 #endif
 
-/* ---------------- IMU 初始化参数（2kHz） ---------------- */
+/* ---------------- IMU 初始化参数（2kHz�?---------------- */
 #define IMU_WARMUP_DISCARD_SAMPLES   (4000U)
 #define IMU_UPDATE_DT_SEC            (1.0f / IMU_SAMPLE_RATE_HZ)
 
@@ -27,7 +27,7 @@ extern uint8 g_imu_ready;
 extern uint32 g_imu_update_count;
 
 void IMU_Init_All(void);
-void IMU_Update_2kHz(void);
+void IMU_Update_2000HZ(void);
 uint8 IMU_Is_Ready(void);
 
 #ifdef __cplusplus
@@ -35,3 +35,4 @@ uint8 IMU_Is_Ready(void);
 #endif
 
 #endif /* IMU_TOP_H_ */
+

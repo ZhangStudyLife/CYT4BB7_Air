@@ -50,7 +50,9 @@
 // 本例程是开源库空工程 可用作移植或者测试各类内外设
 
 // **************************** 代码区域 ****************************
-volatile uint8 g_height_est_tick_100hz = 0U;
+volatile uint16 g_tick_2000HZ = 0U;
+volatile uint8 g_tick_100HZ = 0U;
+static uint8 s_tick_div_pos_250hz = 0U;
 
 int main(void)
 {
@@ -58,71 +60,65 @@ int main(void)
     debug_init();                  // 调试串口信息初始化
     // 此处编写用户代码 例如外设初始化代码等
 
-    Height_Est_Init();         // 高度估计初始化（TOF+Baro）
-    PMW3901_Init();            // PMW3901 光流传感器初始化
-    IMU_Init_All();            // ICM42688 IMU 初始化
-    // pos_est_init();         // 当前阶段先聚焦加速度校准，位置估计暂不启用
-    crsf_init();               // CRSF 遥控协议初始化          
-    AccelCalibration_Init(); // 加速度标定模块初始化
-    IMUCalib_Init(); // 读取Flash中的IMU校准参数并应用
-    pit_us_init(PIT_CH0, 500); // PIT 定时器初始化 500us 中断周期 用于 IMU 2kHz 更新
+    Height_Est_Init(); // 高度估计初始化（TOF+Baro）
+    PMW3901_Init();    // PMW3901 光流传感器初始化
+    IMU_Init_All();    // ICM42688 IMU 初始化
+    Pos_Est_Init();    // 位置估计初始化
+    crsf_init();       // CRSF 遥控协议初始化
+    AccelCalibration_Init();   // 加速度标定模块初始化
+    IMUCalib_Init();           // 读取Flash中的IMU校准参数并应用
+    pit_us_init(PIT_CH0, 500); // PIT 定时器初始化 500us 中断周期
     pit_ms_init(PIT_CH1, 10);  // 100Hz 节拍
-
-
 
     while (true)
     {
-        if (g_height_est_tick_100hz > 0U)
-        {
-            g_height_est_tick_100hz = 0U;
-            Height_Est_update_100HZ();
+        uint8 run_100hz = 0U;
+        uint16 tick_2000_guard = 0U;
 
+        while ((g_tick_2000HZ > 0U) && (tick_2000_guard < 200U))
+        {
+            g_tick_2000HZ--;
+            IMU_Update_2000HZ();
+            AccelCalibration_Update_2000HZ();
+            IMUCalib_Update_2000HZ();
+
+            s_tick_div_pos_250hz++;
+            if (s_tick_div_pos_250hz >= 8U)
+            {
+                s_tick_div_pos_250hz = 0U;
+                Pos_Est_Update_250HZ();
+            }
+
+            tick_2000_guard++;
         }
+
+        if (g_tick_100HZ > 0U)
+        {
+            g_tick_100HZ--;
+            Height_Est_Update_100HZ();
+            Pos_Est_Update_100HZ();
+            CRSF_Update_100HZ();
+            run_100hz = 1U;
+        }
+
         IMUCalib_CommandPoll();
 
-        float ax_level, ay_level, az_level;
-        AccelCalibration_GetLevelAccelMps2(&ax_level, &ay_level, &az_level);
-        printf("%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\r\n",
-             ICM42688.gyro_x,
-               ICM42688.gyro_y,
-               ICM42688.gyro_z,
-               ICM42688.acc_x,
-                 ICM42688.acc_y,
-                 ICM42688.acc_z,
-                 ax_level,
-                  ay_level,
-                   az_level,
-                   g_euler.roll,
-                    g_euler.pitch,
-                     g_euler.yaw
-                );
-        system_delay_ms(20); // 20ms 延时 避免串口输出过快导致卡死
-        // printf("%d,%f\r\n",g_height_est_mm, g_height_vz_mps); // 打印高度估计结果
-        // VL53L1X_read_data(&VL53L1X_data); // 读取 VL53L1X 传感器数据
-        // PMW3901_Update(); // 更新 PMW3901 光流传感器数据
-        // printf("%d,%d,%d,%d,%d,%d\r\n",
-        //        VL53L1X_data.VL53L1X2_distance_mm,
-        //        VL53L1X_data.VL53L1X3_distance_mm,
-        //        g_tof2_height_mm,
-        //        g_tof3_height_mm,
-        //        g_tof_fused_height_mm,
-        //        g_tof_fused_source);
-        // crsf_send_25hz(); // 25Hz 发送一次遥控数据
-        // printf("%d,%d,%d,%d\r\n", CRSF_STD[0], CRSF_STD[1], CRSF_STD[2], CRSF_STD[3]);
-        // printf("%d,%d,%f,%f\r\n",g_BMP388_data.raw_pressure, g_BMP388_data.raw_temperature, g_BMP388_data.pressure_pa, g_BMP388_data.temperature_c); // 打印 BMP388 气压和温度数据
-        // printf("%f,%f,%f,%f,%f,%f\r\n", ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z, ICM42688.acc_x, ICM42688.acc_y, ICM42688.acc_z); // 打印 IMU 滤波后的陀螺和加速度数据
-        // printf("%f,%f,%f,%f\r\n", g_euler.roll, g_euler.pitch, g_euler.yaw, g_baro_altitude); // 打印欧拉角和气压高度数据
-        // printf("%d,%d,%d,%d\r\n", VL53L1X_data.VL53L1X2_distance_mm, VL53L1X_data.VL53L1X3_distance_mm, VL53L1X_data.VL53L1X2_range_status, VL53L1X_data.VL53L1X3_range_status);
-        // printf("%d,%d,%d,%d\r\n", g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY, g_pmw3901_raw.squal, g_pmw3901_raw.observation); // 打印 PMW3901 光流数据
-
+        if (run_100hz != 0U)
+        {
+            static uint8 s_pos_print_div = 0U;
+            s_pos_print_div++;
+            if (s_pos_print_div >= 2U)
+            {
+                s_pos_print_div = 0U;
+                // ch0~ch16: raw_dx,raw_dy,squal,gate,roll,pitch,height,corr_x,corr_y,flow_vx,flow_vy,bias_x,bias_y,pos_x,pos_y,vel_x,vel_y
+                printf("%f,%f,%f,%f\r\n",
+                       g_pos_est_output.position_x_m,
+                       g_pos_est_output.position_y_m,
+                       g_pos_est_output.velocity_x_mps,
+                       g_pos_est_output.velocity_y_mps);
+            }
+        }
     }
 }
 
 // **************************** 代码区域 ****************************
-
-
-
-
-
-
-

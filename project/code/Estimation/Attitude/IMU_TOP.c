@@ -4,10 +4,10 @@
 #include <stdio.h>
 #include <math.h>
 
-/* ======================== IMU 全局状态 ======================== */
-IMUFilter_t g_imu_filter;         /* IMU 滤波器状态 */
-MahonyAhrs_t g_mahony_ahrs;       /* Mahony 姿态解算器状态 */
-MahonyAhrs_Euler_t g_euler;       /* 当前姿态欧拉角（度） */
+/* ======================== IMU 全局状�?======================== */
+IMUFilter_t g_imu_filter;         /* IMU 滤波器状�?*/
+MahonyAhrs_t g_mahony_ahrs;       /* Mahony 姿态解算器状�?*/
+MahonyAhrs_Euler_t g_euler;       /* 当前姿态欧拉角（度�?*/
 uint8 g_imu_ready = 0U;           /* IMU 是否完成初始化与自检 */
 uint32 g_imu_update_count = 0U;   /* 2kHz 更新计数 */
 static uint8 s_imu_initializing = 0U;
@@ -29,12 +29,10 @@ static uint8 IMU_IsFiniteFloat(float value)
 }
 
 /*
- * 函数功能: 上电读取短窗口数据做基础健康检查
- * 检查项  :
+ * 函数功能: 上电读取短窗口数据做基础健康检�? * 检查项  :
  *   1) 数据是否有效（无 NaN/异常值）
- *   2) 静止时平均角速度是否在合理范围
- *   3) 加速度模长均值是否接近 1g
- * 返回值  : 1=通过，0=失败
+ *   2) 静止时平均角速度是否在合理范�? *   3) 加速度模长均值是否接�?1g
+ * 返回�? : 1=通过�?=失败
  */
 static uint8 IMU_Startup_SelfCheck(void)
 {
@@ -89,7 +87,7 @@ static uint8 IMU_Startup_SelfCheck(void)
 	return 1U;
 }
 
-/* ======================== IMU 初始化 ======================== */
+/* ======================== IMU 初始�?======================== */
 void IMU_Init_All(void)
 {
 	uint32 i;
@@ -98,7 +96,7 @@ void IMU_Init_All(void)
 	s_imu_initializing = 1U;
 	g_imu_update_count = 0U;
 
-	/* 步骤1: 上电初始化 ICM42688 驱动 */
+	/* 步骤1: 上电初始�?ICM42688 驱动 */
 	ICM42688_Init(&ICM42688_CONFIG);
 
 	/* 步骤2: 上电自检（必须静止放置） */
@@ -121,10 +119,10 @@ void IMU_Init_All(void)
 	g_euler.sin_pitch = 0.0f;
 	g_euler.cos_pitch = 1.0f;
 
-	/* 步骤4: 暖机，丢弃前若干帧用于稳定滤波器内部状态 */
+	/* 步骤4: 暖机，丢弃前若干帧用于稳定滤波器内部状�?*/
 	for (i = 0U; i < IMU_WARMUP_DISCARD_SAMPLES; i++)
 	{
-		IMU_Update_2kHz();
+		IMU_Update_2000HZ();
 	}
 
 	g_imu_ready = 1U;
@@ -188,9 +186,9 @@ static void IMU_SelectAhrsInput(float *gx, float *gy, float *gz,
 	*az = cal_az;
 }
 
-void IMU_Update_2kHz(void)
+void IMU_Update_2000HZ(void)
 {
-	/* 步骤1: 从 ICM42688 读取一帧原始传感器数据 */
+	/* 步骤1: �?ICM42688 读取一帧原始传感器数据 */
 	const float dt_s = IMU_UPDATE_DT_SEC;
 	float ahrs_gx;
 	float ahrs_gy;
@@ -213,18 +211,18 @@ void IMU_Update_2kHz(void)
 	g_imu_filter.acc_raw_y = ICM42688.acc_y;
 	g_imu_filter.acc_raw_z = ICM42688.acc_z;
 
-	/* 步骤3: 更新 IMU 滤波器（低通/陷波等） */
+	/* 步骤3: 更新 IMU 滤波器（低�?陷波等） */
 	IMUFilter_Update(&g_imu_filter);
 	IMU_SelectAhrsInput(&ahrs_gx, &ahrs_gy, &ahrs_gz, &ahrs_ax, &ahrs_ay, &ahrs_az);
 
-	/* 步骤4: 使用滤波后的陀螺和加速度数据进行 Mahony 姿态更新 */
+	/* 步骤4: 使用滤波后的陀螺和加速度数据进行 Mahony 姿态更�?*/
 	MahonyAhrs_Update(
 		&g_mahony_ahrs,
 		ahrs_gx, ahrs_gy, ahrs_gz,
 		ahrs_ax, ahrs_ay, ahrs_az,
 		dt_s);
 
-	/* 步骤5: 计算欧拉角（单位: 度）并缓存 */
+	/* 步骤5: 计算欧拉角（单位: 度）并缓�?*/
 	g_euler = MahonyAhrs_GetEulerDegrees(&g_mahony_ahrs);
 	g_imu_update_count++;
 }
@@ -233,3 +231,4 @@ uint8 IMU_Is_Ready(void)
 {
 	return g_imu_ready;
 }
+

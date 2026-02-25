@@ -8,16 +8,12 @@
 #define PMW3901_PRODUCT_ID_3901        (0x49U)
 #define PMW3901_POWER_ON_RESET_CMD     (0x5AU)
 #define PMW3901_WRITE_FLAG             (0x80U)
-#define PMW3901_MOTION_VALID_BIT       (0x80U)
 #define PMW3901_DUMMY_BYTE             (0x00U)
 
 #define PMW3901_POWERUP_DELAY_MS       (50U)
 #define PMW3901_STAGE_GAP_DELAY_MS     (100U)
 #define PMW3901_READY_DELAY_MS         (50U)
 #define PMW3901_REG_RETRY_MAX          (5U)
-
-#define PMW3901_SQUAL_MIN_THRESHOLD    (25U)
-#define PMW3901_DELTA_MAX_LIMIT        (2047)
 
 #define PMW3901_TSRAD_US               (300U)
 #define PMW3901_TSR_US                 (35U)
@@ -278,8 +274,6 @@ uint8 PMW3901_ReInit(void)
 void PMW3901_Update(void)
 {
     pmw3901_raw_t burst_data = {0};
-    int16 deltaX;
-    int16 deltaY;
 
     if (pmw3901_inited == 0U)
     {
@@ -287,23 +281,7 @@ void PMW3901_Update(void)
     }
 
     pmw3901_motion_burst_read(&burst_data);
+    burst_data.deltaX = (int16)(PMW3901_SIGN_X * burst_data.deltaX);
+    burst_data.deltaY = (int16)(PMW3901_SIGN_Y * burst_data.deltaY);
     g_pmw3901_raw = burst_data;
-    g_pmw3901_raw.deltaX = (int16)(PMW3901_SIGN_X * g_pmw3901_raw.deltaX);
-    g_pmw3901_raw.deltaY = (int16)(PMW3901_SIGN_Y * g_pmw3901_raw.deltaY);
-
-    if (((g_pmw3901_raw.motion & PMW3901_MOTION_VALID_BIT) != 0U)
-        && (g_pmw3901_raw.squal >= PMW3901_SQUAL_MIN_THRESHOLD))
-    {
-        deltaX = g_pmw3901_raw.deltaX;
-        deltaY = g_pmw3901_raw.deltaY;
-
-        if ((abs(deltaX) < PMW3901_DELTA_MAX_LIMIT)
-            && (abs(deltaY) < PMW3901_DELTA_MAX_LIMIT))
-        {
-            return;
-        }
-    }
-
-    g_pmw3901_raw.deltaX = 0;
-    g_pmw3901_raw.deltaY = 0;
 }

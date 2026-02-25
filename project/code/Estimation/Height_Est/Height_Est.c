@@ -72,7 +72,7 @@ void Height_Est_Init(void)
     s_height_est_inited = 1U;
 }
 
-void Height_Est_update_100HZ(void)
+void Height_Est_Update_100HZ(void)
 {
     static uint8 s_baro_div_cnt = 0U;
     static uint8 s_vl53_recover_div_cnt = 0U;
@@ -187,3 +187,4 @@ void Height_Est_update_100HZ(void)
     g_height_est_m = s_height_est_z_m;
     g_height_est_mm = Height_Est_ToMM(s_height_est_z_m);
 }
+

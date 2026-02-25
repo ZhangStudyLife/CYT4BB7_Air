@@ -39,6 +39,7 @@
 #include "zf_common_headfile.h"
 #include "../code/Estimation/Attitude/IMU_TOP.h"
 #include "../code/Protocols/crsf/crsf.h"
+#include "../code/Estimation/Pos_Est/Accel_Calibration.h"
 extern volatile uint8 g_height_est_tick_100hz;
 // **************************** PIT中断函数 ****************************
 void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数      
@@ -46,7 +47,7 @@ void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数
     pit_isr_flag_clear(PIT_CH0);
   
     IMU_Update_2kHz(); // 2kHz 更新 IMU 数据
-    
+    AccelCalibration_Update2kHz(); // 2kHz 更新加速度标定与预处理
     
 }
 

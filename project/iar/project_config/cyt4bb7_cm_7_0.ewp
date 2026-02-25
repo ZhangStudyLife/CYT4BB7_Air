@@ -1711,6 +1711,21 @@
                     </settings>
                 </configuration>
             </group>
+            <group>
+                <name>Pos_Est</name>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\Accel_Calibration.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\Accel_Calibration.h</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\Pos_Est.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\Pos_Est.h</name>
+                </file>
+            </group>
         </group>
         <group>
             <name>HW_Drivers</name>

@@ -37,8 +37,10 @@
 #include "../code/HW_Drivers/ICM42688/ICM42688.h"
 #include "../code/HW_Drivers/PMW3901/PMW3901.h"
 #include "../code/Estimation/Height_Est/Height_Est.h"
+#include "../code/Estimation/Pos_Est/Pos_Est.h"
 #include "../code/Estimation/Attitude/IMU_TOP.h"
 #include "../code/Protocols/crsf/crsf.h"
+#include "../code/Estimation/Pos_Est/Accel_Calibration.h"
 // 打开新的工程或者工程移动了位置务必执行以下操作
 // 第一步 关闭上面所有打开的文件
 // 第二步 project->clean  等待下方进度条走完
@@ -59,17 +61,14 @@ int main(void)
     Height_Est_Init();         // 高度估计初始化（TOF+Baro）
     PMW3901_Init();            // PMW3901 光流传感器初始化
     IMU_Init_All();            // ICM42688 IMU 初始化
-    crsf_init();               // CRSF 遥控协议初始化
+    // pos_est_init();         // 当前阶段先聚焦加速度校准，位置估计暂不启用
+    crsf_init();               // CRSF 遥控协议初始化          
+    AccelCalibration_Init(); // 加速度标定模块初始化
+    AccelCalibration_Start(); // 启动加速度标定
     pit_us_init(PIT_CH0, 500); // PIT 定时器初始化 500us 中断周期 用于 IMU 2kHz 更新
     pit_ms_init(PIT_CH1, 10);  // 100Hz 节拍
 
-    printf("1");
-    for (int i = 0; i < 100; i++)
-    {
-        Height_Est_update_100HZ(); // 100Hz 更新一次高度估计
-        system_delay_ms(10);
-    }
-    printf("2");
+
 
     while (true)
     {
@@ -77,7 +76,12 @@ int main(void)
         {
             g_height_est_tick_100hz = 0U;
             Height_Est_update_100HZ();
+
         }
+        float ax_level, ay_level, az_level;
+        AccelCalibration_GetLevelAccelMps2(&ax_level, &ay_level, &az_level);
+        printf("%f,%f,%f\r\n", ax_level, ay_level, az_level);
+
         // printf("%d,%f\r\n",g_height_est_mm, g_height_vz_mps); // 打印高度估计结果
         // VL53L1X_read_data(&VL53L1X_data); // 读取 VL53L1X 传感器数据
         // PMW3901_Update(); // 更新 PMW3901 光流传感器数据
@@ -95,8 +99,15 @@ int main(void)
         // printf("%f,%f,%f,%f\r\n", g_euler.roll, g_euler.pitch, g_euler.yaw, g_baro_altitude); // 打印欧拉角和气压高度数据
         // printf("%d,%d,%d,%d\r\n", VL53L1X_data.VL53L1X2_distance_mm, VL53L1X_data.VL53L1X3_distance_mm, VL53L1X_data.VL53L1X2_range_status, VL53L1X_data.VL53L1X3_range_status);
         // printf("%d,%d,%d,%d\r\n", g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY, g_pmw3901_raw.squal, g_pmw3901_raw.observation); // 打印 PMW3901 光流数据
-        system_delay_ms(1);
+
     }
 }
 
 // **************************** 代码区域 ****************************
+
+
+
+
+
+
+

@@ -89,6 +89,32 @@ typedef struct
     uint32_t invalid_sample_count;
 } AccelCalibration_t;
 
+typedef struct
+{
+    float accel_bias_g[3];
+    float accel_scale[3];
+    float imu_to_body[3][3];
+    float gravity_mps2;
+} AccelCalibrationParams_t;
+
+#define IMU_CALIB_FLASH_MAGIC                (0x43414C49UL)
+#define IMU_CALIB_FLASH_VERSION              (1U)
+#define IMU_CALIB_FLASH_PAGE                 (95U)
+
+typedef struct
+{
+    uint32_t magic;
+    uint16_t version;
+    uint16_t size;
+
+    float gyro_bias_dps[3];
+    float accel_bias_g[3];
+    float accel_scale[3];
+    float imu_to_body[3][3];
+
+    uint32_t reserved[8];
+} IMUCalibBlob_t;
+
 extern AccelCalibration_t g_accel_calibration;
 
 void AccelCalibration_Init(void);
@@ -117,6 +143,17 @@ void AccelCalibration_GetBodyGyroDps(float *gx, float *gy, float *gz);
 /* 地面水平系线加速度（去重力） */
 void AccelCalibration_GetLevelAccelMps2(float *ax_level, float *ay_level, float *az_level);
 void AccelCalibration_GetHorizontalAccelMps2(float *ax_h, float *ay_h);
+
+bool AccelCalibration_LoadParams(const AccelCalibrationParams_t *params);
+void AccelCalibration_GetParams(AccelCalibrationParams_t *params);
+
+void IMUCalib_Init(void);
+void IMUCalib_Update2kHz(void);
+void IMUCalib_CommandPoll(void);
+uint8_t IMUCalib_LoadFromFlashAndApply(void);
+uint8_t IMUCalib_SaveCurrentToFlash(void);
+uint8_t IMUCalib_ClearFlash(void);
+uint8_t IMUCalib_IsBusy(void);
 
 #ifdef __cplusplus
 }

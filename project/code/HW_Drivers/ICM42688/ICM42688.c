@@ -497,6 +497,34 @@ void ICM42688_Bias_Init(uint32 times)
     ICM42688_Bias_Init_Flag = 1;
 }
 
+void ICM42688_SetGyroBiasDps(float bx, float by, float bz, uint8 enable)
+{
+    ICM42688_Bias_gyro_x = bx;
+    ICM42688_Bias_gyro_y = by;
+    ICM42688_Bias_gyro_z = bz;
+    ICM42688_Bias_Init_Flag = (enable != 0U) ? 1U : 0U;
+}
+
+void ICM42688_GetGyroBiasDps(float *bx, float *by, float *bz, uint8 *enable)
+{
+    if (bx != NULL)
+    {
+        *bx = ICM42688_Bias_gyro_x;
+    }
+    if (by != NULL)
+    {
+        *by = ICM42688_Bias_gyro_y;
+    }
+    if (bz != NULL)
+    {
+        *bz = ICM42688_Bias_gyro_z;
+    }
+    if (enable != NULL)
+    {
+        *enable = ICM42688_Bias_Init_Flag;
+    }
+}
+
 /* 初始化 ICM42688 并加载配置 */
 void ICM42688_Init(ICM42688_CONFIG_STRUCT *ICM42688_CONFIG)
 {

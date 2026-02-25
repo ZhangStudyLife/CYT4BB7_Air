@@ -97,7 +97,7 @@ void flash_read_page(uint32 sector_num, uint32 page_num, uint32 *buf, uint32 len
 #endif
     for(data_cont = 0; data_cont < len; data_cont ++)
     {
-        *buf ++ = *(flash_addr + (data_cont * FLASH_DATA_SIZE));
+        *buf ++ = *(flash_addr + data_cont);
     }
 }
 
@@ -188,7 +188,7 @@ uint8 flash_write_page_from_buffer (uint32 sector_num, uint32 page_num, uint32 l
 //-------------------------------------------------------------------------------------------------------------------
 void flash_buffer_clear (void)
 {
-    memset(flash_union_buffer, 0xFF, FLASH_PAGE_LENGTH);
+    memset(flash_union_buffer, 0xFF, sizeof(flash_union_buffer));
 }
 
 //-------------------------------------------------------------------------------------------------------------------

@@ -1,6 +1,5 @@
 #include "IMU_TOP.h"
 #include "zf_common_headfile.h"
-#include <stdint.h>
 #include <stdio.h>
 #include <math.h>
 
@@ -89,42 +88,6 @@ static uint8 IMU_Startup_SelfCheck(void)
 	return 1U;
 }
 
-/*
- * 函数功能: 对驱动层静态零偏标定结果做验收
- * 判据    : 标定后静止状态下三轴角速度绝对值均值小于阈值
- */
-static uint8 IMU_Verify_GyroBias(void)
-{
-	uint32 i;
-	float mean_abs_x = 0.0f;
-	float mean_abs_y = 0.0f;
-	float mean_abs_z = 0.0f;
-
-	for (i = 0U; i < IMU_BIAS_VERIFY_SAMPLES; i++)
-	{
-		ICM42688_Get_Data();
-
-		mean_abs_x += fabsf(ICM42688.gyro_x);
-		mean_abs_y += fabsf(ICM42688.gyro_y);
-		mean_abs_z += fabsf(ICM42688.gyro_z);
-
-		system_delay_us(500);
-	}
-
-	mean_abs_x /= (float)IMU_BIAS_VERIFY_SAMPLES;
-	mean_abs_y /= (float)IMU_BIAS_VERIFY_SAMPLES;
-	mean_abs_z /= (float)IMU_BIAS_VERIFY_SAMPLES;
-
-	if ((mean_abs_x > IMU_BIAS_VERIFY_MEAN_ABS_MAX_DPS) ||
-		(mean_abs_y > IMU_BIAS_VERIFY_MEAN_ABS_MAX_DPS) ||
-		(mean_abs_z > IMU_BIAS_VERIFY_MEAN_ABS_MAX_DPS))
-	{
-		return 0U;
-	}
-
-	return 1U;
-}
-
 /* ======================== IMU 初始化 ======================== */
 void IMU_Init_All(void)
 {
@@ -146,26 +109,7 @@ void IMU_Init_All(void)
 		}
 	}
 
-	/* 步骤3: 驱动层静态零偏标定（2kHz采样） */
-	ICM42688_Bias_Init(IMU_BIAS_CALIBRATION_SAMPLES);
-	if (ICM42688_Bias_Init_Flag == 0U)
-	{
-		printf("IMU gyro bias calibration failed.\r\n");
-		while (1)
-		{
-		}
-	}
-
-	/* 步骤4: 标定结果验收，确保静态零偏足够小 */
-	if (0U == IMU_Verify_GyroBias())
-	{
-		printf("IMU gyro bias verify failed.\r\n");
-		while (1)
-		{
-		}
-	}
-
-	/* 步骤5: 初始化上层滤波与姿态解算器 */
+	/* 步骤3: 初始化上层滤波与姿态解算器 */
 	IMUFilter_Init(&g_imu_filter);
 	MahonyAhrs_Init(&g_mahony_ahrs);
 	g_euler.roll = 0.0f;
@@ -176,7 +120,7 @@ void IMU_Init_All(void)
 	g_euler.sin_pitch = 0.0f;
 	g_euler.cos_pitch = 1.0f;
 
-	/* 步骤6: 暖机，丢弃前若干帧用于稳定滤波器内部状态 */
+	/* 步骤4: 暖机，丢弃前若干帧用于稳定滤波器内部状态 */
 	for (i = 0U; i < IMU_WARMUP_DISCARD_SAMPLES; i++)
 	{
 		IMU_Update_2kHz();

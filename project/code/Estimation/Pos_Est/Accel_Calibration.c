@@ -12,6 +12,7 @@
 #include "zf_common_headfile.h"
 
 #include <float.h>
+#include <ctype.h>
 #include <math.h>
 #include <string.h>
 
@@ -36,7 +37,8 @@
 #define ACCEL_CALIBRATION_CONVERGE_BIAS_DELTA_G  (0.004f)
 #define ACCEL_CALIBRATION_CONVERGE_ACC_STD_G     (0.025f)
 
-/* 在线微调：仅在静止窗口内慢速修正 bias */
+/* 在线微调：默认关闭，专注“一次性校准”参数稳定性 */
+#define ACCEL_CALIBRATION_ENABLE_ONLINE_TRIM      (0U)
 #define ACCEL_CALIBRATION_ONLINE_BIAS_ALPHA      (0.0025f)
 #define ACCEL_CALIBRATION_ONLINE_GYRO_MAX_DPS    (1.2f)
 #define ACCEL_CALIBRATION_ONLINE_ACCEL_ERR_MAX_G (0.08f)
@@ -49,7 +51,98 @@
 #define ACCEL_CALIBRATION_QUALITY_ALPHA_STATIC   (0.0020f)
 #define ACCEL_CALIBRATION_QUALITY_ALPHA_DYNAMIC  (0.0120f)
 
+#define IMU_CALIB_GYRO_TARGET_VALID_SAMPLES      (120000U)
+#define IMU_CALIB_GYRO_TIMEOUT_SAMPLES           (600000U)
+#define IMU_CALIB_GYRO_STATIC_MAX_DPS            (1.5f)
+#define IMU_CALIB_GYRO_STATIC_ACC_ERR_G          (0.06f)
+#define IMU_CALIB_GYRO_STD_MAX_DPS               (0.20f)
+#define IMU_CALIB_GYRO_BIAS_MAX_DPS              (3.0f)
+#define IMU_CALIB_GYRO_PRE_STABLE_SAMPLES        (3000U)
+
+#define IMU_CALIB_ACC6_FACE_TARGET_SAMPLES       (5000U)
+#define IMU_CALIB_ACC6_FACE_STABLE_SAMPLES       (1500U)
+#define IMU_CALIB_ACC6_FACE_HOLD_DELAY_SAMPLES   (1000U)
+#define IMU_CALIB_ACC6_TIMEOUT_SAMPLES           (960000U)
+#define IMU_CALIB_ACC6_STATIC_MAX_DPS            (3.0f)
+#define IMU_CALIB_ACC6_DOM_MIN_G                 (0.90f)
+#define IMU_CALIB_ACC6_OTHER_MAX_G               (0.25f)
+#define IMU_CALIB_ACC6_VALID_MIN_G               (0.75f)
+#define IMU_CALIB_ACC6_VALID_MAX_G               (1.25f)
+#define IMU_CALIB_ACC6_DOM_STD_MAX_G             (0.03f)
+#define IMU_CALIB_ACC6_AXIS_STD_MAX_G            (0.025f)
+#define IMU_CALIB_ACC6_POST_NORM_ERR_MAX_G       (0.030f)
+#define IMU_CALIB_ACC6_POST_DOM_ERR_MAX_G        (0.060f)
+#define IMU_CALIB_ACC6_POST_OFF_AXIS_MAX_G       (0.090f)
+#define IMU_CALIB_ACC6_PRE_STABLE_SAMPLES        (2500U)
+
+#define IMU_CALIB_CMD_LINE_MAX                   (64U)
+#define IMU_CALIB_CMD_READ_MAX                   (64U)
+
+typedef enum
+{
+    IMU_CALIB_MODE_IDLE = 0,
+    IMU_CALIB_MODE_GYRO = 1,
+    IMU_CALIB_MODE_ACC6 = 2,
+    IMU_CALIB_MODE_ALL = 3
+} IMUCalibMode_e;
+
+typedef enum
+{
+    IMU_CALIB_ALL_STAGE_NONE = 0,
+    IMU_CALIB_ALL_STAGE_GYRO = 1,
+    IMU_CALIB_ALL_STAGE_ACC6 = 2
+} IMUCalibAllStage_e;
+
+typedef enum
+{
+    IMU_CALIB_FACE_X_POS = 0,
+    IMU_CALIB_FACE_X_NEG = 1,
+    IMU_CALIB_FACE_Y_POS = 2,
+    IMU_CALIB_FACE_Y_NEG = 3,
+    IMU_CALIB_FACE_Z_POS = 4,
+    IMU_CALIB_FACE_Z_NEG = 5,
+    IMU_CALIB_FACE_NUM = 6
+} IMUCalibFace_e;
+
+typedef struct
+{
+    uint8_t busy;
+    uint8_t mode;
+    uint8_t all_stage;
+
+    float gyro_sum_dps[3];
+    float gyro_mean_dps[3];
+    float gyro_m2_dps[3];
+    uint32_t gyro_valid_samples;
+    uint32_t gyro_total_samples;
+    uint32_t gyro_static_stable_samples;
+    uint8_t gyro_stable_progress_bucket;
+    uint8_t gyro_collect_progress_bucket;
+    float gyro_prev_bias_dps[3];
+    uint8_t gyro_prev_enabled;
+
+    uint8_t acc6_done_mask;
+    int8_t acc6_candidate_face;
+    uint16_t acc6_candidate_stable_samples;
+    uint16_t acc6_face_hold_delay_samples;
+    uint8_t acc6_face_hold_progress_bucket;
+    uint32_t acc6_total_samples;
+    uint32_t acc6_static_stable_samples;
+    int8_t acc6_collect_face;
+    uint8_t acc6_collect_progress_bucket;
+    uint32_t acc6_face_samples[IMU_CALIB_FACE_NUM];
+    float acc6_face_sum[IMU_CALIB_FACE_NUM][3];
+    float acc6_face_mean[IMU_CALIB_FACE_NUM][3];
+    float acc6_face_m2[IMU_CALIB_FACE_NUM][3];
+    float acc6_face_dom_mean[IMU_CALIB_FACE_NUM];
+    float acc6_face_dom_m2[IMU_CALIB_FACE_NUM];
+
+    char cmd_line[IMU_CALIB_CMD_LINE_MAX];
+    uint8_t cmd_line_len;
+} IMUCalibRuntime_t;
+
 AccelCalibration_t g_accel_calibration = {0};
+static IMUCalibRuntime_t s_imu_calib = {0};
 
 /* ========================= 基础工具函数 ========================= */
 
@@ -252,12 +345,14 @@ static void clamp_bias(void)
     }
 }
 
+#if ACCEL_CALIBRATION_ENABLE_ONLINE_TRIM
 static float mean_scale(void)
 {
     return (g_accel_calibration.accel_scale[0] +
             g_accel_calibration.accel_scale[1] +
             g_accel_calibration.accel_scale[2]) / 3.0f;
 }
+#endif
 
 static void apply_uniform_scale(float scale)
 {
@@ -334,6 +429,12 @@ static float std_from_m2(float m2, uint32_t sample_count)
     return sqrtf(m2 / (float)(sample_count - 1U));
 }
 
+static float max3f_local(float a, float b, float c)
+{
+    float max_ab = (a > b) ? a : b;
+    return (max_ab > c) ? max_ab : c;
+}
+
 static bool static_calibration_sample_valid(const float accel_body_g[3],
                                             const float gyro_body_dps[3],
                                             float *acc_norm_g,
@@ -379,6 +480,7 @@ static bool static_calibration_sample_valid(const float accel_body_g[3],
     return true;
 }
 
+#if ACCEL_CALIBRATION_ENABLE_ONLINE_TRIM
 static void update_bias_online(const float accel_body_g[3],
                                const float gyro_body_dps[3],
                                float gravity_x_g,
@@ -476,6 +578,7 @@ static void update_scale_online(const float accel_body_g[3], const float gyro_bo
     cur_scale += ACCEL_CALIBRATION_ONLINE_SCALE_ALPHA * (target_scale - cur_scale);
     apply_uniform_scale(cur_scale);
 }
+#endif
 
 static void update_runtime_quality(const float accel_corrected_body_g[3], const float gyro_body_dps[3])
 {
@@ -526,6 +629,915 @@ static void update_runtime_quality(const float accel_corrected_body_g[3], const 
 
     g_accel_calibration.accel_norm_mean_g = clampf_local(mean, 0.6f, 1.4f);
     g_accel_calibration.accel_norm_std_g = clampf_local(std, 0.0f, 0.25f);
+}
+
+static uint8_t imu_calib_count_done_faces(uint8_t done_mask)
+{
+    uint8_t i;
+    uint8_t count = 0U;
+    for (i = 0U; i < IMU_CALIB_FACE_NUM; i++)
+    {
+        if ((done_mask & (uint8_t)(1U << i)) != 0U)
+        {
+            count++;
+        }
+    }
+    return count;
+}
+
+static uint8_t imu_calib_blob_is_valid(const IMUCalibBlob_t *blob)
+{
+    if (blob == NULL)
+    {
+        return 0U;
+    }
+    if (blob->magic != IMU_CALIB_FLASH_MAGIC)
+    {
+        return 0U;
+    }
+    if (blob->version != IMU_CALIB_FLASH_VERSION)
+    {
+        return 0U;
+    }
+    if (blob->size != (uint16_t)sizeof(IMUCalibBlob_t))
+    {
+        return 0U;
+    }
+    return 1U;
+}
+
+static void imu_calib_fill_blob(IMUCalibBlob_t *blob)
+{
+    AccelCalibrationParams_t params;
+    uint8_t enabled = 0U;
+
+    if (blob == NULL)
+    {
+        return;
+    }
+
+    memset(blob, 0, sizeof(*blob));
+    blob->magic = IMU_CALIB_FLASH_MAGIC;
+    blob->version = IMU_CALIB_FLASH_VERSION;
+    blob->size = (uint16_t)sizeof(IMUCalibBlob_t);
+
+    ICM42688_GetGyroBiasDps(&blob->gyro_bias_dps[0], &blob->gyro_bias_dps[1], &blob->gyro_bias_dps[2], &enabled);
+    if (enabled == 0U)
+    {
+        blob->gyro_bias_dps[0] = 0.0f;
+        blob->gyro_bias_dps[1] = 0.0f;
+        blob->gyro_bias_dps[2] = 0.0f;
+    }
+
+    AccelCalibration_GetParams(&params);
+    memcpy(blob->accel_bias_g, params.accel_bias_g, sizeof(blob->accel_bias_g));
+    memcpy(blob->accel_scale, params.accel_scale, sizeof(blob->accel_scale));
+    memcpy(blob->imu_to_body, params.imu_to_body, sizeof(blob->imu_to_body));
+}
+
+static uint8_t imu_calib_apply_blob(const IMUCalibBlob_t *blob)
+{
+    AccelCalibrationParams_t params;
+
+    if (imu_calib_blob_is_valid(blob) == 0U)
+    {
+        return 0U;
+    }
+
+    params.accel_bias_g[0] = blob->accel_bias_g[0];
+    params.accel_bias_g[1] = blob->accel_bias_g[1];
+    params.accel_bias_g[2] = blob->accel_bias_g[2];
+    params.accel_scale[0] = blob->accel_scale[0];
+    params.accel_scale[1] = blob->accel_scale[1];
+    params.accel_scale[2] = blob->accel_scale[2];
+    memcpy(params.imu_to_body, blob->imu_to_body, sizeof(params.imu_to_body));
+    params.gravity_mps2 = ACCEL_CALIBRATION_GRAVITY_MSS;
+
+    if (!AccelCalibration_LoadParams(&params))
+    {
+        return 0U;
+    }
+
+    ICM42688_SetGyroBiasDps(blob->gyro_bias_dps[0], blob->gyro_bias_dps[1], blob->gyro_bias_dps[2], 1U);
+    return 1U;
+}
+
+static void imu_calib_print_runtime_params(void)
+{
+    AccelCalibrationParams_t params;
+    float bx = 0.0f;
+    float by = 0.0f;
+    float bz = 0.0f;
+    uint8_t enabled = 0U;
+
+    ICM42688_GetGyroBiasDps(&bx, &by, &bz, &enabled);
+    AccelCalibration_GetParams(&params);
+
+    printf("cal,dump,gyro,%u,%f,%f,%f\r\n",
+           (unsigned int)enabled, bx, by, bz);
+    printf("cal,dump,acc,%f,%f,%f,%f,%f,%f,%f\r\n",
+           params.accel_bias_g[0], params.accel_bias_g[1], params.accel_bias_g[2],
+           params.accel_scale[0], params.accel_scale[1], params.accel_scale[2],
+           params.gravity_mps2);
+    printf("cal,dump,r0,%f,%f,%f\r\n",
+           params.imu_to_body[0][0], params.imu_to_body[0][1], params.imu_to_body[0][2]);
+    printf("cal,dump,r1,%f,%f,%f\r\n",
+           params.imu_to_body[1][0], params.imu_to_body[1][1], params.imu_to_body[1][2]);
+    printf("cal,dump,r2,%f,%f,%f\r\n",
+           params.imu_to_body[2][0], params.imu_to_body[2][1], params.imu_to_body[2][2]);
+}
+
+static void imu_calib_print_flash_params(void)
+{
+    IMUCalibBlob_t blob;
+    uint8_t valid;
+    const uint32_t words = (uint32_t)((sizeof(IMUCalibBlob_t) + sizeof(uint32_t) - 1U) / sizeof(uint32_t));
+
+    memset(&blob, 0, sizeof(blob));
+    flash_read_page(0U, IMU_CALIB_FLASH_PAGE, (uint32_t *)&blob, words);
+    valid = imu_calib_blob_is_valid(&blob);
+
+    printf("cal,flash,meta,%u,0x%08lX,%u,%u\r\n",
+           (unsigned int)valid,
+           (unsigned long)blob.magic,
+           (unsigned int)blob.version,
+           (unsigned int)blob.size);
+
+    if (valid == 0U)
+    {
+        return;
+    }
+
+    printf("cal,flash,gyro,%f,%f,%f\r\n",
+           blob.gyro_bias_dps[0], blob.gyro_bias_dps[1], blob.gyro_bias_dps[2]);
+    printf("cal,flash,acc,%f,%f,%f,%f,%f,%f\r\n",
+           blob.accel_bias_g[0], blob.accel_bias_g[1], blob.accel_bias_g[2],
+           blob.accel_scale[0], blob.accel_scale[1], blob.accel_scale[2]);
+    printf("cal,flash,r0,%f,%f,%f\r\n",
+           blob.imu_to_body[0][0], blob.imu_to_body[0][1], blob.imu_to_body[0][2]);
+    printf("cal,flash,r1,%f,%f,%f\r\n",
+           blob.imu_to_body[1][0], blob.imu_to_body[1][1], blob.imu_to_body[1][2]);
+    printf("cal,flash,r2,%f,%f,%f\r\n",
+           blob.imu_to_body[2][0], blob.imu_to_body[2][1], blob.imu_to_body[2][2]);
+}
+
+static void imu_calib_reset_runtime(void)
+{
+    memset(&s_imu_calib, 0, sizeof(s_imu_calib));
+    s_imu_calib.acc6_candidate_face = -1;
+    s_imu_calib.acc6_collect_face = -1;
+}
+
+static void imu_calib_start_gyro(void)
+{
+    imu_calib_reset_runtime();
+    ICM42688_GetGyroBiasDps(&s_imu_calib.gyro_prev_bias_dps[0],
+                            &s_imu_calib.gyro_prev_bias_dps[1],
+                            &s_imu_calib.gyro_prev_bias_dps[2],
+                            &s_imu_calib.gyro_prev_enabled);
+    ICM42688_SetGyroBiasDps(0.0f, 0.0f, 0.0f, 0U);
+    s_imu_calib.busy = 1U;
+    s_imu_calib.mode = IMU_CALIB_MODE_GYRO;
+}
+
+static void imu_calib_prepare_acc6_state(void)
+{
+    s_imu_calib.acc6_done_mask = 0U;
+    s_imu_calib.acc6_candidate_face = -1;
+    s_imu_calib.acc6_candidate_stable_samples = 0U;
+    s_imu_calib.acc6_face_hold_delay_samples = 0U;
+    s_imu_calib.acc6_face_hold_progress_bucket = 0U;
+    s_imu_calib.acc6_total_samples = 0U;
+    s_imu_calib.acc6_static_stable_samples = 0U;
+    s_imu_calib.acc6_collect_face = -1;
+    s_imu_calib.acc6_collect_progress_bucket = 0U;
+    memset(s_imu_calib.acc6_face_samples, 0, sizeof(s_imu_calib.acc6_face_samples));
+    memset(s_imu_calib.acc6_face_sum, 0, sizeof(s_imu_calib.acc6_face_sum));
+    memset(s_imu_calib.acc6_face_mean, 0, sizeof(s_imu_calib.acc6_face_mean));
+    memset(s_imu_calib.acc6_face_m2, 0, sizeof(s_imu_calib.acc6_face_m2));
+    memset(s_imu_calib.acc6_face_dom_mean, 0, sizeof(s_imu_calib.acc6_face_dom_mean));
+    memset(s_imu_calib.acc6_face_dom_m2, 0, sizeof(s_imu_calib.acc6_face_dom_m2));
+}
+
+static void imu_calib_start_acc6(void)
+{
+    imu_calib_reset_runtime();
+    s_imu_calib.busy = 1U;
+    s_imu_calib.mode = IMU_CALIB_MODE_ACC6;
+    imu_calib_prepare_acc6_state();
+}
+
+static void imu_calib_start_all(void)
+{
+    imu_calib_reset_runtime();
+    ICM42688_GetGyroBiasDps(&s_imu_calib.gyro_prev_bias_dps[0],
+                            &s_imu_calib.gyro_prev_bias_dps[1],
+                            &s_imu_calib.gyro_prev_bias_dps[2],
+                            &s_imu_calib.gyro_prev_enabled);
+    ICM42688_SetGyroBiasDps(0.0f, 0.0f, 0.0f, 0U);
+    s_imu_calib.busy = 1U;
+    s_imu_calib.mode = IMU_CALIB_MODE_ALL;
+    s_imu_calib.all_stage = IMU_CALIB_ALL_STAGE_GYRO;
+}
+
+static int8_t imu_calib_pick_face(const float accel_body_g[3])
+{
+    float abs_x;
+    float abs_y;
+    float abs_z;
+    float max_abs;
+    uint8_t axis = 0U;
+    float axis_value;
+    float other_1;
+    float other_2;
+
+    if (accel_body_g == NULL)
+    {
+        return -1;
+    }
+
+    abs_x = fabsf_local(accel_body_g[0]);
+    abs_y = fabsf_local(accel_body_g[1]);
+    abs_z = fabsf_local(accel_body_g[2]);
+
+    max_abs = abs_x;
+    axis = 0U;
+    if (abs_y > max_abs)
+    {
+        max_abs = abs_y;
+        axis = 1U;
+    }
+    if (abs_z > max_abs)
+    {
+        max_abs = abs_z;
+        axis = 2U;
+    }
+
+    if (max_abs < IMU_CALIB_ACC6_DOM_MIN_G)
+    {
+        return -1;
+    }
+
+    axis_value = accel_body_g[axis];
+    if (axis == 0U)
+    {
+        other_1 = abs_y;
+        other_2 = abs_z;
+    }
+    else if (axis == 1U)
+    {
+        other_1 = abs_x;
+        other_2 = abs_z;
+    }
+    else
+    {
+        other_1 = abs_x;
+        other_2 = abs_y;
+    }
+
+    if ((other_1 > IMU_CALIB_ACC6_OTHER_MAX_G) || (other_2 > IMU_CALIB_ACC6_OTHER_MAX_G))
+    {
+        return -1;
+    }
+
+    return (int8_t)(axis * 2U + ((axis_value >= 0.0f) ? 0U : 1U));
+}
+
+static uint8_t imu_calib_all_faces_done(void)
+{
+    return (s_imu_calib.acc6_done_mask == (uint8_t)((1U << IMU_CALIB_FACE_NUM) - 1U)) ? 1U : 0U;
+}
+
+static int32_t imu_calib_update_gyro_step(void)
+{
+    float gx = g_imu_filter.gyro_filt_x;
+    float gy = g_imu_filter.gyro_filt_y;
+    float gz = g_imu_filter.gyro_filt_z;
+    float ax = g_imu_filter.acc_filt_x;
+    float ay = g_imu_filter.acc_filt_y;
+    float az = g_imu_filter.acc_filt_z;
+    float gyro_norm_dps;
+    float acc_norm_g;
+    uint8_t static_ok;
+
+    if (!is_finitef_local(gx) || !is_finitef_local(gy) || !is_finitef_local(gz) ||
+        !is_finitef_local(ax) || !is_finitef_local(ay) || !is_finitef_local(az))
+    {
+        s_imu_calib.gyro_total_samples++;
+        if (s_imu_calib.gyro_total_samples >= IMU_CALIB_GYRO_TIMEOUT_SAMPLES)
+        {
+            return -1;
+        }
+        return 0;
+    }
+
+    gyro_norm_dps = vec3_norm(gx, gy, gz);
+    acc_norm_g = vec3_norm(ax, ay, az);
+    s_imu_calib.gyro_total_samples++;
+    static_ok = ((gyro_norm_dps < IMU_CALIB_GYRO_STATIC_MAX_DPS) &&
+                 (fabsf_local(acc_norm_g - 1.0f) < IMU_CALIB_GYRO_STATIC_ACC_ERR_G)) ? 1U : 0U;
+
+    if (s_imu_calib.gyro_valid_samples == 0U)
+    {
+        if (static_ok != 0U)
+        {
+            s_imu_calib.gyro_static_stable_samples++;
+        }
+        else
+        {
+            s_imu_calib.gyro_static_stable_samples = 0U;
+        }
+
+        if (s_imu_calib.gyro_static_stable_samples < IMU_CALIB_GYRO_PRE_STABLE_SAMPLES)
+        {
+            uint8_t stable_bucket = (uint8_t)((s_imu_calib.gyro_static_stable_samples * 4U) / IMU_CALIB_GYRO_PRE_STABLE_SAMPLES);
+            if (stable_bucket > s_imu_calib.gyro_stable_progress_bucket)
+            {
+                s_imu_calib.gyro_stable_progress_bucket = stable_bucket;
+                if ((stable_bucket >= 1U) && (stable_bucket <= 3U))
+                {
+                    printf("cal,gyro,stabilizing,%u,%lu,%u\r\n",
+                           (unsigned int)(stable_bucket * 25U),
+                           (unsigned long)s_imu_calib.gyro_static_stable_samples,
+                           (unsigned int)IMU_CALIB_GYRO_PRE_STABLE_SAMPLES);
+                }
+            }
+            return 0;
+        }
+
+        if (s_imu_calib.gyro_stable_progress_bucket < 4U)
+        {
+            s_imu_calib.gyro_stable_progress_bucket = 4U;
+            printf("cal,gyro,collect,start\r\n");
+        }
+    }
+
+    if (static_ok != 0U)
+    {
+        s_imu_calib.gyro_sum_dps[0] += gx;
+        s_imu_calib.gyro_sum_dps[1] += gy;
+        s_imu_calib.gyro_sum_dps[2] += gz;
+        s_imu_calib.gyro_valid_samples++;
+        update_running_stats(gx, &s_imu_calib.gyro_mean_dps[0], &s_imu_calib.gyro_m2_dps[0], s_imu_calib.gyro_valid_samples);
+        update_running_stats(gy, &s_imu_calib.gyro_mean_dps[1], &s_imu_calib.gyro_m2_dps[1], s_imu_calib.gyro_valid_samples);
+        update_running_stats(gz, &s_imu_calib.gyro_mean_dps[2], &s_imu_calib.gyro_m2_dps[2], s_imu_calib.gyro_valid_samples);
+
+        {
+            uint8_t collect_bucket = (uint8_t)((s_imu_calib.gyro_valid_samples * 4U) / IMU_CALIB_GYRO_TARGET_VALID_SAMPLES);
+            if (collect_bucket > s_imu_calib.gyro_collect_progress_bucket)
+            {
+                s_imu_calib.gyro_collect_progress_bucket = collect_bucket;
+                if ((collect_bucket >= 1U) && (collect_bucket <= 3U))
+                {
+                    printf("cal,gyro,progress,%u,%lu,%u\r\n",
+                           (unsigned int)(collect_bucket * 25U),
+                           (unsigned long)s_imu_calib.gyro_valid_samples,
+                           (unsigned int)IMU_CALIB_GYRO_TARGET_VALID_SAMPLES);
+                }
+            }
+        }
+    }
+
+    if (s_imu_calib.gyro_valid_samples >= IMU_CALIB_GYRO_TARGET_VALID_SAMPLES)
+    {
+        float bx = s_imu_calib.gyro_sum_dps[0] / (float)s_imu_calib.gyro_valid_samples;
+        float by = s_imu_calib.gyro_sum_dps[1] / (float)s_imu_calib.gyro_valid_samples;
+        float bz = s_imu_calib.gyro_sum_dps[2] / (float)s_imu_calib.gyro_valid_samples;
+        float std_x = std_from_m2(s_imu_calib.gyro_m2_dps[0], s_imu_calib.gyro_valid_samples);
+        float std_y = std_from_m2(s_imu_calib.gyro_m2_dps[1], s_imu_calib.gyro_valid_samples);
+        float std_z = std_from_m2(s_imu_calib.gyro_m2_dps[2], s_imu_calib.gyro_valid_samples);
+
+        if (!is_finitef_local(std_x) || !is_finitef_local(std_y) || !is_finitef_local(std_z) ||
+            !is_finitef_local(bx) || !is_finitef_local(by) || !is_finitef_local(bz))
+        {
+            return -1;
+        }
+
+        if ((std_x > IMU_CALIB_GYRO_STD_MAX_DPS) ||
+            (std_y > IMU_CALIB_GYRO_STD_MAX_DPS) ||
+            (std_z > IMU_CALIB_GYRO_STD_MAX_DPS) ||
+            (fabsf_local(bx) > IMU_CALIB_GYRO_BIAS_MAX_DPS) ||
+            (fabsf_local(by) > IMU_CALIB_GYRO_BIAS_MAX_DPS) ||
+            (fabsf_local(bz) > IMU_CALIB_GYRO_BIAS_MAX_DPS))
+        {
+            printf("cal,gyro,quality_fail,%f,%f,%f,%f,%f,%f\r\n",
+                   bx, by, bz, std_x, std_y, std_z);
+            return -1;
+        }
+
+        ICM42688_SetGyroBiasDps(bx, by, bz, 1U);
+        printf("cal,gyro,ok,%lu,%f,%f,%f,%f,%f,%f\r\n",
+               (unsigned long)s_imu_calib.gyro_valid_samples, bx, by, bz, std_x, std_y, std_z);
+        return 1;
+    }
+
+    if (s_imu_calib.gyro_total_samples >= IMU_CALIB_GYRO_TIMEOUT_SAMPLES)
+    {
+        return -1;
+    }
+
+    return 0;
+}
+
+static int32_t imu_calib_update_acc6_step(void)
+{
+    float accel_sensor_g[3];
+    float gyro_sensor_dps[3];
+    float accel_body_g[3];
+    float gyro_body_dps[3];
+    float accel_norm_g;
+    float gyro_norm_dps;
+    int8_t face;
+    uint8_t face_idx;
+    uint32_t n;
+
+    s_imu_calib.acc6_total_samples++;
+    if (s_imu_calib.acc6_total_samples >= IMU_CALIB_ACC6_TIMEOUT_SAMPLES)
+    {
+        return -1;
+    }
+
+    accel_sensor_g[0] = g_imu_filter.acc_filt_x;
+    accel_sensor_g[1] = g_imu_filter.acc_filt_y;
+    accel_sensor_g[2] = g_imu_filter.acc_filt_z;
+    gyro_sensor_dps[0] = g_imu_filter.gyro_filt_x;
+    gyro_sensor_dps[1] = g_imu_filter.gyro_filt_y;
+    gyro_sensor_dps[2] = g_imu_filter.gyro_filt_z;
+
+    if (!imu_sample_valid(accel_sensor_g[0], accel_sensor_g[1], accel_sensor_g[2],
+                          gyro_sensor_dps[0], gyro_sensor_dps[1], gyro_sensor_dps[2]))
+    {
+        s_imu_calib.acc6_static_stable_samples = 0U;
+        s_imu_calib.acc6_candidate_stable_samples = 0U;
+        s_imu_calib.acc6_face_hold_delay_samples = 0U;
+        s_imu_calib.acc6_face_hold_progress_bucket = 0U;
+        return 0;
+    }
+
+    rotate_imu_to_body(accel_sensor_g, accel_body_g);
+    rotate_imu_to_body(gyro_sensor_dps, gyro_body_dps);
+
+    accel_norm_g = vec3_norm(accel_body_g[0], accel_body_g[1], accel_body_g[2]);
+    gyro_norm_dps = vec3_norm(gyro_body_dps[0], gyro_body_dps[1], gyro_body_dps[2]);
+
+    if ((gyro_norm_dps > IMU_CALIB_ACC6_STATIC_MAX_DPS) ||
+        (accel_norm_g < IMU_CALIB_ACC6_VALID_MIN_G) ||
+        (accel_norm_g > IMU_CALIB_ACC6_VALID_MAX_G))
+    {
+        s_imu_calib.acc6_static_stable_samples = 0U;
+        s_imu_calib.acc6_candidate_stable_samples = 0U;
+        s_imu_calib.acc6_face_hold_delay_samples = 0U;
+        s_imu_calib.acc6_face_hold_progress_bucket = 0U;
+        return 0;
+    }
+
+    if (s_imu_calib.acc6_static_stable_samples < IMU_CALIB_ACC6_PRE_STABLE_SAMPLES)
+    {
+        s_imu_calib.acc6_static_stable_samples++;
+        if (s_imu_calib.acc6_static_stable_samples == IMU_CALIB_ACC6_PRE_STABLE_SAMPLES)
+        {
+            printf("cal,acc6,stabilized,start_collect\r\n");
+        }
+        return 0;
+    }
+
+    face = imu_calib_pick_face(accel_body_g);
+    if (face < 0)
+    {
+        s_imu_calib.acc6_candidate_stable_samples = 0U;
+        s_imu_calib.acc6_face_hold_delay_samples = 0U;
+        s_imu_calib.acc6_face_hold_progress_bucket = 0U;
+        return 0;
+    }
+
+    face_idx = (uint8_t)face;
+    if ((s_imu_calib.acc6_done_mask & (uint8_t)(1U << face_idx)) != 0U)
+    {
+        s_imu_calib.acc6_candidate_stable_samples = 0U;
+        s_imu_calib.acc6_face_hold_delay_samples = 0U;
+        s_imu_calib.acc6_face_hold_progress_bucket = 0U;
+        return 0;
+    }
+
+    if (s_imu_calib.acc6_candidate_face != face)
+    {
+        s_imu_calib.acc6_candidate_face = face;
+        s_imu_calib.acc6_candidate_stable_samples = 1U;
+        s_imu_calib.acc6_face_hold_delay_samples = 0U;
+        s_imu_calib.acc6_face_hold_progress_bucket = 0U;
+        return 0;
+    }
+
+    if (s_imu_calib.acc6_candidate_stable_samples < IMU_CALIB_ACC6_FACE_STABLE_SAMPLES)
+    {
+        s_imu_calib.acc6_candidate_stable_samples++;
+        s_imu_calib.acc6_face_hold_delay_samples = 0U;
+        s_imu_calib.acc6_face_hold_progress_bucket = 0U;
+        return 0;
+    }
+
+    if (s_imu_calib.acc6_face_samples[face_idx] == 0U)
+    {
+        if (s_imu_calib.acc6_face_hold_delay_samples == 0U)
+        {
+            printf("cal,acc6,face_hold_start,%u,%u\r\n",
+                   (unsigned int)face_idx,
+                   (unsigned int)IMU_CALIB_ACC6_FACE_HOLD_DELAY_SAMPLES);
+        }
+
+        if (s_imu_calib.acc6_face_hold_delay_samples < IMU_CALIB_ACC6_FACE_HOLD_DELAY_SAMPLES)
+        {
+            s_imu_calib.acc6_face_hold_delay_samples++;
+            {
+                uint8_t hold_bucket = (uint8_t)((s_imu_calib.acc6_face_hold_delay_samples * 4U) / IMU_CALIB_ACC6_FACE_HOLD_DELAY_SAMPLES);
+                if (hold_bucket > s_imu_calib.acc6_face_hold_progress_bucket)
+                {
+                    s_imu_calib.acc6_face_hold_progress_bucket = hold_bucket;
+                    if ((hold_bucket >= 1U) && (hold_bucket <= 3U))
+                    {
+                        printf("cal,acc6,face_hold_progress,%u,%u,%u,%u\r\n",
+                               (unsigned int)face_idx,
+                               (unsigned int)(hold_bucket * 25U),
+                               (unsigned int)s_imu_calib.acc6_face_hold_delay_samples,
+                               (unsigned int)IMU_CALIB_ACC6_FACE_HOLD_DELAY_SAMPLES);
+                    }
+                }
+            }
+            return 0;
+        }
+
+        if (s_imu_calib.acc6_face_hold_progress_bucket < 4U)
+        {
+            s_imu_calib.acc6_face_hold_progress_bucket = 4U;
+            printf("cal,acc6,face_hold_done,%u\r\n", (unsigned int)face_idx);
+        }
+    }
+
+    n = s_imu_calib.acc6_face_samples[face_idx] + 1U;
+    s_imu_calib.acc6_face_samples[face_idx] = n;
+    if (s_imu_calib.acc6_collect_face != face)
+    {
+        s_imu_calib.acc6_collect_face = face;
+        s_imu_calib.acc6_collect_progress_bucket = 0U;
+        printf("cal,acc6,face_collect_start,%u\r\n", (unsigned int)face_idx);
+    }
+
+    s_imu_calib.acc6_face_sum[face_idx][0] += accel_body_g[0];
+    s_imu_calib.acc6_face_sum[face_idx][1] += accel_body_g[1];
+    s_imu_calib.acc6_face_sum[face_idx][2] += accel_body_g[2];
+    update_running_stats(accel_body_g[0], &s_imu_calib.acc6_face_mean[face_idx][0], &s_imu_calib.acc6_face_m2[face_idx][0], n);
+    update_running_stats(accel_body_g[1], &s_imu_calib.acc6_face_mean[face_idx][1], &s_imu_calib.acc6_face_m2[face_idx][1], n);
+    update_running_stats(accel_body_g[2], &s_imu_calib.acc6_face_mean[face_idx][2], &s_imu_calib.acc6_face_m2[face_idx][2], n);
+
+    {
+        uint8_t dom_axis = (uint8_t)(face_idx / 2U);
+        float dom_value = accel_body_g[dom_axis];
+        float delta = dom_value - s_imu_calib.acc6_face_dom_mean[face_idx];
+        s_imu_calib.acc6_face_dom_mean[face_idx] += delta / (float)n;
+        s_imu_calib.acc6_face_dom_m2[face_idx] += delta * (dom_value - s_imu_calib.acc6_face_dom_mean[face_idx]);
+    }
+
+    {
+        uint8_t face_bucket = (uint8_t)((n * 4U) / IMU_CALIB_ACC6_FACE_TARGET_SAMPLES);
+        if (face_bucket > s_imu_calib.acc6_collect_progress_bucket)
+        {
+            s_imu_calib.acc6_collect_progress_bucket = face_bucket;
+            if ((face_bucket >= 1U) && (face_bucket <= 3U))
+            {
+                printf("cal,acc6,face_progress,%u,%u,%lu,%u\r\n",
+                       (unsigned int)face_idx,
+                       (unsigned int)(face_bucket * 25U),
+                       (unsigned long)n,
+                       (unsigned int)IMU_CALIB_ACC6_FACE_TARGET_SAMPLES);
+            }
+        }
+    }
+
+    if (s_imu_calib.acc6_face_samples[face_idx] >= IMU_CALIB_ACC6_FACE_TARGET_SAMPLES)
+    {
+        float std_dom = std_from_m2(s_imu_calib.acc6_face_dom_m2[face_idx], s_imu_calib.acc6_face_samples[face_idx]);
+        float std_x = std_from_m2(s_imu_calib.acc6_face_m2[face_idx][0], s_imu_calib.acc6_face_samples[face_idx]);
+        float std_y = std_from_m2(s_imu_calib.acc6_face_m2[face_idx][1], s_imu_calib.acc6_face_samples[face_idx]);
+        float std_z = std_from_m2(s_imu_calib.acc6_face_m2[face_idx][2], s_imu_calib.acc6_face_samples[face_idx]);
+        float std_all_max = max3f_local(std_x, std_y, std_z);
+
+        if ((std_dom > IMU_CALIB_ACC6_DOM_STD_MAX_G) ||
+            (std_all_max > IMU_CALIB_ACC6_AXIS_STD_MAX_G))
+        {
+            printf("cal,acc6,face_fail,%u,%f,%f,%f,%f\r\n",
+                   (unsigned int)face_idx, std_dom, std_x, std_y, std_z);
+            return -1;
+        }
+
+        s_imu_calib.acc6_done_mask |= (uint8_t)(1U << face_idx);
+        s_imu_calib.acc6_candidate_face = -1;
+        s_imu_calib.acc6_candidate_stable_samples = 0U;
+        s_imu_calib.acc6_face_hold_delay_samples = 0U;
+        s_imu_calib.acc6_face_hold_progress_bucket = 0U;
+        s_imu_calib.acc6_static_stable_samples = 0U;
+        s_imu_calib.acc6_collect_face = -1;
+        s_imu_calib.acc6_collect_progress_bucket = 0U;
+        printf("cal,acc6,face_done,%u,%lu,%f,%f\r\n",
+               (unsigned int)face_idx,
+               (unsigned long)s_imu_calib.acc6_face_samples[face_idx],
+               std_dom,
+               std_all_max);
+    }
+
+    if (imu_calib_all_faces_done() != 0U)
+    {
+        AccelCalibrationParams_t params;
+        uint8_t axis;
+        float max_norm_err = 0.0f;
+        float max_dom_err = 0.0f;
+        float max_off_axis = 0.0f;
+
+        AccelCalibration_GetParams(&params);
+
+        for (axis = 0U; axis < 3U; axis++)
+        {
+            uint8_t face_pos = (uint8_t)(axis * 2U);
+            uint8_t face_neg = (uint8_t)(axis * 2U + 1U);
+            float mean_pos;
+            float mean_neg;
+            float delta;
+
+            if ((s_imu_calib.acc6_face_samples[face_pos] < IMU_CALIB_ACC6_FACE_TARGET_SAMPLES) ||
+                (s_imu_calib.acc6_face_samples[face_neg] < IMU_CALIB_ACC6_FACE_TARGET_SAMPLES))
+            {
+                return -1;
+            }
+
+            mean_pos = s_imu_calib.acc6_face_sum[face_pos][axis] / (float)s_imu_calib.acc6_face_samples[face_pos];
+            mean_neg = s_imu_calib.acc6_face_sum[face_neg][axis] / (float)s_imu_calib.acc6_face_samples[face_neg];
+            delta = mean_pos - mean_neg;
+
+            if (!is_finitef_local(mean_pos) || !is_finitef_local(mean_neg) || (fabsf_local(delta) < 0.40f))
+            {
+                return -1;
+            }
+
+            params.accel_bias_g[axis] = 0.5f * (mean_pos + mean_neg);
+            params.accel_scale[axis] = 2.0f / fabsf_local(delta);
+            params.accel_scale[axis] = clampf_local(params.accel_scale[axis], ACCEL_CALIBRATION_SCALE_MIN, ACCEL_CALIBRATION_SCALE_MAX);
+        }
+
+        if (!AccelCalibration_LoadParams(&params))
+        {
+            return -1;
+        }
+
+        for (face_idx = 0U; face_idx < IMU_CALIB_FACE_NUM; face_idx++)
+        {
+            uint8_t dom_axis = (uint8_t)(face_idx / 2U);
+            uint8_t off_axis_1 = (uint8_t)((dom_axis + 1U) % 3U);
+            uint8_t off_axis_2 = (uint8_t)((dom_axis + 2U) % 3U);
+            float expect_sign = ((face_idx % 2U) == 0U) ? 1.0f : -1.0f;
+            float mean_vec[3];
+            float corr_vec[3];
+            float norm_err;
+            float dom_err;
+            float off_1;
+            float off_2;
+
+            if (s_imu_calib.acc6_face_samples[face_idx] < IMU_CALIB_ACC6_FACE_TARGET_SAMPLES)
+            {
+                return -1;
+            }
+
+            mean_vec[0] = s_imu_calib.acc6_face_sum[face_idx][0] / (float)s_imu_calib.acc6_face_samples[face_idx];
+            mean_vec[1] = s_imu_calib.acc6_face_sum[face_idx][1] / (float)s_imu_calib.acc6_face_samples[face_idx];
+            mean_vec[2] = s_imu_calib.acc6_face_sum[face_idx][2] / (float)s_imu_calib.acc6_face_samples[face_idx];
+
+            corr_vec[0] = (mean_vec[0] - params.accel_bias_g[0]) * params.accel_scale[0];
+            corr_vec[1] = (mean_vec[1] - params.accel_bias_g[1]) * params.accel_scale[1];
+            corr_vec[2] = (mean_vec[2] - params.accel_bias_g[2]) * params.accel_scale[2];
+
+            norm_err = fabsf_local(vec3_norm(corr_vec[0], corr_vec[1], corr_vec[2]) - 1.0f);
+            dom_err = fabsf_local(corr_vec[dom_axis] - expect_sign);
+            off_1 = fabsf_local(corr_vec[off_axis_1]);
+            off_2 = fabsf_local(corr_vec[off_axis_2]);
+
+            if (norm_err > max_norm_err)
+            {
+                max_norm_err = norm_err;
+            }
+            if (dom_err > max_dom_err)
+            {
+                max_dom_err = dom_err;
+            }
+            if (off_1 > max_off_axis)
+            {
+                max_off_axis = off_1;
+            }
+            if (off_2 > max_off_axis)
+            {
+                max_off_axis = off_2;
+            }
+
+            if ((norm_err > IMU_CALIB_ACC6_POST_NORM_ERR_MAX_G) ||
+                (dom_err > IMU_CALIB_ACC6_POST_DOM_ERR_MAX_G) ||
+                (off_1 > IMU_CALIB_ACC6_POST_OFF_AXIS_MAX_G) ||
+                (off_2 > IMU_CALIB_ACC6_POST_OFF_AXIS_MAX_G))
+            {
+                printf("cal,acc6,post_fail,%u,%f,%f,%f,%f\r\n",
+                       (unsigned int)face_idx, norm_err, dom_err, off_1, off_2);
+                return -1;
+            }
+        }
+
+        printf("cal,acc6,ok,%f,%f,%f,%f,%f,%f,%f,%f,%f\r\n",
+               params.accel_bias_g[0], params.accel_bias_g[1], params.accel_bias_g[2],
+               params.accel_scale[0], params.accel_scale[1], params.accel_scale[2],
+               max_norm_err, max_dom_err, max_off_axis);
+        return 1;
+    }
+
+    return 0;
+}
+
+static uint32_t imu_calib_progress_percent(void)
+{
+    uint32_t progress = 0U;
+
+    if (s_imu_calib.busy == 0U)
+    {
+        return 0U;
+    }
+
+    if (s_imu_calib.mode == IMU_CALIB_MODE_GYRO)
+    {
+        progress = (uint32_t)(100.0f * (float)s_imu_calib.gyro_valid_samples / (float)IMU_CALIB_GYRO_TARGET_VALID_SAMPLES);
+    }
+    else if (s_imu_calib.mode == IMU_CALIB_MODE_ACC6)
+    {
+        uint8_t done = imu_calib_count_done_faces(s_imu_calib.acc6_done_mask);
+        progress = (uint32_t)((100U * done) / IMU_CALIB_FACE_NUM);
+    }
+    else if (s_imu_calib.mode == IMU_CALIB_MODE_ALL)
+    {
+        if (s_imu_calib.all_stage == IMU_CALIB_ALL_STAGE_GYRO)
+        {
+            progress = (uint32_t)(50.0f * (float)s_imu_calib.gyro_valid_samples / (float)IMU_CALIB_GYRO_TARGET_VALID_SAMPLES);
+        }
+        else if (s_imu_calib.all_stage == IMU_CALIB_ALL_STAGE_ACC6)
+        {
+            uint8_t done = imu_calib_count_done_faces(s_imu_calib.acc6_done_mask);
+            progress = 50U + (uint32_t)((50U * done) / IMU_CALIB_FACE_NUM);
+        }
+    }
+
+    if (progress > 100U)
+    {
+        progress = 100U;
+    }
+    return progress;
+}
+
+static void imu_calib_print_status(void)
+{
+    uint8_t face_done = imu_calib_count_done_faces(s_imu_calib.acc6_done_mask);
+    uint32_t progress = imu_calib_progress_percent();
+    printf("cal,status,%u,%u,%u,%u,%u\r\n",
+           (unsigned int)s_imu_calib.busy,
+           (unsigned int)s_imu_calib.mode,
+           (unsigned int)s_imu_calib.all_stage,
+           (unsigned int)progress,
+           (unsigned int)face_done);
+}
+
+static void imu_calib_command_to_lower(char *line)
+{
+    uint8_t i;
+    uint8_t len;
+
+    if (line == NULL)
+    {
+        return;
+    }
+
+    len = (uint8_t)strlen(line);
+    for (i = 0U; i < len; i++)
+    {
+        line[i] = (char)tolower((int)line[i]);
+    }
+}
+
+static void imu_calib_process_command(char *line)
+{
+    uint32_t irq_state;
+
+    if (line == NULL)
+    {
+        return;
+    }
+
+    imu_calib_command_to_lower(line);
+
+    if (strcmp(line, "cal status") == 0)
+    {
+        imu_calib_print_status();
+        return;
+    }
+
+    if (strcmp(line, "cal load") == 0)
+    {
+        if (s_imu_calib.busy != 0U)
+        {
+            printf("cal,busy\r\n");
+            return;
+        }
+        printf("cal,load,%u\r\n", (unsigned int)IMUCalib_LoadFromFlashAndApply());
+        return;
+    }
+
+    if (strcmp(line, "cal save") == 0)
+    {
+        if (s_imu_calib.busy != 0U)
+        {
+            printf("cal,busy\r\n");
+            return;
+        }
+        printf("cal,save,%u\r\n", (unsigned int)IMUCalib_SaveCurrentToFlash());
+        return;
+    }
+
+    if (strcmp(line, "cal clear") == 0)
+    {
+        if (s_imu_calib.busy != 0U)
+        {
+            printf("cal,busy\r\n");
+            return;
+        }
+        printf("cal,clear,%u\r\n", (unsigned int)IMUCalib_ClearFlash());
+        return;
+    }
+
+    if (strcmp(line, "cal dump") == 0)
+    {
+        if (s_imu_calib.busy != 0U)
+        {
+            printf("cal,busy\r\n");
+            return;
+        }
+        imu_calib_print_runtime_params();
+        imu_calib_print_flash_params();
+        return;
+    }
+
+    if (strcmp(line, "cal gyro start") == 0)
+    {
+        if (s_imu_calib.busy != 0U)
+        {
+            printf("cal,busy\r\n");
+            return;
+        }
+        irq_state = interrupt_global_disable();
+        imu_calib_start_gyro();
+        interrupt_global_enable(irq_state);
+        printf("cal,gyro,start\r\n");
+        return;
+    }
+
+    if (strcmp(line, "cal acc6 start") == 0)
+    {
+        if (s_imu_calib.busy != 0U)
+        {
+            printf("cal,busy\r\n");
+            return;
+        }
+        irq_state = interrupt_global_disable();
+        imu_calib_start_acc6();
+        interrupt_global_enable(irq_state);
+        printf("cal,acc6,start\r\n");
+        return;
+    }
+
+    if (strcmp(line, "cal all start") == 0)
+    {
+        if (s_imu_calib.busy != 0U)
+        {
+            printf("cal,busy\r\n");
+            return;
+        }
+        irq_state = interrupt_global_disable();
+        imu_calib_start_all();
+        interrupt_global_enable(irq_state);
+        printf("cal,all,start\r\n");
+        return;
+    }
+
+    printf("cal,unknown\r\n");
+}
+
+static void imu_calib_print_boot_reminder(void)
+{
+    printf("cal,remind,cmd,cal status\r\n");
+    printf("cal,remind,cmd,cal dump\r\n");
+    printf("cal,remind,cmd,cal all start\r\n");
+    printf("cal,remind,cmd,cal load\r\n");
+    printf("cal,remind,cmd,cal save\r\n");
+    printf("cal,remind,cmd,cal clear\r\n");
 }
 
 void AccelCalibration_Init(void)
@@ -896,6 +1908,7 @@ void AccelCalibration_Update2kHz(void)
 
     /* 在线微调（仅满足静止门限时有效） */
     get_gravity_body_g(&gravity_x_g, &gravity_y_g, &gravity_z_g);
+#if ACCEL_CALIBRATION_ENABLE_ONLINE_TRIM
     update_bias_online(
         g_accel_calibration.accel_raw_body_g,
         g_accel_calibration.gyro_raw_body_dps,
@@ -905,6 +1918,7 @@ void AccelCalibration_Update2kHz(void)
     update_scale_online(
         g_accel_calibration.accel_raw_body_g,
         g_accel_calibration.gyro_raw_body_dps);
+#endif
 
     /* 关键修正：raw -> (raw - bias) * scale */
     g_accel_calibration.accel_corrected_body_g[0] =
@@ -1051,6 +2065,251 @@ void AccelCalibration_GetHorizontalAccelMps2(float *ax_h, float *ay_h)
     if (ay_h != NULL)
     {
         *ay_h = g_accel_calibration.accel_level_mps2[1];
+    }
+}
+
+bool AccelCalibration_LoadParams(const AccelCalibrationParams_t *params)
+{
+    if (params == NULL)
+    {
+        return false;
+    }
+
+    if (!is_finitef_local(params->accel_bias_g[0]) ||
+        !is_finitef_local(params->accel_bias_g[1]) ||
+        !is_finitef_local(params->accel_bias_g[2]) ||
+        !is_finitef_local(params->accel_scale[0]) ||
+        !is_finitef_local(params->accel_scale[1]) ||
+        !is_finitef_local(params->accel_scale[2]))
+    {
+        return false;
+    }
+
+    g_accel_calibration.accel_bias_g[0] = params->accel_bias_g[0];
+    g_accel_calibration.accel_bias_g[1] = params->accel_bias_g[1];
+    g_accel_calibration.accel_bias_g[2] = params->accel_bias_g[2];
+    g_accel_calibration.accel_scale[0] = params->accel_scale[0];
+    g_accel_calibration.accel_scale[1] = params->accel_scale[1];
+    g_accel_calibration.accel_scale[2] = params->accel_scale[2];
+    memcpy(g_accel_calibration.imu_to_body, params->imu_to_body, sizeof(g_accel_calibration.imu_to_body));
+
+    if (is_finitef_local(params->gravity_mps2) && (params->gravity_mps2 > 6.0f) && (params->gravity_mps2 < 13.0f))
+    {
+        g_accel_calibration.gravity_mps2 = params->gravity_mps2;
+    }
+    else
+    {
+        g_accel_calibration.gravity_mps2 = ACCEL_CALIBRATION_GRAVITY_MSS;
+    }
+
+    g_accel_calibration.imu_to_body_identity = matrix_is_identity(g_accel_calibration.imu_to_body);
+    clamp_bias();
+    sanitize_scale();
+    g_accel_calibration.is_calibrated = true;
+    return true;
+}
+
+void AccelCalibration_GetParams(AccelCalibrationParams_t *params)
+{
+    if (params == NULL)
+    {
+        return;
+    }
+
+    params->accel_bias_g[0] = g_accel_calibration.accel_bias_g[0];
+    params->accel_bias_g[1] = g_accel_calibration.accel_bias_g[1];
+    params->accel_bias_g[2] = g_accel_calibration.accel_bias_g[2];
+    params->accel_scale[0] = g_accel_calibration.accel_scale[0];
+    params->accel_scale[1] = g_accel_calibration.accel_scale[1];
+    params->accel_scale[2] = g_accel_calibration.accel_scale[2];
+    memcpy(params->imu_to_body, g_accel_calibration.imu_to_body, sizeof(params->imu_to_body));
+    params->gravity_mps2 = g_accel_calibration.gravity_mps2;
+}
+
+void IMUCalib_Init(void)
+{
+    flash_init();
+    imu_calib_reset_runtime();
+    if (IMUCalib_LoadFromFlashAndApply() != 0U)
+    {
+        printf("cal,loaded\r\n");
+    }
+    else
+    {
+        printf("cal,default\r\n");
+    }
+    imu_calib_print_boot_reminder();
+}
+
+uint8_t IMUCalib_LoadFromFlashAndApply(void)
+{
+    IMUCalibBlob_t blob;
+    const uint32_t words = (uint32_t)((sizeof(IMUCalibBlob_t) + sizeof(uint32_t) - 1U) / sizeof(uint32_t));
+
+    memset(&blob, 0, sizeof(blob));
+    flash_read_page(0U, IMU_CALIB_FLASH_PAGE, (uint32_t *)&blob, words);
+    return imu_calib_apply_blob(&blob);
+}
+
+uint8_t IMUCalib_SaveCurrentToFlash(void)
+{
+    IMUCalibBlob_t blob;
+    const uint32_t words = (uint32_t)((sizeof(IMUCalibBlob_t) + sizeof(uint32_t) - 1U) / sizeof(uint32_t));
+
+    imu_calib_fill_blob(&blob);
+    flash_write_page(0U, IMU_CALIB_FLASH_PAGE, (const uint32_t *)&blob, words);
+    return 1U;
+}
+
+uint8_t IMUCalib_ClearFlash(void)
+{
+    flash_erase_page(0U, IMU_CALIB_FLASH_PAGE);
+    return 1U;
+}
+
+uint8_t IMUCalib_IsBusy(void)
+{
+    return s_imu_calib.busy;
+}
+
+void IMUCalib_Update2kHz(void)
+{
+    int32_t ret;
+
+    if (s_imu_calib.busy == 0U)
+    {
+        return;
+    }
+
+    if (s_imu_calib.mode == IMU_CALIB_MODE_GYRO)
+    {
+        ret = imu_calib_update_gyro_step();
+        if (ret > 0)
+        {
+            s_imu_calib.busy = 0U;
+            s_imu_calib.mode = IMU_CALIB_MODE_IDLE;
+        }
+        else if (ret < 0)
+        {
+            printf("cal,gyro,fail,%lu,%lu\r\n",
+                   (unsigned long)s_imu_calib.gyro_valid_samples,
+                   (unsigned long)s_imu_calib.gyro_total_samples);
+            ICM42688_SetGyroBiasDps(s_imu_calib.gyro_prev_bias_dps[0],
+                                    s_imu_calib.gyro_prev_bias_dps[1],
+                                    s_imu_calib.gyro_prev_bias_dps[2],
+                                    s_imu_calib.gyro_prev_enabled);
+            s_imu_calib.busy = 0U;
+            s_imu_calib.mode = IMU_CALIB_MODE_IDLE;
+        }
+        return;
+    }
+
+    if (s_imu_calib.mode == IMU_CALIB_MODE_ACC6)
+    {
+        ret = imu_calib_update_acc6_step();
+        if (ret > 0)
+        {
+            s_imu_calib.busy = 0U;
+            s_imu_calib.mode = IMU_CALIB_MODE_IDLE;
+        }
+        else if (ret < 0)
+        {
+            printf("cal,acc6,fail,%lu,%u\r\n",
+                   (unsigned long)s_imu_calib.acc6_total_samples,
+                   (unsigned int)imu_calib_count_done_faces(s_imu_calib.acc6_done_mask));
+            s_imu_calib.busy = 0U;
+            s_imu_calib.mode = IMU_CALIB_MODE_IDLE;
+        }
+        return;
+    }
+
+    if (s_imu_calib.mode == IMU_CALIB_MODE_ALL)
+    {
+        if (s_imu_calib.all_stage == IMU_CALIB_ALL_STAGE_GYRO)
+        {
+            ret = imu_calib_update_gyro_step();
+            if (ret > 0)
+            {
+                s_imu_calib.all_stage = IMU_CALIB_ALL_STAGE_ACC6;
+                imu_calib_prepare_acc6_state();
+                printf("cal,all,stage,acc6\r\n");
+            }
+            else if (ret < 0)
+            {
+                printf("cal,all,fail,gyro\r\n");
+                ICM42688_SetGyroBiasDps(s_imu_calib.gyro_prev_bias_dps[0],
+                                        s_imu_calib.gyro_prev_bias_dps[1],
+                                        s_imu_calib.gyro_prev_bias_dps[2],
+                                        s_imu_calib.gyro_prev_enabled);
+                s_imu_calib.busy = 0U;
+                s_imu_calib.mode = IMU_CALIB_MODE_IDLE;
+                s_imu_calib.all_stage = IMU_CALIB_ALL_STAGE_NONE;
+            }
+            return;
+        }
+
+        if (s_imu_calib.all_stage == IMU_CALIB_ALL_STAGE_ACC6)
+        {
+            ret = imu_calib_update_acc6_step();
+            if (ret > 0)
+            {
+                uint8_t save_ok = IMUCalib_SaveCurrentToFlash();
+                printf("cal,all,ok,%u\r\n", (unsigned int)save_ok);
+                s_imu_calib.busy = 0U;
+                s_imu_calib.mode = IMU_CALIB_MODE_IDLE;
+                s_imu_calib.all_stage = IMU_CALIB_ALL_STAGE_NONE;
+            }
+            else if (ret < 0)
+            {
+                printf("cal,all,fail,acc6\r\n");
+                s_imu_calib.busy = 0U;
+                s_imu_calib.mode = IMU_CALIB_MODE_IDLE;
+                s_imu_calib.all_stage = IMU_CALIB_ALL_STAGE_NONE;
+            }
+            return;
+        }
+    }
+}
+
+void IMUCalib_CommandPoll(void)
+{
+    uint8_t rx_buf[IMU_CALIB_CMD_READ_MAX];
+    uint32_t len;
+    uint32_t i;
+
+    len = debug_read_ring_buffer(rx_buf, sizeof(rx_buf));
+    if (len == 0U)
+    {
+        return;
+    }
+
+    for (i = 0U; i < len; i++)
+    {
+        char c = (char)rx_buf[i];
+        if ((c == '\r') || (c == '\n'))
+        {
+            if (s_imu_calib.cmd_line_len > 0U)
+            {
+                s_imu_calib.cmd_line[s_imu_calib.cmd_line_len] = '\0';
+                imu_calib_process_command(s_imu_calib.cmd_line);
+                s_imu_calib.cmd_line_len = 0U;
+            }
+            continue;
+        }
+
+        if (((uint8_t)c < 32U) || ((uint8_t)c > 126U))
+        {
+            continue;
+        }
+
+        if (s_imu_calib.cmd_line_len < (IMU_CALIB_CMD_LINE_MAX - 1U))
+        {
+            s_imu_calib.cmd_line[s_imu_calib.cmd_line_len++] = c;
+        }
+        else
+        {
+            s_imu_calib.cmd_line_len = 0U;
+        }
     }
 }
 

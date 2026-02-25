@@ -73,7 +73,8 @@
 #define ICM42688_SIGN_GZ                     (-1.0f)
 #define ICM42688_SIGN_AX                      (1.0f)
 #define ICM42688_SIGN_AY                     (-1.0f)
-#define ICM42688_SIGN_AZ                     (-1.0f)
+/* AGENTS 约定: 静止平放 az≈-1g（比力，+Z 向下） */
+#define ICM42688_SIGN_AZ                      (1.0f)
 
 /* 传感器原始数据（寄存器直接读出的 LSB 值） */
 typedef struct ICM42688_RAW_DATA {
@@ -205,5 +206,9 @@ void ICM42688_Bias_Init(uint32 times);
 
 /* 读取一次传感器数据并完成单位换算 */
 void ICM42688_Get_Data(void);
+
+/* 软陀螺零偏设置/读取（dps） */
+void ICM42688_SetGyroBiasDps(float bx, float by, float bz, uint8 enable);
+void ICM42688_GetGyroBiasDps(float *bx, float *by, float *bz, uint8 *enable);
 
 #endif /* CODE_ICM42688_H_ */

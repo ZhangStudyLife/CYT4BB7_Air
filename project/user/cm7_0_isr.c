@@ -48,6 +48,7 @@ void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数
   
     IMU_Update_2kHz(); // 2kHz 更新 IMU 数据
     AccelCalibration_Update2kHz(); // 2kHz 更新加速度标定与预处理
+    IMUCalib_Update2kHz(); // 2kHz 校准状态机更新
     
 }
 

@@ -11,7 +11,6 @@ extern "C" {
 #endif
 
 /* ---------------- IMU 初始化参数（2kHz） ---------------- */
-#define IMU_BIAS_CALIBRATION_SAMPLES  (2000U)
 #define IMU_WARMUP_DISCARD_SAMPLES   (4000U)
 #define IMU_UPDATE_DT_SEC            (1.0f / IMU_SAMPLE_RATE_HZ)
 
@@ -20,10 +19,6 @@ extern "C" {
 #define IMU_SELFTEST_GYRO_MEAN_MAX_DPS   (8.0f)
 #define IMU_SELFTEST_ACC_MIN_G           (0.75f)
 #define IMU_SELFTEST_ACC_MAX_G           (1.25f)
-
-/* ---------------- 零偏验收参数 ---------------- */
-#define IMU_BIAS_VERIFY_SAMPLES          (400U)
-#define IMU_BIAS_VERIFY_MEAN_ABS_MAX_DPS (0.80f)
 
 extern IMUFilter_t g_imu_filter;
 extern MahonyAhrs_t g_mahony_ahrs;
@@ -40,4 +35,3 @@ uint8 IMU_Is_Ready(void);
 #endif
 
 #endif /* IMU_TOP_H_ */
-

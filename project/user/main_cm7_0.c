@@ -64,7 +64,7 @@ int main(void)
     // pos_est_init();         // 当前阶段先聚焦加速度校准，位置估计暂不启用
     crsf_init();               // CRSF 遥控协议初始化          
     AccelCalibration_Init(); // 加速度标定模块初始化
-    AccelCalibration_Start(); // 启动加速度标定
+    IMUCalib_Init(); // 读取Flash中的IMU校准参数并应用
     pit_us_init(PIT_CH0, 500); // PIT 定时器初始化 500us 中断周期 用于 IMU 2kHz 更新
     pit_ms_init(PIT_CH1, 10);  // 100Hz 节拍
 
@@ -78,10 +78,12 @@ int main(void)
             Height_Est_update_100HZ();
 
         }
+        IMUCalib_CommandPoll();
+
         float ax_level, ay_level, az_level;
         AccelCalibration_GetLevelAccelMps2(&ax_level, &ay_level, &az_level);
-        printf("%f,%f,%f\r\n", ax_level, ay_level, az_level);
-
+        printf("%f,%f,%f,%f,%f,%f,%f,%f,%f\r\n", ICM42688.gyro_x,  ICM42688.gyro_y,ICM42688.gyro_z,ICM42688.acc_x,  ICM42688.acc_y,ICM42688.acc_z,ax_level, ay_level, az_level);
+        system_delay_ms(20); // 20ms 延时 避免串口输出过快导致卡死
         // printf("%d,%f\r\n",g_height_est_mm, g_height_vz_mps); // 打印高度估计结果
         // VL53L1X_read_data(&VL53L1X_data); // 读取 VL53L1X 传感器数据
         // PMW3901_Update(); // 更新 PMW3901 光流传感器数据

@@ -2019,6 +2019,7 @@ void AccelCalibration_Update2kHz(void)
     {
         /* 无效样本处理：平滑衰减，防止积分突变 */
         g_accel_calibration.invalid_sample_count++;
+        g_accel_calibration.realtime_sample_valid = 0U;
 
         g_accel_calibration.accel_down_for_ekf_mps2 *= 0.98f;
         g_accel_calibration.accel_down_for_output_mps2 *= 0.99f;
@@ -2107,11 +2108,17 @@ void AccelCalibration_Update2kHz(void)
     /* 垂向积分（向上为正） */
     g_accel_calibration.vel_up_mps += (-g_accel_calibration.accel_down_for_ekf_mps2) * ACCEL_CALIBRATION_DT_S;
     g_accel_calibration.pos_up_m += g_accel_calibration.vel_up_mps * ACCEL_CALIBRATION_DT_S;
+    g_accel_calibration.realtime_sample_valid = 1U;
 }
 
 bool AccelCalibration_IsCalibrated(void)
 {
     return g_accel_calibration.is_calibrated;
+}
+
+uint8_t AccelCalibration_IsRealtimeDataValid(void)
+{
+    return g_accel_calibration.realtime_sample_valid;
 }
 
 float AccelCalibration_GetGravityMps2(void)
@@ -2178,6 +2185,22 @@ void AccelCalibration_GetBodyGyroDps(float *gx, float *gy, float *gz)
     if (gz != NULL)
     {
         *gz = g_accel_calibration.gyro_raw_body_dps[2];
+    }
+}
+
+void AccelCalibration_GetCorrectedSpecificForceG(float *ax_g, float *ay_g, float *az_g)
+{
+    if (ax_g != NULL)
+    {
+        *ax_g = g_accel_calibration.accel_corrected_body_g[0];
+    }
+    if (ay_g != NULL)
+    {
+        *ay_g = g_accel_calibration.accel_corrected_body_g[1];
+    }
+    if (az_g != NULL)
+    {
+        *az_g = g_accel_calibration.accel_corrected_body_g[2];
     }
 }
 

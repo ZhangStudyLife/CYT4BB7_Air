@@ -130,6 +130,13 @@ void MahonyAhrs_Update(MahonyAhrs_t *ahrs,
         ahrs->gyro_bias_z_static += MAHONY_YAW_BIAS_LP_ALPHA * (gz_rad - ahrs->gyro_bias_z_static);
     }
 
+#if (MAHONY_BIAS_XY_ENABLE == 0U)
+    ahrs->integral_fbx = 0.0f;
+    ahrs->integral_fby = 0.0f;
+    ahrs->gyro_bias_x = 0.0f;
+    ahrs->gyro_bias_y = 0.0f;
+#endif
+
     gx = gyro_x * DEGREES_TO_RADIANS - ahrs->gyro_bias_x;
     gy = gyro_y * DEGREES_TO_RADIANS - ahrs->gyro_bias_y;
     gz = gyro_z * DEGREES_TO_RADIANS - ahrs->gyro_bias_z_static;
@@ -181,12 +188,20 @@ void MahonyAhrs_Update(MahonyAhrs_t *ahrs,
         {
             float ki_eff = ahrs->ki * accel_trust;
 
+#if (MAHONY_BIAS_XY_ENABLE != 0U)
             ahrs->integral_fbx += ki_eff * half_ex * dt;
             ahrs->integral_fby += ki_eff * half_ey * dt;
             ahrs->integral_fbx = Mahony_Clamp(ahrs->integral_fbx, -MAHONY_BIAS_MAX_RAD_S, MAHONY_BIAS_MAX_RAD_S);
             ahrs->integral_fby = Mahony_Clamp(ahrs->integral_fby, -MAHONY_BIAS_MAX_RAD_S, MAHONY_BIAS_MAX_RAD_S);
             ahrs->gyro_bias_x = ahrs->integral_fbx;
             ahrs->gyro_bias_y = ahrs->integral_fby;
+#else
+            (void)ki_eff;
+            ahrs->integral_fbx = 0.0f;
+            ahrs->integral_fby = 0.0f;
+            ahrs->gyro_bias_x = 0.0f;
+            ahrs->gyro_bias_y = 0.0f;
+#endif
 
 #if MAHONY_YAW_CORR_ENABLE
             ahrs->integral_fbz += ki_eff * half_ez * dt;

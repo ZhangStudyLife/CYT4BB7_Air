@@ -87,6 +87,7 @@ typedef struct
 
     float gravity_mps2;
     uint32_t invalid_sample_count;
+    uint8_t realtime_sample_valid;
 } AccelCalibration_t;
 
 typedef struct
@@ -126,6 +127,7 @@ void AccelCalibration_SetImuToBodyMatrix(const float matrix[3][3]);
 void AccelCalibration_SetImuToBodyEulerDeg(float roll_deg, float pitch_deg, float yaw_deg);
 
 bool AccelCalibration_IsCalibrated(void);
+uint8_t AccelCalibration_IsRealtimeDataValid(void);
 float AccelCalibration_GetGravityMps2(void);
 
 float AccelCalibration_GetVerticalAccelUpMps2(void);
@@ -139,6 +141,8 @@ float AccelCalibration_GetAccelDownForOutputMps2(void);
 /* 机体系线加速度（去重力），静止应接近 0,0,0 */
 void AccelCalibration_GetBodyAccelMps2(float *ax, float *ay, float *az);
 void AccelCalibration_GetBodyGyroDps(float *gx, float *gy, float *gz);
+/* 机体系校准后比力（单位 g，未去重力），供姿态解算使用 */
+void AccelCalibration_GetCorrectedSpecificForceG(float *ax_g, float *ay_g, float *az_g);
 
 /* 地面水平系线加速度（去重力） */
 void AccelCalibration_GetLevelAccelMps2(float *ax_level, float *ay_level, float *az_level);

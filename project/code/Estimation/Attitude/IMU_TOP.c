@@ -1,4 +1,5 @@
 #include "IMU_TOP.h"
+#include "../Pos_Est/Accel_Calibration.h"
 #include "zf_common_headfile.h"
 #include <stdio.h>
 #include <math.h>
@@ -130,10 +131,73 @@ void IMU_Init_All(void)
 	s_imu_initializing = 0U;
 }
 
+static void IMU_SelectAhrsInput(float *gx, float *gy, float *gz,
+								float *ax, float *ay, float *az)
+{
+	float cal_gx = 0.0f;
+	float cal_gy = 0.0f;
+	float cal_gz = 0.0f;
+	float cal_ax = 0.0f;
+	float cal_ay = 0.0f;
+	float cal_az = 0.0f;
+	float accel_norm_g;
+
+	if ((gx == 0) || (gy == 0) || (gz == 0) ||
+		(ax == 0) || (ay == 0) || (az == 0))
+	{
+		return;
+	}
+
+	/* 默认使用当前滤波值，保证启动与未校准阶段正常工作 */
+	*gx = g_imu_filter.gyro_filt_x;
+	*gy = g_imu_filter.gyro_filt_y;
+	*gz = g_imu_filter.gyro_filt_z;
+	*ax = g_imu_filter.acc_filt_x;
+	*ay = g_imu_filter.acc_filt_y;
+	*az = g_imu_filter.acc_filt_z;
+
+	/* 校准未完成、校准忙、或本帧校准数据无效时，不切换姿态输入源 */
+	if ((0U == AccelCalibration_IsCalibrated()) ||
+		(0U == AccelCalibration_IsRealtimeDataValid()) ||
+		(0U != IMUCalib_IsBusy()))
+	{
+		return;
+	}
+
+	AccelCalibration_GetBodyGyroDps(&cal_gx, &cal_gy, &cal_gz);
+	AccelCalibration_GetCorrectedSpecificForceG(&cal_ax, &cal_ay, &cal_az);
+
+	if ((0U == IMU_IsFiniteFloat(cal_gx)) || (0U == IMU_IsFiniteFloat(cal_gy)) || (0U == IMU_IsFiniteFloat(cal_gz)) ||
+		(0U == IMU_IsFiniteFloat(cal_ax)) || (0U == IMU_IsFiniteFloat(cal_ay)) || (0U == IMU_IsFiniteFloat(cal_az)))
+	{
+		return;
+	}
+
+	accel_norm_g = sqrtf(cal_ax * cal_ax + cal_ay * cal_ay + cal_az * cal_az);
+	if ((accel_norm_g < 0.30f) || (accel_norm_g > 1.70f))
+	{
+		return;
+	}
+
+	/* 姿态解算优先使用校准后机体系数据，减小长时静止漂移 */
+	*gx = cal_gx;
+	*gy = cal_gy;
+	*gz = cal_gz;
+	*ax = cal_ax;
+	*ay = cal_ay;
+	*az = cal_az;
+}
+
 void IMU_Update_2kHz(void)
 {
 	/* 步骤1: 从 ICM42688 读取一帧原始传感器数据 */
 	const float dt_s = IMU_UPDATE_DT_SEC;
+	float ahrs_gx;
+	float ahrs_gy;
+	float ahrs_gz;
+	float ahrs_ax;
+	float ahrs_ay;
+	float ahrs_az;
 	if ((0U == g_imu_ready) && (0U == s_imu_initializing))
 	{
 		return;
@@ -151,12 +215,13 @@ void IMU_Update_2kHz(void)
 
 	/* 步骤3: 更新 IMU 滤波器（低通/陷波等） */
 	IMUFilter_Update(&g_imu_filter);
+	IMU_SelectAhrsInput(&ahrs_gx, &ahrs_gy, &ahrs_gz, &ahrs_ax, &ahrs_ay, &ahrs_az);
 
 	/* 步骤4: 使用滤波后的陀螺和加速度数据进行 Mahony 姿态更新 */
 	MahonyAhrs_Update(
 		&g_mahony_ahrs,
-		g_imu_filter.gyro_filt_x, g_imu_filter.gyro_filt_y, g_imu_filter.gyro_filt_z,
-		g_imu_filter.acc_filt_x, g_imu_filter.acc_filt_y, g_imu_filter.acc_filt_z,
+		ahrs_gx, ahrs_gy, ahrs_gz,
+		ahrs_ax, ahrs_ay, ahrs_az,
 		dt_s);
 
 	/* 步骤5: 计算欧拉角（单位: 度）并缓存 */

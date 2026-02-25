@@ -35,6 +35,8 @@
 #define MAHONY_BIAS_LEARN_MAX_GYRO_DPS      25.0f
 #define MAHONY_BIAS_LEARN_MAX_ACC_ERR_G     0.20f
 #define MAHONY_BIAS_MAX_RAD_S               0.25f
+/* 0: 禁止 x/y 偏置积分学习，降低长时静止 roll/pitch 漂移 */
+#define MAHONY_BIAS_XY_ENABLE               (0U)
 #define MAHONY_YAW_CORR_ENABLE              (0U)
 #define MAHONY_STATIC_GYRO_DPS_TH           1.5f
 #define MAHONY_STATIC_ACC_ERR_G_TH          0.08f

@@ -1005,6 +1005,27 @@ static uint8_t imu_calib_all_faces_done(void)
     return (s_imu_calib.acc6_done_mask == (uint8_t)((1U << IMU_CALIB_FACE_NUM) - 1U)) ? 1U : 0U;
 }
 
+static const char *imu_calib_face_name(uint8_t face_idx)
+{
+    switch (face_idx)
+    {
+    case IMU_CALIB_FACE_X_POS:
+        return "front";
+    case IMU_CALIB_FACE_X_NEG:
+        return "back";
+    case IMU_CALIB_FACE_Y_POS:
+        return "right";
+    case IMU_CALIB_FACE_Y_NEG:
+        return "left";
+    case IMU_CALIB_FACE_Z_POS:
+        return "down";
+    case IMU_CALIB_FACE_Z_NEG:
+        return "up";
+    default:
+        return "unknown";
+    }
+}
+
 static int32_t imu_calib_update_gyro_step(void)
 {
     float gx = g_imu_filter.gyro_filt_x;
@@ -1237,8 +1258,8 @@ static int32_t imu_calib_update_acc6_step(void)
     {
         if (s_imu_calib.acc6_face_hold_delay_samples == 0U)
         {
-            printf("cal,acc6,face_hold_start,%u,%u\r\n",
-                   (unsigned int)face_idx,
+            printf("cal,acc6,face_hold_start,%s,%u\r\n",
+                   imu_calib_face_name(face_idx),
                    (unsigned int)IMU_CALIB_ACC6_FACE_HOLD_DELAY_SAMPLES);
         }
 
@@ -1252,8 +1273,8 @@ static int32_t imu_calib_update_acc6_step(void)
                     s_imu_calib.acc6_face_hold_progress_bucket = hold_bucket;
                     if ((hold_bucket >= 1U) && (hold_bucket <= 3U))
                     {
-                        printf("cal,acc6,face_hold_progress,%u,%u,%u,%u\r\n",
-                               (unsigned int)face_idx,
+                        printf("cal,acc6,face_hold_progress,%s,%u,%u,%u\r\n",
+                               imu_calib_face_name(face_idx),
                                (unsigned int)(hold_bucket * 25U),
                                (unsigned int)s_imu_calib.acc6_face_hold_delay_samples,
                                (unsigned int)IMU_CALIB_ACC6_FACE_HOLD_DELAY_SAMPLES);
@@ -1266,7 +1287,7 @@ static int32_t imu_calib_update_acc6_step(void)
         if (s_imu_calib.acc6_face_hold_progress_bucket < 4U)
         {
             s_imu_calib.acc6_face_hold_progress_bucket = 4U;
-            printf("cal,acc6,face_hold_done,%u\r\n", (unsigned int)face_idx);
+            printf("cal,acc6,face_hold_done,%s\r\n", imu_calib_face_name(face_idx));
         }
     }
 
@@ -1276,7 +1297,7 @@ static int32_t imu_calib_update_acc6_step(void)
     {
         s_imu_calib.acc6_collect_face = face;
         s_imu_calib.acc6_collect_progress_bucket = 0U;
-        printf("cal,acc6,face_collect_start,%u\r\n", (unsigned int)face_idx);
+        printf("cal,acc6,face_collect_start,%s\r\n", imu_calib_face_name(face_idx));
     }
 
     s_imu_calib.acc6_face_sum[face_idx][0] += accel_body_g[0];
@@ -1301,8 +1322,8 @@ static int32_t imu_calib_update_acc6_step(void)
             s_imu_calib.acc6_collect_progress_bucket = face_bucket;
             if ((face_bucket >= 1U) && (face_bucket <= 3U))
             {
-                printf("cal,acc6,face_progress,%u,%u,%lu,%u\r\n",
-                       (unsigned int)face_idx,
+                printf("cal,acc6,face_progress,%s,%u,%lu,%u\r\n",
+                       imu_calib_face_name(face_idx),
                        (unsigned int)(face_bucket * 25U),
                        (unsigned long)n,
                        (unsigned int)IMU_CALIB_ACC6_FACE_TARGET_SAMPLES);
@@ -1321,8 +1342,8 @@ static int32_t imu_calib_update_acc6_step(void)
         if ((std_dom > IMU_CALIB_ACC6_DOM_STD_MAX_G) ||
             (std_all_max > IMU_CALIB_ACC6_AXIS_STD_MAX_G))
         {
-            printf("cal,acc6,face_fail,%u,%f,%f,%f,%f\r\n",
-                   (unsigned int)face_idx, std_dom, std_x, std_y, std_z);
+            printf("cal,acc6,face_fail,%s,%f,%f,%f,%f\r\n",
+                   imu_calib_face_name(face_idx), std_dom, std_x, std_y, std_z);
             return -1;
         }
 
@@ -1334,8 +1355,8 @@ static int32_t imu_calib_update_acc6_step(void)
         s_imu_calib.acc6_static_stable_samples = 0U;
         s_imu_calib.acc6_collect_face = -1;
         s_imu_calib.acc6_collect_progress_bucket = 0U;
-        printf("cal,acc6,face_done,%u,%lu,%f,%f\r\n",
-               (unsigned int)face_idx,
+        printf("cal,acc6,face_done,%s,%lu,%f,%f\r\n",
+               imu_calib_face_name(face_idx),
                (unsigned long)s_imu_calib.acc6_face_samples[face_idx],
                std_dom,
                std_all_max);
@@ -1437,8 +1458,8 @@ static int32_t imu_calib_update_acc6_step(void)
                 (off_1 > IMU_CALIB_ACC6_POST_OFF_AXIS_MAX_G) ||
                 (off_2 > IMU_CALIB_ACC6_POST_OFF_AXIS_MAX_G))
             {
-                printf("cal,acc6,post_fail,%u,%f,%f,%f,%f\r\n",
-                       (unsigned int)face_idx, norm_err, dom_err, off_1, off_2);
+                printf("cal,acc6,post_fail,%s,%f,%f,%f,%f\r\n",
+                       imu_calib_face_name(face_idx), norm_err, dom_err, off_1, off_2);
                 return -1;
             }
         }

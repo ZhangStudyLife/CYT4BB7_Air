@@ -82,7 +82,20 @@ int main(void)
 
         float ax_level, ay_level, az_level;
         AccelCalibration_GetLevelAccelMps2(&ax_level, &ay_level, &az_level);
-        printf("%f,%f,%f,%f,%f,%f,%f,%f,%f\r\n", ICM42688.gyro_x,  ICM42688.gyro_y,ICM42688.gyro_z,ICM42688.acc_x,  ICM42688.acc_y,ICM42688.acc_z,ax_level, ay_level, az_level);
+        printf("%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\r\n",
+             ICM42688.gyro_x,
+               ICM42688.gyro_y,
+               ICM42688.gyro_z,
+               ICM42688.acc_x,
+                 ICM42688.acc_y,
+                 ICM42688.acc_z,
+                 ax_level,
+                  ay_level,
+                   az_level,
+                   g_euler.roll,
+                    g_euler.pitch,
+                     g_euler.yaw
+                );
         system_delay_ms(20); // 20ms 延时 避免串口输出过快导致卡死
         // printf("%d,%f\r\n",g_height_est_mm, g_height_vz_mps); // 打印高度估计结果
         // VL53L1X_read_data(&VL53L1X_data); // 读取 VL53L1X 传感器数据

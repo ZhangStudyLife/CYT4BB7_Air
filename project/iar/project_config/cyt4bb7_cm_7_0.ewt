@@ -1518,6 +1518,18 @@
                 </file>
             </group>
             <group>
+                <name>Motor</name>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\Motor\Motor_Drive.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\Motor\Motor_Drive.h</name>
+                </file>
+                <configuration>
+                    <name>Debug</name>
+                </configuration>
+            </group>
+            <group>
                 <name>PMW3901</name>
                 <file>
                     <name>$PROJ_DIR$\..\..\code\HW_Drivers\PMW3901\PMW3901.c</name>

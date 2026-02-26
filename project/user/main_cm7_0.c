@@ -41,6 +41,7 @@
 #include "../code/Estimation/Attitude/IMU_TOP.h"
 #include "../code/Protocols/crsf/crsf.h"
 #include "../code/Estimation/Pos_Est/Accel_Calibration.h"
+#include "../code/HW_Drivers/Motor/Motor_Drive.h"
 // 打开新的工程或者工程移动了位置务必执行以下操作
 // 第一步 关闭上面所有打开的文件
 // 第二步 project->clean  等待下方进度条走完
@@ -67,8 +68,19 @@ int main(void)
     crsf_init();       // CRSF 遥控协议初始化
     AccelCalibration_Init();   // 加速度标定模块初始化
     IMUCalib_Init();           // 读取Flash中的IMU校准参数并应用
+    Motor_Init();              // 电机驱动初始化
     pit_us_init(PIT_CH0, 500); // PIT 定时器初始化 500us 中断周期
     pit_ms_init(PIT_CH1, 10);  // 100Hz 节拍
+    Motor_Enable();            // 解锁电机
+    Motor_SetThrottleAll((const int32[]){2000, 0, 0, 0});
+    system_delay_ms(3000);
+    Motor_SetThrottleAll((const int32[]){0, 2000, 0, 0});    
+    system_delay_ms(3000);
+    Motor_SetThrottleAll((const int32[]){0, 0, 2000, 0});    
+    system_delay_ms(3000);
+    Motor_SetThrottleAll((const int32[]){0, 0, 0, 2000});    
+    system_delay_ms(3000);
+    Motor_SetThrottleAll((const int32[]){0, 0, 0, 0});    
 
     while (true)
     {

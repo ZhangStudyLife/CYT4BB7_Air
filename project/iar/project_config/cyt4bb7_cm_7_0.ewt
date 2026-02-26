@@ -1502,6 +1502,12 @@
             <file>
                 <name>$PROJ_DIR$\..\..\code\FlightController\fc_start_crsf.h</name>
             </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\pid_core.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\pid_core.h</name>
+            </file>
             <configuration>
                 <name>Debug</name>
             </configuration>

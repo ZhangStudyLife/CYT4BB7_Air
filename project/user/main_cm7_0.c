@@ -74,16 +74,7 @@ int main(void)
     FC_START_CRSF_Init();     // 起飞流程状态机初始化
     pit_us_init(PIT_CH0, 500); // PIT 定时器初始化 500us 中断周期
     pit_ms_init(PIT_CH1, 10);  // 100Hz 节拍
-    // Motor_Enable();            // 解锁电机
-    // Motor_SetThrottleAll((const int32[]){2000, 0, 0, 0});
-    // system_delay_ms(3000);
-    // Motor_SetThrottleAll((const int32[]){0, 2000, 0, 0});    
-    // system_delay_ms(3000);
-    // Motor_SetThrottleAll((const int32[]){0, 0, 2000, 0});    
-    // system_delay_ms(3000);
-    // Motor_SetThrottleAll((const int32[]){0, 0, 0, 2000});    
-    // system_delay_ms(3000);
-    // Motor_SetThrottleAll((const int32[]){0, 0, 0, 0});    
+ 
 
     while (true)
     {

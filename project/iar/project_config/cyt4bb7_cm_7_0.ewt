@@ -1495,6 +1495,18 @@
             </group>
         </group>
         <group>
+            <name>FlightController</name>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_start_crsf.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_start_crsf.h</name>
+            </file>
+            <configuration>
+                <name>Debug</name>
+            </configuration>
+        </group>
+        <group>
             <name>HW_Drivers</name>
             <group>
                 <name>BMP388</name>

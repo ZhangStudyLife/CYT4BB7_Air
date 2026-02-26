@@ -42,6 +42,7 @@
 #include "../code/Protocols/crsf/crsf.h"
 #include "../code/Estimation/Pos_Est/Accel_Calibration.h"
 #include "../code/HW_Drivers/Motor/Motor_Drive.h"
+#include "../code/FlightController/fc_start_crsf.h"
 // 打开新的工程或者工程移动了位置务必执行以下操作
 // 第一步 关闭上面所有打开的文件
 // 第二步 project->clean  等待下方进度条走完
@@ -54,6 +55,7 @@
 volatile uint16 g_tick_2000HZ = 0U;
 volatile uint8 g_tick_100HZ = 0U;
 static uint8 s_tick_div_pos_250hz = 0U;
+static uint8 s_tick_div_fc_start_10hz = 0U;
 
 int main(void)
 {
@@ -69,18 +71,19 @@ int main(void)
     AccelCalibration_Init();   // 加速度标定模块初始化
     IMUCalib_Init();           // 读取Flash中的IMU校准参数并应用
     Motor_Init();              // 电机驱动初始化
+    FC_START_CRSF_Init();     // 起飞流程状态机初始化
     pit_us_init(PIT_CH0, 500); // PIT 定时器初始化 500us 中断周期
     pit_ms_init(PIT_CH1, 10);  // 100Hz 节拍
-    Motor_Enable();            // 解锁电机
-    Motor_SetThrottleAll((const int32[]){2000, 0, 0, 0});
-    system_delay_ms(3000);
-    Motor_SetThrottleAll((const int32[]){0, 2000, 0, 0});    
-    system_delay_ms(3000);
-    Motor_SetThrottleAll((const int32[]){0, 0, 2000, 0});    
-    system_delay_ms(3000);
-    Motor_SetThrottleAll((const int32[]){0, 0, 0, 2000});    
-    system_delay_ms(3000);
-    Motor_SetThrottleAll((const int32[]){0, 0, 0, 0});    
+    // Motor_Enable();            // 解锁电机
+    // Motor_SetThrottleAll((const int32[]){2000, 0, 0, 0});
+    // system_delay_ms(3000);
+    // Motor_SetThrottleAll((const int32[]){0, 2000, 0, 0});    
+    // system_delay_ms(3000);
+    // Motor_SetThrottleAll((const int32[]){0, 0, 2000, 0});    
+    // system_delay_ms(3000);
+    // Motor_SetThrottleAll((const int32[]){0, 0, 0, 2000});    
+    // system_delay_ms(3000);
+    // Motor_SetThrottleAll((const int32[]){0, 0, 0, 0});    
 
     while (true)
     {
@@ -110,6 +113,12 @@ int main(void)
             Height_Est_Update_100HZ();
             Pos_Est_Update_100HZ();
             CRSF_Update_100HZ();
+            s_tick_div_fc_start_10hz++;
+            if (s_tick_div_fc_start_10hz >= 10U)
+            {
+                s_tick_div_fc_start_10hz = 0U;
+                FC_START_CRSF_Update();
+            }
             run_100hz = 1U;
         }
 
@@ -123,14 +132,16 @@ int main(void)
             {
                 s_pos_print_div = 0U;
                 // ch0~ch16: raw_dx,raw_dy,squal,gate,roll,pitch,height,corr_x,corr_y,flow_vx,flow_vy,bias_x,bias_y,pos_x,pos_y,vel_x,vel_y
-                printf("%f,%f,%f,%f\r\n",
-                       g_pos_est_output.position_x_m,
-                       g_pos_est_output.position_y_m,
-                       g_pos_est_output.velocity_x_mps,
-                       g_pos_est_output.velocity_y_mps);
+                FC_START_CRSF_state_e state = FC_START_CRSF_Get_State();
+                FC_START_CRSF_flight_mode_e mode = FC_START_CRSF_Get_Flight_Mode();
+                printf("%d,%d\r\n",
+                       state,
+                       mode);
             }
         }
     }
 }
 
 // **************************** 代码区域 ****************************
+
+

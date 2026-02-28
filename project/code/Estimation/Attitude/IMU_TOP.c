@@ -1,5 +1,4 @@
 #include "IMU_TOP.h"
-#include "../Pos_Est/Accel_Calibration.h"
 #include "zf_common_headfile.h"
 #include <stdio.h>
 #include <math.h>
@@ -129,7 +128,7 @@ void IMU_Init_All(void)
 	s_imu_initializing = 0U;
 }
 
-static void IMU_SelectAhrsInput(float *gx, float *gy, float *gz,
+void IMU_SelectAhrsInput(float *gx, float *gy, float *gz,
 								float *ax, float *ay, float *az)
 {
 	float cal_gx = 0.0f;

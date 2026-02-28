@@ -1,5 +1,5 @@
 #include "TOF_data.h"
-#include "../Attitude/IMU_TOP.h"
+#include "zf_common_headfile.h"
 
 #define TOF_CH2_VALID_MASK               (1U << 0)
 #define TOF_CH3_VALID_MASK               (1U << 1)

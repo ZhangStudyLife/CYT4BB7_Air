@@ -27,7 +27,7 @@
  * SOFTWARE.
  */
 
-#include "icm42688.h"
+#include "ICM42688.h"
 
 /*
  * ICM42688 默认配置（2kHz）

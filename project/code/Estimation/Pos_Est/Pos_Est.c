@@ -1,9 +1,5 @@
 #include "Pos_Est.h"
-
-#include "../Height_Est/Height_Est.h"
-#include "../Attitude/IMU_TOP.h"
-#include "Accel_Calibration.h"
-#include "../../HW_Drivers/PMW3901/PMW3901.h"
+#include "zf_common_headfile.h"
 #include <math.h>
 
 typedef struct

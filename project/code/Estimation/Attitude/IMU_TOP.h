@@ -26,9 +26,12 @@ extern MahonyAhrs_Euler_t g_euler;
 extern uint8 g_imu_ready;
 extern uint32 g_imu_update_count;
 
+void IMU_SelectAhrsInput(float *gx, float *gy, float *gz,
+								float *ax, float *ay, float *az);
 void IMU_Init_All(void);
 void IMU_Update_2000HZ(void);
 uint8 IMU_Is_Ready(void);
+
 
 #ifdef __cplusplus
 }

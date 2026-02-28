@@ -1,7 +1,5 @@
 #include "crsf.h"
-#include "zf_driver_uart.h"
-#include "zf_driver_timer.h"
-#include "../../Estimation/Attitude/IMU_TOP.h"
+#include "zf_common_headfile.h"
 
 #define CRSF_UART_INDEX        (UART_2)
 #define CRSF_UART_TX_PIN       (UART2_TX_P10_1)

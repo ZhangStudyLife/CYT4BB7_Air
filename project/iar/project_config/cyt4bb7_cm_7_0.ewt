@@ -1497,6 +1497,18 @@
         <group>
             <name>FlightController</name>
             <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_loop.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_loop.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_params.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_params.h</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\..\..\code\FlightController\fc_start_crsf.c</name>
             </file>
             <file>

@@ -41,6 +41,7 @@
 #include "../code/Protocols/crsf/crsf.h"
 #include "../code/Estimation/Pos_Est/Pos_Est.h"
 #include "../code/Estimation/Pos_Est/Accel_Calibration.h"
+extern volatile uint32 tick_500us_cnt;
 extern volatile uint16 g_tick_2000HZ;
 extern volatile uint8 g_tick_100HZ;
 // **************************** PIT中断函数 ****************************
@@ -51,6 +52,7 @@ void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数
     {
         g_tick_2000HZ++;
     }
+    tick_500us_cnt++;
 }
 
 void pit0_ch1_isr()                     // 定时器通道 1 周期中断服务函数      

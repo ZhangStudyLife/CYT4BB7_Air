@@ -98,7 +98,7 @@ typedef struct
 
 /* ======================== 全局状态变量 ======================== */
 extern motor_state_t g_motor_state;
-
+extern motor_mixer_input_t g_motor_cmd;
 /* ======================== 函数接口 ======================== */
 
 /**

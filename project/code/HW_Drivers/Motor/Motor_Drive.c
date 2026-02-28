@@ -53,7 +53,7 @@ static const int32 MOTOR_MIX_MATRIX[MOTOR_NUM][3] = {
 
 /* ======================== 全局状态变量 ======================== */
 motor_state_t g_motor_state = {0};
-
+motor_mixer_input_t g_motor_cmd = {0};
 /* ======================== 内部辅助函数 ======================== */
 
 /**

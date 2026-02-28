@@ -1,4 +1,4 @@
-#include "pmw3901.h"
+#include "PMW3901.h"
 
 #define PMW3901_REG_PRODUCT_ID         (0x00U)
 #define PMW3901_REG_POWER_RST          (0x3AU)

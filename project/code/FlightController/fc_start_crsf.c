@@ -1,7 +1,5 @@
 #include "fc_start_crsf.h"
-
-#include "../HW_Drivers/Motor/Motor_Drive.h"
-#include "../Protocols/crsf/crsf.h"
+#include "zf_common_headfile.h"
 
 #define FC_START_CRSF_TASK_PERIOD_MS (100U)
 #define FC_START_CRSF_TAKEOFF_PAIR1_RAMP_MS (800U)
@@ -257,6 +255,8 @@ static void FC_START_CRSF_StateMachine_Update(void)
     case FC_START_CRSF_STATE_FLYING:
         FC_START_CRSF_UpdateModeFromCH6();
         FC_START_CRSF_RunFlightModeHook();
+        // int32_t motor_throttl[4] = {2900, 2900, 2900, 2900};
+        // Motor_SetThrottleAll(motor_throttl);
         if (s_landing_request != 0U)
         {
             s_fc_start_state = FC_START_CRSF_STATE_LANDING;

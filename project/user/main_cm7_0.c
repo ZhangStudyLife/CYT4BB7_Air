@@ -34,15 +34,7 @@
  ********************************************************************************************************************/
 
 #include "zf_common_headfile.h"
-#include "../code/HW_Drivers/ICM42688/ICM42688.h"
-#include "../code/HW_Drivers/PMW3901/PMW3901.h"
-#include "../code/Estimation/Height_Est/Height_Est.h"
-#include "../code/Estimation/Pos_Est/Pos_Est.h"
-#include "../code/Estimation/Attitude/IMU_TOP.h"
-#include "../code/Protocols/crsf/crsf.h"
-#include "../code/Estimation/Pos_Est/Accel_Calibration.h"
-#include "../code/HW_Drivers/Motor/Motor_Drive.h"
-#include "../code/FlightController/fc_start_crsf.h"
+
 // 打开新的工程或者工程移动了位置务必执行以下操作
 // 第一步 关闭上面所有打开的文件
 // 第二步 project->clean  等待下方进度条走完
@@ -52,6 +44,7 @@
 // 本例程是开源库空工程 可用作移植或者测试各类内外设
 
 // **************************** 代码区域 ****************************
+volatile uint32 tick_500us_cnt = 0U;
 volatile uint16 g_tick_2000HZ = 0U;
 volatile uint8 g_tick_100HZ = 0U;
 static uint8 s_tick_div_pos_250hz = 0U;
@@ -70,6 +63,8 @@ int main(void)
     crsf_init();       // CRSF 遥控协议初始化
     AccelCalibration_Init();   // 加速度标定模块初始化
     IMUCalib_Init();           // 读取Flash中的IMU校准参数并应用
+    FC_Params_Init();          // 飞控参数初始化
+    FC_Loop_Init();            // 飞控主循环相关资源初始化
     Motor_Init();              // 电机驱动初始化
     FC_START_CRSF_Init();     // 起飞流程状态机初始化
     pit_us_init(PIT_CH0, 500); // PIT 定时器初始化 500us 中断周期
@@ -87,7 +82,7 @@ int main(void)
             IMU_Update_2000HZ();
             AccelCalibration_Update_2000HZ();
             IMUCalib_Update_2000HZ();
-
+            FC_Loop_2000Hz();
             s_tick_div_pos_250hz++;
             if (s_tick_div_pos_250hz >= 8U)
             {
@@ -103,6 +98,7 @@ int main(void)
             g_tick_100HZ--;
             Height_Est_Update_100HZ();
             Pos_Est_Update_100HZ();
+            crsf_send_25hz(); // CRSF 25Hz发送函数（100Hz调用一次）
             CRSF_Update_100HZ();
             s_tick_div_fc_start_10hz++;
             if (s_tick_div_fc_start_10hz >= 10U)
@@ -125,9 +121,13 @@ int main(void)
                 // ch0~ch16: raw_dx,raw_dy,squal,gate,roll,pitch,height,corr_x,corr_y,flow_vx,flow_vy,bias_x,bias_y,pos_x,pos_y,vel_x,vel_y
                 FC_START_CRSF_state_e state = FC_START_CRSF_Get_State();
                 FC_START_CRSF_flight_mode_e mode = FC_START_CRSF_Get_Flight_Mode();
-                printf("%d,%d\r\n",
-                       state,
-                       mode);
+                float gx, gy, gz,ax, ay, az;
+                IMU_SelectAhrsInput(&gx, &gy, &gz, &ax, &ay, &az);
+                printf("%f,%f,%f,%f,%f,%f\r\n",
+                       g_imu_filter.gyro_filt_x,
+                       g_imu_filter.gyro_filt_y,
+                       g_imu_filter.gyro_filt_z,
+                       gx, gy, gz);
             }
         }
     }

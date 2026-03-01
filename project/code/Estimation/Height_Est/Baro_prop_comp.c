@@ -34,6 +34,26 @@ static float Baro_PropComp_Clampf(float x, float x_min, float x_max)
     return x;
 }
 
+static float Baro_PropComp_GetGroundScale(void)
+{
+    float h_cm;
+    float ratio;
+    float smooth_ratio;
+    float ge_h_cm = s_param.ground_effect_height_cm;
+
+    if ((0U == g_tof_fused_valid) || (ge_h_cm <= 0.0f))
+    {
+        return 1.0f;
+    }
+
+    h_cm = 0.1f * (float)g_tof_fused_height_mm;
+    ratio = Baro_PropComp_Clampf(h_cm / ge_h_cm, 0.0f, 1.0f);
+    smooth_ratio = ratio * ratio * (3.0f - 2.0f * ratio);
+
+    return s_param.ground_effect_scale +
+           (1.0f - s_param.ground_effect_scale) * smooth_ratio;
+}
+
 void Baro_PropComp_Init(void)
 {
     g_baro_prop_bias_hat_pa = 0.0f;
@@ -81,17 +101,7 @@ float Baro_PropComp_Apply(float pressure_pa, uint8 prop_spinning, float dt_s)
 
     if (0U != prop_spinning)
     {
-        target_bias = s_param.bias_on_pa;
-
-        /*
-         * 近地时存在气垫/遮挡扰动，减弱补偿强度，避免高度突变。
-         * TOF 无效时保持原补偿目标。
-         */
-        if ((0U != g_tof_fused_valid) &&
-            ((float)g_tof_fused_height_mm < s_param.ground_effect_height_cm * 10.0f))
-        {
-            target_bias *= s_param.ground_effect_scale;
-        }
+        target_bias = s_param.bias_on_pa * Baro_PropComp_GetGroundScale();
     }
     else
     {
@@ -116,3 +126,4 @@ float Baro_PropComp_Apply(float pressure_pa, uint8 prop_spinning, float dt_s)
     g_baro_pressure_comp_pa = pressure_pa - g_baro_prop_bias_hat_pa;
     return g_baro_pressure_comp_pa;
 }
+

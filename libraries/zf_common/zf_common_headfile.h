@@ -117,8 +117,8 @@
 #include "../code/FlightController/fc_start_crsf.h"
 #include "../code/FlightController/fc_loop.h"
 #include "../code/FlightController/fc_params.h"
-
-
+#include "../code/HW_Drivers/Beep/Beep.h"
+#include "../code/Protocols/wifi_vofa/wifi_vofa.h"
 
 
 

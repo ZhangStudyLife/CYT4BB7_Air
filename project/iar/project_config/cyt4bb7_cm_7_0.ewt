@@ -1463,6 +1463,12 @@
                     <name>$PROJ_DIR$\..\..\code\Estimation\Height_Est\Baro_data.h</name>
                 </file>
                 <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Height_Est\Baro_prop_comp.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Height_Est\Baro_prop_comp.h</name>
+                </file>
+                <file>
                     <name>$PROJ_DIR$\..\..\code\Estimation\Height_Est\Height_Est.c</name>
                 </file>
                 <file>
@@ -1527,6 +1533,18 @@
         <group>
             <name>HW_Drivers</name>
             <group>
+                <name>Beep</name>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\Beep\Beep.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\Beep\Beep.h</name>
+                </file>
+                <configuration>
+                    <name>Debug</name>
+                </configuration>
+            </group>
+            <group>
                 <name>BMP388</name>
                 <file>
                     <name>$PROJ_DIR$\..\..\code\HW_Drivers\BMP388\BMP388.c</name>
@@ -1590,6 +1608,18 @@
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\..\code\Protocols\crsf\crsf.h</name>
+                </file>
+                <configuration>
+                    <name>Debug</name>
+                </configuration>
+            </group>
+            <group>
+                <name>wifi_vofa</name>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi_vofa\wifi_vofa.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi_vofa\wifi_vofa.h</name>
                 </file>
                 <configuration>
                     <name>Debug</name>

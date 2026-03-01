@@ -56,7 +56,9 @@ int main(void)
     clock_init(SYSTEM_CLOCK_250M); // 时钟配置及系统初始化<务必保留>
     debug_init();                  // 调试串口信息初始化
     // 此处编写用户代码 例如外设初始化代码等
-
+    Beep_Init();                   // 蜂鸣器初始化
+    pit_ms_init(PIT_CH2,10);     // 10ms周期的PIT定时器 用于Beep节奏驱动
+    wifi_vofa_Init();              // WiFi VOFA协议模块初始化
     Height_Est_Init();         // 高度估计初始化（TOF+Baro）
     PMW3901_Init();            // PMW3901 光流传感器初始化
     IMU_Init_All();            // ICM42688 IMU 初始化
@@ -161,8 +163,7 @@ int main(void)
                 //        (unsigned int)g_height_est_valid,
                 //        (unsigned int)g_height_est_source,
                 //        g_height_vz_mps);
-                // printf("%.3f,%.5f,%.5f\r\n", height_vel_out, g_height_vz_mps,
-                //        g_height_est_m);
+                wifi_vofa_JustFloat(4U, g_height_est_m, g_height_vz_mps, g_baro_pressure_filt_pa, (float)state);
             }
         }
     }

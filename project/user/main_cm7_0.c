@@ -90,6 +90,7 @@ int main(void)
             {
                 s_tick_div_fc_loop_500hz = 0U;
                 FC_Loop_500Hz();
+
             }
 
             FC_Loop_2000Hz();
@@ -145,27 +146,6 @@ int main(void)
                                        (state == FC_START_CRSF_STATE_FLYING))
                                           ? 1U
                                           : 0U;
-                // ch0~ch15: tick500us,state,prop_spin,raw_p_adc,raw_t_adc,press_raw_pa,press_lpf_pa,ref_pa,alt_raw_m,alt_lpf_m,tof_fused_mm,tof_fused_valid,height_m,height_valid,height_src,vz_mps
-                // printf("%lu,%u,%u,%lu,%lu,%.3f,%.3f,%.3f,%.4f,%.4f,%u,%u,%.4f,%u,%u,%.4f\r\n",
-                //        (unsigned long)tick_500us_cnt,
-                //        (unsigned int)state,
-                //        (unsigned int)prop_spinning,
-                //        (unsigned long)g_BMP388_data.raw_pressure,
-                //        (unsigned long)g_BMP388_data.raw_temperature,
-                //        g_baro_pressure_raw_pa,
-                //        g_baro_pressure_filt_pa,
-                //        g_baro_ref_pressure,
-                //        g_baro_altitude_raw_m,
-                //        g_baro_altitude,
-                //        (unsigned int)g_tof_fused_height_mm,
-                //        (unsigned int)g_tof_fused_valid,
-                //        g_height_est_m,
-                //        (unsigned int)g_height_est_valid,
-                //        (unsigned int)g_height_est_source,
-                //        g_height_vz_mps);
-                wifi_vofa_tx_stats_t stats;
-                wifi_vofa_GetTxStats(&stats);
-                wifi_vofa_JustFloat(6U, (double)stats.last_us, (double)stats.min_us, (double)stats.max_us, (double)stats.avg_us, (double)stats.ok_count, (double)stats.fail_count);
             }
         }
     }

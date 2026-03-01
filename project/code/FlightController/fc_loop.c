@@ -256,6 +256,14 @@ void FC_Loop_100Hz(void)
     tick_500us_cnt_last = tick_now;
     if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
     {
+        float ch0 = fc_clampf((float)CRSF_STD[0], -1000.0f, 1000.0f);
+        float ch1 = fc_clampf((float)CRSF_STD[1], -1000.0f, 1000.0f);
+        float ch2 = fc_clampf((float)CRSF_STD[2], -1000.0f, 1000.0f);
+
+        target_height_m = 0.1f + (ch2 + 1000.0f) * (1.2f / 2000.0f); /* CH0: 0.1m~1.3m */
+        roll_angle_target = ch0 * (20.0f / 1000.0f);                  /* roll>0 右倾 */
+        pitch_angle_target = -ch1 * (20.0f / 1000.0f);                /* pitch>0 抬头，前倾为负 */
+
         // FC_ThrTrim_Update_100Hz();
         // 飞机向上的时候, g_height_vz_mps > 0
         float height_vz_mps = g_height_vz_mps;
@@ -263,6 +271,9 @@ void FC_Loop_100Hz(void)
         
         height_vel_out = fc_clampf(height_vel_out, -2000.0f, 2000.0f);
     }
+
+
+
 }
 
 void FC_Loop_500Hz(void)
@@ -289,6 +300,8 @@ void FC_Loop_500Hz(void)
         roll_gyro_target = roll_ctrl;
         pitch_gyro_target = pitch_ctrl;
         yaw_gyro_target = 0; // 不闭环航向角，保持当前值
+                        wifi_vofa_JustFloat(11U, roll_angle_target,g_euler.roll,roll_angle_pid.p_term,roll_angle_pid.i_term,roll_angle_pid.d_term,
+                roll_gyro_target,g_imu_filter.gyro_filt_x,roll_gyro_pid.p_term,roll_gyro_pid.i_term,roll_gyro_pid.d_term);
     }
 }
 

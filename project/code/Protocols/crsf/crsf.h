@@ -1,6 +1,7 @@
 #ifndef CRSF_H
 #define CRSF_H
 
+#include "zf_common_headfile.h"
 #include <stdint.h>
 #define CRSF_CH_COUNT 10
 

@@ -13,7 +13,16 @@ extern pid_t pitch_angle_pid;
 extern pid_t yaw_angle_pid;
 extern pid_t height_pos_pid;
 extern pid_t height_vel_pid;
+extern float roll_gyro_target;
+extern float pitch_gyro_target;
+extern float yaw_gyro_target;
+extern float roll_angle_target;
+extern float pitch_angle_target;
+extern float yaw_angle_target;
 extern float height_vel_out;
+extern float height_pos_out;
+extern float target_height_m;
+
 /*
  * 主要是PID循环控制函数的声明，分别对应不同频率的控制环
  */

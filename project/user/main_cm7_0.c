@@ -50,28 +50,26 @@ volatile uint8 g_tick_100HZ = 0U;
 static uint8 s_tick_div_pos_250hz = 0U;
 static uint8 s_tick_div_fc_loop_500hz = 0U;
 static uint8 s_tick_div_fc_start_10hz = 0U;
-
-
+static uint8 s_tick_div_fc_start_50hz = 0U;
 int main(void)
 {
     clock_init(SYSTEM_CLOCK_250M); // 时钟配置及系统初始化<务必保留>
     debug_init();                  // 调试串口信息初始化
     // 此处编写用户代码 例如外设初始化代码等
 
-    Height_Est_Init(); // 高度估计初始化（TOF+Baro）
-    PMW3901_Init();    // PMW3901 光流传感器初始化
-    IMU_Init_All();    // ICM42688 IMU 初始化
-    Pos_Est_Init();    // 位置估计初始化
-    crsf_init();       // CRSF 遥控协议初始化
+    Height_Est_Init();         // 高度估计初始化（TOF+Baro）
+    PMW3901_Init();            // PMW3901 光流传感器初始化
+    IMU_Init_All();            // ICM42688 IMU 初始化
+    Pos_Est_Init();            // 位置估计初始化
+    crsf_init();               // CRSF 遥控协议初始化
     AccelCalibration_Init();   // 加速度标定模块初始化
     IMUCalib_Init();           // 读取Flash中的IMU校准参数并应用
     FC_Params_Init();          // 飞控参数初始化
     FC_Loop_Init();            // 飞控主循环相关资源初始化
     Motor_Init();              // 电机驱动初始化
-    FC_START_CRSF_Init();     // 起飞流程状态机初始化
+    FC_START_CRSF_Init();      // 起飞流程状态机初始化
     pit_us_init(PIT_CH0, 500); // PIT 定时器初始化 500us 中断周期
     pit_ms_init(PIT_CH1, 10);  // 100Hz 节拍
- 
 
     while (true)
     {
@@ -107,10 +105,17 @@ int main(void)
         {
             g_tick_100HZ--;
             Height_Est_Update_100HZ();
-            Pos_Est_Update_100HZ();
+            // Pos_Est_Update_100HZ();
             PMW3901_Update();
             crsf_send_25hz(); // CRSF 25Hz发送函数（100Hz调用一次）
             CRSF_Update_100HZ();
+            FC_Loop_100Hz();
+            s_tick_div_fc_start_50hz++;
+            if (s_tick_div_fc_start_50hz >= 2)
+            {
+                s_tick_div_fc_start_50hz = 0U;
+                FC_Loop_50Hz();
+            }
             s_tick_div_fc_start_10hz++;
             if (s_tick_div_fc_start_10hz >= 10U)
             {
@@ -135,7 +140,9 @@ int main(void)
                 s_pos_print_div = 0U;
                 FC_START_CRSF_state_e state = FC_START_CRSF_Get_State();
                 uint8 prop_spinning = ((state == FC_START_CRSF_STATE_TAKEOFF) ||
-                                       (state == FC_START_CRSF_STATE_FLYING)) ? 1U : 0U;
+                                       (state == FC_START_CRSF_STATE_FLYING))
+                                          ? 1U
+                                          : 0U;
                 // ch0~ch15: tick500us,state,prop_spin,raw_p_adc,raw_t_adc,press_raw_pa,press_lpf_pa,ref_pa,alt_raw_m,alt_lpf_m,tof_fused_mm,tof_fused_valid,height_m,height_valid,height_src,vz_mps
                 // printf("%lu,%u,%u,%lu,%lu,%.3f,%.3f,%.3f,%.4f,%.4f,%u,%u,%.4f,%u,%u,%.4f\r\n",
                 //        (unsigned long)tick_500us_cnt,
@@ -154,12 +161,11 @@ int main(void)
                 //        (unsigned int)g_height_est_valid,
                 //        (unsigned int)g_height_est_source,
                 //        g_height_vz_mps);
-                printf("%.4f\r\n",g_height_est_m);
+                // printf("%.3f,%.5f,%.5f\r\n", height_vel_out, g_height_vz_mps,
+                //        g_height_est_m);
             }
         }
     }
 }
 
 // **************************** 代码区域 ****************************
-
-

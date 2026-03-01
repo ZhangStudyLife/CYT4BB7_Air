@@ -163,7 +163,9 @@ int main(void)
                 //        (unsigned int)g_height_est_valid,
                 //        (unsigned int)g_height_est_source,
                 //        g_height_vz_mps);
-                wifi_vofa_JustFloat(4U, g_height_est_m, g_height_vz_mps, g_baro_pressure_filt_pa, (float)state);
+                wifi_vofa_tx_stats_t stats;
+                wifi_vofa_GetTxStats(&stats);
+                wifi_vofa_JustFloat(6U, (double)stats.last_us, (double)stats.min_us, (double)stats.max_us, (double)stats.avg_us, (double)stats.ok_count, (double)stats.fail_count);
             }
         }
     }

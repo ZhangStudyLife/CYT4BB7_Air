@@ -50,6 +50,7 @@ volatile uint8 g_tick_100HZ = 0U;
 static uint8 s_tick_div_pos_250hz = 0U;
 static uint8 s_tick_div_fc_start_10hz = 0U;
 
+
 int main(void)
 {
     clock_init(SYSTEM_CLOCK_250M); // 时钟配置及系统初始化<务必保留>
@@ -98,6 +99,7 @@ int main(void)
             g_tick_100HZ--;
             Height_Est_Update_100HZ();
             Pos_Est_Update_100HZ();
+            PMW3901_Update();
             crsf_send_25hz(); // CRSF 25Hz发送函数（100Hz调用一次）
             CRSF_Update_100HZ();
             s_tick_div_fc_start_10hz++;
@@ -111,23 +113,36 @@ int main(void)
 
         IMUCalib_CommandPoll();
 
-        if (run_100hz != 0U)
+        if ((run_100hz != 0U))
         {
             static uint8 s_pos_print_div = 0U;
             s_pos_print_div++;
             if (s_pos_print_div >= 2U)
             {
                 s_pos_print_div = 0U;
-                // ch0~ch16: raw_dx,raw_dy,squal,gate,roll,pitch,height,corr_x,corr_y,flow_vx,flow_vy,bias_x,bias_y,pos_x,pos_y,vel_x,vel_y
                 FC_START_CRSF_state_e state = FC_START_CRSF_Get_State();
-                FC_START_CRSF_flight_mode_e mode = FC_START_CRSF_Get_Flight_Mode();
-                float gx, gy, gz,ax, ay, az;
-                IMU_SelectAhrsInput(&gx, &gy, &gz, &ax, &ay, &az);
-                printf("%f,%f,%f,%f,%f,%f\r\n",
-                       g_imu_filter.gyro_filt_x,
-                       g_imu_filter.gyro_filt_y,
-                       g_imu_filter.gyro_filt_z,
-                       gx, gy, gz);
+                uint8 prop_spinning = ((state == FC_START_CRSF_STATE_TAKEOFF) ||
+                                       (state == FC_START_CRSF_STATE_FLYING)) ? 1U : 0U;
+                // ch0~ch15: tick500us,state,prop_spin,raw_p_adc,raw_t_adc,press_raw_pa,press_lpf_pa,ref_pa,alt_raw_m,alt_lpf_m,tof_fused_mm,tof_fused_valid,height_m,height_valid,height_src,vz_mps
+                // printf("%lu,%u,%u,%lu,%lu,%.3f,%.3f,%.3f,%.4f,%.4f,%u,%u,%.4f,%u,%u,%.4f\r\n",
+                //        (unsigned long)tick_500us_cnt,
+                //        (unsigned int)state,
+                //        (unsigned int)prop_spinning,
+                //        (unsigned long)g_BMP388_data.raw_pressure,
+                //        (unsigned long)g_BMP388_data.raw_temperature,
+                //        g_baro_pressure_raw_pa,
+                //        g_baro_pressure_filt_pa,
+                //        g_baro_ref_pressure,
+                //        g_baro_altitude_raw_m,
+                //        g_baro_altitude,
+                //        (unsigned int)g_tof_fused_height_mm,
+                //        (unsigned int)g_tof_fused_valid,
+                //        g_height_est_m,
+                //        (unsigned int)g_height_est_valid,
+                //        (unsigned int)g_height_est_source,
+                //        g_height_vz_mps);
+
+                printf("%d,%d\r\n",g_pmw3901_raw.deltaX,g_pmw3901_raw.deltaY);
             }
         }
     }

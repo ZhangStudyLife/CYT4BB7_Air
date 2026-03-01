@@ -14,6 +14,11 @@ extern "C" {
 
 extern float g_baro_ref_pressure;
 extern float g_baro_altitude;
+extern float g_baro_pressure_raw_pa;
+extern float g_baro_pressure_filt_pa;
+extern float g_baro_pressure_comp_pa;
+extern float g_baro_prop_bias_hat_pa;
+extern float g_baro_altitude_raw_m;
 extern uint8 g_baro_sample_new;
 
 void Baro_Init(void);

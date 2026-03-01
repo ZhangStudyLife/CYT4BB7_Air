@@ -1,4 +1,6 @@
 #include "Baro_data.h"
+#include "Baro_prop_comp.h"
+#include "../../FlightController/fc_start_crsf.h"
 
 #define BARO_PRESS_LPF_ALPHA            (0.26f)
 #define BARO_ALT_LPF_ALPHA_SLOW         (0.14f)
@@ -13,6 +15,9 @@
 
 float g_baro_ref_pressure = 0.0f;
 float g_baro_altitude = 0.0f;
+float g_baro_pressure_raw_pa = 0.0f;
+float g_baro_pressure_filt_pa = 0.0f;
+float g_baro_altitude_raw_m = 0.0f;
 uint8 g_baro_sample_new = 0U;
 
 static uint8 s_baro_inited = 0U;
@@ -159,9 +164,15 @@ void Baro_Init(void)
 
     g_baro_ref_pressure = 0.0f;
     g_baro_altitude = 0.0f;
+    g_baro_pressure_raw_pa = 0.0f;
+    g_baro_pressure_filt_pa = 0.0f;
+    g_baro_pressure_comp_pa = 0.0f;
+    g_baro_prop_bias_hat_pa = 0.0f;
+    g_baro_altitude_raw_m = 0.0f;
     g_baro_sample_new = 0U;
     s_baro_ref_valid = 0U;
     Baro_ClearFilterState();
+    Baro_PropComp_Init();
 
     if (BMP388_RET_OK != ret)
     {
@@ -189,12 +200,15 @@ void Baro_Calibrate(void)
     g_baro_sample_new = 0U;
     s_baro_ref_valid = 0U;
     Baro_ClearFilterState();
+    Baro_PropComp_Reset();
 
     for (i = 0U; i < BARO_CALIBRATION_SAMPLES; ++i)
     {
         if (BMP388_RET_OK == BMP388_update())
         {
             pressure_filtered_pa = Baro_FilterPressure(g_BMP388_data.pressure_pa);
+            g_baro_pressure_raw_pa = g_BMP388_data.pressure_pa;
+            g_baro_pressure_filt_pa = pressure_filtered_pa;
             pressure_sum += pressure_filtered_pa;
             ++valid_samples;
         }
@@ -209,6 +223,7 @@ void Baro_Calibrate(void)
     {
         g_baro_ref_pressure = pressure_sum / (float)valid_samples;
         g_baro_altitude = 0.0f;
+        g_baro_altitude_raw_m = 0.0f;
         s_baro_ref_valid = 1U;
         Baro_SeedFilterState(g_baro_ref_pressure);
     }
@@ -216,7 +231,10 @@ void Baro_Calibrate(void)
 
 void Baro_Update(void)
 {
+    FC_START_CRSF_state_e fc_state;
+    uint8 prop_spinning;
     float pressure_filtered_pa;
+    float pressure_compensated_pa;
     float altitude_raw_m;
     float abs_alt_m;
     float altitude_innov_m;
@@ -239,18 +257,30 @@ void Baro_Update(void)
         return;
     }
     pressure_filtered_pa = Baro_FilterPressure(g_BMP388_data.pressure_pa);
+    g_baro_pressure_raw_pa = g_BMP388_data.pressure_pa;
+    g_baro_pressure_filt_pa = pressure_filtered_pa;
+    g_baro_pressure_comp_pa = pressure_filtered_pa;
 
     if (0U == s_baro_ref_valid)
     {
         g_baro_ref_pressure = pressure_filtered_pa;
         g_baro_altitude = 0.0f;
+        g_baro_altitude_raw_m = 0.0f;
         s_baro_ref_valid = 1U;
         Baro_SeedFilterState(g_baro_ref_pressure);
         return;
     }
 
-    altitude_raw_m = (g_baro_ref_pressure - pressure_filtered_pa) * BARO_TO_HEIGHT_SCALE_FACTOR * 0.01f;
+    fc_state = FC_START_CRSF_Get_State();
+    prop_spinning = ((fc_state == FC_START_CRSF_STATE_TAKEOFF) ||
+                     (fc_state == FC_START_CRSF_STATE_FLYING)) ? 1U : 0U;
+
+    pressure_compensated_pa = Baro_PropComp_Apply(pressure_filtered_pa, prop_spinning, BARO_UPDATE_DT_SEC);
+    g_baro_pressure_comp_pa = pressure_compensated_pa;
+
+    altitude_raw_m = (g_baro_ref_pressure - pressure_compensated_pa) * BARO_TO_HEIGHT_SCALE_FACTOR * 0.01f;
     altitude_raw_m = Baro_ClampStep(altitude_raw_m, s_prev_alt_raw_m, BARO_ALT_STEP_LIMIT_M);
+    g_baro_altitude_raw_m = altitude_raw_m;
     s_prev_alt_raw_m = altitude_raw_m;
 
     altitude_innov_m = altitude_raw_m - s_alt_lpf_m;

@@ -48,6 +48,7 @@ volatile uint32 tick_500us_cnt = 0U;
 volatile uint16 g_tick_2000HZ = 0U;
 volatile uint8 g_tick_100HZ = 0U;
 static uint8 s_tick_div_pos_250hz = 0U;
+static uint8 s_tick_div_fc_loop_500hz = 0U;
 static uint8 s_tick_div_fc_start_10hz = 0U;
 
 
@@ -83,6 +84,14 @@ int main(void)
             IMU_Update_2000HZ();
             AccelCalibration_Update_2000HZ();
             IMUCalib_Update_2000HZ();
+
+            s_tick_div_fc_loop_500hz++;
+            if (s_tick_div_fc_loop_500hz >= 4U)
+            {
+                s_tick_div_fc_loop_500hz = 0U;
+                FC_Loop_500Hz();
+            }
+
             FC_Loop_2000Hz();
             s_tick_div_pos_250hz++;
             if (s_tick_div_pos_250hz >= 8U)
@@ -107,6 +116,10 @@ int main(void)
             {
                 s_tick_div_fc_start_10hz = 0U;
                 FC_START_CRSF_Update();
+                if (g_euler.roll > 20.0f || g_euler.roll < -20.0f || g_euler.pitch > 20.0f || g_euler.pitch < -20.0f)
+                {
+                    FC_START_CRSF_Trigger_Emergency_Stop();
+                }
             }
             run_100hz = 1U;
         }
@@ -141,8 +154,7 @@ int main(void)
                 //        (unsigned int)g_height_est_valid,
                 //        (unsigned int)g_height_est_source,
                 //        g_height_vz_mps);
-
-                printf("%d,%d\r\n",g_pmw3901_raw.deltaX,g_pmw3901_raw.deltaY);
+                printf("%.4f\r\n",g_height_est_m);
             }
         }
     }

@@ -264,7 +264,7 @@ void FC_Loop_100Hz(void)
         float ch1 = fc_clampf((float)CRSF_STD[1], -1000.0f, 1000.0f);
         float ch2 = fc_clampf((float)CRSF_STD[2], -1000.0f, 1000.0f);
 
-        target_height_m = (ch2 + 1000.0f) * (1.5f / 2000.0f); /* CH0: 0m~1.5m */
+        target_height_m = (ch2 + 1000.0f) * (1.5f / 2000.0f); /* CH2: 0m~1.5m */
         roll_angle_target = fc_clampf(ch0 * (20.0f / 1000.0f) + FC_ROLL_MECH_TRIM_DEG, -20.0f, 20.0f);   /* roll>0 右倾 */
         pitch_angle_target = fc_clampf(-ch1 * (20.0f / 1000.0f) + FC_PITCH_MECH_TRIM_DEG, -20.0f, 20.0f); /* pitch>0 抬头，前倾为负 */
 
@@ -272,12 +272,27 @@ void FC_Loop_100Hz(void)
         // 飞机向上的时候, g_height_vz_mps > 0
         float height_vz_mps = g_height_vz_mps;
         height_vel_out = PID_Update(&height_vel_pid, height_pos_out, height_vz_mps, dt);
-        
+
         height_vel_out = fc_clampf(height_vel_out, -2000.0f, 2000.0f);
+
+        wifi_vofa_JustFloat(16U,
+                            target_height_m,                                   // 1 目标高度(m)
+                            g_height_est_m,                                    // 2 融合高度(m)
+                            target_height_m - g_height_est_m,                  // 3 高度误差(m)
+                            height_pos_out,                                    // 4 高度环输出=速度目标(m/s)
+                            g_height_vz_mps,                                   // 5 融合垂直速度(m/s)
+                            height_pos_out - g_height_vz_mps,                  // 6 速度误差(m/s)
+                            height_vel_out,                                    // 7 速度环输出(油门增量)
+                            (float)g_fc_params.base_throttle + height_vel_out, // 8 总油门命令
+                            (float)g_tof2_height_mm * 0.001f,                  // 9 TOF2(m)
+                            (float)g_tof3_height_mm * 0.001f,                  // 10 TOF3(m)
+                            (float)g_tof_fused_height_mm * 0.001f,             // 11 TOF融合(m)
+                            (float)g_tof_fused_valid,                          // 12 TOF融合有效标志
+                            g_baro_altitude_raw_m,                             // 13 气压原始高度(m)
+                            g_baro_altitude,                                   // 14 气压滤波/补偿高度(m)
+                            g_baro_prop_bias_hat_pa,                           // 15 桨流补偿偏置(Pa)
+                            (float)g_height_est_source);                       // 16 融合来源
     }
-
-
-
 }
 
 void FC_Loop_500Hz(void)
@@ -304,19 +319,7 @@ void FC_Loop_500Hz(void)
         roll_gyro_target = roll_ctrl;
         pitch_gyro_target = pitch_ctrl;
         yaw_gyro_target = 0; // 不闭环航向角，保持当前值
-        /* ch0~ch15:
-         * roll_sp, roll_meas, pitch_sp, pitch_meas,
-         * roll_rate_sp, roll_rate_meas, pitch_rate_sp, pitch_rate_meas,
-         * roll_rate_p, roll_rate_i, roll_rate_d,
-         * pitch_rate_p, pitch_rate_i, pitch_rate_d,
-         * vz_mps, throttle_cmd
-         */
-        wifi_vofa_JustFloat(16U,
-                            roll_angle_target, g_euler.roll, pitch_angle_target, g_euler.pitch,
-                            roll_gyro_target, g_imu_filter.gyro_filt_x, pitch_gyro_target, g_imu_filter.gyro_filt_y,
-                            roll_gyro_pid.p_term, roll_gyro_pid.i_term, roll_gyro_pid.d_term,
-                            pitch_gyro_pid.p_term, pitch_gyro_pid.i_term, pitch_gyro_pid.d_term,
-                            g_height_vz_mps, (float)g_fc_params.base_throttle + height_vel_out);
+
     }
 }
 

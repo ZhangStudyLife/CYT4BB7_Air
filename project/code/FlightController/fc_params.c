@@ -23,40 +23,40 @@ void FC_Params_Init(void)
     g_fc_params.base_throttle = 3550; /* 悬停油门 */
 
     /* ===== Roll轴角速度环参�?===== */
-    g_fc_params.roll_gyro_kp = 4.5f;
+    g_fc_params.roll_gyro_kp = 2.0f;
     g_fc_params.roll_gyro_ki = 2.0f;
-    g_fc_params.roll_gyro_kd = 0.013f;
+    g_fc_params.roll_gyro_kd = 0.0f;
     g_fc_params.roll_gyro_kff = 0.0f;
     g_fc_params.roll_gyro_i_limit = 1400.0f;
     g_fc_params.roll_gyro_d_lpf = 0.08f;
 
     /* ===== Pitch轴角速度环参�?===== */
-    g_fc_params.pitch_gyro_kp = 4.5f;
+    g_fc_params.pitch_gyro_kp = 2.0f;
     g_fc_params.pitch_gyro_ki = 2.0f;
-    g_fc_params.pitch_gyro_kd = 0.013f;
+    g_fc_params.pitch_gyro_kd = 0.0f;
     g_fc_params.pitch_gyro_kff = 0.0f;
     g_fc_params.pitch_gyro_i_limit = 1400.0f;
     g_fc_params.pitch_gyro_d_lpf = 0.08f;
 
     /* ===== Yaw轴角速度环参�?===== */
-    g_fc_params.yaw_gyro_kp = 10.5f;
-    g_fc_params.yaw_gyro_ki = 5.5f;
+    g_fc_params.yaw_gyro_kp = 14.0f;
+    g_fc_params.yaw_gyro_ki = 8.0f;
     g_fc_params.yaw_gyro_kd = 0.0f;
     g_fc_params.yaw_gyro_kff = 0.0f;
     g_fc_params.yaw_gyro_i_limit = 1800.0f;
     g_fc_params.yaw_gyro_d_lpf = 0.18f;
 
     /* ===== roll轴角度环参数 ===== */
-    g_fc_params.roll_angle_kp = 3.5f;
-    g_fc_params.roll_angle_ki = 0.12f;
+    g_fc_params.roll_angle_kp = 4.0f;
+    g_fc_params.roll_angle_ki = 0.08f;
     g_fc_params.roll_angle_kd = 0.0f;
     g_fc_params.roll_angle_kff = 0.0f;
     g_fc_params.roll_angle_i_limit = 110.0f;
     g_fc_params.roll_angle_d_lpf = 0.0f;
 
     /* ===== pitch轴角度环参数 ===== */
-    g_fc_params.pitch_angle_kp = 3.5f;
-    g_fc_params.pitch_angle_ki = 0.12f;
+    g_fc_params.pitch_angle_kp = 4.0f;
+    g_fc_params.pitch_angle_ki = 0.08f;
     g_fc_params.pitch_angle_kd = 0.0f;
     g_fc_params.pitch_angle_kff = 0.0f;
     g_fc_params.pitch_angle_i_limit = 110.0f;

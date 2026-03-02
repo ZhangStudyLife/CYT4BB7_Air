@@ -20,8 +20,8 @@ float target_height_m = 1.0f;
 extern volatile uint32 tick_500us_cnt;
 
 
-#define FC_ROLL_MECH_TRIM_DEG  (0.0f)
-#define FC_PITCH_MECH_TRIM_DEG (0.0f)
+#define FC_ROLL_MECH_TRIM_DEG  (-2.0)
+#define FC_PITCH_MECH_TRIM_DEG (4.0f)
 
 static float fc_clampf(float value, float min_value, float max_value)
 {
@@ -233,32 +233,65 @@ void FC_Loop_Reset(void)
 
 void FC_Loop_50Hz(void)
 {
+    static uint8 s_height_pos_sp_inited = 0U;
     static uint32 tick_500us_cnt_last = 0;
     uint32 tick_now = tick_500us_cnt; // 读一次，缓存
     uint32 diff = tick_now - tick_500us_cnt_last;
     float dt = diff * 0.0005f; // 秒
+    float height_pos_out_raw;
+    float pos_sp_step_max;
 
     tick_500us_cnt_last = tick_now;
     if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
     {
-        FC_ThrTrim_Update_100Hz();
+        // FC_ThrTrim_Update_100Hz();
         float height_m = g_height_est_m;
-        height_pos_out = PID_Update(&height_pos_pid, target_height_m, height_m, dt);
-        height_pos_out = fc_clampf(height_pos_out, -0.35f, 0.35f);
+        height_pos_out_raw = PID_Update(&height_pos_pid, target_height_m, height_m, dt);
+        height_pos_out_raw = fc_clampf(height_pos_out_raw, -0.26f, 0.26f);
 
+        if (0U == s_height_pos_sp_inited)
+        {
+            height_pos_out = height_pos_out_raw;
+            s_height_pos_sp_inited = 1U;
+        }
+
+        /* 限制高度外环速度指令变化率，降低低频慢摆引起的内环激励 */
+        pos_sp_step_max = 0.050f; /* 50Hz下约 2.5 m/s^2 */
+        height_pos_out += fc_clampf(height_pos_out_raw - height_pos_out,
+                                    -pos_sp_step_max,
+                                    pos_sp_step_max);
+
+    }
+    else
+    {
+        s_height_pos_sp_inited = 0U;
+        height_pos_out = 0.0f;
     }
 }
 
 
 void FC_Loop_100Hz(void)
 {
+    static float s_height_vz_ctrl_lpf = 0.0f;
+    static float s_height_vel_out_lpf = 0.0f;
+    static uint8 s_height_vz_ctrl_lpf_inited = 0U;
+    static uint8 s_height_vel_out_lpf_inited = 0U;
     static uint32 tick_500us_cnt_last = 0;
+    FC_START_CRSF_state_e state;
+    float vz_lpf_alpha;
+    float out_lpf_alpha;
+    float height_vz_ctrl_mps;
+    float height_vel_out_raw;
+    float status_code;
+    const float vz_lpf_tau_s = 0.045f;
+    const float out_lpf_tau_s = 0.030f;
     uint32 tick_now = tick_500us_cnt; // 读一次，缓存
     uint32 diff = tick_now - tick_500us_cnt_last;
     float dt = diff * 0.0005f; // 秒
 
     tick_500us_cnt_last = tick_now;
-    if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
+    state = FC_START_CRSF_Get_State();
+    if (state == FC_START_CRSF_STATE_FLYING)
     {
         float ch0 = fc_clampf((float)CRSF_STD[0], -1000.0f, 1000.0f);
         float ch1 = fc_clampf((float)CRSF_STD[1], -1000.0f, 1000.0f);
@@ -268,30 +301,62 @@ void FC_Loop_100Hz(void)
         roll_angle_target = fc_clampf(ch0 * (20.0f / 1000.0f) + FC_ROLL_MECH_TRIM_DEG, -20.0f, 20.0f);   /* roll>0 右倾 */
         pitch_angle_target = fc_clampf(-ch1 * (20.0f / 1000.0f) + FC_PITCH_MECH_TRIM_DEG, -20.0f, 20.0f); /* pitch>0 抬头，前倾为负 */
 
-        // FC_ThrTrim_Update_100Hz();
-        // 飞机向上的时候, g_height_vz_mps > 0
-        float height_vz_mps = g_height_vz_mps;
-        height_vel_out = PID_Update(&height_vel_pid, height_pos_out, height_vz_mps, dt);
+        if (0U == s_height_vz_ctrl_lpf_inited)
+        {
+            s_height_vz_ctrl_lpf = g_height_vz_mps;
+            s_height_vz_ctrl_lpf_inited = 1U;
+        }
+        if (0U == s_height_vel_out_lpf_inited)
+        {
+            s_height_vel_out_lpf = height_vel_out;
+            s_height_vel_out_lpf_inited = 1U;
+        }
 
-        height_vel_out = fc_clampf(height_vel_out, -2000.0f, 2000.0f);
+        if (dt < 0.0001f)
+        {
+            dt = 0.01f;
+        }
+        vz_lpf_alpha = dt / (vz_lpf_tau_s + dt);
+        vz_lpf_alpha = fc_clampf(vz_lpf_alpha, 0.0f, 1.0f);
+        out_lpf_alpha = dt / (out_lpf_tau_s + dt);
+        out_lpf_alpha = fc_clampf(out_lpf_alpha, 0.0f, 1.0f);
+
+        s_height_vz_ctrl_lpf += vz_lpf_alpha * (g_height_vz_mps - s_height_vz_ctrl_lpf);
+        height_vz_ctrl_mps = s_height_vz_ctrl_lpf;
+
+        height_vel_out_raw = PID_Update(&height_vel_pid, height_pos_out, height_vz_ctrl_mps, dt);
+        height_vel_out_raw = fc_clampf(height_vel_out_raw, -1500.0f, 1500.0f);
+
+        s_height_vel_out_lpf += out_lpf_alpha * (height_vel_out_raw - s_height_vel_out_lpf);
+        height_vel_out = fc_clampf(s_height_vel_out_lpf, -1500.0f, 1500.0f);
+
+        status_code = (float)g_tof_fused_valid +
+                      10.0f * (float)g_height_est_valid +
+                      100.0f * (float)g_height_est_source;
 
         wifi_vofa_JustFloat(16U,
-                            target_height_m,                                   // 1 目标高度(m)
-                            g_height_est_m,                                    // 2 融合高度(m)
-                            target_height_m - g_height_est_m,                  // 3 高度误差(m)
-                            height_pos_out,                                    // 4 高度环输出=速度目标(m/s)
-                            g_height_vz_mps,                                   // 5 融合垂直速度(m/s)
-                            height_pos_out - g_height_vz_mps,                  // 6 速度误差(m/s)
-                            height_vel_out,                                    // 7 速度环输出(油门增量)
-                            (float)g_fc_params.base_throttle + height_vel_out, // 8 总油门命令
-                            (float)g_tof2_height_mm * 0.001f,                  // 9 TOF2(m)
-                            (float)g_tof3_height_mm * 0.001f,                  // 10 TOF3(m)
-                            (float)g_tof_fused_height_mm * 0.001f,             // 11 TOF融合(m)
-                            (float)g_tof_fused_valid,                          // 12 TOF融合有效标志
-                            g_baro_altitude_raw_m,                             // 13 气压原始高度(m)
-                            g_baro_altitude,                                   // 14 气压滤波/补偿高度(m)
-                            g_baro_prop_bias_hat_pa,                           // 15 桨流补偿偏置(Pa)
-                            (float)g_height_est_source);                       // 16 融合来源
+                            target_height_m,
+                            g_height_est_m,
+                            height_pos_out,
+                            g_height_vz_mps,
+                            height_vz_ctrl_mps,
+                            height_vel_pid.p_term,
+                            height_vel_pid.i_term,
+                            height_vel_pid.d_term,
+                            height_vel_out,
+                            (float)g_fc_params.base_throttle + height_vel_out,
+                            (float)g_tof2_height_mm * 0.001f,
+                            (float)g_tof3_height_mm * 0.001f,
+                            (float)g_tof_fused_height_mm * 0.001f,
+                            g_baro_altitude,
+                            g_baro_prop_bias_hat_pa,
+                            status_code);
+    }
+    else
+    {
+        s_height_vz_ctrl_lpf_inited = 0U;
+        s_height_vel_out_lpf_inited = 0U;
+        height_vel_out = 0.0f;
     }
 }
 
@@ -354,3 +419,4 @@ void FC_Loop_2000Hz(void)
         Motor_Mixer(&g_motor_cmd);
     }
 }
+

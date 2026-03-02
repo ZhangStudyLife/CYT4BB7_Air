@@ -37,8 +37,22 @@ static uint8_t FC_START_CRSF_IsUnlockStickCommand(void)
 
 static uint8_t FC_START_CRSF_IsEmergencyStopRequested(void)
 {
-    return (CRSF_STD[7] == 0) ? 1U : 0U;
+    static uint8_t zero_streak = 0U;
+
+    if (CRSF_STD[7] == 0)
+    {
+        if (zero_streak < 3U)
+        {
+            zero_streak++;
+        }
+    }
+    else
+    {
+        zero_streak = 0U;
+    }
+    return (zero_streak >= 3U) ? 1U : 0U;
 }
+
 
 static void FC_START_CRSF_UpdateModeFromCH6(void)
 {

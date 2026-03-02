@@ -4,10 +4,10 @@
 #include "../../FlightController/fc_start_crsf.h"
 
 #define BARO_PRESS_LPF_ALPHA            (0.26f)
-#define BARO_ALT_LPF_ALPHA_SLOW         (0.14f)
-#define BARO_ALT_LPF_ALPHA_FAST         (0.35f)
+#define BARO_ALT_LPF_ALPHA_SLOW         (0.10f)
+#define BARO_ALT_LPF_ALPHA_FAST         (0.25f)
 #define BARO_ALT_FAST_SWITCH_M          (0.08f)
-#define BARO_ALT_STEP_LIMIT_M           (0.04f)
+#define BARO_ALT_STEP_LIMIT_M           (0.025f)
 #define BARO_ZERO_DEADBAND_M            (0.006f)
 #define BARO_GROUND_ENTER_ABS_H_M       (0.20f)
 #define BARO_AIRBORNE_LATCH_ABS_H_M     (0.35f)

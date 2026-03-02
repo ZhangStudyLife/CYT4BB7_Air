@@ -8,11 +8,13 @@
 #define TOF_MAX_VALID_MM                 (1300U)
 #define TOF_COS_TERM_MIN                 (0.35f)
 
-#define TOF_AGREE_GATE_MM                (40U)
-#define TOF_SWITCH_CONFIRM_FRAMES        (3U)
-#define TOF_FUSED_HOLD_FRAMES            (4U)
-#define TOF_STEP_FAST_MM                 (28U)
-#define TOF_STEP_SAFE_MM                 (18U)
+#define TOF_AGREE_GATE_MM                (25U)
+#define TOF_HARD_MISMATCH_GATE_MM        (120U)
+#define TOF_SWITCH_CONFIRM_FRAMES        (6U)
+#define TOF_FUSED_HOLD_FRAMES            (8U)
+#define TOF_STEP_FAST_MM                 (16U)
+#define TOF_STEP_SAFE_MM                 (10U)
+#define TOF_STEP_HARD_MM                 (6U)
 
 #define TOF_SAME_VALUE_FRAMES_TH         (25U)
 #define TOF_SAME_VALUE_PENALTY_BASE      (120U)
@@ -631,9 +633,20 @@ void TOF_Update(void)
         return;
     }
 
-    if ((0U != ch2_fusion_valid) && (0U != ch3_fusion_valid) && (diff_mm <= TOF_AGREE_GATE_MM))
+    if ((0U != ch2_fusion_valid) && (0U != ch3_fusion_valid))
     {
-        step_limit = TOF_STEP_FAST_MM;
+        if (diff_mm <= TOF_AGREE_GATE_MM)
+        {
+            step_limit = TOF_STEP_FAST_MM;
+        }
+        else if (diff_mm <= TOF_HARD_MISMATCH_GATE_MM)
+        {
+            step_limit = TOF_STEP_SAFE_MM;
+        }
+        else
+        {
+            step_limit = TOF_STEP_HARD_MM;
+        }
     }
     else
     {

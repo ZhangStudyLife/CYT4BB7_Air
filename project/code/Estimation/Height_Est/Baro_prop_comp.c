@@ -2,11 +2,11 @@
 #include "TOF_data.h"
 
 #define BARO_PROP_COMP_DEFAULT_ENABLE            (1U)
-#define BARO_PROP_COMP_DEFAULT_BIAS_ON_PA        (9.95f)
-#define BARO_PROP_COMP_DEFAULT_TAU_ON_S          (1.50f)
-#define BARO_PROP_COMP_DEFAULT_TAU_OFF_S         (0.38f)
-#define BARO_PROP_COMP_DEFAULT_GND_EFFECT_CM     (25.0f)
-#define BARO_PROP_COMP_DEFAULT_GND_EFFECT_SCALE  (0.35f)
+#define BARO_PROP_COMP_DEFAULT_BIAS_ON_PA        (6.00f)
+#define BARO_PROP_COMP_DEFAULT_TAU_ON_S          (1.20f)
+#define BARO_PROP_COMP_DEFAULT_TAU_OFF_S         (0.50f)
+#define BARO_PROP_COMP_DEFAULT_GND_EFFECT_CM     (30.0f)
+#define BARO_PROP_COMP_DEFAULT_GND_EFFECT_SCALE  (0.30f)
 #define BARO_PROP_COMP_MIN_TAU_S                 (0.01f)
 
 float g_baro_prop_bias_hat_pa = 0.0f;

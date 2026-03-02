@@ -1,10 +1,16 @@
-#include "Height_Est.h"
+﻿#include "Height_Est.h"
 
 #define HEIGHT_EST_UPDATE_HZ_F             (100.0f)
-#define HEIGHT_EST_TOF_STEP_MAX_M          (0.028f)
-#define HEIGHT_EST_BARO_FALLBACK_ALPHA     (0.06f)
+#define HEIGHT_EST_TOF_STEP_MAX_M          (0.013f)
+#define HEIGHT_EST_TOF_STEP_SAFE_M         (0.008f)
+#define HEIGHT_EST_TOF_STEP_HARD_M         (0.005f)
+#define HEIGHT_EST_TOF_MISMATCH_GATE_M     (0.030f)
+#define HEIGHT_EST_TOF_MISMATCH_HARD_GATE_M (0.120f)
+#define HEIGHT_EST_TOF_LPF_ALPHA           (0.16f)
+#define HEIGHT_EST_BARO_FALLBACK_ALPHA     (0.03f)
 #define HEIGHT_EST_BARO_BIAS_ALPHA         (0.002f)
-#define HEIGHT_EST_VZ_ALPHA                (0.25f)
+#define HEIGHT_EST_VZ_ALPHA                (0.12f)
+#define HEIGHT_EST_VZ_DEADBAND_M           (0.0018f)
 #define HEIGHT_EST_INVALID_HOLD_FRAMES     (8U)
 #define HEIGHT_EST_BARO_DECIM              (1U)
 #define HEIGHT_EST_VL53_RECOVER_DECIM      (10U)
@@ -19,6 +25,8 @@ static uint8 s_height_est_inited = 0U;
 static float s_height_est_z_m = 0.0f;
 static float s_height_est_prev_z_m = 0.0f;
 static float s_height_est_baro_bias_m = 0.0f;
+static float s_height_est_tof_lpf_m = 0.0f;
+static uint8 s_height_est_tof_lpf_inited = 0U;
 static uint16 s_height_est_invalid_hold_cnt = 0U;
 
 static float Height_Est_ClampFloat(float value, float min_value, float max_value)
@@ -32,6 +40,15 @@ static float Height_Est_ClampFloat(float value, float min_value, float max_value
         return max_value;
     }
     return value;
+}
+
+static float Height_Est_AbsFloat(float value)
+{
+    if (value >= 0.0f)
+    {
+        return value;
+    }
+    return -value;
 }
 
 static uint16 Height_Est_ToMM(float value_m)
@@ -55,6 +72,8 @@ void Height_Est_Reset(void)
     s_height_est_z_m = 0.0f;
     s_height_est_prev_z_m = 0.0f;
     s_height_est_baro_bias_m = 0.0f;
+    s_height_est_tof_lpf_m = 0.0f;
+    s_height_est_tof_lpf_inited = 0U;
     s_height_est_invalid_hold_cnt = 0U;
 
     g_height_est_mm = 0U;
@@ -82,7 +101,11 @@ void Height_Est_Update_100HZ(void)
     float z_tof_m = 0.0f;
     float z_baro_m;
     float z_baro_corrected_m;
+    float z_tof_use_m = 0.0f;
     float innovation_m;
+    float tof_step_limit_m;
+    float tof_mismatch_m;
+    float delta_z_m;
     float vz_raw_mps;
 
     if (0U == s_height_est_inited)
@@ -114,24 +137,48 @@ void Height_Est_Update_100HZ(void)
     if (0U != tof_valid)
     {
         z_tof_m = 0.001f * (float)g_tof_fused_height_mm;
+        if (0U == s_height_est_tof_lpf_inited)
+        {
+            s_height_est_tof_lpf_m = z_tof_m;
+            s_height_est_tof_lpf_inited = 1U;
+        }
+        else
+        {
+            s_height_est_tof_lpf_m += HEIGHT_EST_TOF_LPF_ALPHA * (z_tof_m - s_height_est_tof_lpf_m);
+        }
+        z_tof_use_m = s_height_est_tof_lpf_m;
 
         if (0U == g_height_est_valid)
         {
-            s_height_est_z_m = z_tof_m;
-            s_height_est_prev_z_m = z_tof_m;
+            s_height_est_z_m = z_tof_use_m;
+            s_height_est_prev_z_m = z_tof_use_m;
             g_height_vz_mps = 0.0f;
         }
         else
         {
-            innovation_m = z_tof_m - s_height_est_z_m;
-            s_height_est_z_m += Height_Est_ClampFloat(innovation_m, -HEIGHT_EST_TOF_STEP_MAX_M, HEIGHT_EST_TOF_STEP_MAX_M);
+            tof_step_limit_m = HEIGHT_EST_TOF_STEP_MAX_M;
+            if ((0U != g_tof2_valid) && (0U != g_tof3_valid))
+            {
+                tof_mismatch_m = Height_Est_AbsFloat(0.001f * (float)g_tof2_height_mm - 0.001f * (float)g_tof3_height_mm);
+                if (tof_mismatch_m > HEIGHT_EST_TOF_MISMATCH_HARD_GATE_M)
+                {
+                    tof_step_limit_m = HEIGHT_EST_TOF_STEP_HARD_M;
+                }
+                else if (tof_mismatch_m > HEIGHT_EST_TOF_MISMATCH_GATE_M)
+                {
+                    tof_step_limit_m = HEIGHT_EST_TOF_STEP_SAFE_M;
+                }
+            }
+
+            innovation_m = z_tof_use_m - s_height_est_z_m;
+            s_height_est_z_m += Height_Est_ClampFloat(innovation_m, -tof_step_limit_m, tof_step_limit_m);
         }
 
         if (0U != baro_valid)
         {
             if (0U != baro_updated)
             {
-                s_height_est_baro_bias_m += HEIGHT_EST_BARO_BIAS_ALPHA * (z_tof_m - (z_baro_m + s_height_est_baro_bias_m));
+                s_height_est_baro_bias_m += HEIGHT_EST_BARO_BIAS_ALPHA * (z_tof_use_m - (z_baro_m + s_height_est_baro_bias_m));
             }
             g_height_est_source = HEIGHT_EST_SOURCE_MIXED;
         }
@@ -145,6 +192,7 @@ void Height_Est_Update_100HZ(void)
     }
     else if (0U != baro_valid)
     {
+        s_height_est_tof_lpf_inited = 0U;
         z_baro_corrected_m = z_baro_m + s_height_est_baro_bias_m;
 
         if (0U == g_height_est_valid)
@@ -164,6 +212,7 @@ void Height_Est_Update_100HZ(void)
     }
     else
     {
+        s_height_est_tof_lpf_inited = 0U;
         if ((0U != g_height_est_valid) && (s_height_est_invalid_hold_cnt < HEIGHT_EST_INVALID_HOLD_FRAMES))
         {
             s_height_est_invalid_hold_cnt++;
@@ -179,7 +228,12 @@ void Height_Est_Update_100HZ(void)
 
     if (0U != g_height_est_valid)
     {
-        vz_raw_mps = (s_height_est_z_m - s_height_est_prev_z_m) * HEIGHT_EST_UPDATE_HZ_F;
+        delta_z_m = s_height_est_z_m - s_height_est_prev_z_m;
+        if (Height_Est_AbsFloat(delta_z_m) < HEIGHT_EST_VZ_DEADBAND_M)
+        {
+            delta_z_m = 0.0f;
+        }
+        vz_raw_mps = delta_z_m * HEIGHT_EST_UPDATE_HZ_F;
         g_height_vz_mps += HEIGHT_EST_VZ_ALPHA * (vz_raw_mps - g_height_vz_mps);
         s_height_est_prev_z_m = s_height_est_z_m;
     }
@@ -187,4 +241,5 @@ void Height_Est_Update_100HZ(void)
     g_height_est_m = s_height_est_z_m;
     g_height_est_mm = Height_Est_ToMM(s_height_est_z_m);
 }
+
 

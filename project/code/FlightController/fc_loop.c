@@ -217,6 +217,12 @@ void FC_Loop_Init(void)
              g_fc_params.vel_z_kp, g_fc_params.vel_z_ki, g_fc_params.vel_z_kd,
              g_fc_params.vel_z_kff, g_fc_params.vel_z_dt,
              g_fc_params.vel_z_i_limit, g_fc_params.vel_z_d_lpf);
+
+    /* 仅高度速度环启用 anti-windup，其他环保持默认关闭 */
+    height_vel_pid.aw_enable = 1U;
+    height_vel_pid.aw_gain = 0.30f;
+    height_vel_pid.output_min = -1500.0f;
+    height_vel_pid.output_max = 1500.0f;
 }
 
 void FC_Loop_Reset(void)
@@ -285,6 +291,8 @@ void FC_Loop_100Hz(void)
     float status_code;
     const float vz_lpf_tau_s = 0.045f;
     const float out_lpf_tau_s = 0.030f;
+    const float height_vel_out_min = -1500.0f;
+    const float height_vel_out_max = 1500.0f;
     uint32 tick_now = tick_500us_cnt; // 读一次，缓存
     uint32 diff = tick_now - tick_500us_cnt_last;
     float dt = diff * 0.0005f; // 秒
@@ -325,10 +333,10 @@ void FC_Loop_100Hz(void)
         height_vz_ctrl_mps = s_height_vz_ctrl_lpf;
 
         height_vel_out_raw = PID_Update(&height_vel_pid, height_pos_out, height_vz_ctrl_mps, dt);
-        height_vel_out_raw = fc_clampf(height_vel_out_raw, -1500.0f, 1500.0f);
+        height_vel_out_raw = fc_clampf(height_vel_out_raw, height_vel_out_min, height_vel_out_max);
 
         s_height_vel_out_lpf += out_lpf_alpha * (height_vel_out_raw - s_height_vel_out_lpf);
-        height_vel_out = fc_clampf(s_height_vel_out_lpf, -1500.0f, 1500.0f);
+        height_vel_out = fc_clampf(s_height_vel_out_lpf, height_vel_out_min, height_vel_out_max);
 
         status_code = (float)g_tof_fused_valid +
                       10.0f * (float)g_height_est_valid +

@@ -87,7 +87,7 @@ void FC_Params_Init(void)
     g_fc_params.pos_y_d_lpf = 0.0f;
 
     /* ===== Z 杞翠綅缃幆鍙傛暟 ===== */
-    g_fc_params.pos_z_kp = 0.48f;
+    g_fc_params.pos_z_kp = 0.65f;
     g_fc_params.pos_z_ki = 0.0f;
     g_fc_params.pos_z_kd = 0.0f;
     g_fc_params.pos_z_kff = 0.0f;
@@ -95,11 +95,11 @@ void FC_Params_Init(void)
     g_fc_params.pos_z_d_lpf = 0.0f;
 
     /* ===== Z 杞撮€熷害鐜弬鏁?===== */
-    g_fc_params.vel_z_kp = 410.0f;
-    g_fc_params.vel_z_ki = 56.0f;
-    g_fc_params.vel_z_kd = 14.0f;
+    g_fc_params.vel_z_kp = 720.0f;
+    g_fc_params.vel_z_ki = 110.0f;
+    g_fc_params.vel_z_kd = 0.0f;
     g_fc_params.vel_z_kff = 0.0f;
-    g_fc_params.vel_z_i_limit = 250.0f;
-    g_fc_params.vel_z_d_lpf = 0.15f;
+    g_fc_params.vel_z_i_limit = 380.0f;
+    g_fc_params.vel_z_d_lpf = 0.0f;
 }
 

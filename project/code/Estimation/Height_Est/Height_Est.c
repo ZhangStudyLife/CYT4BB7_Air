@@ -10,7 +10,6 @@
 #define HEIGHT_EST_BARO_FALLBACK_ALPHA     (0.03f)
 #define HEIGHT_EST_BARO_BIAS_ALPHA         (0.002f)
 #define HEIGHT_EST_VZ_ALPHA                (0.12f)
-#define HEIGHT_EST_VZ_DEADBAND_M           (0.0018f)
 #define HEIGHT_EST_INVALID_HOLD_FRAMES     (8U)
 #define HEIGHT_EST_BARO_DECIM              (1U)
 #define HEIGHT_EST_VL53_RECOVER_DECIM      (10U)
@@ -229,10 +228,6 @@ void Height_Est_Update_100HZ(void)
     if (0U != g_height_est_valid)
     {
         delta_z_m = s_height_est_z_m - s_height_est_prev_z_m;
-        if (Height_Est_AbsFloat(delta_z_m) < HEIGHT_EST_VZ_DEADBAND_M)
-        {
-            delta_z_m = 0.0f;
-        }
         vz_raw_mps = delta_z_m * HEIGHT_EST_UPDATE_HZ_F;
         g_height_vz_mps += HEIGHT_EST_VZ_ALPHA * (vz_raw_mps - g_height_vz_mps);
         s_height_est_prev_z_m = s_height_est_z_m;

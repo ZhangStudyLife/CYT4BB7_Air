@@ -8,13 +8,13 @@
 #define TOF_MAX_VALID_MM                 (1300U)
 #define TOF_COS_TERM_MIN                 (0.35f)
 
-#define TOF_AGREE_GATE_MM                (25U)
+#define TOF_AGREE_GATE_MM                (22U)
 #define TOF_HARD_MISMATCH_GATE_MM        (120U)
-#define TOF_SWITCH_CONFIRM_FRAMES        (6U)
+#define TOF_SWITCH_CONFIRM_FRAMES        (7U)
 #define TOF_FUSED_HOLD_FRAMES            (8U)
 #define TOF_STEP_FAST_MM                 (16U)
-#define TOF_STEP_SAFE_MM                 (10U)
-#define TOF_STEP_HARD_MM                 (6U)
+#define TOF_STEP_SAFE_MM                 (9U)
+#define TOF_STEP_HARD_MM                 (5U)
 
 #define TOF_SAME_VALUE_FRAMES_TH         (25U)
 #define TOF_SAME_VALUE_PENALTY_BASE      (120U)

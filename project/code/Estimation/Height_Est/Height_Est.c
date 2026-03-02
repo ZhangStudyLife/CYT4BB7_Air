@@ -9,7 +9,7 @@
 #define HEIGHT_EST_TOF_LPF_ALPHA           (0.16f)
 #define HEIGHT_EST_BARO_FALLBACK_ALPHA     (0.03f)
 #define HEIGHT_EST_BARO_BIAS_ALPHA         (0.002f)
-#define HEIGHT_EST_VZ_ALPHA                (0.12f)
+#define HEIGHT_EST_VZ_ALPHA                (0.14f)
 #define HEIGHT_EST_INVALID_HOLD_FRAMES     (8U)
 #define HEIGHT_EST_BARO_DECIM              (1U)
 #define HEIGHT_EST_VL53_RECOVER_DECIM      (10U)

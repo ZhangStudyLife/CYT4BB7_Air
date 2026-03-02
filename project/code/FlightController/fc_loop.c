@@ -262,7 +262,7 @@ void FC_Loop_50Hz(void)
         }
 
         /* 限制高度外环速度指令变化率，降低低频慢摆引起的内环激励 */
-        pos_sp_step_max = 0.050f; /* 50Hz下约 2.5 m/s^2 */
+        pos_sp_step_max = 0.040f; /* 精度档：50Hz下约 2.0 m/s^2，减小外环激励 */
         height_pos_out += fc_clampf(height_pos_out_raw - height_pos_out,
                                     -pos_sp_step_max,
                                     pos_sp_step_max);

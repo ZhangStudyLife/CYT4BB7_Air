@@ -16,7 +16,7 @@ extern "C" {
 #define IMU_GYRO_NOTCH1_HZ        (220.0f)
 #define IMU_GYRO_NOTCH2_HZ        (440.0f)
 #define IMU_GYRO_NOTCH_Q          (5.0f)
-#define IMU_GYRO_LOWPASS_HZ       (80.0f)
+#define IMU_GYRO_LOWPASS_HZ       (70.0f)
 
 /* ======================== 加速度滤波链参数 ======================== */
 #define IMU_ACC_LOWPASS_EST_HZ    (20.0f)

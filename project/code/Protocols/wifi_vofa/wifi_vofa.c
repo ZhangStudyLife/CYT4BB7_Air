@@ -91,7 +91,7 @@ void wifi_vofa_Init(void)
     {
         /* 初始化失败蜂鸣提示 */
         Beep_Stop();
-        Beep_Play(50U, 0.5f, 10U);
+        Beep_Play(50U, 0.5f, 5U);
     }
 }
 

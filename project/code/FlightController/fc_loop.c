@@ -19,6 +19,10 @@ float height_pos_out = 0.0f;
 float target_height_m = 1.0f;
 extern volatile uint32 tick_500us_cnt;
 
+
+#define FC_ROLL_MECH_TRIM_DEG  (0.0f)
+#define FC_PITCH_MECH_TRIM_DEG (0.0f)
+
 static float fc_clampf(float value, float min_value, float max_value)
 {
     if (value < min_value)
@@ -39,7 +43,7 @@ static float fc_clampf(float value, float min_value, float max_value)
 void FC_ThrTrim_Update_100Hz(void)
 {
     static uint8 s_inited = 0U;
-    static uint8 s_fly_prev = 0U;
+    static uint8 s_fly_prev = 0U; 
     static int32_t s_base_init = 0;
     static float s_base_f = 0.0f;
     static float s_vz_lpf = 0.0f;
@@ -237,7 +241,7 @@ void FC_Loop_50Hz(void)
     tick_500us_cnt_last = tick_now;
     if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
     {
-        // FC_ThrTrim_Update_100Hz();
+        FC_ThrTrim_Update_100Hz();
         float height_m = g_height_est_m;
         height_pos_out = PID_Update(&height_pos_pid, target_height_m, height_m, dt);
         height_pos_out = fc_clampf(height_pos_out, -0.35f, 0.35f);
@@ -260,9 +264,9 @@ void FC_Loop_100Hz(void)
         float ch1 = fc_clampf((float)CRSF_STD[1], -1000.0f, 1000.0f);
         float ch2 = fc_clampf((float)CRSF_STD[2], -1000.0f, 1000.0f);
 
-        target_height_m = 0.1f + (ch2 + 1000.0f) * (1.2f / 2000.0f); /* CH0: 0.1m~1.3m */
-        roll_angle_target = ch0 * (20.0f / 1000.0f);                  /* roll>0 右倾 */
-        pitch_angle_target = -ch1 * (20.0f / 1000.0f);                /* pitch>0 抬头，前倾为负 */
+        target_height_m = (ch2 + 1000.0f) * (1.5f / 2000.0f); /* CH0: 0m~1.5m */
+        roll_angle_target = fc_clampf(ch0 * (20.0f / 1000.0f) + FC_ROLL_MECH_TRIM_DEG, -20.0f, 20.0f);   /* roll>0 右倾 */
+        pitch_angle_target = fc_clampf(-ch1 * (20.0f / 1000.0f) + FC_PITCH_MECH_TRIM_DEG, -20.0f, 20.0f); /* pitch>0 抬头，前倾为负 */
 
         // FC_ThrTrim_Update_100Hz();
         // 飞机向上的时候, g_height_vz_mps > 0
@@ -300,8 +304,19 @@ void FC_Loop_500Hz(void)
         roll_gyro_target = roll_ctrl;
         pitch_gyro_target = pitch_ctrl;
         yaw_gyro_target = 0; // 不闭环航向角，保持当前值
-                        wifi_vofa_JustFloat(11U, roll_angle_target,g_euler.roll,roll_angle_pid.p_term,roll_angle_pid.i_term,roll_angle_pid.d_term,
-                roll_gyro_target,g_imu_filter.gyro_filt_x,roll_gyro_pid.p_term,roll_gyro_pid.i_term,roll_gyro_pid.d_term);
+        /* ch0~ch15:
+         * roll_sp, roll_meas, pitch_sp, pitch_meas,
+         * roll_rate_sp, roll_rate_meas, pitch_rate_sp, pitch_rate_meas,
+         * roll_rate_p, roll_rate_i, roll_rate_d,
+         * pitch_rate_p, pitch_rate_i, pitch_rate_d,
+         * vz_mps, throttle_cmd
+         */
+        wifi_vofa_JustFloat(16U,
+                            roll_angle_target, g_euler.roll, pitch_angle_target, g_euler.pitch,
+                            roll_gyro_target, g_imu_filter.gyro_filt_x, pitch_gyro_target, g_imu_filter.gyro_filt_y,
+                            roll_gyro_pid.p_term, roll_gyro_pid.i_term, roll_gyro_pid.d_term,
+                            pitch_gyro_pid.p_term, pitch_gyro_pid.i_term, pitch_gyro_pid.d_term,
+                            g_height_vz_mps, (float)g_fc_params.base_throttle + height_vel_out);
     }
 }
 

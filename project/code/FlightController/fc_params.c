@@ -20,23 +20,23 @@ void FC_Params_Init(void)
     g_fc_params.vel_z_dt = 0.01f;  /* 100Hz */
 
     /* ===== 油门参数 ===== */
-    g_fc_params.base_throttle = 3500; /* 悬停油门 */
+    g_fc_params.base_throttle = 3550; /* 悬停油门 */
 
     /* ===== Roll轴角速度环参�?===== */
-    g_fc_params.roll_gyro_kp = 7.2f;
-    g_fc_params.roll_gyro_ki = 4.6f;
-    g_fc_params.roll_gyro_kd = 0.018f;
+    g_fc_params.roll_gyro_kp = 4.5f;
+    g_fc_params.roll_gyro_ki = 2.0f;
+    g_fc_params.roll_gyro_kd = 0.013f;
     g_fc_params.roll_gyro_kff = 0.0f;
-    g_fc_params.roll_gyro_i_limit = 2200.0f;
-    g_fc_params.roll_gyro_d_lpf = 0.12f;
+    g_fc_params.roll_gyro_i_limit = 1400.0f;
+    g_fc_params.roll_gyro_d_lpf = 0.08f;
 
     /* ===== Pitch轴角速度环参�?===== */
-    g_fc_params.pitch_gyro_kp = 7.2f;
-    g_fc_params.pitch_gyro_ki = 4.6f;
-    g_fc_params.pitch_gyro_kd = 0.018f;
+    g_fc_params.pitch_gyro_kp = 4.5f;
+    g_fc_params.pitch_gyro_ki = 2.0f;
+    g_fc_params.pitch_gyro_kd = 0.013f;
     g_fc_params.pitch_gyro_kff = 0.0f;
-    g_fc_params.pitch_gyro_i_limit = 2200.0f;
-    g_fc_params.pitch_gyro_d_lpf = 0.12f;
+    g_fc_params.pitch_gyro_i_limit = 1400.0f;
+    g_fc_params.pitch_gyro_d_lpf = 0.08f;
 
     /* ===== Yaw轴角速度环参�?===== */
     g_fc_params.yaw_gyro_kp = 10.5f;
@@ -47,16 +47,16 @@ void FC_Params_Init(void)
     g_fc_params.yaw_gyro_d_lpf = 0.18f;
 
     /* ===== roll轴角度环参数 ===== */
-    g_fc_params.roll_angle_kp = 3.3f;
-    g_fc_params.roll_angle_ki = 0.10f;
+    g_fc_params.roll_angle_kp = 3.5f;
+    g_fc_params.roll_angle_ki = 0.12f;
     g_fc_params.roll_angle_kd = 0.0f;
     g_fc_params.roll_angle_kff = 0.0f;
     g_fc_params.roll_angle_i_limit = 110.0f;
     g_fc_params.roll_angle_d_lpf = 0.0f;
 
     /* ===== pitch轴角度环参数 ===== */
-    g_fc_params.pitch_angle_kp = 3.3f;
-    g_fc_params.pitch_angle_ki = 0.10f;
+    g_fc_params.pitch_angle_kp = 3.5f;
+    g_fc_params.pitch_angle_ki = 0.12f;
     g_fc_params.pitch_angle_kd = 0.0f;
     g_fc_params.pitch_angle_kff = 0.0f;
     g_fc_params.pitch_angle_i_limit = 110.0f;

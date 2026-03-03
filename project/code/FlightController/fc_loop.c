@@ -45,11 +45,6 @@ static float fc_clampf(float value, float min_value, float max_value)
     return value;
 }
 
-static void FC_HeightFallback_Update_100Hz(float dt_s)
-{
-    (void)dt_s;
-}
-
 void FC_ThrTrim_Update_100Hz(void)
 {
 }
@@ -142,10 +137,8 @@ void FC_Loop_100Hz(void)
     static float s_height_prev_m = 0.0f;
     static float s_height_vz_lpf_mps = 0.0f;
     static uint32 tick_500us_cnt_last = 0;
-    FC_START_CRSF_state_e state;
     float height_m;
     float height_vz_raw_mps;
-    float status_code;
     const float vz_lpf_alpha = 0.08f;
     const float height_vel_out_min = -1500.0f;
     const float height_vel_out_max = 1500.0f;

@@ -138,20 +138,6 @@ int main(void)
 
         IMUCalib_CommandPoll();
 
-        if ((run_100hz != 0U))
-        {
-            static uint8 s_pos_print_div = 0U;
-            s_pos_print_div++;
-            if (s_pos_print_div >= 2U)
-            {
-                s_pos_print_div = 0U;
-                FC_START_CRSF_state_e state = FC_START_CRSF_Get_State();
-                uint8 prop_spinning = ((state == FC_START_CRSF_STATE_TAKEOFF) ||
-                                       (state == FC_START_CRSF_STATE_FLYING))
-                                          ? 1U
-                                          : 0U;
-            }
-        }
     }
 }
 

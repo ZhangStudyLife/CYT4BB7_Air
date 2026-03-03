@@ -62,8 +62,8 @@ typedef struct
     uint16 same_value_streak;
 } TOFChannelState_t;
 
-/* 融合后TOF高度，单位：mm，无效时为VL53L1X_INVALID_DISTANCE_MM */
-uint16 g_tof_fused_height_mm = VL53L1X_INVALID_DISTANCE_MM;
+/* 融合后TOF高度，单位：mm，无效时为VL53L1X_VALID_RANGE_MAX */
+uint16 g_tof_fused_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
 /* TOF通道2显示高度，单位：mm，无效时为VL53L1X_INVALID_DISTANCE_MM */
 uint16 g_tof2_height_mm = VL53L1X_INVALID_DISTANCE_MM;
 /* TOF通道3显示高度，单位：mm，无效时为VL53L1X_INVALID_DISTANCE_MM */
@@ -244,7 +244,7 @@ static void TOF_ResetFusionState(void)
 {
     g_tof2_height_mm = VL53L1X_INVALID_DISTANCE_MM;
     g_tof3_height_mm = VL53L1X_INVALID_DISTANCE_MM;
-    g_tof_fused_height_mm = VL53L1X_INVALID_DISTANCE_MM;
+    g_tof_fused_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
     g_tof2_valid = 0U;
     g_tof3_valid = 0U;
     g_tof_fused_valid = 0U;
@@ -807,7 +807,7 @@ void TOF_Update(void)
         }
 
         g_tof_fused_valid = 0U;
-        g_tof_fused_height_mm = VL53L1X_INVALID_DISTANCE_MM;
+        g_tof_fused_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
         TOF_UpdateFusionUsage(TOF_SRC_NONE);
         return;
     }

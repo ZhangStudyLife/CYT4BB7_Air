@@ -10,7 +10,7 @@
 extern "C" {
 #endif
 
-/* 融合后TOF高度，单位：mm，无效时为VL53L1X_INVALID_DISTANCE_MM */
+/* 融合后TOF高度，单位：mm，无效时为VL53L1X_VALID_RANGE_MAX */
 extern uint16 g_tof_fused_height_mm;
 /* TOF通道2显示高度，单位：mm，无效时为VL53L1X_INVALID_DISTANCE_MM */
 extern uint16 g_tof2_height_mm;

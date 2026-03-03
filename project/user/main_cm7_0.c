@@ -78,7 +78,6 @@ int main(void)
 
     while (true)
     {
-        uint8 run_100hz = 0U;
         uint16 tick_2000_guard = 0U;
 
         while ((g_tick_2000HZ > 0U) && (tick_2000_guard < 200U))
@@ -133,7 +132,6 @@ int main(void)
                     FC_START_CRSF_Trigger_Emergency_Stop();
                 }
             }
-            run_100hz = 1U;
         }
 
         IMUCalib_CommandPoll();

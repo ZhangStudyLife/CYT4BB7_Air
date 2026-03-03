@@ -20,19 +20,19 @@ void FC_Params_Init(void)
     g_fc_params.vel_z_dt = 0.01f;  /* 100Hz */
 
     /* ===== 娌归棬鍙傛暟 ===== */
-    g_fc_params.base_throttle = 3590; /* 鎮仠娌归棬 */
+    g_fc_params.base_throttle = 3500; /* 鎮仠娌归棬 */
 
     /* ===== Roll 杞磋閫熷害鐜弬鏁?===== */
-    g_fc_params.roll_gyro_kp = 2.0f;
-    g_fc_params.roll_gyro_ki = 2.0f;
+    g_fc_params.roll_gyro_kp = 2.5f;
+    g_fc_params.roll_gyro_ki = 3.0f;
     g_fc_params.roll_gyro_kd = 0.0f;
     g_fc_params.roll_gyro_kff = 0.0f;
     g_fc_params.roll_gyro_i_limit = 1400.0f;
     g_fc_params.roll_gyro_d_lpf = 0.08f;
 
     /* ===== Pitch 杞磋閫熷害鐜弬鏁?===== */
-    g_fc_params.pitch_gyro_kp = 2.0f;
-    g_fc_params.pitch_gyro_ki = 2.0f;
+    g_fc_params.pitch_gyro_kp = 2.5f;
+    g_fc_params.pitch_gyro_ki = 3.0f;
     g_fc_params.pitch_gyro_kd = 0.0f;
     g_fc_params.pitch_gyro_kff = 0.0f;
     g_fc_params.pitch_gyro_i_limit = 1400.0f;
@@ -47,16 +47,16 @@ void FC_Params_Init(void)
     g_fc_params.yaw_gyro_d_lpf = 0.18f;
 
     /* ===== Roll 杞磋搴︾幆鍙傛暟 ===== */
-    g_fc_params.roll_angle_kp = 4.0f;
-    g_fc_params.roll_angle_ki = 0.08f;
+    g_fc_params.roll_angle_kp = 5.0f;
+    g_fc_params.roll_angle_ki = 0.04f;
     g_fc_params.roll_angle_kd = 0.0f;
     g_fc_params.roll_angle_kff = 0.0f;
     g_fc_params.roll_angle_i_limit = 110.0f;
     g_fc_params.roll_angle_d_lpf = 0.0f;
 
     /* ===== Pitch 杞磋搴︾幆鍙傛暟 ===== */
-    g_fc_params.pitch_angle_kp = 4.0f;
-    g_fc_params.pitch_angle_ki = 0.08f;
+    g_fc_params.pitch_angle_kp = 5.0f;
+    g_fc_params.pitch_angle_ki = 0.04f;
     g_fc_params.pitch_angle_kd = 0.0f;
     g_fc_params.pitch_angle_kff = 0.0f;
     g_fc_params.pitch_angle_i_limit = 110.0f;
@@ -87,19 +87,19 @@ void FC_Params_Init(void)
     g_fc_params.pos_y_d_lpf = 0.0f;
 
     /* ===== Z 杞翠綅缃幆鍙傛暟 ===== */
-    g_fc_params.pos_z_kp = 0.8f;
-    g_fc_params.pos_z_ki = 0.02f;
+    g_fc_params.pos_z_kp = 1.2f;
+    g_fc_params.pos_z_ki = 0.0f;
     g_fc_params.pos_z_kd = 0.0f;
     g_fc_params.pos_z_kff = 0.0f;
     g_fc_params.pos_z_i_limit = 0.0f;
     g_fc_params.pos_z_d_lpf = 0.0f;
 
     /* ===== Z 杞撮€熷害鐜弬鏁?===== */
-    g_fc_params.vel_z_kp = 700.0f;
-    g_fc_params.vel_z_ki = 58.0f;
-    g_fc_params.vel_z_kd = 10.0f;
+    g_fc_params.vel_z_kp = 1000.0f;
+    g_fc_params.vel_z_ki = 80.0f;
+    g_fc_params.vel_z_kd = 85.0f;
     g_fc_params.vel_z_kff = 0.0f;
-    g_fc_params.vel_z_i_limit = 330.0f;
-    g_fc_params.vel_z_d_lpf = 0.12f;
+    g_fc_params.vel_z_i_limit = 2000.0f;
+    g_fc_params.vel_z_d_lpf = 0.14f;
 }
 

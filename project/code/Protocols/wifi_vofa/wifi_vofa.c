@@ -130,7 +130,7 @@ void wifi_vofa_GetTxStats(wifi_vofa_tx_stats_t *stats)
 }
 
 /* JustFloat发送：data_num通道，每通道4字节float，末尾4字节协议尾 */
-uint8 wifi_vofa_JustFloat(uint8 data_num, ...)
+uint8 wifi_vofa_JustFloat_Impl(uint8 data_num, ...)
 {
     uint8 i;
     uint8 ret;

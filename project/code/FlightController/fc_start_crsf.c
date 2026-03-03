@@ -269,8 +269,6 @@ static void FC_START_CRSF_StateMachine_Update(void)
     case FC_START_CRSF_STATE_FLYING:
         FC_START_CRSF_UpdateModeFromCH6();
         FC_START_CRSF_RunFlightModeHook();
-        // int32_t motor_throttl[4] = {2900, 2900, 2900, 2900};
-        // Motor_SetThrottleAll(motor_throttl);
         if (s_landing_request != 0U)
         {
             s_fc_start_state = FC_START_CRSF_STATE_LANDING;

@@ -59,7 +59,10 @@ int main(void)
     Beep_Init();                   // 蜂鸣器初始化
     pit_ms_init(PIT_CH2,10);     // 10ms周期的PIT定时器 用于Beep节奏驱动
     wifi_vofa_Init();              // WiFi VOFA协议模块初始化
-    Height_Est_Init();         // 高度估计初始化（TOF+Baro）
+    // TODO: 暂时移除 Height_Est 库，后续重构高度融合后再恢复初始化调用
+    // Height_Est_Init();         // 高度估计初始化（TOF+Baro）
+    TOF_Init();                 // TODO: Height_Est 移除后，临时直接初始化 TOF
+
     PMW3901_Init();            // PMW3901 光流传感器初始化
     IMU_Init_All();            // ICM42688 IMU 初始化
     Pos_Est_Init();            // 位置估计初始化
@@ -107,7 +110,8 @@ int main(void)
         if (g_tick_100HZ > 0U)
         {
             g_tick_100HZ--;
-            Height_Est_Update_100HZ();
+            // TODO: 暂时移除 Height_Est 库，后续重构高度融合后再恢复周期更新调用
+            // Height_Est_Update_100HZ();
             // Pos_Est_Update_100HZ();
             PMW3901_Update();
             crsf_send_25hz(); // CRSF 25Hz发送函数（100Hz调用一次）
@@ -152,3 +156,5 @@ int main(void)
 }
 
 // **************************** 代码区域 ****************************
+
+

@@ -306,8 +306,8 @@ void FC_Loop_100Hz(void)
         float ch2 = fc_clampf((float)CRSF_STD[2], -1000.0f, 1000.0f);
 
         target_height_m = (ch2 + 1000.0f) * (1.5f / 2000.0f); /* CH2: 0m~1.5m */
-        roll_angle_target = fc_clampf(ch0 * (20.0f / 1000.0f) + FC_ROLL_MECH_TRIM_DEG, -20.0f, 20.0f);   /* roll>0 右倾 */
-        pitch_angle_target = fc_clampf(-ch1 * (20.0f / 1000.0f) + FC_PITCH_MECH_TRIM_DEG, -20.0f, 20.0f); /* pitch>0 抬头，前倾为负 */
+        roll_angle_target = fc_clampf(ch0 * (40.0f / 1000.0f) + FC_ROLL_MECH_TRIM_DEG, -40.0f, 40.0f);   /* roll>0 右倾 */
+        pitch_angle_target = fc_clampf(-ch1 * (40.0f / 1000.0f) + FC_PITCH_MECH_TRIM_DEG, -40.0f, 40.0f); /* pitch>0 抬头，前倾为负 */
 
         if (0U == s_height_vz_ctrl_lpf_inited)
         {
@@ -428,3 +428,4 @@ void FC_Loop_2000Hz(void)
     }
 }
 
+ 

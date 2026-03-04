@@ -191,23 +191,26 @@ void FC_Loop_100Hz(void)
         height_vel_out = 0.0f;
     }
     float debug_state = (float)FC_START_CRSF_Get_State()*1 + (float)g_tof_fused_valid*10;
-    wifi_vofa_JustFloat(16U,
-                        target_height_m * 1000.0f,
-                        g_tof_fused_height_mm,
-                        height_pos_pid.p_term,
-                        height_pos_pid.i_term,
-                        height_pos_pid.d_term,
-                        height_pos_out,
-                        g_height_vz_mps,
-                        height_vel_pid.p_term,
-                        height_vel_pid.i_term,
-                        height_vel_pid.d_term,
-                        -AccelCalibration_GetAccelDownMps2(),
-                    g_euler.roll,
-                    g_euler.pitch,
-                    roll_angle_target,
-                    pitch_angle_target,debug_state
-                );
+    // wifi_vofa_JustFloat(16U,
+    //                     target_height_m * 1000.0f,
+    //                     g_tof_fused_height_mm,
+    //                     height_pos_pid.p_term,
+    //                     height_pos_pid.i_term,
+    //                     height_pos_pid.d_term,
+    //                     height_pos_out,
+    //                     g_height_vz_mps,
+    //                     height_vel_pid.p_term,
+    //                     height_vel_pid.i_term,
+    //                     height_vel_pid.d_term,
+    //                     -AccelCalibration_GetAccelDownMps2(),
+    //                 g_euler.roll,
+    //                 g_euler.pitch,
+    //                 roll_angle_target,
+    //                 pitch_angle_target,debug_state
+    //             );
+
+
+    wifi_vofa_JustFloat(4u,g_pmw3901_raw.deltaX,g_pmw3901_raw.deltaY,g_pmw3901_raw.frameFrom0,g_pmw3901_raw.squal);
 }
 
 void FC_Loop_500Hz(void)

@@ -1,33 +1,41 @@
 #include "PMW3901.h"
 
-#define PMW3901_REG_PRODUCT_ID         (0x00U)
-#define PMW3901_REG_POWER_RST          (0x3AU)
-#define PMW3901_REG_INV_PROD_ID2       (0x5FU)
-#define PMW3901_REG_MOT_BURST2         (0x16U)
+/* ======================== 寄存器地址定义 ======================== */
+#define PMW3901_REG_PRODUCT_ID         (0x00U)     /* 产品ID寄存器地址 */
+#define PMW3901_REG_POWER_RST          (0x3AU)     /* 电源复位寄存器地址 */
+#define PMW3901_REG_INV_PROD_ID2       (0x5FU)     /* 反码产品ID寄存器地址，值应为~PRODUCT_ID */
+#define PMW3901_REG_MOT_BURST2         (0x16U)     /* Burst读取启动寄存器地址 */
 
-#define PMW3901_PRODUCT_ID_3901        (0x49U)
-#define PMW3901_POWER_ON_RESET_CMD     (0x5AU)
-#define PMW3901_WRITE_FLAG             (0x80U)
-#define PMW3901_DUMMY_BYTE             (0x00U)
+/* ======================== 常量定义 ======================== */
+#define PMW3901_PRODUCT_ID_3901        (0x49U)     /* PMW3901的产品ID期望值 */
+#define PMW3901_POWER_ON_RESET_CMD     (0x5AU)     /* 上电复位命令字 */
+#define PMW3901_WRITE_FLAG             (0x80U)     /* SPI写操作标志位（寄存器地址最高位置1） */
+#define PMW3901_DUMMY_BYTE             (0x00U)     /* SPI读取时发送的填充字节 */
 
-#define PMW3901_POWERUP_DELAY_MS       (50U)
-#define PMW3901_STAGE_GAP_DELAY_MS     (100U)
-#define PMW3901_READY_DELAY_MS         (50U)
-#define PMW3901_REG_RETRY_MAX          (5U)
+/* ======================== 时序延迟参数 ======================== */
+#define PMW3901_POWERUP_DELAY_MS       (50U)       /* 上电复位后等待时间 ms */
+#define PMW3901_STAGE_GAP_DELAY_MS     (100U)      /* 两阶段初始化之间的间隔时间 ms */
+#define PMW3901_READY_DELAY_MS         (50U)       /* 初始化完成后的就绪等待时间 ms */
+#define PMW3901_REG_RETRY_MAX          (5U)        /* 寄存器写入/ID校验最大重试次数 */
 
-#define PMW3901_TSRAD_US               (300U)
-#define PMW3901_TSR_US                 (500U)
-#define PMW3901_TSWX_US                (120U)
-#define PMW3901_TSRX_US                (200U)
-#define PMW3901_TBEXIT_US              (1U)
-#define PMW3901_MOTION_BURST_DELAY_US  (150U)
+/* ======================== SPI时序延迟（微秒） ======================== */
+#define PMW3901_TSRAD_US               (300U)      /* 地址字节与数据字节之间的延迟 tSRAD */
+#define PMW3901_TSR_US                 (500U)      /* 读操作地址后的等待时间 tSR */
+#define PMW3901_TSWX_US                (120U)      /* 写操作完成后的等待时间 tSWx */
+#define PMW3901_TSRX_US                (200U)      /* 读操作完成后的等待时间 tSRx */
+#define PMW3901_TBEXIT_US              (1U)        /* Burst读取结束后的CS拉高延迟 tBEXIT */
+#define PMW3901_MOTION_BURST_DELAY_US  (150U)      /* Burst读取命令发送后的等待时间 */
 
+/**
+ * @brief 寄存器配置项结构体，用于初始化寄存器表
+ */
 typedef struct
 {
-    uint8 reg;
-    uint8 value;
+    uint8 reg;      /* 寄存器地址 */
+    uint8 value;    /* 要写入的值 */
 } pmw3901_reg_cfg_t;
 
+/* 第一阶段初始化寄存器配置表（传感器内部参数调优） */
 static const pmw3901_reg_cfg_t pmw3901_init_stage1[] =
 {
     { 0x7F, 0x00 },
@@ -91,6 +99,7 @@ static const pmw3901_reg_cfg_t pmw3901_init_stage1[] =
     { 0x70, 0x00 }
 };
 
+/* 第二阶段初始化寄存器配置表（LED_N启用、最终工作模式配置） */
 static const pmw3901_reg_cfg_t pmw3901_init_stage2[] =
 {
     { 0x32, 0x44 },
@@ -112,9 +121,18 @@ static const pmw3901_reg_cfg_t pmw3901_init_stage2[] =
     { 0x7F, 0x00 }
 };
 
+/* PMW3901光流传感器原始数据，由PMW3901_Update()周期性填充，已做极性映射 */
 volatile pmw3901_raw_t g_pmw3901_raw = {0};
+/* 初始化完成标志，1=已初始化，0=未初始化或初始化失败 */
 static uint8 pmw3901_inited = 0U;
 
+/**
+ * @brief  SPI单字节收发
+ *         同时发送一个字节并接收一个字节（全双工）
+ *
+ * @param  tx  要发送的字节
+ * @return 接收到的字节
+ */
 static uint8 pmw3901_spi_transfer_byte(uint8 tx)
 {
     uint8 rx = 0U;
@@ -122,6 +140,14 @@ static uint8 pmw3901_spi_transfer_byte(uint8 tx)
     return rx;
 }
 
+/**
+ * @brief  写入PMW3901寄存器
+ *         拉低CS→发送地址(置写标志)→等待tSRAD→发送数据→拉高CS→等待tSWx
+ *
+ * @param  reg    寄存器地址（0x00~0x7F）
+ * @param  value  要写入的值
+ * @return 无
+ */
 static void pmw3901_reg_write(uint8 reg, uint8 value)
 {
     gpio_low(PMW3901_CS_Pin);
@@ -132,6 +158,13 @@ static void pmw3901_reg_write(uint8 reg, uint8 value)
     system_delay_us(PMW3901_TSWX_US);
 }
 
+/**
+ * @brief  读取PMW3901寄存器
+ *         拉低CS→发送地址→等待tSR→读取数据→拉高CS→等待tSRx
+ *
+ * @param  reg  寄存器地址（0x00~0x7F）
+ * @return 读取到的寄存器值
+ */
 static uint8 pmw3901_reg_read(uint8 reg)
 {
     uint8 value;
@@ -144,6 +177,14 @@ static uint8 pmw3901_reg_read(uint8 reg)
     return value;
 }
 
+/**
+ * @brief  批量加载寄存器配置表
+ *         遍历配置表逐项写入，开启校验时写后回读验证，失败则重试
+ *
+ * @param  table      寄存器配置表指针
+ * @param  table_len  配置表元素数量
+ * @return 0=加载完成
+ */
 static uint8 pmw3901_load_config(const pmw3901_reg_cfg_t *table, uint32 table_len)
 {
     uint32 i;
@@ -154,6 +195,7 @@ static uint8 pmw3901_load_config(const pmw3901_reg_cfg_t *table, uint32 table_le
         uint8 try_idx;
         uint8 matched = 0U;
 
+        /* 写入后回读校验，失败则重试最多 REG_RETRY_MAX 次 */
         for (try_idx = 0U; try_idx < PMW3901_REG_RETRY_MAX; ++try_idx)
         {
             pmw3901_reg_write(table[i].reg, table[i].value);
@@ -176,6 +218,13 @@ static uint8 pmw3901_load_config(const pmw3901_reg_cfg_t *table, uint32 table_le
     return 0U;
 }
 
+/**
+ * @brief  校验PMW3901芯片ID
+ *         读取产品ID和反码ID，验证两者互为按位取反关系
+ *
+ * @param  无
+ * @return 0=ID校验通过，1=校验失败
+ */
 static uint8 pmw3901_check_id(void)
 {
     uint8 id1 = pmw3901_reg_read(PMW3901_REG_PRODUCT_ID);
@@ -189,21 +238,39 @@ static uint8 pmw3901_check_id(void)
     return 1U;
 }
 
+/**
+ * @brief  复位光流原始数据和初始化标志
+ *         将 g_pmw3901_raw 清零，并将 pmw3901_inited 置0
+ *
+ * @param  无
+ * @return 无
+ */
 static void pmw3901_reset_raw_data(void)
 {
     g_pmw3901_raw = (pmw3901_raw_t){0};
     pmw3901_inited = 0U;
 }
 
+/**
+ * @brief  Motion Burst读取
+ *         一次性读取全部运动数据（像素位移、质量、曝光等），
+ *         并对大端序传输的shutter字段做字节交换
+ *
+ * @param  motion  输出指针，存放读取到的原始运动数据
+ * @return 无
+ */
 static void pmw3901_motion_burst_read(pmw3901_raw_t *motion)
 {
     uint8 idx;
     uint8 *raw = (uint8 *)motion;
     uint16 shutter_value;
 
+    /* 拉低CS，发送Burst读取命令，等待数据就绪 */
     gpio_low(PMW3901_CS_Pin);
     pmw3901_spi_transfer_byte(PMW3901_REG_MOT_BURST2);
     system_delay_us(PMW3901_MOTION_BURST_DELAY_US);
+
+    /* 逐字节读取整个Burst数据帧 */
     for (idx = 0U; idx < (uint8)sizeof(pmw3901_raw_t); ++idx)
     {
         raw[idx] = pmw3901_spi_transfer_byte(PMW3901_DUMMY_BYTE);
@@ -211,16 +278,26 @@ static void pmw3901_motion_burst_read(pmw3901_raw_t *motion)
     gpio_high(PMW3901_CS_Pin);
     system_delay_us(PMW3901_TBEXIT_US);
 
+    /* shutter字段为大端序传输，需要字节交换转为小端序 */
     shutter_value = motion->shutter;
     motion->shutter = (uint16)(((shutter_value >> 8) & 0x00FFU)
                                | ((shutter_value & 0x00FFU) << 8));
 }
 
+/**
+ * @brief  PMW3901光流传感器初始化
+ *         执行SPI外设初始化、芯片上电复位、ID校验（带重试）、
+ *         两阶段寄存器配置，并执行首次数据读取
+ *
+ * @param  无
+ * @return 0=初始化成功，1=初始化失败（ID校验或寄存器配置失败）
+ */
 uint8 PMW3901_Init(void)
 {
     uint8 retry_cnt = 0U;
     pmw3901_reset_raw_data();
 
+    /* 初始化SPI外设和CS引脚 */
     spi_init(PMW3901_SPI,
              SPI_MODE3,
              PMW3901_SPI_SPEED,
@@ -231,9 +308,11 @@ uint8 PMW3901_Init(void)
     gpio_init(PMW3901_CS_Pin, GPO, 1, GPO_PUSH_PULL);
     system_delay_ms(10U);
 
+    /* 发送上电复位命令，等待芯片就绪 */
     pmw3901_reg_write(PMW3901_REG_POWER_RST, PMW3901_POWER_ON_RESET_CMD);
     system_delay_ms(PMW3901_POWERUP_DELAY_MS);
 
+    /* ID校验，失败则重新复位并重试，超过最大次数则返回失败 */
     while (pmw3901_check_id() != 0U)
     {
         retry_cnt++;
@@ -247,6 +326,7 @@ uint8 PMW3901_Init(void)
         system_delay_ms(PMW3901_POWERUP_DELAY_MS);
     }
 
+    /* 加载第一阶段寄存器配置 */
     if (pmw3901_load_config(pmw3901_init_stage1,
                             (uint32)(sizeof(pmw3901_init_stage1) / sizeof(pmw3901_init_stage1[0]))) != 0U)
     {
@@ -255,6 +335,7 @@ uint8 PMW3901_Init(void)
     }
     system_delay_ms(PMW3901_STAGE_GAP_DELAY_MS);
 
+    /* 加载第二阶段寄存器配置 */
     if (pmw3901_load_config(pmw3901_init_stage2,
                             (uint32)(sizeof(pmw3901_init_stage2) / sizeof(pmw3901_init_stage2[0]))) != 0U)
     {
@@ -263,17 +344,33 @@ uint8 PMW3901_Init(void)
     }
     system_delay_ms(PMW3901_READY_DELAY_MS);
 
+    /* 标记初始化完成，执行首次数据读取 */
     pmw3901_inited = 1U;
     PMW3901_Update();
     return 0U;
 }
 
+/**
+ * @brief  PMW3901重新初始化
+ *         先清零原始数据和初始化标志，再调用PMW3901_Init()完成完整初始化
+ *
+ * @param  无
+ * @return 0=重新初始化成功，1=失败
+ */
 uint8 PMW3901_ReInit(void)
 {
     pmw3901_reset_raw_data();
     return PMW3901_Init();
 }
 
+/**
+ * @brief  PMW3901数据更新（需周期性调用，典型100Hz）
+ *         执行Burst Read读取全部运动数据，对deltaX/deltaY施加极性映射，
+ *         结果写入 g_pmw3901_raw 全局变量
+ *
+ * @param  无
+ * @return 无
+ */
 void PMW3901_Update(void)
 {
     pmw3901_raw_t burst_data = {0};
@@ -284,6 +381,8 @@ void PMW3901_Update(void)
     }
 
     pmw3901_motion_burst_read(&burst_data);
+
+    /* 对像素位移施加极性映射，将芯片坐标系转换为机体坐标系 */
     burst_data.deltaX = (int16)(PMW3901_SIGN_X * burst_data.deltaX);
     burst_data.deltaY = (int16)(PMW3901_SIGN_Y * burst_data.deltaY);
     g_pmw3901_raw = burst_data;

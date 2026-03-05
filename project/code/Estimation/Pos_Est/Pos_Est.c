@@ -108,6 +108,15 @@ void Pos_Est_Init(void)
     g_pos_est_debug.accel_bias_y_mps2 = 0.0f;
 }
 
+
+void Pos_Est_Update_2000HZ()
+{
+    g_pos_est_debug.gyro_filt_y = g_imu_filter.gyro_filt_y;
+    g_pos_est_debug.gyro_filt_x = g_imu_filter.gyro_filt_x;
+    
+}
+
+
 void Pos_Est_Update_250HZ(void)
 {
     float accel_x_mps2;
@@ -199,8 +208,6 @@ void Pos_Est_Update_100HZ(void)
     float pitch_rad;
     float tan_pitch;
     float tan_roll;
-    float dtan_pitch;
-    float dtan_roll;
     float pix_x;
     float pix_y;
     float pix_x_corr;
@@ -220,8 +227,8 @@ void Pos_Est_Update_100HZ(void)
 
     PMW3901_Update();
 
-    g_pos_est_debug.raw_flow_dx_count = g_pmw3901_raw.deltaX;
-    g_pos_est_debug.raw_flow_dy_count = g_pmw3901_raw.deltaY;
+    g_pos_est_debug.raw_flow_dx_count = -g_pmw3901_raw.deltaX;
+    g_pos_est_debug.raw_flow_dy_count = -g_pmw3901_raw.deltaY;
     g_pos_est_debug.raw_flow_squal = g_pmw3901_raw.squal;
 
     height_m = g_height_est_m;
@@ -231,18 +238,9 @@ void Pos_Est_Update_100HZ(void)
     roll_rad = g_euler.roll * 0.01745329251994f;
     tan_pitch = Pos_Est_TanLimited(pitch_rad);
     tan_roll = Pos_Est_TanLimited(roll_rad);
-    if (s_pos_est_state.flow_ref_ready == 0U)
-    {
+
         s_pos_est_state.prev_tan_pitch = tan_pitch;
         s_pos_est_state.prev_tan_roll = tan_roll;
-        dtan_pitch = 0.0f;
-        dtan_roll = 0.0f;
-    }
-    else
-    {
-        dtan_pitch = tan_pitch - s_pos_est_state.prev_tan_pitch;
-        dtan_roll = tan_roll - s_pos_est_state.prev_tan_roll;
-    }
 
     if ((g_height_est_valid == 0U) ||
         (height_m < POS_EST_FLOW_HEIGHT_MIN_M) ||
@@ -290,11 +288,11 @@ void Pos_Est_Update_100HZ(void)
     pix_y = (float)g_pmw3901_raw.deltaX;
 
     pix_x_corr = pix_x +
-                 POS_EST_K_DTILT_X_PITCH_DEFAULT * dtan_pitch +
-                 POS_EST_K_DTILT_X_ROLL_DEFAULT * dtan_roll;
+                 POS_EST_K_DTILT_X_PITCH_DEFAULT * g_imu_filter.gyro_filt_y +
+                 POS_EST_K_DTILT_X_ROLL_DEFAULT * g_imu_filter.gyro_filt_x;
     pix_y_corr = pix_y +
-                 POS_EST_K_DTILT_Y_PITCH_DEFAULT * dtan_pitch +
-                 POS_EST_K_DTILT_Y_ROLL_DEFAULT * dtan_roll;
+                 POS_EST_K_DTILT_Y_PITCH_DEFAULT * g_imu_filter.gyro_filt_y +
+                 POS_EST_K_DTILT_Y_ROLL_DEFAULT * g_imu_filter.gyro_filt_x;
 
     meter_per_count = POS_EST_K_PIX_TO_M_AT_1M_DEFAULT * height_m;
     flow_vx_raw_mps = (pix_x_corr * meter_per_count) / POS_EST_DT_100HZ_S;

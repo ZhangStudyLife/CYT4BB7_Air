@@ -109,10 +109,7 @@ int main(void)
         if (g_tick_100HZ > 0U)
         {
             g_tick_100HZ--;
-            // TODO: 暂时移除 Height_Est 库，后续重构高度融合后再恢复周期更新调用
-            // Height_Est_Update_100HZ();
-            // Pos_Est_Update_100HZ();
-            PMW3901_Update();
+            Pos_Est_Update_100HZ();
             crsf_send_25hz(); // CRSF 25Hz发送函数（100Hz调用一次）
             CRSF_Update_100HZ();
             FC_Loop_100Hz();

@@ -171,6 +171,7 @@ void FC_Loop_100Hz(void)
 
     g_height_est_m = height_m;
     g_height_vz_mps = s_height_vz_lpf_mps;
+    g_height_est_valid = g_tof_fused_valid;  /* 同步高度有效标志给位置估计模块 */
 
     if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
     {
@@ -211,15 +212,15 @@ void FC_Loop_100Hz(void)
 
 
     /* 光流调试：前4路保持原有顺序，后4路补充纹理质量与原始像素统计 */
-    wifi_vofa_JustFloat(8u,
-                        g_pmw3901_raw.deltaX,
-                        g_pmw3901_raw.deltaY,
-                        g_pmw3901_raw.frameFrom0,
-                        g_pmw3901_raw.squal,
-                        g_pmw3901_raw.rawDataSum,
-                        g_pmw3901_raw.maxRawData,
-                        g_pmw3901_raw.minRawData,
-                        g_pmw3901_raw.motionOccured);
+    // wifi_vofa_JustFloat(8u,
+    //                     g_pos_est_debug.raw_flow_dx_count,
+    //                     g_pos_est_debug.raw_flow_dy_count,
+    //                     g_pos_est_output.flow_valid,
+    //                     g_pmw3901_raw.squal,
+    //                     g_pmw3901_raw.rawDataSum,
+    //                     g_pmw3901_raw.maxRawData,
+    //                     g_pmw3901_raw.minRawData,
+    //                     g_pmw3901_raw.motionOccured);
 }
 
 void FC_Loop_500Hz(void)

@@ -64,10 +64,10 @@ typedef struct
 
 typedef struct
 {
-    int16_t raw_flow_dx_count;
-    int16_t raw_flow_dy_count;
-    uint8_t raw_flow_squal;
-    uint8_t flow_gate_state;
+    int16_t raw_flow_dx_count;          // flow原始像素增量，向右移动为正 向左移动为负
+    int16_t raw_flow_dy_count;          // flow原始像素增量，向前移动为正 向后移动为负
+    uint8_t raw_flow_squal;             // flow原始质量值，范围0-255，数值越大质量越好
+    uint8_t flow_gate_state;            // flow有效性状态，0为通过，非0为不通过的原因
 
     float flow_pix_x_corr;
     float flow_pix_y_corr;
@@ -76,6 +76,9 @@ typedef struct
 
     float accel_bias_x_mps2;
     float accel_bias_y_mps2;
+
+    float gyro_filt_y;
+    float gyro_filt_x;
 } PosEstDebug_t;
 
 extern volatile PosEstOutput_t g_pos_est_output;

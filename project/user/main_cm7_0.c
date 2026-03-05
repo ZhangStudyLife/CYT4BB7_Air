@@ -86,7 +86,7 @@ int main(void)
             IMU_Update_2000HZ();
             AccelCalibration_Update_2000HZ();
             IMUCalib_Update_2000HZ();
-
+            Pos_Est_Update_2000HZ();
             s_tick_div_fc_loop_500hz++;
             if (s_tick_div_fc_loop_500hz >= 4U)
             {

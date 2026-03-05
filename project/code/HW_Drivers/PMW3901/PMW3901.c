@@ -2,6 +2,11 @@
 
 /* ======================== 寄存器地址定义 ======================== */
 #define PMW3901_REG_PRODUCT_ID         (0x00U)     /* 产品ID寄存器地址 */
+#define PMW3901_REG_MOTION             (0x02U)     /* 运动检测寄存器地址 */
+#define PMW3901_REG_DELTA_X_L          (0x03U)     /* X轴像素位移低字节寄存器 */
+#define PMW3901_REG_DELTA_X_H          (0x04U)     /* X轴像素位移高字节寄存器 */
+#define PMW3901_REG_DELTA_Y_L          (0x05U)     /* Y轴像素位移低字节寄存器 */
+#define PMW3901_REG_DELTA_Y_H          (0x06U)     /* Y轴像素位移高字节寄存器 */
 #define PMW3901_REG_POWER_RST          (0x3AU)     /* 电源复位寄存器地址 */
 #define PMW3901_REG_INV_PROD_ID2       (0x5FU)     /* 反码产品ID寄存器地址，值应为~PRODUCT_ID */
 #define PMW3901_REG_MOT_BURST2         (0x16U)     /* Burst读取启动寄存器地址 */
@@ -25,6 +30,8 @@
 #define PMW3901_TSRX_US                (200U)      /* 读操作完成后的等待时间 tSRx */
 #define PMW3901_TBEXIT_US              (1U)        /* Burst读取结束后的CS拉高延迟 tBEXIT */
 #define PMW3901_MOTION_BURST_DELAY_US  (150U)      /* Burst读取命令发送后的等待时间 */
+#define PMW3901_INIT_FLUSH_COUNT       (3U)        /* 初始化后丢弃的脏数据帧数 */
+#define PMW3901_FLUSH_INTERVAL_MS      (20U)       /* 丢弃帧之间的间隔时间 ms */
 
 /**
  * @brief 寄存器配置项结构体，用于初始化寄存器表
@@ -344,8 +351,26 @@ uint8 PMW3901_Init(void)
     }
     system_delay_ms(PMW3901_READY_DELAY_MS);
 
-    /* 标记初始化完成，执行首次数据读取 */
+    /* 标记初始化完成 */
     pmw3901_inited = 1U;
+
+    /* 清除初始脏数据：读取motion和delta寄存器丢弃上电累积的像素值 */
+    {
+        uint8 flush_i;
+        pmw3901_raw_t discard = {0};
+        for (flush_i = 0U; flush_i < PMW3901_INIT_FLUSH_COUNT; ++flush_i)
+        {
+            pmw3901_reg_read(PMW3901_REG_MOTION);
+            pmw3901_reg_read(PMW3901_REG_DELTA_X_L);
+            pmw3901_reg_read(PMW3901_REG_DELTA_X_H);
+            pmw3901_reg_read(PMW3901_REG_DELTA_Y_L);
+            pmw3901_reg_read(PMW3901_REG_DELTA_Y_H);
+            pmw3901_motion_burst_read(&discard);
+            system_delay_ms(PMW3901_FLUSH_INTERVAL_MS);
+        }
+    }
+
+    /* 执行首次有效数据读取 */
     PMW3901_Update();
     return 0U;
 }
@@ -365,8 +390,9 @@ uint8 PMW3901_ReInit(void)
 
 /**
  * @brief  PMW3901数据更新（需周期性调用，典型100Hz）
- *         执行Burst Read读取全部运动数据，对deltaX/deltaY施加极性映射，
- *         结果写入 g_pmw3901_raw 全局变量
+ *         执行Burst Read读取全部运动数据，检查motionOccured标志位，
+ *         仅当传感器报告有新运动时才更新deltaX/deltaY并施加极性映射，
+ *         否则将deltaX/deltaY清零防止残留脏数据
  *
  * @param  无
  * @return 无
@@ -381,6 +407,13 @@ void PMW3901_Update(void)
     }
 
     pmw3901_motion_burst_read(&burst_data);
+
+    /* 检查motionOccured标志：传感器未完成新帧处理时delta可能为脏数据 */
+    if (burst_data.motionOccured == 0U)
+    {
+        burst_data.deltaX = 0;
+        burst_data.deltaY = 0;
+    }
 
     /* 对像素位移施加极性映射，将芯片坐标系转换为机体坐标系 */
     burst_data.deltaX = (int16)(PMW3901_SIGN_X * burst_data.deltaX);

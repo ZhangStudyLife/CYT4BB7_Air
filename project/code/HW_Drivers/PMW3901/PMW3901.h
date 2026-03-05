@@ -22,6 +22,13 @@
 /* 寄存器写入校验开关：0=直接写入不验证（内部寄存器多为非公开寄存器，回读值可能与写入值不同） */
 #define PMW3901_VERIFY_WRITES    (0)
 
+
+
+
+
+
+
+
 /**
  * @brief PMW3901 Motion Burst 原始数据结构体
  *        对应芯片 Burst Read 返回的 12 字节数据帧，按字节紧凑排列
@@ -85,6 +92,6 @@ uint8 PMW3901_ReInit(void);
  * @param  无
  * @return 无
  */
-void PMW3901_Update_50HZ(void);
+void PMW3901_Update_100HZ(void);
 
 #endif /* PMW3901_H_ */

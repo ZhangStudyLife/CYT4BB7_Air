@@ -2,39 +2,51 @@
 #define POS_EST_H
 
 #include <stdint.h>
-
+#include "zf_common_headfile.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 
-#define POS_EST_DEG2RAD (0.017453292519943295f)  /* 角度转弧度的常数 */
+#define DEG2RAD (0.017453292519943295f)  /* 角度转弧度的常数 */
 #define POS_EST_RAD2DEG (57.29577951308232f)    /* 弧度转角度的常数 */
-#define POS_EST_SQUAL_MIN 20U              /* 光流有效的最小表面质量指标 */
+#define POS_EST_SQUAL_MIN 25U              /* 光流有效的最小表面质量指标 */
+#define RESOLUTION			(0.2131946f)/*1m高度下 1个像素对应的位移，单位cm*/
+#define POS_EST_100HZ_DT (0.01f) /* 100Hz周期的时间间隔，单位秒 */
+#define POS_EST_250HZ_DT (0.004f) /* 250Hz周期的时间间隔，单位秒 */
+#define POS_EST_VEL_LIMIT (100.0f) /* 速度限幅，单位cm/s */
+
+typedef struct opFlow_s 
+{
+	float pixSum[2];		/*累积像素*/
+	float pixComp[2];		/*像素补偿*/
+	float pixValid[2];		/*有效像素*/
+	float pixValidLast[2];	/*上一次有效像素*/
+	
+	float deltaPos[2];		/*2帧之间的位移 单位cm*/
+	float deltaVel[2];		/*速度 单位cm/s*/
+	float posSum[2];		/*累积位移 单位cm*/
+	float velLpf[2];		/*速度低通 单位cm/s*/
+	
+	uint8 isOpFlowOk;		/*光流状态*/
+	uint8 isDataValid;		/*数据有效*/
+
+} opFlow_t;
 
 
 typedef struct
 {
-    float position_x_m;
-    float position_y_m;
-    float velocity_x_mps;
-    float velocity_y_mps;
-    float height_m;
-    uint8_t flow_valid;
-} PosEstOutput_t;
+	float vAccDeadband; /* 加速度死区 */
+	float accBias[3];	/* 加速度 偏置(cm/s/s)*/
+	float acc[3];		/* 估测加速度 单位(cm/s/s)*/
+	float vel[3];		/* 估测速度 单位(cm/s)*/
+	float pos[3]; 		/* 估测位移 单位(cm)*/
+} estimator_t;
 
-typedef struct
-{
-    int16_t deltaX;          // flow原始像素增量，向右移动为正 向左移动为负
-    int16_t deltaY;          // flow原始像素增量，向前移动为正 向后移动为负
-    uint8_t squal;           // 表面质量指标，0~255，越大质量越好
-    float pixel_flow_X;      // 像素流动指标
-    float pixel_flow_Y;      // 像素流动指标
 
-} PosEstDebug_t;
+extern volatile opFlow_t opFlow; /* 光流全局状态，跨周期更新需使用volatile */
 
-extern volatile PosEstOutput_t g_pos_est_output;
-extern volatile PosEstDebug_t g_pos_est_debug;
+
 
 /**
  * @brief  位置估计模块初始化
@@ -60,7 +72,7 @@ void Pos_Est_Update_250HZ(void);
  * @brief  100Hz光流融合更新
  *         读取光流传感器，进行姿态解耦补偿，与加速度计积分融合
  */
-void Pos_Est_Update_50HZ(void);
+void Pos_Est_Update_100HZ(void);
 
 #ifdef __cplusplus
 }

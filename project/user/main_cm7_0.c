@@ -70,6 +70,7 @@ int main(void)
     AccelCalibration_Init();   // 加速度标定模块初始化
     IMUCalib_Init();           // 读取Flash中的IMU校准参数并应用
     FC_Params_Init();          // 飞控参数初始化
+    Pos_Est_Init();            // 位置估计模块初始化
     FC_Loop_Init();            // 飞控主循环相关资源初始化
     Motor_Init();              // 电机驱动初始化
     FC_START_CRSF_Init();      // 起飞流程状态机初始化
@@ -117,7 +118,7 @@ int main(void)
             s_tick_div_fc_start_50hz++;
             if (s_tick_div_fc_start_50hz >= 2)
             {
-                Pos_Est_Update_50HZ();
+                Pos_Est_Update_100HZ();
                 s_tick_div_fc_start_50hz = 0U;
                 FC_Loop_50Hz();
             }

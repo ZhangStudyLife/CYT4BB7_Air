@@ -28,12 +28,12 @@
 
 PMW3901 光流传感器输出的是 **像素位移量**（ΔX, ΔY），即相邻两帧图像之间的平移像素数。要将其转化为飞行器的 **水平速度（m/s）**，需要结合以下信息：
 
-| 信息 | 来源 | 作用 |
-|------|------|------|
-| ΔX, ΔY（像素位移） | PMW3901 SPI 读取 | 原始光流测量 |
-| 对地高度 h（米/mm） | TOF 测距仪 / 气压计 | 像素→真实距离的缩放因子 |
+| 信息                       | 来源                      | 作用                       |
+| -------------------------- | ------------------------- | -------------------------- |
+| ΔX, ΔY（像素位移）       | PMW3901 SPI 读取          | 原始光流测量               |
+| 对地高度 h（米/mm）        | TOF 测距仪 / 气压计       | 像素→真实距离的缩放因子   |
 | 姿态角（roll, pitch, yaw） | IMU 陀螺仪积分 / 互补滤波 | 去除机体旋转引起的虚假光流 |
-| 陀螺仪角速度（gx, gy, gz） | ICM42688 陀螺仪 | 实时旋转补偿 |
+| 陀螺仪角速度（gx, gy, gz） | ICM42688 陀螺仪           | 实时旋转补偿               |
 
 ### 1.2 核心挑战
 
@@ -58,6 +58,7 @@ $$
 $$
 
 其中：
+
 - $\Delta_{pix}$：原始像素位移（ΔX 或 ΔY）
 - $F_{pix}$：焦距像素常数（PX4 中为 385.0 pix/rad，本项目标定约为 476.2 pix/rad）
 - $\Delta t$：积分时间（秒）
@@ -74,7 +75,7 @@ $$
 
 ### 2.3 速度计算
 
-补偿后的光流角速率乘以对地距离（range）得到线速度：
+补偿后的光流角速率乘以对地距离（range）得到线		速度：
 
 $$
 v = \text{flowRate}_{compensated} \times \text{range}
@@ -96,6 +97,7 @@ $$
 $$
 v_{body,x} = -\text{flowRate}_{comp,Y} \times \text{range}
 $$
+
 $$
 v_{body,y} = +\text{flowRate}_{comp,X} \times \text{range}
 $$
@@ -146,10 +148,11 @@ if (_collect_time >= 15000) {
 ```
 
 **关键参数**：
-| 参数 | 值 | 说明 |
-|------|-----|------|
-| `385.0f` | pix/rad | 焦距像素常数（弧度域） |
-| `15000` us | 15ms | 最小累积时间 → ~50-66Hz 发布 |
+
+| 参数          | 值         | 说明                            |
+| ------------- | ---------- | ------------------------------- |
+| `385.0f`    | pix/rad    | 焦距像素常数（弧度域）          |
+| `15000` us  | 15ms       | 最小累积时间 → ~50-66Hz 发布   |
 | `±240` pix | 离群值门限 | 超过 ±240 像素的单次读数被丢弃 |
 
 #### 3.1.3 质量门限
@@ -266,6 +269,7 @@ _flow_gyro_bias = 0.99f * _flow_gyro_bias
 ```
 
 **设计要点**：
+
 - 使用 **极慢的 IIR 滤波器**（α=0.01）来追踪陀螺仪偏差
 - 配合 **尖峰限幅**（±0.1 rad/s），避免突变干扰影响偏差估计
 - 偏差估计是 **2D 向量**（X, Y 两轴独立）
@@ -387,14 +391,14 @@ void Ekf::fuseOptFlow(int axis) {
 
 #### 3.3.9 PX4 光流参数总结
 
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| `EKF2_OF_DELAY` | 5 ms | 光流测量延迟补偿 |
-| `EKF2_OF_N_MIN` | 0.15 rad/s | 最佳情况下的 LOS 噪声 σ |
-| `EKF2_OF_N_MAX` | 0.50 rad/s | 最差情况下的 LOS 噪声 σ |
-| `EKF2_OF_QMIN` | 1 | 最低可接受质量（0~255） |
-| `EKF2_OF_GATE` | 3.0 | 新息门限（标准差倍数） |
-| `EKF2_OF_GYR_SRC` | 0 | 陀螺仪来源（0=EKF内部） |
+| 参数                | 默认值     | 说明                     |
+| ------------------- | ---------- | ------------------------ |
+| `EKF2_OF_DELAY`   | 5 ms       | 光流测量延迟补偿         |
+| `EKF2_OF_N_MIN`   | 0.15 rad/s | 最佳情况下的 LOS 噪声 σ |
+| `EKF2_OF_N_MAX`   | 0.50 rad/s | 最差情况下的 LOS 噪声 σ |
+| `EKF2_OF_QMIN`    | 1          | 最低可接受质量（0~255）  |
+| `EKF2_OF_GATE`    | 3.0        | 新息门限（标准差倍数）   |
+| `EKF2_OF_GYR_SRC` | 0          | 陀螺仪来源（0=EKF内部）  |
 
 ---
 
@@ -526,6 +530,7 @@ gyroBodyRateTimeUs = 0;
 ```
 
 **优势**：
+
 - 陀螺仪以 **kHz 级** 频率累积，光流以 **~100Hz** 消费
 - 确保陀螺仪的时间区间与光流的时间区间 **完美对齐**
 - 无需人为指定延迟补偿，自然匹配
@@ -546,6 +551,7 @@ flowRate[Y] = DEGREES_TO_RADIANS(flowRate[Y]);
 ```
 
 **换算关系**：
+
 $$
 \text{opflow\_scale} = 10.5 \text{ pix/deg} = 10.5 \times \frac{180}{\pi} \approx 601.5 \text{ pix/rad}
 $$
@@ -588,6 +594,7 @@ flowVel.y =  (opflow.flowRate[X] - opflow.bodyRate[X]) * surface.alt;
 $$
 v_x = -(\omega_{flow,Y} - \omega_{gyro,Y}) \times h
 $$
+
 $$
 v_y = +(\omega_{flow,X} - \omega_{gyro,X}) \times h
 $$
@@ -728,6 +735,7 @@ float stdFlow = 0.0007984f * shutter + 0.4335f;
 ```
 
 快门时间（shutter）反映了光照条件：
+
 - 光照充足 → 快门短 → 噪声小
 - 光照不足 → 快门长 → 噪声大
 
@@ -737,24 +745,24 @@ float stdFlow = 0.0007984f * shutter + 0.4335f;
 
 ## 6. 三大飞控对比总结
 
-| 特性 | PX4 | iNav | Crazyflie |
-|------|-----|------|-----------|
-| **PMW3901 接口** | SPI 直驱 | 串口/MSP 协议 | SPI Burst Read |
-| **SPI 轮询频率** | 100Hz | N/A | 100Hz |
-| **发布频率** | ~50-66Hz（15ms累积） | ~100Hz | ~100Hz |
-| **像素→弧度常数** | 385.0 pix/rad | 10.5 pix/deg（≈601 pix/rad） | 无统一标准 |
-| **自动标定** | 无 | 有（30s+3600°） | 无 |
-| **陀螺仪同步** | EKF内部延迟缓冲 | 高频回调积分（kHz） | 直接采样 |
-| **旋转补偿** | flow - (gyro - bias) | flowRate - bodyRate | 简化版 |
-| **陀螺偏差估计** | IIR α=0.01 + ±0.1 rad/s 限幅 | 无独立偏差估计 | 无 |
-| **高度/距离** | EKF HAGL / cos(tilt) | surface.alt（测距仪） | 直接使用高度 |
-| **倾斜校正** | ÷ cos(tilt) → 斜距 | 未显式校正 | 未校正 |
-| **轴映射** | vel_x = -flow_y, vel_y = +flow_x | 相同 | 相同 |
-| **融合算法** | 扩展 Kalman 滤波（EKF） | 互补滤波（CF） | 扩展 Kalman |
-| **噪声模型** | 基于质量的线性插值 | 固定权重 | 基于快门时间 |
-| **新息门限** | 卡方检验 3.0σ | 无 | 简化版 |
-| **驱动层滤波** | 无（仅累积+离群值剔除） | 无 | 可选 IIR/MA |
-| **质量滤波** | SQUAL > 0 | 滞回 35/10 | motion bit |
+| 特性                     | PX4                              | iNav                          | Crazyflie      |
+| ------------------------ | -------------------------------- | ----------------------------- | -------------- |
+| **PMW3901 接口**   | SPI 直驱                         | 串口/MSP 协议                 | SPI Burst Read |
+| **SPI 轮询频率**   | 100Hz                            | N/A                           | 100Hz          |
+| **发布频率**       | ~50-66Hz（15ms累积）             | ~100Hz                        | ~100Hz         |
+| **像素→弧度常数** | 385.0 pix/rad                    | 10.5 pix/deg（≈601 pix/rad） | 无统一标准     |
+| **自动标定**       | 无                               | 有（30s+3600°）              | 无             |
+| **陀螺仪同步**     | EKF内部延迟缓冲                  | 高频回调积分（kHz）           | 直接采样       |
+| **旋转补偿**       | flow - (gyro - bias)             | flowRate - bodyRate           | 简化版         |
+| **陀螺偏差估计**   | IIR α=0.01 + ±0.1 rad/s 限幅   | 无独立偏差估计                | 无             |
+| **高度/距离**      | EKF HAGL / cos(tilt)             | surface.alt（测距仪）         | 直接使用高度   |
+| **倾斜校正**       | ÷ cos(tilt) → 斜距             | 未显式校正                    | 未校正         |
+| **轴映射**         | vel_x = -flow_y, vel_y = +flow_x | 相同                          | 相同           |
+| **融合算法**       | 扩展 Kalman 滤波（EKF）          | 互补滤波（CF）                | 扩展 Kalman    |
+| **噪声模型**       | 基于质量的线性插值               | 固定权重                      | 基于快门时间   |
+| **新息门限**       | 卡方检验 3.0σ                   | 无                            | 简化版         |
+| **驱动层滤波**     | 无（仅累积+离群值剔除）          | 无                            | 可选 IIR/MA    |
+| **质量滤波**       | SQUAL > 0                        | 滞回 35/10                    | motion bit     |
 
 ---
 
@@ -778,7 +786,7 @@ PMW3901 (SPI3, 100Hz)
            │ 每 10ms 一次（100Hz）
            ▼
 ┌──────────────────────────────────────┐
-│  Pos_Est_Update_50HZ()             │
+│  Pos_Est_Update_100HZ()             │
 │  ① pix_x = -deltaX, pix_y = -deltaY│
 │  ② 读取 & 重置角度积累器             │
 │  ③ 使用 prev_deg 补偿（延迟一帧）    │
@@ -790,16 +798,16 @@ PMW3901 (SPI3, 100Hz)
 
 ### 7.2 与 PX4 的关键差异
 
-| 维度 | 本项目 | PX4 |
-|------|--------|-----|
-| **补偿域** | 像素域（K × deg） | 角速率域（rad/s） |
-| **焦距常数** | K_X=8.40, K_Y=8.85 pix/deg（≈481/507 pix/rad） | 385.0 pix/rad |
-| **陀螺积分** | 2kHz 硬件定时器 | EKF 内部延迟缓冲 |
-| **延迟补偿** | prev_frame 机制 | 时间戳中点修正 |
-| **后滤波** | IIR α=0.5 | 无（EKF 自带） |
-| **融合层** | 无 EKF，直接计算速度 | 24 维 EKF |
-| **噪声模型** | 固定滤波系数 | 自适应（质量插值） |
-| **倾斜校正** | 未实现 | ÷ cos(tilt) |
+| 维度               | 本项目                                          | PX4                |
+| ------------------ | ----------------------------------------------- | ------------------ |
+| **补偿域**   | 像素域（K × deg）                              | 角速率域（rad/s）  |
+| **焦距常数** | K_X=8.40, K_Y=8.85 pix/deg（≈481/507 pix/rad） | 385.0 pix/rad      |
+| **陀螺积分** | 2kHz 硬件定时器                                 | EKF 内部延迟缓冲   |
+| **延迟补偿** | prev_frame 机制                                 | 时间戳中点修正     |
+| **后滤波**   | IIR α=0.5                                      | 无（EKF 自带）     |
+| **融合层**   | 无 EKF，直接计算速度                            | 24 维 EKF          |
+| **噪声模型** | 固定滤波系数                                    | 自适应（质量插值） |
+| **倾斜校正** | 未实现                                          | ÷ cos(tilt)       |
 
 ### 7.3 当前方案的优势
 
@@ -824,7 +832,7 @@ PMW3901 (SPI3, 100Hz)
 #### 8.1.1 倾斜校正
 
 ```c
-// 在 Pos_Est_Update_50HZ() 中添加
+// 在 Pos_Est_Update_100HZ() 中添加
 float cos_tilt = cosf(roll_rad) * cosf(pitch_rad);
 if (cos_tilt < 0.5f) cos_tilt = 0.5f;  // 限制最大60°倾斜
 float range_mm = height_mm / cos_tilt;
@@ -886,6 +894,7 @@ gyro_bias_y = 0.99f * gyro_bias_y + 0.01f * bias_innov_y;
 ### 8.3 长期演进方向
 
 如果需要更高精度的位置保持，可以考虑实现简化版 EKF：
+
 - 4 维状态：[vx, vy, px, py]
 - 2 维观测：[flow_comp_x × range, flow_comp_y × range]
 - 预测：加速度计积分
@@ -895,28 +904,28 @@ gyro_bias_y = 0.99f * gyro_bias_y + 0.01f * bias_innov_y;
 
 ## 附录 A：焦距像素常数对比
 
-| 飞控/项目 | 常数 | 单位 | 换算 (pix/rad) | 换算 (pix/deg) |
-|-----------|------|------|----------------|----------------|
-| PX4 | 385.0 | pix/rad | 385.0 | 6.72 |
-| iNav | 10.5 | pix/deg | 601.5 | 10.5 |
-| CYT4BB7 (本项目) | 8.40 / 8.85 | pix/deg | 481 / 507 | 8.40 / 8.85 |
-| 理论值 (本项目光学标定) | 476.2 | pix/rad | 476.2 | 8.31 |
+| 飞控/项目               | 常数        | 单位    | 换算 (pix/rad) | 换算 (pix/deg) |
+| ----------------------- | ----------- | ------- | -------------- | -------------- |
+| PX4                     | 385.0       | pix/rad | 385.0          | 6.72           |
+| iNav                    | 10.5        | pix/deg | 601.5          | 10.5           |
+| CYT4BB7 (本项目)        | 8.40 / 8.85 | pix/deg | 481 / 507      | 8.40 / 8.85    |
+| 理论值 (本项目光学标定) | 476.2       | pix/rad | 476.2          | 8.31           |
 
 > 注意：不同传感器个体、安装高度、镜片差异都会影响焦距常数值，实飞标定值
 > 与理论值 ±10% 的差异是正常的。
 
 ## 附录 B：参考代码文件
 
-| 文件 | 路径 | 说明 |
-|------|------|------|
-| PX4 PMW3901 驱动 | `PX4-Autopilot/src/drivers/optical_flow/pmw3901/PMW3901.cpp` | 硬件驱动 |
-| PX4 EKF2 桥接 | `PX4-Autopilot/src/modules/ekf2/EKF2.cpp :: UpdateFlowSample()` | 数据格式转换 |
-| PX4 光流融合控制 | `PX4-Autopilot/src/modules/ekf2/EKF/optical_flow_control.cpp` | 补偿与噪声 |
-| PX4 光流融合数学 | `PX4-Autopilot/src/modules/ekf2/EKF/optical_flow_fusion.cpp` | Kalman 运算 |
-| iNav 光流传感器 | `inav/src/main/sensors/opflow.c` | 传感器抽象层 |
-| iNav 导航光流估计 | `inav/src/main/navigation/navigation_pos_estimator_flow.c` | 互补滤波融合 |
-| 本项目光流驱动 | `project/code/HW_Drivers/PMW3901/PMW3901.c` | SPI 驱动 |
-| 本项目位置估计 | `project/code/Pos_Est/Pos_Est.c` | 补偿与速度计算 |
+| 文件              | 路径                                                              | 说明           |
+| ----------------- | ----------------------------------------------------------------- | -------------- |
+| PX4 PMW3901 驱动  | `PX4-Autopilot/src/drivers/optical_flow/pmw3901/PMW3901.cpp`    | 硬件驱动       |
+| PX4 EKF2 桥接     | `PX4-Autopilot/src/modules/ekf2/EKF2.cpp :: UpdateFlowSample()` | 数据格式转换   |
+| PX4 光流融合控制  | `PX4-Autopilot/src/modules/ekf2/EKF/optical_flow_control.cpp`   | 补偿与噪声     |
+| PX4 光流融合数学  | `PX4-Autopilot/src/modules/ekf2/EKF/optical_flow_fusion.cpp`    | Kalman 运算    |
+| iNav 光流传感器   | `inav/src/main/sensors/opflow.c`                                | 传感器抽象层   |
+| iNav 导航光流估计 | `inav/src/main/navigation/navigation_pos_estimator_flow.c`      | 互补滤波融合   |
+| 本项目光流驱动    | `project/code/HW_Drivers/PMW3901/PMW3901.c`                     | SPI 驱动       |
+| 本项目位置估计    | `project/code/Pos_Est/Pos_Est.c`                                | 补偿与速度计算 |
 
 ---
 

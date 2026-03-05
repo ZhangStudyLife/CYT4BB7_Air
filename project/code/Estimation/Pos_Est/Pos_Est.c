@@ -2,25 +2,29 @@
 #include "zf_common_headfile.h"
 #include <math.h>
 
-typedef struct
-{
-    float accel_bias_x_mps2;
-    float accel_bias_y_mps2;
-    float accel_lpf_x_mps2;
-    float accel_lpf_y_mps2;
-    float accel_vibe_metric;
-    float acc_weight_xy;
-    float flow_vx_lpf_mps;
-    float flow_vy_lpf_mps;
-    float flow_pos_x_m;
-    float flow_pos_y_m;
-    float flow_dead_time_s;
-    uint8_t flow_ref_ready;
-} PosEstState_t;
+#ifndef sq
+#define sq(x) ((x) * (x))
+#endif
+#define GRAVITY_CMSS (980.f)                                  /*重力加速度 单位cm/s/s*/
+#define INAV_ACC_BIAS_ACCEPTANCE_VALUE (GRAVITY_CMSS * 0.25f) // Max accepted bias correction of 0.25G - unlikely we are going to be that much off anyway
 
-volatile PosEstOutput_t g_pos_est_output = {0};
-volatile PosEstDebug_t g_pos_est_debug = {0};
-static PosEstState_t s_pos_est_state = {0};
+volatile opFlow_t opFlow = {0};
+static estimator_t estimator =
+    {
+        .vAccDeadband = 4.0f,
+        .accBias[0] = 0.0f,
+        .accBias[1] = 0.0f,
+        .accBias[2] = 0.0f,
+        .acc[0] = 0.0f,
+        .acc[1] = 0.0f,
+        .acc[2] = 0.0f,
+        .vel[0] = 0.0f,
+        .vel[1] = 0.0f,
+        .vel[2] = 0.0f,
+        .pos[0] = 0.0f,
+        .pos[1] = 0.0f,
+        .pos[2] = 0.0f,
+};
 
 static float Pos_Est_Clampf(float value, float min_value, float max_value)
 {
@@ -35,6 +39,19 @@ static float Pos_Est_Clampf(float value, float min_value, float max_value)
     return value;
 }
 
+/**
+ * @brief 计算角度的正切值
+ *
+ * @param angle_rad 输入角度，单位：rad（弧度）
+ *                  建议避免接近 ±pi/2 的角度，以防正切值数值发散。
+ *
+ * @return float 输出正切值 tan(angle_rad)，单位：无量纲
+ */
+static float Pos_Est_Tan(float angle_rad)
+{
+    return tanf(angle_rad);
+}
+
 static float Pos_Est_Absf(float value)
 {
     if (value < 0.0f)
@@ -44,8 +61,61 @@ static float Pos_Est_Absf(float value)
     return value;
 }
 
+/* Inertial filter, implementation taken from PX4 implementation by Anton Babushkin <rk3dov@gmail.com> */
+static void inavFilterPredict(int axis, float dt, float acc)
+{
+    estimator.pos[axis] += estimator.vel[axis] * dt + acc * dt * dt / 2.0f;
+    estimator.vel[axis] += acc * dt;
+}
+/*位置校正*/
+static void inavFilterCorrectPos(int axis, float dt, float e, float w)
+{
+    float ewdt = e * w * dt;
+    estimator.pos[axis] += ewdt;
+    estimator.vel[axis] += w * ewdt;
+}
+/*速度校正*/
+static void inavFilterCorrectVel(int axis, float dt, float e, float w)
+{
+    estimator.vel[axis] += e * w * dt;
+}
+
 void Pos_Est_Init(void)
 {
+    estimator.vAccDeadband = 4.0f;
+    estimator.accBias[0] = 0.0f;
+    estimator.accBias[1] = 0.0f;
+    estimator.accBias[2] = 0.0f;
+    estimator.acc[0] = 0.0f;
+    estimator.acc[1] = 0.0f;
+    estimator.acc[2] = 0.0f;
+    estimator.vel[0] = 0.0f;
+    estimator.vel[1] = 0.0f;
+    estimator.vel[2] = 0.0f;
+    estimator.pos[0] = 0.0f;
+    estimator.pos[1] = 0.0f;
+    estimator.pos[2] = 0.0f;
+
+    opFlow.pixSum[0] = 0.0f;
+    opFlow.pixSum[1] = 0.0f;
+    opFlow.pixComp[0] = 0.0f;
+    opFlow.pixComp[1] = 0.0f;
+    opFlow.pixValid[0] = 0.0f;
+    opFlow.pixValid[1] = 0.0f;
+    opFlow.pixValidLast[0] = 0.0f;
+    opFlow.pixValidLast[1] = 0.0f;
+
+    opFlow.deltaPos[0] = 0.0f;
+    opFlow.deltaPos[1] = 0.0f;
+    opFlow.deltaVel[0] = 0.0f;
+    opFlow.deltaVel[1] = 0.0f;
+    opFlow.posSum[0] = 0.0f;
+    opFlow.posSum[1] = 0.0f;
+    opFlow.velLpf[0] = 0.0f;
+    opFlow.velLpf[1] = 0.0f;
+
+    opFlow.isOpFlowOk = false;
+    opFlow.isDataValid = false;
 }
 
 float gx_sum = 0.0f;
@@ -53,41 +123,157 @@ float gy_sum = 0.0f;
 uint16_t count = 0U;
 void Pos_Est_Update_2000HZ(void)
 {
-    gx_sum+=g_imu_filter.gyro_filt_x;
-    gy_sum+=g_imu_filter.gyro_filt_y;
+    gx_sum += g_imu_filter.gyro_filt_x;
+    gy_sum += g_imu_filter.gyro_filt_y;
     count++;
 }
 
 void Pos_Est_Update_250HZ(void)
 {
+
+    static float rangeLpf = 0.f;                                                 // 激光测距低通
+    static float accLpf[3] = {0.f};                                              /*加速度低通*/
+                                                                                 // float weight = wBaro;				//气压权重，范围0-1，0表示完全信任气压高度，1表示完全信任激光高度       // 不用气压计试试
+    static float fusedHeightLpf = 0.f;                                           // 融合高度低通
+    fusedHeightLpf += (g_tof_fused_height_mm / 1000.0f - fusedHeightLpf) * 0.1f; // 单位m，融合高度低通
+
+    float ax, ay, az;
+    float az_up;
+    AccelCalibration_GetLevelAccelMps2(&ax, &ay, &az); /*获取水平系线加速度，单位m/s^2*/
+    az_up = AccelCalibration_GetVerticalAccelUpMps2();
+    ax *= 100.0f; /*转换为cm/s^2*/
+    ay *= 100.0f;
+    az *= 100.0f;
+    az_up *= 1000.0f; /* Z轴统一使用mm/s^2 */
+    if (ax < 4.0f && ax > -4.0f)
+    {
+        ax = 0.0f;
+    }
+    if (ay < 4.0f && ay > -4.0f)
+    {
+        ay = 0.0f;
+    }
+    if (az < 4.0f && az > -4.0f)
+    {
+        az = 0.0f;
+    }
+    if (az_up < 40.0f && az_up > -40.0f)
+    {
+        az_up = 0.0f;
+    }
+    accLpf[0] += (ax - accLpf[0]) * 0.1f;    /*加速度低通*/
+    accLpf[1] += (ay - accLpf[1]) * 0.1f;    /*加速度低通*/
+    accLpf[2] += (az_up - accLpf[2]) * 0.1f; /*加速度低通*/
+    accLpf[0] = (accLpf[0] > 1000.0f) ? 1000.0f : accLpf[0] < -1000.0f ? -1000.0f
+                                                                       : accLpf[0]; /*加速度限幅*/
+    accLpf[1] = (accLpf[1] > 1000.0f) ? 1000.0f : accLpf[1] < -1000.0f ? -1000.0f
+                                                                       : accLpf[1]; /*加速度限幅*/
+    accLpf[2] = (accLpf[2] > 10000.0f) ? 10000.0f : accLpf[2] < -10000.0f ? -10000.0f
+                                                                       : accLpf[2]; /*加速度限幅*/
+
+    // 实际测试
+    // 飞机向正前方水平加速 estimator.acc[0]为正
+    // 飞机水平向右方加速   estimator.acc[1]是正
+    // 飞机垂直向上加速    estimator.acc[2]是正
+    estimator.acc[0] = accLpf[1]; /*更新估测加速度，单位cm/s^2*/
+    estimator.acc[1] = accLpf[0];
+    estimator.acc[2] = accLpf[2]; /* Z轴单位:mm/s^2 */
+    float errPosZ = (float)g_tof_fused_height_mm - estimator.pos[2]; /* Z轴误差统一:mm */
+
+    /* 位置预估: Z-axis */
+    inavFilterPredict(2, POS_EST_250HZ_DT, estimator.acc[2]);
+    /* 位置校正: Z-axis */
+    inavFilterCorrectPos(2, POS_EST_250HZ_DT, errPosZ, 1);
+
+    float opflowDt = POS_EST_250HZ_DT;
+
+    float opResidualX = opFlow.posSum[0] - estimator.pos[0];
+    float opResidualY = opFlow.posSum[1] - estimator.pos[1];
+    float opResidualXVel = opFlow.velLpf[0] - estimator.vel[0];
+    float opResidualYVel = opFlow.velLpf[1] - estimator.vel[1];
+
+    float opWeightScaler = 1.0f;
+
+    float wXYPos = 1 * opWeightScaler;     // 1表示完全信任光流位置，0表示完全不信任光流位置
+    float wXYVel = 2 * sq(opWeightScaler); // 二次关系，增加权重区分度，2表示完全信任光流速度，0表示完全不信任光流速度
+
+    /* 位置预估: XY-axis */
+    inavFilterPredict(0, opflowDt, estimator.acc[0]);
+    inavFilterPredict(1, opflowDt, estimator.acc[1]);
+    /* 位置校正: XY-axis */
+    inavFilterCorrectPos(0, opflowDt, opResidualX, wXYPos);
+    inavFilterCorrectPos(1, opflowDt, opResidualY, wXYPos);
+    /* 速度校正: XY-axis */
+    inavFilterCorrectVel(0, opflowDt, opResidualXVel, wXYVel);
+    inavFilterCorrectVel(1, opflowDt, opResidualYVel, wXYVel);
+
+    // wifi_vofa_JustFloat(9u, estimator.pos[0], estimator.pos[1], estimator.pos[2], g_tof_fused_height_mm,
+    //     accLpf[0],accLpf[1],accLpf[2],opFlow.posSum[0],opFlow.posSum[1]);
 }
 
-void Pos_Est_Update_50HZ(void)
+void Pos_Est_Update_100HZ(void)
 {
-    PMW3901_Update_50HZ();
-    g_pos_est_debug.deltaX = g_pmw3901_raw.deltaX;
-    g_pos_est_debug.deltaY = g_pmw3901_raw.deltaY;
-    g_pos_est_debug.squal = g_pmw3901_raw.squal;
+    PMW3901_Update_100HZ(); /* 先更新光流数据，确保读取到最新的像素增量和质量指标 */
 
-    g_pos_est_debug.pixel_flow_X = g_pos_est_debug.deltaX / 470.0f / 0.02f; /* 470像素视场，20ms周期 */
-    g_pos_est_debug.pixel_flow_Y = g_pos_est_debug.deltaY / 470.0f / 0.02f;
+    int16_t pixelDx = g_pmw3901_raw.deltaX;
+    int16_t pixelDy = g_pmw3901_raw.deltaY;
 
-    /*   获取机体陀螺仪角速率 (rad/s)
-     *   roll右倾→图像左移→deltaX为负, 需 +gyro_roll 补偿
-     *   pitch抬头→图像后移→deltaY为负, 需 -gyro_pitch 补偿
-     *   符号与拟合K值一致: K_X=+8.40, K_Y=-8.85*/
+    /* 异常值剔除：仅在增量合理时进入积分，降低突发噪声影响 */
+    if (Pos_Est_Absf(pixelDx) < 100 && Pos_Est_Absf(pixelDy) < 100)
+    {
+        opFlow.pixSum[0] += pixelDx;
+        opFlow.pixSum[1] += pixelDy;
+    }
 
+    float height = g_tof_fused_height_mm / 1000.0f; /*读取高度信息 单位m*/
 
-    float body_rate_x = -(gx_sum/count) * POS_EST_DEG2RAD; // = -gx_rad
-    float body_rate_y = (gy_sum/count) * POS_EST_DEG2RAD;  // = +gy_rad
-    count = 0U;
-    gx_sum = 0.0f;
-    gy_sum = 0.0f;
+    if (height < 0.1f) /*高度过低时不更新位置，避免地面效应干扰*/
+    {
+        opFlow.isDataValid = 0U;
+        return;
+    }
+    /* 位移换算系数：1m 标定值 * 当前高度(m) */
+    float coeff = RESOLUTION * height;
 
-    float flow_comp_x = g_pos_est_debug.pixel_flow_X - body_rate_x; // = flow_rate_x − (−gx_rad) = flow_rate_x + gx_rad
-    float flow_comp_y = g_pos_est_debug.pixel_flow_Y - body_rate_y; // = flow_rate_y − (+gy_rad) = flow_rate_y − gy_rad
+    /*
+     * 姿态补偿：
+     * 俯仰/横滚会导致图像平面出现“伪位移”，
+     * 使用 tan(角度) 进行一阶几何补偿。
+     */
+    float tanRoll = Pos_Est_Tan(g_euler.roll * DEG2RAD);
+    float tanPitch = Pos_Est_Tan(g_euler.pitch * DEG2RAD);
 
+    opFlow.pixComp[0] = 480.f * tanPitch; /*像素补偿，负方向*/
+    opFlow.pixComp[1] = 480.f * tanRoll;
+    opFlow.pixValid[0] = (opFlow.pixSum[0] + opFlow.pixComp[0]); /*实际输出像素*/
+    opFlow.pixValid[1] = (opFlow.pixSum[1] + opFlow.pixComp[1]);
 
-    wifi_vofa_JustFloat(7U, g_pos_est_debug.pixel_flow_X, g_pos_est_debug.pixel_flow_Y, body_rate_x, body_rate_y,flow_comp_x, flow_comp_y, g_pos_est_debug.squal);
-    
+    /*
+     * 位移增量 = 系数 * 两次有效像素差
+     * 注意：此处使用 pixValid 与上次 pixValid 的差，
+     * 不是直接使用当前帧 deltaX/deltaY，可抑制短时噪声。
+     */
+    opFlow.deltaPos[0] = coeff * (opFlow.pixValid[0] - opFlow.pixValidLast[0]); /*2帧之间位移变化量，单位cm*/
+    opFlow.deltaPos[1] = coeff * (opFlow.pixValid[1] - opFlow.pixValidLast[1]);
+    opFlow.pixValidLast[0] = opFlow.pixValid[0]; /*上一次实际输出像素*/
+    opFlow.pixValidLast[1] = opFlow.pixValid[1];
+
+    /* 速度 = 位移 / dt，单位 cm/s */
+    opFlow.deltaVel[0] = opFlow.deltaPos[0] / POS_EST_100HZ_DT; /*速度 cm/s*/
+    opFlow.deltaVel[1] = opFlow.deltaPos[1] / POS_EST_100HZ_DT;
+
+    opFlow.velLpf[0] += (opFlow.deltaVel[0] - opFlow.velLpf[0]) * 0.15f; /*速度低通 cm/s*/
+    opFlow.velLpf[1] += (opFlow.deltaVel[1] - opFlow.velLpf[1]) * 0.15f; /*速度低通 cm/s*/
+
+    /* 速度限幅，防止异常输入影响下游位置控制 */
+    opFlow.velLpf[0] = Pos_Est_Clampf(opFlow.velLpf[0], -POS_EST_VEL_LIMIT, POS_EST_VEL_LIMIT); /*速度限幅 cm/s*/
+    opFlow.velLpf[1] = Pos_Est_Clampf(opFlow.velLpf[1], -POS_EST_VEL_LIMIT, POS_EST_VEL_LIMIT); /*速度限幅 cm/s*/
+
+    /* 累加位移，用于定点控制和调试观测 */
+    opFlow.posSum[0] += opFlow.deltaPos[0]; /*累积位移 cm*/
+    opFlow.posSum[1] += opFlow.deltaPos[1]; /*累积位移 cm*/
+
+    opFlow.isOpFlowOk = (g_pmw3901_raw.squal >= POS_EST_SQUAL_MIN) ? 1U : 0U; /*光流状态*/
+
+    wifi_vofa_JustFloat(7u, opFlow.velLpf[0], opFlow.velLpf[1], opFlow.posSum[0], opFlow.posSum[1], g_pmw3901_raw.squal, g_euler.roll, g_euler.pitch);
 }

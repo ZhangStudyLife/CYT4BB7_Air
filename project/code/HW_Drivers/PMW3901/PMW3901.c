@@ -128,7 +128,7 @@ static const pmw3901_reg_cfg_t pmw3901_init_stage2[] =
     { 0x7F, 0x00 }
 };
 
-/* PMW3901光流传感器原始数据，由PMW3901_Update()周期性填充，已做极性映射 */
+/* PMW3901光流传感器原始数据，由PMW3901_Update_50HZ()周期性填充，已做极性映射 */
 volatile pmw3901_raw_t g_pmw3901_raw = {0};
 /* 初始化完成标志，1=已初始化，0=未初始化或初始化失败 */
 static uint8 pmw3901_inited = 0U;
@@ -354,24 +354,19 @@ uint8 PMW3901_Init(void)
     /* 标记初始化完成 */
     pmw3901_inited = 1U;
 
-    /* 清除初始脏数据：读取motion和delta寄存器丢弃上电累积的像素值 */
+    /* 清除初始脏数据：Burst Read会同时清除motion和delta累加器，无需额外单寄存器读取 */
     {
         uint8 flush_i;
         pmw3901_raw_t discard = {0};
         for (flush_i = 0U; flush_i < PMW3901_INIT_FLUSH_COUNT; ++flush_i)
         {
-            pmw3901_reg_read(PMW3901_REG_MOTION);
-            pmw3901_reg_read(PMW3901_REG_DELTA_X_L);
-            pmw3901_reg_read(PMW3901_REG_DELTA_X_H);
-            pmw3901_reg_read(PMW3901_REG_DELTA_Y_L);
-            pmw3901_reg_read(PMW3901_REG_DELTA_Y_H);
             pmw3901_motion_burst_read(&discard);
             system_delay_ms(PMW3901_FLUSH_INTERVAL_MS);
         }
     }
 
     /* 执行首次有效数据读取 */
-    PMW3901_Update();
+    PMW3901_Update_50HZ();
     return 0U;
 }
 
@@ -389,7 +384,7 @@ uint8 PMW3901_ReInit(void)
 }
 
 /**
- * @brief  PMW3901数据更新（需周期性调用，典型100Hz）
+ * @brief  PMW3901数据更新（需周期性调用，典型50Hz）
  *         执行Burst Read读取全部运动数据，检查motionOccured标志位，
  *         仅当传感器报告有新运动时才更新deltaX/deltaY并施加极性映射，
  *         否则将deltaX/deltaY清零防止残留脏数据
@@ -397,7 +392,7 @@ uint8 PMW3901_ReInit(void)
  * @param  无
  * @return 无
  */
-void PMW3901_Update(void)
+void PMW3901_Update_50HZ(void)
 {
     pmw3901_raw_t burst_data = {0};
 
@@ -409,7 +404,7 @@ void PMW3901_Update(void)
     pmw3901_motion_burst_read(&burst_data);
 
     /* 检查motionOccured标志：传感器未完成新帧处理时delta可能为脏数据 */
-    if (burst_data.motionOccured == 0U)
+    if (burst_data.squal == 0U)
     {
         burst_data.deltaX = 0;
         burst_data.deltaY = 0;

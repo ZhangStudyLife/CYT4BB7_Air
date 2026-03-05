@@ -109,13 +109,15 @@ int main(void)
         if (g_tick_100HZ > 0U)
         {
             g_tick_100HZ--;
-            Pos_Est_Update_100HZ();
+
+            
             crsf_send_25hz(); // CRSF 25Hz发送函数（100Hz调用一次）
             CRSF_Update_100HZ();
             FC_Loop_100Hz();
             s_tick_div_fc_start_50hz++;
             if (s_tick_div_fc_start_50hz >= 2)
             {
+                Pos_Est_Update_50HZ();
                 s_tick_div_fc_start_50hz = 0U;
                 FC_Loop_50Hz();
             }

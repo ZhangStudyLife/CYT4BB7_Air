@@ -16,11 +16,11 @@
 #define PMW3901_SPI_SPEED        (2 * 1000 * 1000)   /* SPI通信速率 2MHz */
 
 /* ======================== 光流极性映射 ======================== */
-#define PMW3901_SIGN_X           (1)                 /* X轴极性：芯片X方向与机体X方向同向 */
-#define PMW3901_SIGN_Y           (-1)                /* Y轴极性：芯片Y方向与机体Y方向反向 */
+#define PMW3901_SIGN_X           (-1)                 /* X轴极性：芯片X方向与机体X方向同向 */
+#define PMW3901_SIGN_Y           (1)                /* Y轴极性：芯片Y方向与机体Y方向反向 */
 
-/* 寄存器写入校验开关：1=写后回读验证，0=直接写入不验证 */
-#define PMW3901_VERIFY_WRITES    (1)
+/* 寄存器写入校验开关：0=直接写入不验证（内部寄存器多为非公开寄存器，回读值可能与写入值不同） */
+#define PMW3901_VERIFY_WRITES    (0)
 
 /**
  * @brief PMW3901 Motion Burst 原始数据结构体
@@ -56,7 +56,7 @@ typedef __packed struct motionBurst_s
     uint16 shutter;                         /* 曝光时间（大端序传输，驱动内做字节交换） */
 } pmw3901_raw_t;
 
-/* PMW3901光流传感器原始数据全局变量，由PMW3901_Update()更新，已做极性映射 */
+/* PMW3901光流传感器原始数据全局变量，由PMW3901_Update_50HZ()更新，已做极性映射 */
 extern volatile pmw3901_raw_t g_pmw3901_raw;
 
 /**
@@ -78,13 +78,13 @@ uint8 PMW3901_Init(void);
 uint8 PMW3901_ReInit(void);
 
 /**
- * @brief  PMW3901数据更新（需周期性调用，典型100Hz）
+ * @brief  PMW3901数据更新（需周期性调用，典型50Hz）
  *         执行Burst Read读取运动数据，并对deltaX/deltaY施加极性映射
  *         结果写入全局变量 g_pmw3901_raw
  *
  * @param  无
  * @return 无
  */
-void PMW3901_Update(void);
+void PMW3901_Update_50HZ(void);
 
 #endif /* PMW3901_H_ */

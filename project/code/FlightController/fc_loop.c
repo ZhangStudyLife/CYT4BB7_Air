@@ -210,7 +210,16 @@ void FC_Loop_100Hz(void)
     //             );
 
 
-    wifi_vofa_JustFloat(4u,g_pmw3901_raw.deltaX,g_pmw3901_raw.deltaY,g_pmw3901_raw.frameFrom0,g_pmw3901_raw.squal);
+    /* 光流调试：前4路保持原有顺序，后4路补充纹理质量与原始像素统计 */
+    wifi_vofa_JustFloat(8u,
+                        g_pmw3901_raw.deltaX,
+                        g_pmw3901_raw.deltaY,
+                        g_pmw3901_raw.frameFrom0,
+                        g_pmw3901_raw.squal,
+                        g_pmw3901_raw.rawDataSum,
+                        g_pmw3901_raw.maxRawData,
+                        g_pmw3901_raw.minRawData,
+                        g_pmw3901_raw.motionOccured);
 }
 
 void FC_Loop_500Hz(void)

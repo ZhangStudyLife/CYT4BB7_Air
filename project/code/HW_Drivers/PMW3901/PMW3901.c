@@ -16,7 +16,7 @@
 #define PMW3901_REG_RETRY_MAX          (5U)
 
 #define PMW3901_TSRAD_US               (300U)
-#define PMW3901_TSR_US                 (35U)
+#define PMW3901_TSR_US                 (500U)
 #define PMW3901_TSWX_US                (120U)
 #define PMW3901_TSRX_US                (200U)
 #define PMW3901_TBEXIT_US              (1U)
@@ -72,11 +72,11 @@ static const pmw3901_reg_cfg_t pmw3901_init_stage1[] =
     { 0x64, 0xFF },
     { 0x65, 0x1F },
     { 0x7F, 0x14 },
-    { 0x65, 0x60 },
+    { 0x65, 0x67 },
     { 0x66, 0x08 },
-    { 0x63, 0x78 },
+    { 0x63, 0x70 },
     { 0x7F, 0x15 },
-    { 0x48, 0x58 },
+    { 0x48, 0x48 },
     { 0x7F, 0x07 },
     { 0x41, 0x0D },
     { 0x43, 0x14 },
@@ -106,7 +106,10 @@ static const pmw3901_reg_cfg_t pmw3901_init_stage2[] =
     { 0x5B, 0xA0 },
     { 0x4E, 0xA8 },
     { 0x5A, 0x50 },
-    { 0x40, 0x80 }
+    { 0x40, 0x80 },
+    { 0x7F, 0x0E },
+    { 0x72, 0x0F },
+    { 0x7F, 0x00 }
 };
 
 volatile pmw3901_raw_t g_pmw3901_raw = {0};

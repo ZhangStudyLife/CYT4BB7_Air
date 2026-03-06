@@ -282,18 +282,18 @@ void Pos_Est_Update_100HZ(void)
     opFlow.isOpFlowOk = (g_pmw3901_raw.squal >= POS_EST_SQUAL_MIN) ? 1U : 0U; /*光流状态*/
 
     /* 16通道VOFA调试输出：完整光流处理链路诊断 */
-    wifi_vofa_JustFloat(12u,
-        estimator.vel[0],         /* CH7:  估测速度X cm/s */
-        estimator.vel[1],         /* CH8:  估测速度Y cm/s */
-        opFlow.velLpf[0],         /* CH9:  滤波速度X cm/s */
-        opFlow.velLpf[1],         /* CH10: 滤波速度Y cm/s */
-        estimator.pos[0],         /* CH11: 估测位移X cm */
-        estimator.pos[1],         /* CH12: 估测位移Y cm */
-        opFlow.posSum[0],         /* CH11: 累积位移X cm */
-        opFlow.posSum[1],         /* CH12: 累积位移Y cm */
-        (float)g_pmw3901_raw.squal, /* CH13: 光流质量 */
-        (float)g_tof_fused_height_mm, /* CH14: 融合高度 mm */
-        g_euler.roll,             /* CH15: 横滚角 deg */
-        g_euler.pitch             /* CH16: 俯仰角 deg */
-    );
+    // wifi_vofa_JustFloat(12u,
+    //     estimator.vel[0],         /* CH7:  估测速度X cm/s */
+    //     estimator.vel[1],         /* CH8:  估测速度Y cm/s */
+    //     opFlow.velLpf[0],         /* CH9:  滤波速度X cm/s */
+    //     opFlow.velLpf[1],         /* CH10: 滤波速度Y cm/s */
+    //     estimator.pos[0],         /* CH11: 估测位移X cm */
+    //     estimator.pos[1],         /* CH12: 估测位移Y cm */
+    //     opFlow.posSum[0],         /* CH11: 累积位移X cm */
+    //     opFlow.posSum[1],         /* CH12: 累积位移Y cm */
+    //     (float)g_pmw3901_raw.squal, /* CH13: 光流质量 */
+    //     (float)g_tof_fused_height_mm, /* CH14: 融合高度 mm */
+    //     g_euler.roll,             /* CH15: 横滚角 deg */
+    //     g_euler.pitch             /* CH16: 俯仰角 deg */
+    // );
 }

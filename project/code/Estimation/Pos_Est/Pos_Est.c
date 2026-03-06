@@ -200,8 +200,26 @@ void Pos_Est_Update_250HZ(void)
     inavFilterCorrectVel(0, opflowDt, opResidualXVel, wXYVel);
     inavFilterCorrectVel(1, opflowDt, opResidualYVel, wXYVel);
 
-    // wifi_vofa_JustFloat(9u, estimator.pos[0], estimator.pos[1], estimator.pos[2], g_tof_fused_height_mm,
-    //     accLpf[0],accLpf[1],accLpf[2],opFlow.posSum[0],opFlow.posSum[1]);
+    /* 16通道VOFA调试输出：完整光流处理链路诊断 */
+    wifi_vofa_JustFloat(16u,
+                        g_pmw3901_raw.deltaX, 
+                        g_pmw3901_raw.deltaY, 
+                        g_pmw3901_raw.squal,  
+                        estimator.vel[0],
+                        estimator.vel[1],
+                        g_tof_fused_height_mm,
+                        g_euler.roll,
+                        g_euler.pitch,
+                        g_imu_filter.acc_filt_x,
+                        g_imu_filter.acc_filt_y,
+                        g_imu_filter.acc_filt_z,
+                        g_imu_filter.gyro_filt_x,
+                        g_imu_filter.gyro_filt_y,
+                        g_imu_filter.gyro_filt_z,
+                        ax,
+                        ay);
+
+
 }
 
 void Pos_Est_Update_100HZ(void)
@@ -227,8 +245,8 @@ void Pos_Est_Update_100HZ(void)
     float tanRoll = Pos_Est_Tan(g_euler.roll * DEG2RAD);
     float tanPitch = Pos_Est_Tan(g_euler.pitch * DEG2RAD);
 
-    opFlow.pixComp[0] = 480.f * tanRoll;  /*右向轴由横滚补偿：右倾时光流看到地面左移，补偿抵消*/
-    opFlow.pixComp[1] = -480.f * tanPitch; /*前向轴由俯仰补偿：符号取反以正确抵消姿态耦合*/
+    opFlow.pixComp[0] = 480.f * tanRoll;                         /*右向轴由横滚补偿：右倾时光流看到地面左移，补偿抵消*/
+    opFlow.pixComp[1] = -480.f * tanPitch;                       /*前向轴由俯仰补偿：符号取反以正确抵消姿态耦合*/
     opFlow.pixValid[0] = (opFlow.pixSum[0] + opFlow.pixComp[0]); /*实际输出像素*/
     opFlow.pixValid[1] = (opFlow.pixSum[1] + opFlow.pixComp[1]);
 
@@ -272,28 +290,18 @@ void Pos_Est_Update_100HZ(void)
     opFlow.velLpf[1] = Pos_Est_Clampf(opFlow.velLpf[1], -POS_EST_VEL_LIMIT, POS_EST_VEL_LIMIT); /*速度限幅 cm/s*/
 
     /* 位移死区：0.2cm≈1.6像素@0.6m，过滤单像素噪声对posSum的累积漂移 */
-    if (Pos_Est_Absf(opFlow.deltaPos[0]) < 0.2f) { opFlow.deltaPos[0] = 0.0f; }
-    if (Pos_Est_Absf(opFlow.deltaPos[1]) < 0.2f) { opFlow.deltaPos[1] = 0.0f; }
+    if (Pos_Est_Absf(opFlow.deltaPos[0]) < 0.2f)
+    {
+        opFlow.deltaPos[0] = 0.0f;
+    }
+    if (Pos_Est_Absf(opFlow.deltaPos[1]) < 0.2f)
+    {
+        opFlow.deltaPos[1] = 0.0f;
+    }
 
     /* 累加位移，用于定点控制和调试观测 */
     opFlow.posSum[0] += opFlow.deltaPos[0]; /*累积位移 cm*/
     opFlow.posSum[1] += opFlow.deltaPos[1]; /*累积位移 cm*/
 
     opFlow.isOpFlowOk = (g_pmw3901_raw.squal >= POS_EST_SQUAL_MIN) ? 1U : 0U; /*光流状态*/
-
-    /* 16通道VOFA调试输出：完整光流处理链路诊断 */
-    wifi_vofa_JustFloat(12u,
-        estimator.vel[0],         /* CH7:  估测速度X cm/s */
-        estimator.vel[1],         /* CH8:  估测速度Y cm/s */
-        opFlow.velLpf[0],         /* CH9:  滤波速度X cm/s */
-        opFlow.velLpf[1],         /* CH10: 滤波速度Y cm/s */
-        estimator.pos[0],         /* CH11: 估测位移X cm */
-        estimator.pos[1],         /* CH12: 估测位移Y cm */
-        opFlow.posSum[0],         /* CH11: 累积位移X cm */
-        opFlow.posSum[1],         /* CH12: 累积位移Y cm */
-        (float)g_pmw3901_raw.squal, /* CH13: 光流质量 */
-        (float)g_tof_fused_height_mm, /* CH14: 融合高度 mm */
-        g_euler.roll,             /* CH15: 横滚角 deg */
-        g_euler.pitch             /* CH16: 俯仰角 deg */
-    );
 }

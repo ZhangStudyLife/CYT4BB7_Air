@@ -214,8 +214,8 @@ void Pos_Est_Update_100HZ(void)
     int16_t pixelDx = g_pmw3901_raw.deltaX;
     int16_t pixelDy = g_pmw3901_raw.deltaY;
 
-    /* 异常值剔除：仅在增量合理时进入积分，降低突发噪声影响 */
-    if (Pos_Est_Absf(pixelDx) < 100 && Pos_Est_Absf(pixelDy) < 100)
+    /* 异常值剔除：阈值35像素，过滤PMW3901周期性突发噪声（实测静止时突发可达±20像素） */
+    if (Pos_Est_Absf(pixelDx) < 40 && Pos_Est_Absf(pixelDy) < 40)
     {
         opFlow.pixSum[0] += pixelDx;
         opFlow.pixSum[1] += pixelDy;
@@ -236,10 +236,21 @@ void Pos_Est_Update_100HZ(void)
     opFlow.pixValid[1] = (opFlow.pixSum[1] + opFlow.pixComp[1]);
 
     /* 位移换算系数：1m 标定值 * 当前高度(m) */
+    static uint8_t heightWasLow = 1U;
     float coeff = RESOLUTION * height;
     if (height < 0.15f) /*高度过低时不更新位置，避免地面效应干扰*/
     {
         coeff = 0.0f;
+        heightWasLow = 1U;
+    }
+
+    /* 首帧跳过：从低高度过渡到有效高度时，同步pixValidLast防止
+     * pixValid-pixValidLast(=0)产生巨大跳变（如pitch=20°时可跳22cm） */
+    if (heightWasLow && coeff > 0.0f)
+    {
+        heightWasLow = 0U;
+        opFlow.pixValidLast[0] = opFlow.pixValid[0];
+        opFlow.pixValidLast[1] = opFlow.pixValid[1];
     }
 
     /*
@@ -263,9 +274,9 @@ void Pos_Est_Update_100HZ(void)
     opFlow.velLpf[0] = Pos_Est_Clampf(opFlow.velLpf[0], -POS_EST_VEL_LIMIT, POS_EST_VEL_LIMIT); /*速度限幅 cm/s*/
     opFlow.velLpf[1] = Pos_Est_Clampf(opFlow.velLpf[1], -POS_EST_VEL_LIMIT, POS_EST_VEL_LIMIT); /*速度限幅 cm/s*/
 
-    /* 位移死区：过滤微小噪声，减少posSum随机游走 */
-    if (Pos_Est_Absf(opFlow.deltaPos[0]) < 0.1f) { opFlow.deltaPos[0] = 0.0f; }
-    if (Pos_Est_Absf(opFlow.deltaPos[1]) < 0.1f) { opFlow.deltaPos[1] = 0.0f; }
+    /* 位移死区：0.2cm≈1.6像素@0.6m，过滤单像素噪声对posSum的累积漂移 */
+    if (Pos_Est_Absf(opFlow.deltaPos[0]) < 0.2f) { opFlow.deltaPos[0] = 0.0f; }
+    if (Pos_Est_Absf(opFlow.deltaPos[1]) < 0.2f) { opFlow.deltaPos[1] = 0.0f; }
 
     /* 累加位移，用于定点控制和调试观测 */
     opFlow.posSum[0] += opFlow.deltaPos[0]; /*累积位移 cm*/

@@ -1,4 +1,4 @@
-#include "Pos_Est.h"
+﻿#include "Pos_Est.h"
 #include "zf_common_headfile.h"
 #include <math.h>
 
@@ -9,7 +9,7 @@
 #define INAV_ACC_BIAS_ACCEPTANCE_VALUE (GRAVITY_CMSS * 0.25f) // Max accepted bias correction of 0.25G - unlikely we are going to be that much off anyway
 
 volatile opFlow_t opFlow = {0};
-static estimator_t estimator =
+estimator_t estimator =
     {
         .vAccDeadband = 4.0f,
         .accBias[0] = 0.0f,

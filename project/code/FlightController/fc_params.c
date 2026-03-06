@@ -23,6 +23,7 @@ void FC_Params_Init(void)
     g_fc_params.angle_dt = 0.002f; /* 500Hz */
     g_fc_params.pos_xy_dt = 0.01f; /* 100Hz */
     g_fc_params.pos_z_dt = 0.02f;  /* 50Hz */
+    g_fc_params.vel_xy_dt = 0.01f;  /* 100Hz */
     g_fc_params.vel_z_dt = 0.01f;  /* 100Hz */
 
     /* ===== 油门参数 ===== */
@@ -99,6 +100,22 @@ void FC_Params_Init(void)
     g_fc_params.pos_z_kff = 0.0f;
     g_fc_params.pos_z_i_limit = 0.0f;
     g_fc_params.pos_z_d_lpf = 0.20f;
+
+    /* ===== X轴速度环参数 ===== */
+    g_fc_params.vel_x_kp = 0.0f;
+    g_fc_params.vel_x_ki = 0.0f;
+    g_fc_params.vel_x_kd = 0.0f;
+    g_fc_params.vel_x_kff = 0.0f;
+    g_fc_params.vel_x_i_limit = 0.0f;
+    g_fc_params.vel_x_d_lpf = 0.0f;
+
+    /* ===== Y轴速度环参数 ===== */
+    g_fc_params.vel_y_kp = 0.0f;
+    g_fc_params.vel_y_ki = 0.0f;
+    g_fc_params.vel_y_kd = 0.0f;
+    g_fc_params.vel_y_kff = 0.0f;
+    g_fc_params.vel_y_i_limit = 0.0f;
+    g_fc_params.vel_y_d_lpf = 0.0f;
 
     /* ===== Z轴速度环参数 ===== */
     g_fc_params.vel_z_kp = 900.0f;

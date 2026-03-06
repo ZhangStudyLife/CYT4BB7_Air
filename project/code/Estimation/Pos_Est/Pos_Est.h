@@ -45,7 +45,7 @@ typedef struct
 
 
 extern volatile opFlow_t opFlow; /* 光流全局状态，跨周期更新需使用volatile */
-
+extern estimator_t estimator;
 
 
 /**

@@ -17,6 +17,7 @@ typedef struct
     float angle_dt; /* 角度环控制周期 */
     float pos_xy_dt; /* 空间位置环控制周期 */
     float pos_z_dt;  /* 空间位置环控制周期 */
+    float vel_xy_dt; /* 空间速度环控制周期 */
     float vel_z_dt; /* 空间速度环控制周期 */
 
     /* ===== 油门参数 ===== */
@@ -94,15 +95,29 @@ typedef struct
     float pos_z_i_limit;
     float pos_z_d_lpf;
 
+    /* ===== X轴的Vel环参数 ===== */
+    float vel_x_kp;
+    float vel_x_ki;
+    float vel_x_kd;
+    float vel_x_kff;      /* 前馈增益 */
+    float vel_x_i_limit;
+    float vel_x_d_lpf;
 
-    /* ===== z轴的Vel环参数 ===== */
+    /* ===== Y轴的Vel环参数 ===== */
+    float vel_y_kp;
+    float vel_y_ki;
+    float vel_y_kd;
+    float vel_y_kff;      /* 前馈增益 */
+    float vel_y_i_limit;
+    float vel_y_d_lpf;
+
+    /* ===== Z轴的Vel环参数 ===== */
     float vel_z_kp;
     float vel_z_ki;
     float vel_z_kd;
     float vel_z_kff;      /* 前馈增益 */
     float vel_z_i_limit;
     float vel_z_d_lpf;
-
 } fc_params_t;
 
 /* ==================== 全局参数实例 ==================== */

@@ -191,36 +191,6 @@ void FC_Loop_100Hz(void)
         s_tof_hist_inited = 0U;
         height_vel_out = 0.0f;
     }
-    float debug_state = (float)FC_START_CRSF_Get_State()*1 + (float)g_tof_fused_valid*10;
-    // wifi_vofa_JustFloat(16U,
-    //                     target_height_m * 1000.0f,
-    //                     g_tof_fused_height_mm,
-    //                     height_pos_pid.p_term,
-    //                     height_pos_pid.i_term,
-    //                     height_pos_pid.d_term,
-    //                     height_pos_out,
-    //                     g_height_vz_mps,
-    //                     height_vel_pid.p_term,
-    //                     height_vel_pid.i_term,
-    //                     height_vel_pid.d_term,
-    //                     -AccelCalibration_GetAccelDownMps2(),
-    //                 g_euler.roll,
-    //                 g_euler.pitch,
-    //                 roll_angle_target,
-    //                 pitch_angle_target,debug_state
-    //             );
-
-
-    /* 光流调试：前4路保持原有顺序，后4路补充纹理质量与原始像素统计 */
-    // wifi_vofa_JustFloat(8u,
-    //                     g_pos_est_debug.raw_flow_dx_count,
-    //                     g_pos_est_debug.raw_flow_dy_count,
-    //                     g_pos_est_output.flow_valid,
-    //                     g_pmw3901_raw.squal,
-    //                     g_pmw3901_raw.rawDataSum,
-    //                     g_pmw3901_raw.maxRawData,
-    //                     g_pmw3901_raw.minRawData,
-    //                     g_pmw3901_raw.motionOccured);
 }
 
 void FC_Loop_500Hz(void)

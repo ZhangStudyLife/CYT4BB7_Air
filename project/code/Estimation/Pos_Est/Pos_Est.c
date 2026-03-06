@@ -123,9 +123,6 @@ float gy_sum = 0.0f;
 uint16_t count = 0U;
 void Pos_Est_Update_2000HZ(void)
 {
-    gx_sum += g_imu_filter.gyro_filt_x;
-    gy_sum += g_imu_filter.gyro_filt_y;
-    count++;
 }
 
 void Pos_Est_Update_250HZ(void)
@@ -231,7 +228,7 @@ void Pos_Est_Update_100HZ(void)
     float tanPitch = Pos_Est_Tan(g_euler.pitch * DEG2RAD);
 
     opFlow.pixComp[0] = 480.f * tanRoll;  /*右向轴由横滚补偿：右倾时光流看到地面左移，补偿抵消*/
-    opFlow.pixComp[1] = 480.f * tanPitch; /*前向轴由俯仰补偿：抬头时光流看到地面后移，补偿抵消*/
+    opFlow.pixComp[1] = -480.f * tanPitch; /*前向轴由俯仰补偿：符号取反以正确抵消姿态耦合*/
     opFlow.pixValid[0] = (opFlow.pixSum[0] + opFlow.pixComp[0]); /*实际输出像素*/
     opFlow.pixValid[1] = (opFlow.pixSum[1] + opFlow.pixComp[1]);
 

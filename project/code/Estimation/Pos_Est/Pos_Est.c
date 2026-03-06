@@ -169,7 +169,7 @@ void Pos_Est_Update_250HZ(void)
     accLpf[1] = (accLpf[1] > 1000.0f) ? 1000.0f : accLpf[1] < -1000.0f ? -1000.0f
                                                                        : accLpf[1]; /*加速度限幅*/
     accLpf[2] = (accLpf[2] > 10000.0f) ? 10000.0f : accLpf[2] < -10000.0f ? -10000.0f
-                                                                       : accLpf[2]; /*加速度限幅*/
+                                                                          : accLpf[2]; /*加速度限幅*/
 
     // 实际测试
     // 飞机向正前方水平加速 estimator.acc[0]为正
@@ -177,13 +177,13 @@ void Pos_Est_Update_250HZ(void)
     // 飞机垂直向上加速    estimator.acc[2]是正
     estimator.acc[0] = accLpf[1]; /*更新估测加速度，单位cm/s^2*/
     estimator.acc[1] = accLpf[0];
-    estimator.acc[2] = accLpf[2]; /* Z轴单位:mm/s^2 */
+    estimator.acc[2] = accLpf[2];                                    /* Z轴单位:mm/s^2 */
     float errPosZ = (float)g_tof_fused_height_mm - estimator.pos[2]; /* Z轴误差统一:mm */
 
     /* 位置预估: Z-axis */
     inavFilterPredict(2, POS_EST_250HZ_DT, estimator.acc[2]);
-    /* 位置校正: Z-axis */
-    inavFilterCorrectPos(2, POS_EST_250HZ_DT, errPosZ, 1);
+    /* 位置校正: Z-axis，权重0.35与正点原子wBaro一致，避免过度校正导致速度振荡 */
+    inavFilterCorrectPos(2, POS_EST_250HZ_DT, errPosZ, 0.35f);
 
     float opflowDt = POS_EST_250HZ_DT;
 
@@ -226,15 +226,6 @@ void Pos_Est_Update_100HZ(void)
     }
 
     float height = g_tof_fused_height_mm / 1000.0f; /*读取高度信息 单位m*/
-
-    if (height < 0.1f) /*高度过低时不更新位置，避免地面效应干扰*/
-    {
-        opFlow.isDataValid = 0U;
-        return;
-    }
-    /* 位移换算系数：1m 标定值 * 当前高度(m) */
-    float coeff = RESOLUTION * height;
-
     /*
      * 姿态补偿：
      * 俯仰/横滚会导致图像平面出现“伪位移”，
@@ -243,10 +234,17 @@ void Pos_Est_Update_100HZ(void)
     float tanRoll = Pos_Est_Tan(g_euler.roll * DEG2RAD);
     float tanPitch = Pos_Est_Tan(g_euler.pitch * DEG2RAD);
 
-    opFlow.pixComp[0] = 480.f * tanPitch; /*像素补偿，负方向*/
-    opFlow.pixComp[1] = 480.f * tanRoll;
+    opFlow.pixComp[0] = 480.f * tanRoll;  /*右向轴由横滚补偿：右倾时光流看到地面左移，补偿抵消*/
+    opFlow.pixComp[1] = 480.f * tanPitch; /*前向轴由俯仰补偿：抬头时光流看到地面后移，补偿抵消*/
     opFlow.pixValid[0] = (opFlow.pixSum[0] + opFlow.pixComp[0]); /*实际输出像素*/
     opFlow.pixValid[1] = (opFlow.pixSum[1] + opFlow.pixComp[1]);
+
+    /* 位移换算系数：1m 标定值 * 当前高度(m) */
+    float coeff = RESOLUTION * height;
+    if (height < 0.15f) /*高度过低时不更新位置，避免地面效应干扰*/
+    {
+        coeff = 0.0f;
+    }
 
     /*
      * 位移增量 = 系数 * 两次有效像素差
@@ -275,5 +273,11 @@ void Pos_Est_Update_100HZ(void)
 
     opFlow.isOpFlowOk = (g_pmw3901_raw.squal >= POS_EST_SQUAL_MIN) ? 1U : 0U; /*光流状态*/
 
-    wifi_vofa_JustFloat(7u, opFlow.velLpf[0], opFlow.velLpf[1], opFlow.posSum[0], opFlow.posSum[1], g_pmw3901_raw.squal, g_euler.roll, g_euler.pitch);
+    wifi_vofa_JustFloat(13u, opFlow.velLpf[0], opFlow.velLpf[1], 
+        opFlow.posSum[0], opFlow.posSum[1], 
+        g_pmw3901_raw.squal,
+         g_euler.roll, g_euler.pitch,
+        opFlow.pixSum[0], opFlow.pixSum[1],
+        opFlow.pixComp[0], opFlow.pixComp[1],
+    opFlow.posSum[2],g_tof_fused_height_mm);
 }

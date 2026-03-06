@@ -264,8 +264,8 @@ void Pos_Est_Update_100HZ(void)
     opFlow.deltaVel[0] = opFlow.deltaPos[0] / POS_EST_100HZ_DT; /*速度 cm/s*/
     opFlow.deltaVel[1] = opFlow.deltaPos[1] / POS_EST_100HZ_DT;
 
-    opFlow.velLpf[0] += (opFlow.deltaVel[0] - opFlow.velLpf[0]) * 0.08f; /*速度低通 cm/s，alpha=0.08降噪*/
-    opFlow.velLpf[1] += (opFlow.deltaVel[1] - opFlow.velLpf[1]) * 0.08f; /*速度低通 cm/s，alpha=0.08降噪*/
+    opFlow.velLpf[0] += (opFlow.deltaVel[0] - opFlow.velLpf[0]) * 0.15f; /*速度低通 cm/s，alpha=0.15降噪*/
+    opFlow.velLpf[1] += (opFlow.deltaVel[1] - opFlow.velLpf[1]) * 0.15f; /*速度低通 cm/s，alpha=0.15降噪*/
 
     /* 速度限幅，防止异常输入影响下游位置控制 */
     opFlow.velLpf[0] = Pos_Est_Clampf(opFlow.velLpf[0], -POS_EST_VEL_LIMIT, POS_EST_VEL_LIMIT); /*速度限幅 cm/s*/
@@ -282,17 +282,13 @@ void Pos_Est_Update_100HZ(void)
     opFlow.isOpFlowOk = (g_pmw3901_raw.squal >= POS_EST_SQUAL_MIN) ? 1U : 0U; /*光流状态*/
 
     /* 16通道VOFA调试输出：完整光流处理链路诊断 */
-    wifi_vofa_JustFloat(16u,
-        (float)pixelDx,           /* CH1:  原始像素增量X(右) */
-        (float)pixelDy,           /* CH2:  原始像素增量Y(前) */
-        opFlow.pixComp[0],        /* CH3:  像素补偿X(右) */
-        opFlow.pixComp[1],        /* CH4:  像素补偿Y(前) */
-        opFlow.deltaPos[0],       /* CH5:  位移增量X cm */
-        opFlow.deltaPos[1],       /* CH6:  位移增量Y cm */
-        opFlow.deltaVel[0],       /* CH7:  原始速度X cm/s */
-        opFlow.deltaVel[1],       /* CH8:  原始速度Y cm/s */
+    wifi_vofa_JustFloat(12u,
+        estimator.vel[0],         /* CH7:  估测速度X cm/s */
+        estimator.vel[1],         /* CH8:  估测速度Y cm/s */
         opFlow.velLpf[0],         /* CH9:  滤波速度X cm/s */
         opFlow.velLpf[1],         /* CH10: 滤波速度Y cm/s */
+        estimator.pos[0],         /* CH11: 估测位移X cm */
+        estimator.pos[1],         /* CH12: 估测位移Y cm */
         opFlow.posSum[0],         /* CH11: 累积位移X cm */
         opFlow.posSum[1],         /* CH12: 累积位移Y cm */
         (float)g_pmw3901_raw.squal, /* CH13: 光流质量 */

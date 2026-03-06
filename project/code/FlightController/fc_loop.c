@@ -220,12 +220,12 @@ void FC_Loop_100Hz(void)
             float ch2 = fc_clampf((float)CRSF_STD[2], -1000.0f, 1000.0f);
 
             target_height_m = (ch2 + 1000.0f) * (1 / 2000.0f);                                                /* CH2: 0m~1m */
-            vely_target = fc_clampf(ch0 * (300.0f / 1000.0f), -300.0f, 300.0f);  /* CH0: -1000~1000 映射为 Y 轴速度目标 -300~300cm/s */
-            velx_target = fc_clampf(-ch1 * (300.0f / 1000.0f), -300.0f, 300.0f); /* CH1: -1000~1000 映射为 X 轴速度目标 -300~300cm/s */
+            velx_target = fc_clampf(ch0 * (300.0f / 1000.0f), -300.0f, 300.0f);  /* CH0: -1000~1000 映射为 X 轴速度目标 -300~300cm/s */
+            vely_target = fc_clampf(-ch1 * (300.0f / 1000.0f), -300.0f, 300.0f); /* CH1: -1000~1000 映射为 Y 轴速度目标 -300~300cm/s */
             velx_out = PID_Update(&velx_pid, velx_target, estimator.vel[0], dt);
             vely_out = PID_Update(&vely_pid, vely_target, estimator.vel[1], dt);
-            velx_out = fc_clampf(velx_out, -40.0f, 40.0f);/*目标角度的限幅-40°-40°*/
-            vely_out = fc_clampf(vely_out, -40.0f, 40.0f);/*目标角度的限幅-40°-40°*/
+            velx_out = fc_clampf(velx_out, -20.0f, 20.0f);/*目标角度的限幅-20°-20°*/
+            vely_out = fc_clampf(vely_out, -20.0f, 20.0f);/*目标角度的限幅-20°-20°*/
             height_vel_out = PID_Update(&height_vel_pid, height_pos_out, g_height_vz_mps, dt);
             height_vel_out = fc_clampf(height_vel_out, height_vel_out_min, height_vel_out_max);
         }
@@ -237,25 +237,8 @@ void FC_Loop_100Hz(void)
             height_vel_out = 0.0f;
         }
     }
-
     float debug_state = (float)FC_START_CRSF_Get_State()*1 + (float)g_tof_fused_valid*10;
-    // wifi_vofa_JustFloat(16U,
-    //                     target_height_m * 1000.0f,
-    //                     g_tof_fused_height_mm,
-    //                     height_pos_pid.p_term,
-    //                     height_pos_pid.i_term,
-    //                     height_pos_pid.d_term,
-    //                     height_pos_out,
-    //                     g_height_vz_mps,
-    //                     height_vel_pid.p_term,
-    //                     height_vel_pid.i_term,
-    //                     height_vel_pid.d_term,
-    //                     -AccelCalibration_GetAccelDownMps2(),
-    //                 g_euler.roll,
-    //                 g_euler.pitch,
-    //                 roll_angle_target,
-    //                 pitch_angle_target,debug_state
-    //             );
+
 
 
     /* 光流调试：前4路保持原有顺序，后4路补充纹理质量与原始像素统计 */
@@ -285,8 +268,8 @@ void FC_Loop_500Hz(void)
         float yaw_angle_meas = g_euler.yaw;
         if(flight_mode == FC_START_CRSF_FLIGHT_MODE_2)/*定点模式*/
         {
-            roll_angle_target = vely_out ;  
-            pitch_angle_target = velx_out; 
+            roll_angle_target = velx_out ;  
+            pitch_angle_target = vely_out; 
         }
         /* 控制量限幅 */
         float limit = 10000.0f;

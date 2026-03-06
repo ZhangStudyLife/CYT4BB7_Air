@@ -304,4 +304,5 @@ void Pos_Est_Update_100HZ(void)
     opFlow.posSum[1] += opFlow.deltaPos[1]; /*累积位移 cm*/
 
     opFlow.isOpFlowOk = (g_pmw3901_raw.squal >= POS_EST_SQUAL_MIN) ? 1U : 0U; /*光流状态*/
+
 }

@@ -145,22 +145,18 @@ void Pos_Est_Update_250HZ(void)
     ay *= 100.0f;
     az *= 100.0f;
     az_up *= 1000.0f; /* Z轴统一使用mm/s^2 */
-    if (ax < 4.0f && ax > -4.0f)
-    {
-        ax = 0.0f;
-    }
-    if (ay < 4.0f && ay > -4.0f)
-    {
-        ay = 0.0f;
-    }
-    if (az < 4.0f && az > -4.0f)
-    {
-        az = 0.0f;
-    }
-    if (az_up < 40.0f && az_up > -40.0f)
-    {
-        az_up = 0.0f;
-    }
+    if (ax > 4.0f) { ax -= 4.0f; }
+    else if (ax < -4.0f) { ax += 4.0f; }
+    else { ax = 0.0f; }
+    if (ay > 4.0f) { ay -= 4.0f; }
+    else if (ay < -4.0f) { ay += 4.0f; }
+    else { ay = 0.0f; }
+    if (az > 4.0f) { az -= 4.0f; }
+    else if (az < -4.0f) { az += 4.0f; }
+    else { az = 0.0f; }
+    if (az_up > 40.0f) { az_up -= 40.0f; }
+    else if (az_up < -40.0f) { az_up += 40.0f; }
+    else { az_up = 0.0f; }
     accLpf[0] += (ax - accLpf[0]) * 0.1f;    /*加速度低通*/
     accLpf[1] += (ay - accLpf[1]) * 0.1f;    /*加速度低通*/
     accLpf[2] += (az_up - accLpf[2]) * 0.1f; /*加速度低通*/
@@ -260,12 +256,16 @@ void Pos_Est_Update_100HZ(void)
     opFlow.deltaVel[0] = opFlow.deltaPos[0] / POS_EST_100HZ_DT; /*速度 cm/s*/
     opFlow.deltaVel[1] = opFlow.deltaPos[1] / POS_EST_100HZ_DT;
 
-    opFlow.velLpf[0] += (opFlow.deltaVel[0] - opFlow.velLpf[0]) * 0.15f; /*速度低通 cm/s*/
-    opFlow.velLpf[1] += (opFlow.deltaVel[1] - opFlow.velLpf[1]) * 0.15f; /*速度低通 cm/s*/
+    opFlow.velLpf[0] += (opFlow.deltaVel[0] - opFlow.velLpf[0]) * 0.08f; /*速度低通 cm/s，alpha=0.08降噪*/
+    opFlow.velLpf[1] += (opFlow.deltaVel[1] - opFlow.velLpf[1]) * 0.08f; /*速度低通 cm/s，alpha=0.08降噪*/
 
     /* 速度限幅，防止异常输入影响下游位置控制 */
     opFlow.velLpf[0] = Pos_Est_Clampf(opFlow.velLpf[0], -POS_EST_VEL_LIMIT, POS_EST_VEL_LIMIT); /*速度限幅 cm/s*/
     opFlow.velLpf[1] = Pos_Est_Clampf(opFlow.velLpf[1], -POS_EST_VEL_LIMIT, POS_EST_VEL_LIMIT); /*速度限幅 cm/s*/
+
+    /* 位移死区：过滤微小噪声，减少posSum随机游走 */
+    if (Pos_Est_Absf(opFlow.deltaPos[0]) < 0.1f) { opFlow.deltaPos[0] = 0.0f; }
+    if (Pos_Est_Absf(opFlow.deltaPos[1]) < 0.1f) { opFlow.deltaPos[1] = 0.0f; }
 
     /* 累加位移，用于定点控制和调试观测 */
     opFlow.posSum[0] += opFlow.deltaPos[0]; /*累积位移 cm*/
@@ -273,11 +273,23 @@ void Pos_Est_Update_100HZ(void)
 
     opFlow.isOpFlowOk = (g_pmw3901_raw.squal >= POS_EST_SQUAL_MIN) ? 1U : 0U; /*光流状态*/
 
-    wifi_vofa_JustFloat(13u, opFlow.velLpf[0], opFlow.velLpf[1], 
-        opFlow.posSum[0], opFlow.posSum[1], 
-        g_pmw3901_raw.squal,
-         g_euler.roll, g_euler.pitch,
-        opFlow.pixSum[0], opFlow.pixSum[1],
-        opFlow.pixComp[0], opFlow.pixComp[1],
-    opFlow.posSum[2],g_tof_fused_height_mm);
+    /* 16通道VOFA调试输出：完整光流处理链路诊断 */
+    wifi_vofa_JustFloat(16u,
+        (float)pixelDx,           /* CH1:  原始像素增量X(右) */
+        (float)pixelDy,           /* CH2:  原始像素增量Y(前) */
+        opFlow.pixComp[0],        /* CH3:  像素补偿X(右) */
+        opFlow.pixComp[1],        /* CH4:  像素补偿Y(前) */
+        opFlow.deltaPos[0],       /* CH5:  位移增量X cm */
+        opFlow.deltaPos[1],       /* CH6:  位移增量Y cm */
+        opFlow.deltaVel[0],       /* CH7:  原始速度X cm/s */
+        opFlow.deltaVel[1],       /* CH8:  原始速度Y cm/s */
+        opFlow.velLpf[0],         /* CH9:  滤波速度X cm/s */
+        opFlow.velLpf[1],         /* CH10: 滤波速度Y cm/s */
+        opFlow.posSum[0],         /* CH11: 累积位移X cm */
+        opFlow.posSum[1],         /* CH12: 累积位移Y cm */
+        (float)g_pmw3901_raw.squal, /* CH13: 光流质量 */
+        (float)g_tof_fused_height_mm, /* CH14: 融合高度 mm */
+        g_euler.roll,             /* CH15: 横滚角 deg */
+        g_euler.pitch             /* CH16: 俯仰角 deg */
+    );
 }

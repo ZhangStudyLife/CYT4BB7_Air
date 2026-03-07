@@ -37,10 +37,7 @@
 ********************************************************************************************************************/
 
 #include "zf_common_headfile.h"
-#include "../code/Estimation/Attitude/IMU_TOP.h"
-#include "../code/Protocols/crsf/crsf.h"
-#include "../code/Estimation/Pos_Est/Pos_Est.h"
-#include "../code/Estimation/Pos_Est/Accel_Calibration.h"
+
 extern volatile uint32 tick_500us_cnt;
 extern volatile uint16 g_tick_2000HZ;
 extern volatile uint8 g_tick_100HZ;

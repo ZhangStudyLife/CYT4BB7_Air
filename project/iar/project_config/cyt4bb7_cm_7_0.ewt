@@ -1433,6 +1433,12 @@
             <group>
                 <name>Attitude</name>
                 <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Attitude\Accel_Calibration.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Attitude\Accel_Calibration.h</name>
+                </file>
+                <file>
                     <name>$PROJ_DIR$\..\..\code\Estimation\Attitude\IMU_Filtter.c</name>
                 </file>
                 <file>
@@ -1468,12 +1474,6 @@
             </group>
             <group>
                 <name>Pos_Est</name>
-                <file>
-                    <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\Accel_Calibration.c</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\Accel_Calibration.h</name>
-                </file>
                 <file>
                     <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\Pos_Est.c</name>
                 </file>

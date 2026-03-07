@@ -112,24 +112,13 @@
 #include "../code/Estimation/Pos_Est/Pos_Est.h"
 #include "../code/Estimation/Attitude/IMU_TOP.h"
 #include "../code/Protocols/crsf/crsf.h"
-#include "../code/Estimation/Pos_Est/Accel_Calibration.h"
+#include "../code/Estimation/Attitude/Accel_Calibration.h"
 #include "../code/HW_Drivers/Motor/Motor_Drive.h"
 #include "../code/FlightController/fc_start_crsf.h"
 #include "../code/FlightController/fc_loop.h"
 #include "../code/FlightController/fc_params.h"
 #include "../code/HW_Drivers/Beep/Beep.h"
 #include "../code/Protocols/wifi_vofa/wifi_vofa.h"
-
-
-
-
-
-
-
-
-
-
-
 
 
 

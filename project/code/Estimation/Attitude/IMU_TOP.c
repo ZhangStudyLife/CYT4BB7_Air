@@ -8,7 +8,7 @@ IMUFilter_t g_imu_filter;         /* IMU 滤波器状�?*/
 MahonyAhrs_t g_mahony_ahrs;       /* Mahony 姿态解算器状�?*/
 MahonyAhrs_Euler_t g_euler;       /* 当前姿态欧拉角（度�?*/
 uint8 g_imu_ready = 0U;           /* IMU 是否完成初始化与自检 */
-uint32 g_imu_update_count = 0U;   /* 2kHz 更新计数 */
+uint32 g_imu_update_count = 0U;   /* 1kHz ���¼��� */
 static uint8 s_imu_initializing = 0U;
 
 /* ======================== 本地工具函数 ======================== */
@@ -67,7 +67,7 @@ static uint8 IMU_Startup_SelfCheck(void)
 		gyro_abs_sum += gyro_abs;
 		acc_mag_sum += acc_mag;
 
-		system_delay_us(500);
+		system_delay_us(ICM42688_SAMPLE_INTERVAL_US);
 	}
 
 	gyro_abs_sum /= (float)IMU_SELFTEST_SAMPLE_COUNT;
@@ -121,7 +121,8 @@ void IMU_Init_All(void)
 	/* 步骤4: 暖机，丢弃前若干帧用于稳定滤波器内部状�?*/
 	for (i = 0U; i < IMU_WARMUP_DISCARD_SAMPLES; i++)
 	{
-		IMU_Update_2000HZ();
+		IMU_Update_1000HZ();
+		system_delay_us(ICM42688_SAMPLE_INTERVAL_US);
 	}
 
 	g_imu_ready = 1U;
@@ -185,7 +186,8 @@ void IMU_SelectAhrsInput(float *gx, float *gy, float *gz,
 	*az = cal_az;
 }
 
-void IMU_Update_2000HZ(void)
+/* �������ܣ�IMU 1kHz ������ڣ���ɲ������˲�����̬���¡�����ֵ���ޡ� */
+void IMU_Update_1000HZ(void)
 {
 	/* 步骤1: �?ICM42688 读取一帧原始传感器数据 */
 	const float dt_s = IMU_UPDATE_DT_SEC;

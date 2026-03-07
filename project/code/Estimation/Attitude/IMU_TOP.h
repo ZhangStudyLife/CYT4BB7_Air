@@ -10,8 +10,8 @@
 extern "C" {
 #endif
 
-/* ---------------- IMU 鍒濆鍖栧弬鏁帮紙2kHz锛?---------------- */
-#define IMU_WARMUP_DISCARD_SAMPLES   (4000U)
+/* ---------------- IMU 鍒濆鍖栧弬鏁帮紙1kHz锛?---------------- */
+#define IMU_WARMUP_DISCARD_SAMPLES   (1000U) /* IMU预热丢弃样本数，按1kHz约1秒 */
 #define IMU_UPDATE_DT_SEC            (1.0f / IMU_SAMPLE_RATE_HZ)
 
 /* ---------------- 涓婄數鑷鍙傛暟 ---------------- */
@@ -29,7 +29,7 @@ extern uint32 g_imu_update_count;
 void IMU_SelectAhrsInput(float *gx, float *gy, float *gz,
 								float *ax, float *ay, float *az);
 void IMU_Init_All(void);
-void IMU_Update_2000HZ(void);
+void IMU_Update_1000HZ(void); /* IMU 1kHz 更新入口 */
 uint8 IMU_Is_Ready(void);
 
 

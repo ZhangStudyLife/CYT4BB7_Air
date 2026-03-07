@@ -14,7 +14,7 @@
 #include <stdint.h>
 
 /* ======================== 采样率与物理常数 ======================== */
-#define MAHONY_SAMPLE_RATE                  2000.0f
+#define MAHONY_SAMPLE_RATE                  1000.0f
 #define MAHONY_SAMPLE_DT                    (1.0f / MAHONY_SAMPLE_RATE)
 #define DEGREES_TO_RADIANS                  (3.14159265359f / 180.0f)
 #define RADIANS_TO_DEGREES                  (180.0f / 3.14159265359f)
@@ -40,8 +40,8 @@
 #define MAHONY_YAW_CORR_ENABLE              (0U)
 #define MAHONY_STATIC_GYRO_DPS_TH           1.5f
 #define MAHONY_STATIC_ACC_ERR_G_TH          0.08f
-#define MAHONY_STATIC_LOCK_COUNT            (200U)
-#define MAHONY_YAW_BIAS_LP_ALPHA            0.002f
+#define MAHONY_STATIC_LOCK_COUNT            (100U)
+#define MAHONY_YAW_BIAS_LP_ALPHA            0.004f
 #define MAHONY_YAW_GZ_DEADBAND_DPS          0.05f
 
 /* 数值稳定阈值 */

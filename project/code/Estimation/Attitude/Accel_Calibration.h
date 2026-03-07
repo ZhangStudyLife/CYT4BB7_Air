@@ -24,8 +24,8 @@ extern "C" {
 #endif
 
 #define ACCEL_CALIBRATION_GRAVITY_MSS            (9.80665f)
-#define ACCEL_CALIBRATION_DT_S                   (0.0005f)
-#define ACCEL_CALIBRATION_SAMPLES                (2000U)
+#define ACCEL_CALIBRATION_DT_S                   (0.001f)  /* 实时更新周期，单位秒 */
+#define ACCEL_CALIBRATION_SAMPLES                (1000U)  /* 启动静止标定目标样本数，按1kHz约1秒 */
 
 #define ACCEL_CALIBRATION_STD_G_WARN_MAX         (0.050f)
 #define ACCEL_CALIBRATION_STD_G_FAIL_MAX         (0.080f)
@@ -121,7 +121,7 @@ extern AccelCalibration_t g_accel_calibration;
 void AccelCalibration_Init(void);
 void AccelCalibration_Reset(void);
 bool AccelCalibration_Start(void);
-void AccelCalibration_Update_2000HZ(void);
+void AccelCalibration_Update_1000HZ(void); /* 1kHz 实时更新入口 */
 
 void AccelCalibration_SetImuToBodyMatrix(const float matrix[3][3]);
 void AccelCalibration_SetImuToBodyEulerDeg(float roll_deg, float pitch_deg, float yaw_deg);
@@ -153,7 +153,7 @@ bool AccelCalibration_LoadParams(const AccelCalibrationParams_t *params);
 void AccelCalibration_GetParams(AccelCalibrationParams_t *params);
 
 void IMUCalib_Init(void);
-void IMUCalib_Update_2000HZ(void);
+void IMUCalib_Update_1000HZ(void); /* 1kHz IMU 校准状态机更新入口 */
 void IMUCalib_CommandPoll(void);
 uint8_t IMUCalib_LoadFromFlashAndApply(void);
 uint8_t IMUCalib_SaveCurrentToFlash(void);

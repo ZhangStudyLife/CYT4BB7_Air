@@ -36,8 +36,9 @@
 #include "zf_driver_gpio.h"
 #include "zf_driver_spi.h"
 
-/* 飞控默认配置：2kHz 输出速率（Betaflight 风格） */
-#define ICM42688_SAMPLE_RATE_HZ          2000
+/* 飞控默认配置：1kHz 输出速率（Betaflight 风格） */
+#define ICM42688_SAMPLE_RATE_HZ          1000   /* IMU 默认输出速率，单位 Hz */
+#define ICM42688_SAMPLE_INTERVAL_US      1000U  /* IMU 采样周期，单位 us */
 
 /* 常用命令与设备信息 */
 #define WHO_AM_I                         0xF500

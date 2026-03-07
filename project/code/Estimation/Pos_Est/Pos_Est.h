@@ -55,12 +55,12 @@ extern estimator_t estimator;
 void Pos_Est_Init(void);
 
 /**
- * @brief  2000Hz陀螺仪角度积分更新
- *         在每个2000Hz周期累积 pitch/roll 轴角位移(deg)，
- *         等效于对角速度做矩形窗平均滤波(20点@2000Hz)，
+ * @brief  1000Hz陀螺仪角度积分更新
+ *         在每个1000Hz周期累积 pitch/roll 轴角位移(deg)，
+ *         等效于对角速度做矩形窗平均滤波(20点@1000Hz)，
  *         在100Hz周期中读取并重置累积值，供光流姿态解耦补偿使用
  */
-void Pos_Est_Update_2000HZ(void);
+void Pos_Est_Update_1000HZ(void);
 
 /**
  * @brief  250Hz加速度计积分更新

@@ -30,7 +30,7 @@
 #include "ICM42688.h"
 
 /*
- * ICM42688 默认配置（2kHz）
+ * ICM42688 默认配置（1kHz）
  * 1) 陀螺仪量程 2000dps，适合飞控快速机动场景
  * 2) 加速度量程 16g，覆盖常见动态范围
  * 3) 二阶滤波 + 合适带宽，兼顾噪声与延迟
@@ -38,13 +38,13 @@
  */
 ICM42688_CONFIG_STRUCT ICM42688_CONFIG = {
     GYRO_2000DPS,
-    GYRO_ODR_2000HZ,
+    GYRO_ODR_1000HZ,
     ACC_16G,
-    ACC_ODR_2000HZ,
-    _2st,
-    Bandwidth_Factor_4,
-    _2st,
-    Bandwidth_Factor_10,
+    ACC_ODR_1000HZ,
+    _3st,
+    Bandwidth_Factor_2,
+    _3st,
+    Bandwidth_Factor_2,
     Bias_On_Chip_Off
 };
 
@@ -488,7 +488,7 @@ void ICM42688_Bias_Init(uint32 times)
         sum_gyro_x += ICM42688_RAW.gyro_x_lsb;
         sum_gyro_y += ICM42688_RAW.gyro_y_lsb;
         sum_gyro_z += ICM42688_RAW.gyro_z_lsb;
-        system_delay_us(500);
+        system_delay_us(ICM42688_SAMPLE_INTERVAL_US);
     }
 
     ICM42688_Bias_gyro_x = ICM42688_SIGN_GX * (((float)sum_gyro_x / (float)times) / Gyro_Sensitivity);

@@ -38,18 +38,18 @@
 
 #include "zf_common_headfile.h"
 
-extern volatile uint32 tick_500us_cnt;
-extern volatile uint16 g_tick_2000HZ;
+extern volatile uint32 tick_1000us_cnt;
+extern volatile uint16 g_tick_1000HZ;
 extern volatile uint8 g_tick_100HZ;
 // **************************** PIT中断函数 ****************************
 void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数      
 {
     pit_isr_flag_clear(PIT_CH0);
-    if (g_tick_2000HZ < 60000U)
+    if (g_tick_1000HZ < 60000U)
     {
-        g_tick_2000HZ++;
+        g_tick_1000HZ++;
     }
-    tick_500us_cnt++;
+    tick_1000us_cnt++;
 }
 
 void pit0_ch1_isr()                     // 定时器通道 1 周期中断服务函数      

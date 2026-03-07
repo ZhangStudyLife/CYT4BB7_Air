@@ -121,7 +121,7 @@ void Pos_Est_Init(void)
 float gx_sum = 0.0f;
 float gy_sum = 0.0f;
 uint16_t count = 0U;
-void Pos_Est_Update_2000HZ(void)
+void Pos_Est_Update_1000HZ(void)
 {
 }
 

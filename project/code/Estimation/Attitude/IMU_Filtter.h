@@ -9,7 +9,7 @@ extern "C" {
 
 /* ======================== 采样参数 ======================== */
 #ifndef IMU_SAMPLE_RATE_HZ
-#define IMU_SAMPLE_RATE_HZ        (2000.0f)
+#define IMU_SAMPLE_RATE_HZ        (1000.0f)
 #endif
 
 /* ======================== 陀螺滤波链参数 ======================== */

@@ -24,7 +24,7 @@ float vely_out = 0.0f;
 float height_vel_out = 0.0f;
 float height_pos_out = 0.0f;
 float target_height_m = 1.0f;
-extern volatile uint32 tick_500us_cnt;
+extern volatile uint32 tick_1000us_cnt;
 
 float g_height_est_m = 0.0f;
 float g_height_vz_mps = 0.0f;
@@ -122,13 +122,13 @@ void FC_Loop_Reset(void)
 
 void FC_Loop_50Hz(void)
 {
-    static uint32 tick_500us_cnt_last = 0;
-    uint32 tick_now = tick_500us_cnt; // 读一次，缓存
-    uint32 diff = tick_now - tick_500us_cnt_last;
-    float dt = diff * 0.0005f; // 秒
+    static uint32 tick_1000us_cnt_last = 0;
+    uint32 tick_now = tick_1000us_cnt; // 读一次，缓存
+    uint32 diff = tick_now - tick_1000us_cnt_last;
+    float dt = diff * 0.001f; // 秒
     float height_m;
 
-    tick_500us_cnt_last = tick_now;
+    tick_1000us_cnt_last = tick_now;
     if (dt < 0.0001f)
     {
         dt = 0.02f;
@@ -152,15 +152,15 @@ void FC_Loop_100Hz(void)
     static uint8 s_tof_hist_inited = 0U;
     static float s_height_prev_m = 0.0f;
     static float s_height_vz_lpf_mps = 0.0f;
-    static uint32 tick_500us_cnt_last = 0;
+    static uint32 tick_1000us_cnt_last = 0;
     float height_m;
     float height_vz_raw_mps;
     const float vz_lpf_alpha = 0.08f;
     const float height_vel_out_min = -1500.0f;
     const float height_vel_out_max = 1500.0f;
-    uint32 tick_now = tick_500us_cnt; // 读一次，缓存
-    uint32 diff = tick_now - tick_500us_cnt_last;
-    float dt = diff * 0.0005f; // 秒
+    uint32 tick_now = tick_1000us_cnt; // 读一次，缓存
+    uint32 diff = tick_now - tick_1000us_cnt_last;
+    float dt = diff * 0.001f; // 秒
     TOF_update_100HZ();
     s_vl53_recover_div++;
     if (s_vl53_recover_div >= 10U)
@@ -168,7 +168,7 @@ void FC_Loop_100Hz(void)
         s_vl53_recover_div = 0U;
         VL53L1X_recover_update_10HZ();
     }
-    tick_500us_cnt_last = tick_now;
+    tick_1000us_cnt_last = tick_now;
     if (dt < 0.0001f)
     {
         dt = 0.01f;
@@ -263,12 +263,12 @@ void FC_Loop_100Hz(void)
 
 void FC_Loop_500Hz(void)
 {
-    static uint32 tick_500us_cnt_last = 0;
-    uint32 tick_now = tick_500us_cnt; // 读一次，缓存
-    uint32 diff = tick_now - tick_500us_cnt_last;
-    float dt = diff * 0.0005f; // 秒
+    static uint32 tick_1000us_cnt_last = 0;
+    uint32 tick_now = tick_1000us_cnt; // 读一次，缓存
+    uint32 diff = tick_now - tick_1000us_cnt_last;
+    float dt = diff * 0.001f; // 秒
 
-    tick_500us_cnt_last = tick_now;
+    tick_1000us_cnt_last = tick_now;
     if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
     {
         float roll_angle_meas = g_euler.roll;
@@ -288,14 +288,14 @@ void FC_Loop_500Hz(void)
     }
 }
 
-void FC_Loop_2000Hz(void)
+void FC_Loop_1000Hz(void)
 {
-    static uint32 tick_500us_cnt_last = 0;
-    uint32 tick_now = tick_500us_cnt; // 读一次，缓存
-    uint32 diff = tick_now - tick_500us_cnt_last;
-    float dt = diff * 0.0005f; // 秒
+    static uint32 tick_1000us_cnt_last = 0;
+    uint32 tick_now = tick_1000us_cnt; // 读一次，缓存
+    uint32 diff = tick_now - tick_1000us_cnt_last;
+    float dt = diff * 0.001f; // 秒
 
-    tick_500us_cnt_last = tick_now;
+    tick_1000us_cnt_last = tick_now;
     if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
     {
         /* 读取当前角速度 */

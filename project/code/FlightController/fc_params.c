@@ -19,7 +19,7 @@ fc_params_t g_fc_params;
 void FC_Params_Init(void)
 {
     /* ===== 控制周期参数 ===== */
-    g_fc_params.gyro_dt = 0.0005f; /* 2kHz */
+    g_fc_params.gyro_dt = 0.001f; /* 1kHz */
     g_fc_params.angle_dt = 0.002f; /* 500Hz */
     g_fc_params.pos_xy_dt = 0.01f; /* 100Hz */
     g_fc_params.pos_z_dt = 0.02f;  /* 50Hz */

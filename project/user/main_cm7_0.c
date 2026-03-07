@@ -44,8 +44,8 @@
 // 本例程是开源库空工程 可用作移植或者测试各类内外设
 
 // **************************** 代码区域 ****************************
-volatile uint32 tick_500us_cnt = 0U;
-volatile uint16 g_tick_2000HZ = 0U;
+volatile uint32 tick_1000us_cnt = 0U; /* 1kHz 基准节拍计数 */
+volatile uint16 g_tick_1000HZ = 0U; /* 1kHz 主循环待处理节拍 */
 volatile uint8 g_tick_100HZ = 0U;
 static uint8 s_tick_div_pos_250hz = 0U;
 static uint8 s_tick_div_fc_loop_500hz = 0U;
@@ -74,37 +74,37 @@ int main(void)
     FC_Loop_Init();            // 飞控主循环相关资源初始化
     Motor_Init();              // 电机驱动初始化
     FC_START_CRSF_Init();      // 起飞流程状态机初始化
-    pit_us_init(PIT_CH0, 500); // PIT 定时器初始化 500us 中断周期
+    pit_us_init(PIT_CH0, 1000); // PIT 定时器初始化 1000us 中断周期
     pit_ms_init(PIT_CH1, 10);  // 100Hz 节拍
 
     while (true)
     {
-        uint16 tick_2000_guard = 0U;
+        uint16 tick_1000_guard = 0U;
 
-        while ((g_tick_2000HZ > 0U) && (tick_2000_guard < 200U))
+        while ((g_tick_1000HZ > 0U) && (tick_1000_guard < 100U))
         {
-            g_tick_2000HZ--;
-            IMU_Update_2000HZ();
-            AccelCalibration_Update_2000HZ();
-            IMUCalib_Update_2000HZ();
-            Pos_Est_Update_2000HZ();
+            g_tick_1000HZ--;
+            IMU_Update_1000HZ();
+            AccelCalibration_Update_1000HZ();
+            IMUCalib_Update_1000HZ();
+            Pos_Est_Update_1000HZ();
             s_tick_div_fc_loop_500hz++;
-            if (s_tick_div_fc_loop_500hz >= 4U)
+            if (s_tick_div_fc_loop_500hz >= 2U)
             {
                 s_tick_div_fc_loop_500hz = 0U;
                 FC_Loop_500Hz();
 
             }
 
-            FC_Loop_2000Hz();
+            FC_Loop_1000Hz();
             s_tick_div_pos_250hz++;
-            if (s_tick_div_pos_250hz >= 8U)
+            if (s_tick_div_pos_250hz >= 4U)
             {
                 s_tick_div_pos_250hz = 0U;
                 Pos_Est_Update_250HZ();
             }
 
-            tick_2000_guard++;
+            tick_1000_guard++;
         }
 
         if (g_tick_100HZ > 0U)

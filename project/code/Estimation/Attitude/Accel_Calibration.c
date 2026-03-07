@@ -4,7 +4,7 @@
  * 核心流程: rotate -> bias/scale -> 去重力 -> 垂向投影 -> 低通 -> 积分
  * 关键入口:
  *   1) AccelCalibration_Start()      启动静止标定
- *   2) AccelCalibration_Update_2000HZ() 实时更新（2kHz）
+ *   2) AccelCalibration_Update_1000HZ() 实时更新（1kHz）
  ********************************************************************/
 
 #include "Accel_Calibration.h"
@@ -22,11 +22,11 @@
 
 #define IMU_ACCEL_G_MAX_ABS                      (20.0f)
 #define IMU_GYRO_DPS_MAX_ABS                     (6000.0f)
-#define CALIB_MAX_TRY_SAMPLES                    (6000U)
+#define CALIB_MAX_TRY_SAMPLES                    (3000U) /* 启动静止标定最大尝试样本数 */
 #define ACCEL_DOWN_SIGN_FOR_EKF                  (+1.0f)
 
 /* AP 风格：分窗口收敛判定 */
-#define ACCEL_CALIBRATION_WINDOW_SAMPLES         (400U)
+#define ACCEL_CALIBRATION_WINDOW_SAMPLES         (200U)  /* 静止窗口样本数，按1kHz保持约0.2秒 */
 #define ACCEL_CALIBRATION_MAX_WINDOWS            (24U)
 #define ACCEL_CALIBRATION_CONVERGE_WINDOWS       (3U)
 #define ACCEL_CALIBRATION_STATIC_ACCEL_MIN_G     (0.80f)
@@ -57,18 +57,18 @@
 #define ACCEL_CALIBRATION_STATIC_RELOCK_ACC_ERR_MAX_G (0.025f)
 #define ACCEL_CALIBRATION_STATIC_RELOCK_TRIM_MAX_G    (0.60f)
 
-#define IMU_CALIB_GYRO_TARGET_VALID_SAMPLES      (120000U)
-#define IMU_CALIB_GYRO_TIMEOUT_SAMPLES           (600000U)
+#define IMU_CALIB_GYRO_TARGET_VALID_SAMPLES      (60000U) /* 陀螺静止标定目标样本数，保持约60秒 */
+#define IMU_CALIB_GYRO_TIMEOUT_SAMPLES           (300000U) /* 陀螺静止标定超时样本数 */
 #define IMU_CALIB_GYRO_STATIC_MAX_DPS            (1.5f)
 #define IMU_CALIB_GYRO_STATIC_ACC_ERR_G          (0.06f)
 #define IMU_CALIB_GYRO_STD_MAX_DPS               (0.20f)
 #define IMU_CALIB_GYRO_BIAS_MAX_DPS              (3.0f)
-#define IMU_CALIB_GYRO_PRE_STABLE_SAMPLES        (3000U)
+#define IMU_CALIB_GYRO_PRE_STABLE_SAMPLES        (1500U) /* 陀螺标定预稳定样本数 */
 
-#define IMU_CALIB_ACC6_FACE_TARGET_SAMPLES       (5000U)
-#define IMU_CALIB_ACC6_FACE_STABLE_SAMPLES       (1500U)
-#define IMU_CALIB_ACC6_FACE_HOLD_DELAY_SAMPLES   (1000U)
-#define IMU_CALIB_ACC6_TIMEOUT_SAMPLES           (960000U)
+#define IMU_CALIB_ACC6_FACE_TARGET_SAMPLES       (2500U) /* 六面体单面目标样本数 */
+#define IMU_CALIB_ACC6_FACE_STABLE_SAMPLES       (750U)  /* 六面体单面稳定样本数 */
+#define IMU_CALIB_ACC6_FACE_HOLD_DELAY_SAMPLES   (500U)  /* 六面体单面保持延时样本数 */
+#define IMU_CALIB_ACC6_TIMEOUT_SAMPLES           (480000U) /* 六面体标定超时样本数 */
 #define IMU_CALIB_ACC6_STATIC_MAX_DPS            (3.0f)
 #define IMU_CALIB_ACC6_DOM_MIN_G                 (0.90f)
 #define IMU_CALIB_ACC6_OTHER_MAX_G               (0.25f)
@@ -79,7 +79,7 @@
 #define IMU_CALIB_ACC6_POST_NORM_ERR_MAX_G       (0.030f)
 #define IMU_CALIB_ACC6_POST_DOM_ERR_MAX_G        (0.060f)
 #define IMU_CALIB_ACC6_POST_OFF_AXIS_MAX_G       (0.090f)
-#define IMU_CALIB_ACC6_PRE_STABLE_SAMPLES        (2500U)
+#define IMU_CALIB_ACC6_PRE_STABLE_SAMPLES        (1250U) /* 六面体标定预稳定样本数 */
 
 #define IMU_CALIB_CMD_LINE_MAX                   (64U)
 #define IMU_CALIB_CMD_READ_MAX                   (64U)
@@ -1808,10 +1808,11 @@ bool AccelCalibration_Start(void)
             float accel_norm_g;
             float gyro_norm_dps;
 
-            /* 读取一帧 IMU 2kHz 数据 */
-            IMU_Update_2000HZ();
+            /* 读取一帧 IMU 1kHz 数据 */
+            IMU_Update_1000HZ();
             window_tries++;
             total_tries++;
+            system_delay_us(ICM42688_SAMPLE_INTERVAL_US);
 
             accel_sensor_g[0] = g_imu_filter.acc_filt_x;
             accel_sensor_g[1] = g_imu_filter.acc_filt_y;
@@ -1989,7 +1990,8 @@ bool AccelCalibration_Start(void)
     }
 }
 
-void AccelCalibration_Update_2000HZ(void)
+/* 函数功能：加速度校准与垂向预处理 1kHz 更新入口。返回值：无。 */
+void AccelCalibration_Update_1000HZ(void)
 {
     float accel_sensor_g[3];
     float gyro_sensor_dps[3];
@@ -2003,7 +2005,7 @@ void AccelCalibration_Update_2000HZ(void)
     float trim_y_g = 0.0f;
     float trim_z_g = 0.0f;
 
-    /* ===================== 重要函数：实时2kHz更新 ===================== */
+    /* ===================== 重要函数：实时1kHz更新 ===================== */
     sanitize_scale();
 
     accel_sensor_g[0] = g_imu_filter.acc_filt_x;
@@ -2343,7 +2345,8 @@ uint8_t IMUCalib_IsBusy(void)
     return s_imu_calib.busy;
 }
 
-void IMUCalib_Update_2000HZ(void)
+/* 函数功能：IMU校准状态机 1kHz 更新入口。返回值：无。 */
+void IMUCalib_Update_1000HZ(void)
 {
     int32_t ret;
 

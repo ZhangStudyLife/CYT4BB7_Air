@@ -31,6 +31,6 @@ void FC_Loop_Reset(void); /* PID循环状态重置，通常在解锁或模式切
 void FC_Loop_50Hz(void);  /* 50Hz */
 void FC_Loop_100Hz(void);  /* 100Hz*/
 void FC_Loop_500Hz(void); /* 500Hz角度外环，输出角速度目标 */
-void FC_Loop_2000Hz(void);  /* 2kHz主循环，处理陀螺仪数据和角速度控制 */
+void FC_Loop_1000Hz(void);  /* 1kHz主循环，处理陀螺仪数据和角速度控制 */
 
 #endif /* FC_LOOP_H */

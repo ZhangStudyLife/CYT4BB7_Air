@@ -207,6 +207,7 @@ extern AccelCalibration_t g_accel_calibration;
 void AccelCalibration_Init(void);
 void AccelCalibration_Reset(void);
 bool AccelCalibration_Start(void);
+void AccelCalibration_ApplySensorCorrection(float *ax, float *ay, float *az);
 void AccelCalibration_Update_1000HZ(void); /* 1kHz 实时更新入口 */
 
 void AccelCalibration_SetImuToBodyMatrix(const float matrix[3][3]);

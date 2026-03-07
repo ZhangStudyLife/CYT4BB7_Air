@@ -200,25 +200,6 @@ void Pos_Est_Update_250HZ(void)
     inavFilterCorrectVel(0, opflowDt, opResidualXVel, wXYVel);
     inavFilterCorrectVel(1, opflowDt, opResidualYVel, wXYVel);
 
-    /* 16通道VOFA调试输出：完整光流处理链路诊断 */
-    wifi_vofa_JustFloat(16u,
-                        g_pmw3901_raw.deltaX, 
-                        g_pmw3901_raw.deltaY, 
-                        g_pmw3901_raw.squal,  
-                        estimator.vel[0],
-                        estimator.vel[1],
-                        g_tof_fused_height_mm,
-                        g_euler.roll,
-                        g_euler.pitch,
-                        g_imufilter_1000hz.accx,
-                        g_imufilter_1000hz.accy,
-                        g_imufilter_1000hz.accz,
-                        g_imufilter_1000hz.gyrox,
-                        g_imufilter_1000hz.gyroy,
-                        g_imufilter_1000hz.gyroz,
-                        ax,
-                        ay);
-
 
 }
 

@@ -146,13 +146,13 @@ void IMU_SelectAhrsInput(float *gx, float *gy, float *gz,
 		return;
 	}
 
-	/* 默认使用当前滤波值，保证启动与未校准阶段正常工作 */
-	*gx = g_imufilter_1000hz.gyrox;
-	*gy = g_imufilter_1000hz.gyroy;
-	*gz = g_imufilter_1000hz.gyroz;
-	*ax = g_imufilter_1000hz.accx;
-	*ay = g_imufilter_1000hz.accy;
-	*az = g_imufilter_1000hz.accz;
+	/* 默认使用500Hz滤波值，保证启动与未校准阶段正常工作 */
+	*gx = g_imudata_500hz.gyrox;
+	*gy = g_imudata_500hz.gyroy;
+	*gz = g_imudata_500hz.gyroz;
+	*ax = g_imudata_500hz.accx;
+	*ay = g_imudata_500hz.accy;
+	*az = g_imudata_500hz.accz;
 
 	/* 校准未完成、校准忙、或本帧校准数据无效时，不切换姿态输入源 */
 	if ((0U == AccelCalibration_IsCalibrated()) ||
@@ -202,14 +202,25 @@ void IMU_Update_1000HZ(void)
 		return;
 	}
 
+	/* 1. 原始数据 (gyro已去零偏) */
 	ICM42688_Get_Data();
 
-	/* 步骤2+3: 直接将原始数据传入滤波器, 输出写入 g_imufilter_1000hz 等 */
-	IMUFilter_Update(ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,
-	                 ICM42688.acc_x,  ICM42688.acc_y,  ICM42688.acc_z);
-	IMU_SelectAhrsInput(&ahrs_gx, &ahrs_gy, &ahrs_gz, &ahrs_ax, &ahrs_ay, &ahrs_az);
+	/* 2. 加速度计校准前置（传感器坐标系） */
+	float cal_ax = ICM42688.acc_x;
+	float cal_ay = ICM42688.acc_y;
+	float cal_az = ICM42688.acc_z;
+	AccelCalibration_ApplySensorCorrection(&cal_ax, &cal_ay, &cal_az);
 
-	/* 步骤4: 使用滤波后的陀螺和加速度数据进行 Mahony 姿态更�?*/
+	/* 3. 校准后数据送入滤波器 */
+	IMUFilter_Update(ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,
+	                 cal_ax, cal_ay, cal_az);
+
+	/* 4. 校准状态机 + 高级处理（当前帧） */
+	IMUCalib_Update_1000HZ();
+	AccelCalibration_Update_1000HZ();
+
+	/* 5. 姿态解算 */
+	IMU_SelectAhrsInput(&ahrs_gx, &ahrs_gy, &ahrs_gz, &ahrs_ax, &ahrs_ay, &ahrs_az);
 	MahonyAhrs_Update(
 		&g_mahony_ahrs,
 		ahrs_gx, ahrs_gy, ahrs_gz,

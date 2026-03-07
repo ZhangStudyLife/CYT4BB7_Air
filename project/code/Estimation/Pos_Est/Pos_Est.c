@@ -210,12 +210,12 @@ void Pos_Est_Update_250HZ(void)
                         g_tof_fused_height_mm,
                         g_euler.roll,
                         g_euler.pitch,
-                        g_imu_filter.acc_filt_x,
-                        g_imu_filter.acc_filt_y,
-                        g_imu_filter.acc_filt_z,
-                        g_imu_filter.gyro_filt_x,
-                        g_imu_filter.gyro_filt_y,
-                        g_imu_filter.gyro_filt_z,
+                        g_imufilter_1000hz.accx,
+                        g_imufilter_1000hz.accy,
+                        g_imufilter_1000hz.accz,
+                        g_imufilter_1000hz.gyrox,
+                        g_imufilter_1000hz.gyroy,
+                        g_imufilter_1000hz.gyroz,
                         ax,
                         ay);
 

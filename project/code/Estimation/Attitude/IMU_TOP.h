@@ -10,8 +10,8 @@
 extern "C" {
 #endif
 
-/* ---------------- IMU åˆå§‹åŒ–å‚æ•°ï¼ˆ1kHzï¼?---------------- */
-#define IMU_WARMUP_DISCARD_SAMPLES   (1000U) /* IMUÔ¤ÈÈ¶ªÆúÑù±¾Êı£¬°´1kHzÔ¼1Ãë */
+/* ---------------- IMU åˆå§‹åŒ–å‚æ•°ï¼ˆ1kHzï¿½?---------------- */
+#define IMU_WARMUP_DISCARD_SAMPLES   (1000U) /* IMUÔ¤ï¿½È¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½1kHzÔ¼1ï¿½ï¿½ */
 #define IMU_UPDATE_DT_SEC            (1.0f / IMU_SAMPLE_RATE_HZ)
 
 /* ---------------- ä¸Šç”µè‡ªæ£€å‚æ•° ---------------- */
@@ -20,7 +20,7 @@ extern "C" {
 #define IMU_SELFTEST_ACC_MIN_G           (0.75f)
 #define IMU_SELFTEST_ACC_MAX_G           (1.25f)
 
-extern IMUFilter_t g_imu_filter;
+/* g_imufilter_1000hz declared in IMU_Filtter.h */
 extern MahonyAhrs_t g_mahony_ahrs;
 extern MahonyAhrs_Euler_t g_euler;
 extern uint8 g_imu_ready;
@@ -29,7 +29,7 @@ extern uint32 g_imu_update_count;
 void IMU_SelectAhrsInput(float *gx, float *gy, float *gz,
 								float *ax, float *ay, float *az);
 void IMU_Init_All(void);
-void IMU_Update_1000HZ(void); /* IMU 1kHz ¸üĞÂÈë¿Ú */
+void IMU_Update_1000HZ(void); /* IMU 1kHz ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 uint8 IMU_Is_Ready(void);
 
 

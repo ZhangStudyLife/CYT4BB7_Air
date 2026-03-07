@@ -1,9 +1,9 @@
 /********************************************************************
  * 文件名  : accel_calibration.c
- * 说明    : ICM42688 加速度标定与垂向加速度预处理
- * 核心流程: rotate -> bias/scale -> 去重力 -> 垂向投影 -> 低通 -> 积分
- * 关键入口:
- *   1) AccelCalibration_Start()      启动静止标定
+ * 说明    : ICM42688 加速度标定与垂直加速度预处理
+ * 处理流水线: rotate -> bias/scale -> 去重力 -> 向下投影 -> 滤波 -> 积分
+ * 关键接口:
+ *   1) AccelCalibration_Start()         启动静止标定
  *   2) AccelCalibration_Update_1000HZ() 实时更新（1kHz）
  ********************************************************************/
 
@@ -22,11 +22,11 @@
 
 #define IMU_ACCEL_G_MAX_ABS                      (20.0f)
 #define IMU_GYRO_DPS_MAX_ABS                     (6000.0f)
-#define CALIB_MAX_TRY_SAMPLES                    (3000U) /* 启动静止标定最大尝试样本数 */
+#define CALIB_MAX_TRY_SAMPLES                    (3000U) /* 加速度静止标定最大采样总次数 */
 #define ACCEL_DOWN_SIGN_FOR_EKF                  (+1.0f)
 
-/* AP 风格：分窗口收敛判定 */
-#define ACCEL_CALIBRATION_WINDOW_SAMPLES         (200U)  /* 静止窗口样本数，按1kHz保持约0.2秒 */
+/* AP 风格：分窗口采集并判定 */
+#define ACCEL_CALIBRATION_WINDOW_SAMPLES         (200U)  /* 静止采样窗口样本数，1kHz约0.2秒 */
 #define ACCEL_CALIBRATION_MAX_WINDOWS            (24U)
 #define ACCEL_CALIBRATION_CONVERGE_WINDOWS       (3U)
 #define ACCEL_CALIBRATION_STATIC_ACCEL_MIN_G     (0.80f)
@@ -36,7 +36,7 @@
 #define ACCEL_CALIBRATION_CONVERGE_BIAS_DELTA_G  (0.004f)
 #define ACCEL_CALIBRATION_CONVERGE_ACC_STD_G     (0.025f)
 
-/* 在线微调：默认关闭，专注“一次性校准”参数稳定性 */
+/* 在线微调默认关闭，专注一次性校准后确认有效 */
 #define ACCEL_CALIBRATION_ENABLE_ONLINE_TRIM      (0U)
 #define ACCEL_CALIBRATION_ONLINE_BIAS_ALPHA      (0.0025f)
 #define ACCEL_CALIBRATION_ONLINE_GYRO_MAX_DPS    (1.2f)
@@ -50,25 +50,25 @@
 #define ACCEL_CALIBRATION_QUALITY_ALPHA_STATIC   (0.0020f)
 #define ACCEL_CALIBRATION_QUALITY_ALPHA_DYNAMIC  (0.0120f)
 
-/* 静止重锁定：抑制长时间静止时姿态/重力解耦误差导致的慢漂 */
+/* 静止重锁定：启动后静止时自动微调偏置以适应温漂 */
 #define ACCEL_CALIBRATION_STATIC_RELOCK_ENABLE        (1U)
 #define ACCEL_CALIBRATION_STATIC_RELOCK_ALPHA         (0.0010f)
 #define ACCEL_CALIBRATION_STATIC_RELOCK_GYRO_MAX_DPS  (0.35f)
 #define ACCEL_CALIBRATION_STATIC_RELOCK_ACC_ERR_MAX_G (0.025f)
 #define ACCEL_CALIBRATION_STATIC_RELOCK_TRIM_MAX_G    (0.60f)
 
-#define IMU_CALIB_GYRO_TARGET_VALID_SAMPLES      (60000U) /* 陀螺静止标定目标样本数，保持约60秒 */
-#define IMU_CALIB_GYRO_TIMEOUT_SAMPLES           (300000U) /* 陀螺静止标定超时样本数 */
+#define IMU_CALIB_GYRO_TARGET_VALID_SAMPLES      (60000U) /* 陀螺仪静止标定目标有效样本数，约60秒 */
+#define IMU_CALIB_GYRO_TIMEOUT_SAMPLES           (300000U) /* 陀螺仪静止标定超时样本数 */
 #define IMU_CALIB_GYRO_STATIC_MAX_DPS            (1.5f)
 #define IMU_CALIB_GYRO_STATIC_ACC_ERR_G          (0.06f)
 #define IMU_CALIB_GYRO_STD_MAX_DPS               (0.20f)
 #define IMU_CALIB_GYRO_BIAS_MAX_DPS              (3.0f)
-#define IMU_CALIB_GYRO_PRE_STABLE_SAMPLES        (1500U) /* 陀螺标定预稳定样本数 */
+#define IMU_CALIB_GYRO_PRE_STABLE_SAMPLES        (1500U) /* 陀螺仪标定预热稳定样本数 */
 
-#define IMU_CALIB_ACC6_FACE_TARGET_SAMPLES       (2500U) /* 六面体单面目标样本数 */
-#define IMU_CALIB_ACC6_FACE_STABLE_SAMPLES       (750U)  /* 六面体单面稳定样本数 */
-#define IMU_CALIB_ACC6_FACE_HOLD_DELAY_SAMPLES   (500U)  /* 六面体单面保持延时样本数 */
-#define IMU_CALIB_ACC6_TIMEOUT_SAMPLES           (480000U) /* 六面体标定超时样本数 */
+#define IMU_CALIB_ACC6_FACE_TARGET_SAMPLES       (2500U) /* 6面标定单面目标采样数 */
+#define IMU_CALIB_ACC6_FACE_STABLE_SAMPLES       (750U)  /* 6面标定单面确认稳定样本数 */
+#define IMU_CALIB_ACC6_FACE_HOLD_DELAY_SAMPLES   (500U)  /* 6面标定单面保持延时样本数 */
+#define IMU_CALIB_ACC6_TIMEOUT_SAMPLES           (480000U) /* 6面标定超时总样本数 */
 #define IMU_CALIB_ACC6_STATIC_MAX_DPS            (3.0f)
 #define IMU_CALIB_ACC6_DOM_MIN_G                 (0.90f)
 #define IMU_CALIB_ACC6_OTHER_MAX_G               (0.25f)
@@ -79,7 +79,7 @@
 #define IMU_CALIB_ACC6_POST_NORM_ERR_MAX_G       (0.030f)
 #define IMU_CALIB_ACC6_POST_DOM_ERR_MAX_G        (0.060f)
 #define IMU_CALIB_ACC6_POST_OFF_AXIS_MAX_G       (0.090f)
-#define IMU_CALIB_ACC6_PRE_STABLE_SAMPLES        (1250U) /* 六面体标定预稳定样本数 */
+#define IMU_CALIB_ACC6_PRE_STABLE_SAMPLES        (1250U) /* 6面标定预热稳定样本数 */
 
 #define IMU_CALIB_CMD_LINE_MAX                   (64U)
 #define IMU_CALIB_CMD_READ_MAX                   (64U)
@@ -89,7 +89,8 @@ typedef enum
     IMU_CALIB_MODE_IDLE = 0,
     IMU_CALIB_MODE_GYRO = 1,
     IMU_CALIB_MODE_ACC6 = 2,
-    IMU_CALIB_MODE_ALL = 3
+    IMU_CALIB_MODE_ALL = 3,
+    IMU_CALIB_MODE_ELLIP = 4
 } IMUCalibMode_e;
 
 typedef enum
@@ -149,6 +150,38 @@ typedef struct
 
 AccelCalibration_t g_accel_calibration = {0};
 static IMUCalibRuntime_t s_imu_calib = {0};
+
+/* ========================= Ellipsoid calibration runtime ========================= */
+#define ELLIP_MAX_ORIENT         (20U)
+#define ELLIP_MIN_ORIENT         (12U)
+#define ELLIP_ORIENT_SAMPLES     (2000U)
+#define ELLIP_PRE_STABLE_SAMPLES (1250U)
+#define ELLIP_TIMEOUT_SAMPLES    (600000U)  /* 10 min at 1kHz */
+#define ELLIP_STATIC_GYRO_MAX_DPS  (3.0f)
+#define ELLIP_STATIC_ACC_MIN_G   (0.75f)
+#define ELLIP_STATIC_ACC_MAX_G   (1.25f)
+#define ELLIP_ORIENT_STD_MAX_G   (0.025f)
+#define ELLIP_ORIENT_ANGLE_MIN_DEG (15.0f)
+#define ELLIP_POST_NORM_ERR_MAX_G  (0.03f)
+#define ELLIP_POST_DIAG_MIN      (0.85f)
+#define ELLIP_POST_DIAG_MAX      (1.15f)
+#define ELLIP_POST_BIAS_NORM_MAX_G (0.35f)
+#define ELLIP_MOVING_GYRO_DPS    (8.0f)
+
+typedef struct
+{
+    float orient_mean[ELLIP_MAX_ORIENT][3];
+    float orient_sum[3];
+    float orient_m2[3];
+    uint32_t orient_samples;
+    uint8_t orient_count;
+    uint32_t total_samples;
+    uint32_t stable_samples;
+    uint8_t collecting;     /* 1 = actively collecting an orientation */
+    uint8_t wait_move;      /* 1 = waiting for user to move to next orientation */
+} EllipCalibRuntime_t;
+
+static EllipCalibRuntime_t s_ellip = {0};
 #if ACCEL_CALIBRATION_STATIC_RELOCK_ENABLE
 static float s_static_relock_trim_g[3] = {0.0f, 0.0f, 0.0f};
 static uint8_t s_static_relock_trim_ready = 0U;
@@ -214,9 +247,260 @@ static void mat3_mul_vec(const float matrix[3][3], const float vec_in[3], float 
     vec_out[2] = matrix[2][0] * vec_in[0] + matrix[2][1] * vec_in[1] + matrix[2][2] * vec_in[2];
 }
 
+/* ========================= Ellipsoid fitting math ========================= */
+
+/* 9x9 Gaussian elimination with partial pivoting, solves A*x = b in-place.
+ * A is stored row-major in a[9][10] (augmented matrix). Solution returned in x[9].
+ * Returns 0 on success, -1 on singular matrix. */
+static int32_t gauss_solve_9x9(float a[9][10], float x[9])
+{
+    uint8_t i, j, k;
+    for (i = 0; i < 9; i++)
+    {
+        /* partial pivoting */
+        float max_val = fabsf_local(a[i][i]);
+        uint8_t max_row = i;
+        for (k = (uint8_t)(i + 1U); k < 9U; k++)
+        {
+            float v = fabsf_local(a[k][i]);
+            if (v > max_val)
+            {
+                max_val = v;
+                max_row = k;
+            }
+        }
+        if (max_val < 1.0e-12f)
+        {
+            return -1;
+        }
+        if (max_row != i)
+        {
+            for (j = 0; j < 10; j++)
+            {
+                float tmp = a[i][j];
+                a[i][j] = a[max_row][j];
+                a[max_row][j] = tmp;
+            }
+        }
+        /* elimination */
+        for (k = (uint8_t)(i + 1U); k < 9U; k++)
+        {
+            float factor = a[k][i] / a[i][i];
+            for (j = i; j < 10; j++)
+            {
+                a[k][j] -= factor * a[i][j];
+            }
+        }
+    }
+    /* back substitution */
+    for (i = 9; i-- > 0;)
+    {
+        float s = a[i][9];
+        for (j = (uint8_t)(i + 1U); j < 9U; j++)
+        {
+            s -= a[i][j] * x[j];
+        }
+        x[i] = s / a[i][i];
+    }
+    return 0;
+}
+
+/* 3x3 symmetric matrix inverse using adjugate method.
+ * Input: symmetric A (only uses upper triangle pattern but reads all).
+ * Output: inv. Returns 0 on success, -1 if singular. */
+static int32_t mat3_inverse_sym(const float A[3][3], float inv[3][3])
+{
+    float det;
+    float cofactor[3][3];
+
+    cofactor[0][0] = A[1][1] * A[2][2] - A[1][2] * A[2][1];
+    cofactor[0][1] = -(A[1][0] * A[2][2] - A[1][2] * A[2][0]);
+    cofactor[0][2] = A[1][0] * A[2][1] - A[1][1] * A[2][0];
+    cofactor[1][0] = -(A[0][1] * A[2][2] - A[0][2] * A[2][1]);
+    cofactor[1][1] = A[0][0] * A[2][2] - A[0][2] * A[2][0];
+    cofactor[1][2] = -(A[0][0] * A[2][1] - A[0][1] * A[2][0]);
+    cofactor[2][0] = A[0][1] * A[1][2] - A[0][2] * A[1][1];
+    cofactor[2][1] = -(A[0][0] * A[1][2] - A[0][2] * A[1][0]);
+    cofactor[2][2] = A[0][0] * A[1][1] - A[0][1] * A[1][0];
+
+    det = A[0][0] * cofactor[0][0] + A[0][1] * cofactor[0][1] + A[0][2] * cofactor[0][2];
+    if (fabsf_local(det) < 1.0e-12f)
+    {
+        return -1;
+    }
+
+    {
+        float inv_det = 1.0f / det;
+        uint8_t r, c;
+        for (r = 0; r < 3; r++)
+        {
+            for (c = 0; c < 3; c++)
+            {
+                inv[r][c] = cofactor[c][r] * inv_det; /* transpose of cofactor */
+            }
+        }
+    }
+    return 0;
+}
+
+/* 3x3 Cholesky decomposition: A = L * L^T.
+ * A must be symmetric positive-definite. L is lower-triangular output.
+ * Returns 0 on success, -1 if not positive-definite. */
+static int32_t cholesky_3x3(const float A[3][3], float L[3][3])
+{
+    memset(L, 0, 9U * sizeof(float));
+
+    if (A[0][0] <= 0.0f)
+    {
+        return -1;
+    }
+    L[0][0] = sqrtf(A[0][0]);
+    L[1][0] = A[1][0] / L[0][0];
+    L[2][0] = A[2][0] / L[0][0];
+
+    {
+        float v = A[1][1] - L[1][0] * L[1][0];
+        if (v <= 0.0f)
+        {
+            return -1;
+        }
+        L[1][1] = sqrtf(v);
+    }
+    L[2][1] = (A[2][1] - L[2][0] * L[1][0]) / L[1][1];
+
+    {
+        float v = A[2][2] - L[2][0] * L[2][0] - L[2][1] * L[2][1];
+        if (v <= 0.0f)
+        {
+            return -1;
+        }
+        L[2][2] = sqrtf(v);
+    }
+    return 0;
+}
+
+/* Ellipsoid fit solver.
+ * Given n (>=9) static orientation measurements orient[n][3] (in g),
+ * fits an ellipsoid and returns:
+ *   bias[3] = ellipsoid center
+ *   M[3][3] = correction matrix such that M*(raw-bias) maps to unit sphere.
+ * Returns 0 on success, -1 on failure. */
+static int32_t ellip_fit_solve(const float orient[][3], uint8_t n, float bias[3], float M[3][3])
+{
+    /* Fit: p0*x^2 + p1*y^2 + p2*z^2 + p3*xy + p4*xz + p5*yz + p6*x + p7*y + p8*z = 1
+     * Build normal equations AtA * p = Atb  (9x9 system) */
+    float aug[9][10]; /* augmented matrix [AtA | Atb] */
+    float p[9];
+    float Q[3][3], Q_inv[3][3], g_vec[3];
+    float k_val;
+    float Q_scaled[3][3];
+    uint8_t i, r, c;
+
+    if (n < 9U)
+    {
+        return -1;
+    }
+
+    memset(aug, 0, sizeof(aug));
+
+    for (i = 0; i < n; i++)
+    {
+        float x = orient[i][0];
+        float y = orient[i][1];
+        float z = orient[i][2];
+        float row[9];
+
+        row[0] = x * x;
+        row[1] = y * y;
+        row[2] = z * z;
+        row[3] = x * y;
+        row[4] = x * z;
+        row[5] = y * z;
+        row[6] = x;
+        row[7] = y;
+        row[8] = z;
+
+        /* Accumulate AtA and Atb */
+        for (r = 0; r < 9; r++)
+        {
+            for (c = 0; c < 9; c++)
+            {
+                aug[r][c] += row[r] * row[c];
+            }
+            aug[r][9] += row[r]; /* rhs = 1 for each measurement */
+        }
+    }
+
+    if (gauss_solve_9x9(aug, p) != 0)
+    {
+        return -1;
+    }
+
+    /* Assemble symmetric Q and vector g */
+    Q[0][0] = p[0];           Q[0][1] = p[3] * 0.5f;  Q[0][2] = p[4] * 0.5f;
+    Q[1][0] = p[3] * 0.5f;   Q[1][1] = p[1];          Q[1][2] = p[5] * 0.5f;
+    Q[2][0] = p[4] * 0.5f;   Q[2][1] = p[5] * 0.5f;  Q[2][2] = p[2];
+
+    g_vec[0] = p[6] * 0.5f;
+    g_vec[1] = p[7] * 0.5f;
+    g_vec[2] = p[8] * 0.5f;
+
+    /* bias = -Q^{-1} * g */
+    if (mat3_inverse_sym(Q, Q_inv) != 0)
+    {
+        return -1;
+    }
+
+    {
+        float neg_g[3] = {-g_vec[0], -g_vec[1], -g_vec[2]};
+        mat3_mul_vec(Q_inv, neg_g, bias);
+    }
+
+    /* k = g^T * Q^{-1} * g - d, where d = -1 (since rhs was 1)
+     * Actually k = bias^T * Q * bias + 1 is simpler since bias = -Q^{-1}*g */
+    {
+        float Qb[3];
+        mat3_mul_vec(Q, bias, Qb);
+        k_val = bias[0] * Qb[0] + bias[1] * Qb[1] + bias[2] * Qb[2] + 1.0f;
+    }
+
+    if (k_val < 1.0e-6f)
+    {
+        return -1;
+    }
+
+    /* Q_scaled = Q / k, so that the fitted ellipsoid is (v-bias)^T * Q_scaled * (v-bias) = 1 */
+    for (r = 0; r < 3; r++)
+    {
+        for (c = 0; c < 3; c++)
+        {
+            Q_scaled[r][c] = Q[r][c] / k_val;
+        }
+    }
+
+    /* M = cholesky(Q_scaled)^T so that M*(v-bias) maps to unit sphere */
+    {
+        float L[3][3];
+        if (cholesky_3x3(Q_scaled, L) != 0)
+        {
+            return -1;
+        }
+        /* M = L^T (transpose of lower-triangular Cholesky factor) */
+        for (r = 0; r < 3; r++)
+        {
+            for (c = 0; c < 3; c++)
+            {
+                M[r][c] = L[c][r];
+            }
+        }
+    }
+
+    return 0;
+}
+
 static bool euler_ready(void)
 {
-    /* 用 sin^2+cos^2≈1 判断姿态三角量是否有效，避免未初始化姿态参与计算 */
+    /* 用 sin^2+cos^2≈1 判定姿态角三角函数有效，排除未初始化姿态数据 */
     const float s2r = g_euler.sin_roll * g_euler.sin_roll;
     const float c2r = g_euler.cos_roll * g_euler.cos_roll;
     const float s2p = g_euler.sin_pitch * g_euler.sin_pitch;
@@ -243,7 +527,7 @@ static void get_gravity_body_g(float *gx, float *gy, float *gz)
         return;
     }
 
-    /* 单位向量（g）：重力在机体系的分量 */
+    /* 单位重力矢量(g)在机体系的分量 */
     *gx = -g_euler.sin_pitch;
     *gy = g_euler.sin_roll * g_euler.cos_pitch;
     *gz = g_euler.cos_roll * g_euler.cos_pitch;
@@ -251,7 +535,7 @@ static void get_gravity_body_g(float *gx, float *gy, float *gz)
 
 static float calc_accel_down_from_body(const float accel_body_mps2[3])
 {
-    /* 使用姿态矩阵第三行，将机体系加速度投影到 NED 的 Down 轴 */
+    /* 使用姿态角将校正后机体系加速度投影到 NED 的 Down 轴 */
     const float sin_pitch = g_euler.sin_pitch;
     const float cos_pitch = g_euler.cos_pitch;
     const float sin_roll = g_euler.sin_roll;
@@ -304,7 +588,7 @@ static void rotate_body_linear_to_level(const float accel_body_mps2[3], float ac
     r32 = cos_roll * sin_pitch * sin_yaw - sin_roll * cos_yaw;
     r33 = cos_roll * cos_pitch;
 #else
-    /* yaw=0: 仅补偿 roll/pitch，满足当前“倾斜解耦”需求 */
+    /* yaw=0: 仅用 roll/pitch 旋转，忽略当前航向偏斜，简化计算 */
     r11 = cos_pitch;
     r12 = 0.0f;
     r13 = -sin_pitch;
@@ -325,7 +609,7 @@ static void rotate_body_linear_to_level(const float accel_body_mps2[3], float ac
 
 static void sanitize_scale(void)
 {
-    /* 防止 scale 非法（NaN/Inf/过小），并限制在安全范围 */
+    /* 防止 scale 异常（NaN/Inf/过小），钳位到安全范围 */
     uint8_t i;
     for (i = 0U; i < 3U; i++)
     {
@@ -379,7 +663,7 @@ static void apply_uniform_scale(float scale)
 
 static bool imu_sample_valid(float ax, float ay, float az, float gx, float gy, float gz)
 {
-    /* 统一样本有效性门限：数值有效 + 量程合理 + 姿态可用 */
+    /* 统一采样有效性检查：数值有效 + 量程合理 + 姿态就绪 */
     if (!is_finitef_local(ax) || !is_finitef_local(ay) || !is_finitef_local(az) ||
         !is_finitef_local(gx) || !is_finitef_local(gy) || !is_finitef_local(gz))
     {
@@ -401,7 +685,7 @@ static bool imu_sample_valid(float ax, float ay, float az, float gx, float gy, f
 
 static void rotate_imu_to_body(const float vec_in[3], float vec_out[3])
 {
-    /* 坐标统一：后续所有标定与估计都在机体系下完成 */
+    /* 传感器坐标系统一旋转到机体系（标定和运行时均使用） */
     if (g_accel_calibration.imu_to_body_identity)
     {
         vec_out[0] = vec_in[0];
@@ -450,7 +734,7 @@ static bool static_calibration_sample_valid(const float accel_body_g[3],
                                             float *acc_norm_g,
                                             float *gyro_norm_dps)
 {
-    /* 启动标定仅接受“近似静止”样本：|a|≈1g 且角速度很小 */
+    /* 静止标定样本校验：确认近似静止，|a|≈1g 且角速度很小 */
     float accel_norm;
     float gyro_norm;
 
@@ -583,7 +867,7 @@ static void update_bias_online(const float accel_body_g[3],
                                float gravity_y_g,
                                float gravity_z_g)
 {
-    /* 在线慢速 bias 微调：只在静止窗口内生效，防止动态误修正 */
+    /* 在线偏置 bias 微调，仅在静止且有效条件下更新 */
     float target_bias[3];
     float accel_norm;
     float gyro_norm;
@@ -627,7 +911,7 @@ static void update_bias_online(const float accel_body_g[3],
 
 static void update_scale_online(const float accel_body_g[3], const float gyro_body_dps[3])
 {
-    /* 在线慢速 scale 微调：让去偏置后的 |a| 逐步逼近 1g */
+    /* 在线 scale 微调，使去偏后 |a| 逐步逼近 1g */
     float accel_unbiased_g[3];
     float accel_norm_g;
     float gyro_norm_dps;
@@ -678,7 +962,7 @@ static void update_scale_online(const float accel_body_g[3], const float gyro_bo
 
 static void update_runtime_quality(const float accel_corrected_body_g[3], const float gyro_body_dps[3])
 {
-    /* 运行质量评估：统计 |a| 的均值和“近似标准差”用于健康度观察 */
+    /* 滑动指数平均统计 |a| 的均值和标准差，用于校准质量观测 */
     float accel_norm_g;
     float gyro_norm_dps;
     float mean;
@@ -741,6 +1025,20 @@ static uint8_t imu_calib_count_done_faces(uint8_t done_mask)
     return count;
 }
 
+/* V1 legacy blob layout for backward compatibility */
+typedef struct
+{
+    uint32_t magic;
+    uint16_t version;
+    uint16_t size;
+    float gyro_bias_dps[3];
+    float accel_bias_g[3];
+    float accel_scale[3];
+    float imu_to_body[3][3];
+    uint32_t reserved[8];
+} IMUCalibBlobV1_t;
+
+/* Check if raw flash data contains a valid blob (v1 or v2) */
 static uint8_t imu_calib_blob_is_valid(const IMUCalibBlob_t *blob)
 {
     if (blob == NULL)
@@ -751,15 +1049,17 @@ static uint8_t imu_calib_blob_is_valid(const IMUCalibBlob_t *blob)
     {
         return 0U;
     }
-    if (blob->version != IMU_CALIB_FLASH_VERSION)
+    /* Accept v2 directly */
+    if ((blob->version == IMU_CALIB_FLASH_VERSION) && (blob->size == (uint16_t)sizeof(IMUCalibBlob_t)))
     {
-        return 0U;
+        return 1U;
     }
-    if (blob->size != (uint16_t)sizeof(IMUCalibBlob_t))
+    /* Accept v1 by checking magic+version on same raw memory (sizes match for both structs) */
+    if (blob->version == IMU_CALIB_FLASH_VERSION_V1)
     {
-        return 0U;
+        return 1U;
     }
-    return 1U;
+    return 0U;
 }
 
 static void imu_calib_fill_blob(IMUCalibBlob_t *blob)
@@ -787,7 +1087,7 @@ static void imu_calib_fill_blob(IMUCalibBlob_t *blob)
 
     AccelCalibration_GetParams(&params);
     memcpy(blob->accel_bias_g, params.accel_bias_g, sizeof(blob->accel_bias_g));
-    memcpy(blob->accel_scale, params.accel_scale, sizeof(blob->accel_scale));
+    memcpy(blob->accel_corr_matrix, params.accel_corr_matrix, sizeof(blob->accel_corr_matrix));
     memcpy(blob->imu_to_body, params.imu_to_body, sizeof(blob->imu_to_body));
 }
 
@@ -795,27 +1095,88 @@ static uint8_t imu_calib_apply_blob(const IMUCalibBlob_t *blob)
 {
     AccelCalibrationParams_t params;
 
-    if (imu_calib_blob_is_valid(blob) == 0U)
+    if (blob == NULL)
     {
         return 0U;
     }
 
-    params.accel_bias_g[0] = blob->accel_bias_g[0];
-    params.accel_bias_g[1] = blob->accel_bias_g[1];
-    params.accel_bias_g[2] = blob->accel_bias_g[2];
-    params.accel_scale[0] = blob->accel_scale[0];
-    params.accel_scale[1] = blob->accel_scale[1];
-    params.accel_scale[2] = blob->accel_scale[2];
-    memcpy(params.imu_to_body, blob->imu_to_body, sizeof(params.imu_to_body));
-    params.gravity_mps2 = ACCEL_CALIBRATION_GRAVITY_MSS;
-
-    if (!AccelCalibration_LoadParams(&params))
+    /* Check raw magic first */
+    if (blob->magic != IMU_CALIB_FLASH_MAGIC)
     {
         return 0U;
     }
 
-    ICM42688_SetGyroBiasDps(blob->gyro_bias_dps[0], blob->gyro_bias_dps[1], blob->gyro_bias_dps[2], 1U);
-    return 1U;
+    memset(&params, 0, sizeof(params));
+
+    if (blob->version == IMU_CALIB_FLASH_VERSION_V1)
+    {
+        /* V1 layout differs from V2: use V1 struct to correctly parse fields.
+         * Both structs are the same total size, just field layout differs. */
+        const IMUCalibBlobV1_t *v1 = (const IMUCalibBlobV1_t *)blob;
+
+        params.accel_bias_g[0] = v1->accel_bias_g[0];
+        params.accel_bias_g[1] = v1->accel_bias_g[1];
+        params.accel_bias_g[2] = v1->accel_bias_g[2];
+        params.accel_scale[0] = v1->accel_scale[0];
+        params.accel_scale[1] = v1->accel_scale[1];
+        params.accel_scale[2] = v1->accel_scale[2];
+        params.use_full_matrix = 0U;
+        memset(params.accel_corr_matrix, 0, sizeof(params.accel_corr_matrix));
+        params.accel_corr_matrix[0][0] = v1->accel_scale[0];
+        params.accel_corr_matrix[1][1] = v1->accel_scale[1];
+        params.accel_corr_matrix[2][2] = v1->accel_scale[2];
+        memcpy(params.imu_to_body, v1->imu_to_body, sizeof(params.imu_to_body));
+        params.gravity_mps2 = ACCEL_CALIBRATION_GRAVITY_MSS;
+
+        if (!AccelCalibration_LoadParams(&params))
+        {
+            return 0U;
+        }
+
+        ICM42688_SetGyroBiasDps(v1->gyro_bias_dps[0], v1->gyro_bias_dps[1], v1->gyro_bias_dps[2], 1U);
+        printf("cal,loaded_v1_as_diag\r\n");
+        return 1U;
+    }
+
+    if (blob->version == IMU_CALIB_FLASH_VERSION)
+    {
+        if (blob->size != (uint16_t)sizeof(IMUCalibBlob_t))
+        {
+            return 0U;
+        }
+
+        params.accel_bias_g[0] = blob->accel_bias_g[0];
+        params.accel_bias_g[1] = blob->accel_bias_g[1];
+        params.accel_bias_g[2] = blob->accel_bias_g[2];
+        memcpy(params.accel_corr_matrix, blob->accel_corr_matrix, sizeof(params.accel_corr_matrix));
+        params.accel_scale[0] = blob->accel_corr_matrix[0][0];
+        params.accel_scale[1] = blob->accel_corr_matrix[1][1];
+        params.accel_scale[2] = blob->accel_corr_matrix[2][2];
+
+        /* Determine if it's a full matrix or diagonal only */
+        {
+            float off_diag_sum = fabsf_local(blob->accel_corr_matrix[0][1]) +
+                                 fabsf_local(blob->accel_corr_matrix[0][2]) +
+                                 fabsf_local(blob->accel_corr_matrix[1][0]) +
+                                 fabsf_local(blob->accel_corr_matrix[1][2]) +
+                                 fabsf_local(blob->accel_corr_matrix[2][0]) +
+                                 fabsf_local(blob->accel_corr_matrix[2][1]);
+            params.use_full_matrix = (off_diag_sum > 1.0e-6f) ? 1U : 0U;
+        }
+
+        memcpy(params.imu_to_body, blob->imu_to_body, sizeof(params.imu_to_body));
+        params.gravity_mps2 = ACCEL_CALIBRATION_GRAVITY_MSS;
+
+        if (!AccelCalibration_LoadParams(&params))
+        {
+            return 0U;
+        }
+
+        ICM42688_SetGyroBiasDps(blob->gyro_bias_dps[0], blob->gyro_bias_dps[1], blob->gyro_bias_dps[2], 1U);
+        return 1U;
+    }
+
+    return 0U;
 }
 
 static void imu_calib_print_runtime_params(void)
@@ -831,10 +1192,19 @@ static void imu_calib_print_runtime_params(void)
 
     printf("cal,dump,gyro,%u,%f,%f,%f\r\n",
            (unsigned int)enabled, bx, by, bz);
-    printf("cal,dump,acc,%f,%f,%f,%f,%f,%f,%f\r\n",
+    printf("cal,dump,acc,%f,%f,%f,%f,%f,%f,%f,%u\r\n",
            params.accel_bias_g[0], params.accel_bias_g[1], params.accel_bias_g[2],
            params.accel_scale[0], params.accel_scale[1], params.accel_scale[2],
-           params.gravity_mps2);
+           params.gravity_mps2, (unsigned int)params.use_full_matrix);
+    if (params.use_full_matrix != 0U)
+    {
+        printf("cal,dump,cm0,%f,%f,%f\r\n",
+               params.accel_corr_matrix[0][0], params.accel_corr_matrix[0][1], params.accel_corr_matrix[0][2]);
+        printf("cal,dump,cm1,%f,%f,%f\r\n",
+               params.accel_corr_matrix[1][0], params.accel_corr_matrix[1][1], params.accel_corr_matrix[1][2]);
+        printf("cal,dump,cm2,%f,%f,%f\r\n",
+               params.accel_corr_matrix[2][0], params.accel_corr_matrix[2][1], params.accel_corr_matrix[2][2]);
+    }
     printf("cal,dump,r0,%f,%f,%f\r\n",
            params.imu_to_body[0][0], params.imu_to_body[0][1], params.imu_to_body[0][2]);
     printf("cal,dump,r1,%f,%f,%f\r\n",
@@ -864,17 +1234,40 @@ static void imu_calib_print_flash_params(void)
         return;
     }
 
-    printf("cal,flash,gyro,%f,%f,%f\r\n",
-           blob.gyro_bias_dps[0], blob.gyro_bias_dps[1], blob.gyro_bias_dps[2]);
-    printf("cal,flash,acc,%f,%f,%f,%f,%f,%f\r\n",
-           blob.accel_bias_g[0], blob.accel_bias_g[1], blob.accel_bias_g[2],
-           blob.accel_scale[0], blob.accel_scale[1], blob.accel_scale[2]);
-    printf("cal,flash,r0,%f,%f,%f\r\n",
-           blob.imu_to_body[0][0], blob.imu_to_body[0][1], blob.imu_to_body[0][2]);
-    printf("cal,flash,r1,%f,%f,%f\r\n",
-           blob.imu_to_body[1][0], blob.imu_to_body[1][1], blob.imu_to_body[1][2]);
-    printf("cal,flash,r2,%f,%f,%f\r\n",
-           blob.imu_to_body[2][0], blob.imu_to_body[2][1], blob.imu_to_body[2][2]);
+    if (blob.version == IMU_CALIB_FLASH_VERSION_V1)
+    {
+        const IMUCalibBlobV1_t *v1 = (const IMUCalibBlobV1_t *)&blob;
+        printf("cal,flash,gyro,%f,%f,%f\r\n",
+               v1->gyro_bias_dps[0], v1->gyro_bias_dps[1], v1->gyro_bias_dps[2]);
+        printf("cal,flash,acc,bias,%f,%f,%f,scale,%f,%f,%f\r\n",
+               v1->accel_bias_g[0], v1->accel_bias_g[1], v1->accel_bias_g[2],
+               v1->accel_scale[0], v1->accel_scale[1], v1->accel_scale[2]);
+        printf("cal,flash,r0,%f,%f,%f\r\n",
+               v1->imu_to_body[0][0], v1->imu_to_body[0][1], v1->imu_to_body[0][2]);
+        printf("cal,flash,r1,%f,%f,%f\r\n",
+               v1->imu_to_body[1][0], v1->imu_to_body[1][1], v1->imu_to_body[1][2]);
+        printf("cal,flash,r2,%f,%f,%f\r\n",
+               v1->imu_to_body[2][0], v1->imu_to_body[2][1], v1->imu_to_body[2][2]);
+    }
+    else
+    {
+        printf("cal,flash,gyro,%f,%f,%f\r\n",
+               blob.gyro_bias_dps[0], blob.gyro_bias_dps[1], blob.gyro_bias_dps[2]);
+        printf("cal,flash,acc,bias,%f,%f,%f\r\n",
+               blob.accel_bias_g[0], blob.accel_bias_g[1], blob.accel_bias_g[2]);
+        printf("cal,flash,cm0,%f,%f,%f\r\n",
+               blob.accel_corr_matrix[0][0], blob.accel_corr_matrix[0][1], blob.accel_corr_matrix[0][2]);
+        printf("cal,flash,cm1,%f,%f,%f\r\n",
+               blob.accel_corr_matrix[1][0], blob.accel_corr_matrix[1][1], blob.accel_corr_matrix[1][2]);
+        printf("cal,flash,cm2,%f,%f,%f\r\n",
+               blob.accel_corr_matrix[2][0], blob.accel_corr_matrix[2][1], blob.accel_corr_matrix[2][2]);
+        printf("cal,flash,r0,%f,%f,%f\r\n",
+               blob.imu_to_body[0][0], blob.imu_to_body[0][1], blob.imu_to_body[0][2]);
+        printf("cal,flash,r1,%f,%f,%f\r\n",
+               blob.imu_to_body[1][0], blob.imu_to_body[1][1], blob.imu_to_body[1][2]);
+        printf("cal,flash,r2,%f,%f,%f\r\n",
+               blob.imu_to_body[2][0], blob.imu_to_body[2][1], blob.imu_to_body[2][2]);
+    }
 }
 
 static void imu_calib_reset_runtime(void)
@@ -934,6 +1327,318 @@ static void imu_calib_start_all(void)
     s_imu_calib.busy = 1U;
     s_imu_calib.mode = IMU_CALIB_MODE_ALL;
     s_imu_calib.all_stage = IMU_CALIB_ALL_STAGE_GYRO;
+}
+
+/* ========================= Ellipsoid calibration ========================= */
+
+static void imu_calib_start_ellip(void)
+{
+    imu_calib_reset_runtime();
+    memset(&s_ellip, 0, sizeof(s_ellip));
+    s_imu_calib.busy = 1U;
+    s_imu_calib.mode = IMU_CALIB_MODE_ELLIP;
+}
+
+static int32_t imu_calib_update_ellip_step(void)
+{
+    float accel_sensor_g[3];
+    float gyro_sensor_dps[3];
+    float accel_body_g[3];
+    float gyro_body_dps[3];
+    float accel_norm_g;
+    float gyro_norm_dps;
+
+    s_ellip.total_samples++;
+    if (s_ellip.total_samples >= ELLIP_TIMEOUT_SAMPLES)
+    {
+        printf("cal,ellip,timeout\r\n");
+        return -1;
+    }
+
+    accel_sensor_g[0] = g_imufilter_1000hz.accx;
+    accel_sensor_g[1] = g_imufilter_1000hz.accy;
+    accel_sensor_g[2] = g_imufilter_1000hz.accz;
+    gyro_sensor_dps[0] = g_imufilter_1000hz.gyrox;
+    gyro_sensor_dps[1] = g_imufilter_1000hz.gyroy;
+    gyro_sensor_dps[2] = g_imufilter_1000hz.gyroz;
+
+    if (!imu_sample_valid(accel_sensor_g[0], accel_sensor_g[1], accel_sensor_g[2],
+                          gyro_sensor_dps[0], gyro_sensor_dps[1], gyro_sensor_dps[2]))
+    {
+        s_ellip.stable_samples = 0U;
+        s_ellip.collecting = 0U;
+        s_ellip.orient_samples = 0U;
+        return 0;
+    }
+
+    rotate_imu_to_body(accel_sensor_g, accel_body_g);
+    rotate_imu_to_body(gyro_sensor_dps, gyro_body_dps);
+
+    accel_norm_g = vec3_norm(accel_body_g[0], accel_body_g[1], accel_body_g[2]);
+    gyro_norm_dps = vec3_norm(gyro_body_dps[0], gyro_body_dps[1], gyro_body_dps[2]);
+
+    /* If waiting for movement after completing an orientation */
+    if (s_ellip.wait_move != 0U)
+    {
+        if (gyro_norm_dps > ELLIP_MOVING_GYRO_DPS)
+        {
+            s_ellip.wait_move = 0U;
+            s_ellip.stable_samples = 0U;
+            s_ellip.collecting = 0U;
+            s_ellip.orient_samples = 0U;
+        }
+        return 0;
+    }
+
+    /* Check static condition */
+    if ((gyro_norm_dps > ELLIP_STATIC_GYRO_MAX_DPS) ||
+        (accel_norm_g < ELLIP_STATIC_ACC_MIN_G) ||
+        (accel_norm_g > ELLIP_STATIC_ACC_MAX_G))
+    {
+        s_ellip.stable_samples = 0U;
+        s_ellip.collecting = 0U;
+        s_ellip.orient_samples = 0U;
+        memset(s_ellip.orient_sum, 0, sizeof(s_ellip.orient_sum));
+        memset(s_ellip.orient_m2, 0, sizeof(s_ellip.orient_m2));
+        return 0;
+    }
+
+    /* Pre-stabilization */
+    if (s_ellip.stable_samples < ELLIP_PRE_STABLE_SAMPLES)
+    {
+        s_ellip.stable_samples++;
+        if (s_ellip.stable_samples == ELLIP_PRE_STABLE_SAMPLES)
+        {
+            /* Start collecting */
+            s_ellip.collecting = 1U;
+            s_ellip.orient_samples = 0U;
+            memset(s_ellip.orient_sum, 0, sizeof(s_ellip.orient_sum));
+            memset(s_ellip.orient_m2, 0, sizeof(s_ellip.orient_m2));
+            printf("cal,ellip,collecting,%u\r\n", (unsigned int)s_ellip.orient_count);
+        }
+        return 0;
+    }
+
+    if (s_ellip.collecting == 0U)
+    {
+        return 0;
+    }
+
+    /* Collect samples using Welford online statistics */
+    {
+        uint32_t n = s_ellip.orient_samples + 1U;
+        uint8_t ax;
+        s_ellip.orient_samples = n;
+        for (ax = 0; ax < 3; ax++)
+        {
+            float delta = accel_body_g[ax] - s_ellip.orient_sum[ax];
+            s_ellip.orient_sum[ax] += delta / (float)n;  /* orient_sum is actually mean */
+            s_ellip.orient_m2[ax] += delta * (accel_body_g[ax] - s_ellip.orient_sum[ax]);
+        }
+    }
+
+    if (s_ellip.orient_samples >= ELLIP_ORIENT_SAMPLES)
+    {
+        /* Check standard deviation */
+        float std_max = 0.0f;
+        uint8_t ax;
+        for (ax = 0; ax < 3; ax++)
+        {
+            float std_val = sqrtf(s_ellip.orient_m2[ax] / (float)s_ellip.orient_samples);
+            if (std_val > std_max)
+            {
+                std_max = std_val;
+            }
+        }
+
+        if (std_max > ELLIP_ORIENT_STD_MAX_G)
+        {
+            printf("cal,ellip,orient_noisy,%u,%f\r\n", (unsigned int)s_ellip.orient_count, (double)std_max);
+            /* Reset and retry this orientation */
+            s_ellip.collecting = 0U;
+            s_ellip.orient_samples = 0U;
+            s_ellip.stable_samples = 0U;
+            return 0;
+        }
+
+        /* Check angular separation from existing orientations */
+        {
+            uint8_t oi;
+            float new_norm = vec3_norm(s_ellip.orient_sum[0], s_ellip.orient_sum[1], s_ellip.orient_sum[2]);
+            float cos_min_angle = cosf(ELLIP_ORIENT_ANGLE_MIN_DEG * DEG_TO_RAD);
+
+            if (new_norm < 0.01f)
+            {
+                s_ellip.collecting = 0U;
+                s_ellip.orient_samples = 0U;
+                s_ellip.stable_samples = 0U;
+                return 0;
+            }
+
+            for (oi = 0; oi < s_ellip.orient_count; oi++)
+            {
+                float old_norm = vec3_norm(s_ellip.orient_mean[oi][0], s_ellip.orient_mean[oi][1], s_ellip.orient_mean[oi][2]);
+                float dot_val = s_ellip.orient_sum[0] * s_ellip.orient_mean[oi][0] +
+                                s_ellip.orient_sum[1] * s_ellip.orient_mean[oi][1] +
+                                s_ellip.orient_sum[2] * s_ellip.orient_mean[oi][2];
+                float cos_angle = dot_val / (new_norm * old_norm + 1.0e-9f);
+
+                if (cos_angle > cos_min_angle)
+                {
+                    printf("cal,ellip,orient_too_close,%u\r\n", (unsigned int)oi);
+                    s_ellip.collecting = 0U;
+                    s_ellip.orient_samples = 0U;
+                    s_ellip.stable_samples = 0U;
+                    s_ellip.wait_move = 1U;
+                    return 0;
+                }
+            }
+        }
+
+        /* Accept this orientation */
+        s_ellip.orient_mean[s_ellip.orient_count][0] = s_ellip.orient_sum[0];
+        s_ellip.orient_mean[s_ellip.orient_count][1] = s_ellip.orient_sum[1];
+        s_ellip.orient_mean[s_ellip.orient_count][2] = s_ellip.orient_sum[2];
+        s_ellip.orient_count++;
+
+        printf("cal,ellip,orient_done,%u,%f,%f,%f\r\n",
+               (unsigned int)s_ellip.orient_count,
+               (double)s_ellip.orient_sum[0],
+               (double)s_ellip.orient_sum[1],
+               (double)s_ellip.orient_sum[2]);
+
+        s_ellip.collecting = 0U;
+        s_ellip.orient_samples = 0U;
+        s_ellip.wait_move = 1U;
+
+        /* Check if we have enough orientations */
+        if (s_ellip.orient_count >= ELLIP_MIN_ORIENT)
+        {
+            /* Attempt solve */
+            float bias[3];
+            float M[3][3];
+
+            printf("cal,ellip,solving,%u\r\n", (unsigned int)s_ellip.orient_count);
+
+            if (ellip_fit_solve(s_ellip.orient_mean, s_ellip.orient_count, bias, M) != 0)
+            {
+                if (s_ellip.orient_count >= ELLIP_MAX_ORIENT)
+                {
+                    printf("cal,ellip,solve_fail\r\n");
+                    return -1;
+                }
+                printf("cal,ellip,solve_fail_retry\r\n");
+                s_ellip.wait_move = 1U;
+                return 0;
+            }
+
+            /* Post-validation */
+            {
+                float bias_norm = vec3_norm(bias[0], bias[1], bias[2]);
+                uint8_t vi;
+                float max_norm_err = 0.0f;
+
+                if (bias_norm > ELLIP_POST_BIAS_NORM_MAX_G)
+                {
+                    printf("cal,ellip,post_fail,bias_norm,%f\r\n", (double)bias_norm);
+                    if (s_ellip.orient_count >= ELLIP_MAX_ORIENT)
+                    {
+                        return -1;
+                    }
+                    return 0;
+                }
+
+                /* Check diagonal elements of M */
+                {
+                    uint8_t di;
+                    for (di = 0; di < 3; di++)
+                    {
+                        if ((M[di][di] < ELLIP_POST_DIAG_MIN) || (M[di][di] > ELLIP_POST_DIAG_MAX))
+                        {
+                            printf("cal,ellip,post_fail,diag,%u,%f\r\n", (unsigned int)di, (double)M[di][di]);
+                            if (s_ellip.orient_count >= ELLIP_MAX_ORIENT)
+                            {
+                                return -1;
+                            }
+                            return 0;
+                        }
+                    }
+                }
+
+                /* Check corrected norm for all orientations */
+                for (vi = 0; vi < s_ellip.orient_count; vi++)
+                {
+                    float centered[3];
+                    float corrected[3];
+                    float corr_norm, norm_err;
+                    uint8_t ci;
+
+                    for (ci = 0; ci < 3; ci++)
+                    {
+                        centered[ci] = s_ellip.orient_mean[vi][ci] - bias[ci];
+                    }
+                    mat3_mul_vec(M, centered, corrected);
+                    corr_norm = vec3_norm(corrected[0], corrected[1], corrected[2]);
+                    norm_err = fabsf_local(corr_norm - 1.0f);
+                    if (norm_err > max_norm_err)
+                    {
+                        max_norm_err = norm_err;
+                    }
+                }
+
+                if (max_norm_err > ELLIP_POST_NORM_ERR_MAX_G)
+                {
+                    printf("cal,ellip,post_fail,norm_err,%f\r\n", (double)max_norm_err);
+                    if (s_ellip.orient_count >= ELLIP_MAX_ORIENT)
+                    {
+                        return -1;
+                    }
+                    return 0;
+                }
+            }
+
+            /* Apply calibration */
+            {
+                AccelCalibrationParams_t params;
+                AccelCalibration_GetParams(&params);
+
+                memcpy(params.accel_bias_g, bias, sizeof(params.accel_bias_g));
+                memcpy(params.accel_corr_matrix, M, sizeof(params.accel_corr_matrix));
+                params.accel_scale[0] = M[0][0];
+                params.accel_scale[1] = M[1][1];
+                params.accel_scale[2] = M[2][2];
+                params.use_full_matrix = 1U;
+
+                if (!AccelCalibration_LoadParams(&params))
+                {
+                    printf("cal,ellip,apply_fail\r\n");
+                    return -1;
+                }
+            }
+
+            /* Save to flash */
+            {
+                uint8_t save_ok = IMUCalib_SaveCurrentToFlash();
+                printf("cal,ellip,ok,%u,bias,%f,%f,%f\r\n",
+                       (unsigned int)save_ok,
+                       (double)bias[0], (double)bias[1], (double)bias[2]);
+                printf("cal,ellip,matrix,%f,%f,%f,%f,%f,%f,%f,%f,%f\r\n",
+                       (double)M[0][0], (double)M[0][1], (double)M[0][2],
+                       (double)M[1][0], (double)M[1][1], (double)M[1][2],
+                       (double)M[2][0], (double)M[2][1], (double)M[2][2]);
+            }
+            return 1;
+        }
+
+        /* Not enough orientations yet, continue */
+        if (s_ellip.orient_count >= ELLIP_MAX_ORIENT)
+        {
+            printf("cal,ellip,max_orient_reached\r\n");
+            return -1;
+        }
+    }
+
+    return 0;
 }
 
 static int8_t imu_calib_pick_face(const float accel_body_g[3])
@@ -1027,12 +1732,12 @@ static const char *imu_calib_face_name(uint8_t face_idx)
 
 static int32_t imu_calib_update_gyro_step(void)
 {
-    float gx = g_imu_filter.gyro_filt_x;
-    float gy = g_imu_filter.gyro_filt_y;
-    float gz = g_imu_filter.gyro_filt_z;
-    float ax = g_imu_filter.acc_filt_x;
-    float ay = g_imu_filter.acc_filt_y;
-    float az = g_imu_filter.acc_filt_z;
+    float gx = g_imufilter_1000hz.gyrox;
+    float gy = g_imufilter_1000hz.gyroy;
+    float gz = g_imufilter_1000hz.gyroz;
+    float ax = g_imufilter_1000hz.accx;
+    float ay = g_imufilter_1000hz.accy;
+    float az = g_imufilter_1000hz.accz;
     float gyro_norm_dps;
     float acc_norm_g;
     uint8_t static_ok;
@@ -1174,12 +1879,12 @@ static int32_t imu_calib_update_acc6_step(void)
         return -1;
     }
 
-    accel_sensor_g[0] = g_imu_filter.acc_filt_x;
-    accel_sensor_g[1] = g_imu_filter.acc_filt_y;
-    accel_sensor_g[2] = g_imu_filter.acc_filt_z;
-    gyro_sensor_dps[0] = g_imu_filter.gyro_filt_x;
-    gyro_sensor_dps[1] = g_imu_filter.gyro_filt_y;
-    gyro_sensor_dps[2] = g_imu_filter.gyro_filt_z;
+    accel_sensor_g[0] = g_imufilter_1000hz.accx;
+    accel_sensor_g[1] = g_imufilter_1000hz.accy;
+    accel_sensor_g[2] = g_imufilter_1000hz.accz;
+    gyro_sensor_dps[0] = g_imufilter_1000hz.gyrox;
+    gyro_sensor_dps[1] = g_imufilter_1000hz.gyroy;
+    gyro_sensor_dps[2] = g_imufilter_1000hz.gyroz;
 
     if (!imu_sample_valid(accel_sensor_g[0], accel_sensor_g[1], accel_sensor_g[2],
                           gyro_sensor_dps[0], gyro_sensor_dps[1], gyro_sensor_dps[2]))
@@ -1370,6 +2075,8 @@ static int32_t imu_calib_update_acc6_step(void)
         float max_off_axis = 0.0f;
 
         AccelCalibration_GetParams(&params);
+        params.use_full_matrix = 0U;
+        memset(params.accel_corr_matrix, 0, sizeof(params.accel_corr_matrix));
 
         for (axis = 0U; axis < 3U; axis++)
         {
@@ -1397,6 +2104,7 @@ static int32_t imu_calib_update_acc6_step(void)
             params.accel_bias_g[axis] = 0.5f * (mean_pos + mean_neg);
             params.accel_scale[axis] = 2.0f / fabsf_local(delta);
             params.accel_scale[axis] = clampf_local(params.accel_scale[axis], ACCEL_CALIBRATION_SCALE_MIN, ACCEL_CALIBRATION_SCALE_MAX);
+            params.accel_corr_matrix[axis][axis] = params.accel_scale[axis];
         }
 
         if (!AccelCalibration_LoadParams(&params))
@@ -1502,6 +2210,10 @@ static uint32_t imu_calib_progress_percent(void)
             uint8_t done = imu_calib_count_done_faces(s_imu_calib.acc6_done_mask);
             progress = 50U + (uint32_t)((50U * done) / IMU_CALIB_FACE_NUM);
         }
+    }
+    else if (s_imu_calib.mode == IMU_CALIB_MODE_ELLIP)
+    {
+        progress = (uint32_t)((100U * s_ellip.orient_count) / ELLIP_MIN_ORIENT);
     }
 
     if (progress > 100U)
@@ -1644,6 +2356,20 @@ static void imu_calib_process_command(char *line)
         return;
     }
 
+    if (strcmp(line, "cal ellip start") == 0)
+    {
+        if (s_imu_calib.busy != 0U)
+        {
+            printf("cal,busy\r\n");
+            return;
+        }
+        irq_state = interrupt_global_disable();
+        imu_calib_start_ellip();
+        interrupt_global_enable(irq_state);
+        printf("cal,ellip,start\r\n");
+        return;
+    }
+
     printf("cal,unknown\r\n");
 }
 
@@ -1652,6 +2378,7 @@ static void imu_calib_print_boot_reminder(void)
     printf("cal,remind,cmd,cal status\r\n");
     printf("cal,remind,cmd,cal dump\r\n");
     printf("cal,remind,cmd,cal all start\r\n");
+    printf("cal,remind,cmd,cal ellip start\r\n");
     printf("cal,remind,cmd,cal load\r\n");
     printf("cal,remind,cmd,cal save\r\n");
     printf("cal,remind,cmd,cal clear\r\n");
@@ -1659,7 +2386,7 @@ static void imu_calib_print_boot_reminder(void)
 
 void AccelCalibration_Init(void)
 {
-    /* 初始化等价于复位 */
+    /* 初始化并全部复位 */
     AccelCalibration_Reset();
 }
 
@@ -1671,7 +2398,7 @@ void AccelCalibration_Reset(void)
     uint8_t i;
     uint8_t j;
 
-    /* 重要：复位时保留已有安装矩阵，避免重复配置 IMU 安装方向 */
+    /* 复位前暂存 IMU 安装矩阵，避免复位后丢失 IMU 安装方向 */
     memcpy(saved_matrix, g_accel_calibration.imu_to_body, sizeof(saved_matrix));
 
     for (i = 0U; i < 3U; i++)
@@ -1701,6 +2428,8 @@ void AccelCalibration_Reset(void)
     g_accel_calibration.accel_scale[0] = 1.0f;
     g_accel_calibration.accel_scale[1] = 1.0f;
     g_accel_calibration.accel_scale[2] = 1.0f;
+    g_accel_calibration.use_full_matrix = 0U;
+    set_identity_matrix(g_accel_calibration.accel_corr_matrix);
 
     g_accel_calibration.gravity_mps2 = ACCEL_CALIBRATION_GRAVITY_MSS;
 
@@ -1752,11 +2481,11 @@ void AccelCalibration_SetImuToBodyEulerDeg(float roll_deg, float pitch_deg, floa
     g_accel_calibration.imu_to_body_identity = matrix_is_identity(g_accel_calibration.imu_to_body);
 }
 
-/* ========================= 重要函数：启动标定 =========================
- * AP 风格：静止窗口批量校准。
- * - 每个窗口收集固定数量静止样本
- * - 用窗口内稳定性和 bias 大小评分，选最优窗口
- * - 连续多个窗口收敛则判定标定成功
+/* ========================= 静止标定主流程 =========================
+ * AP 风格：分窗口采集静止样本
+ * - 每个窗口采集固定数量的静止样本
+ * - 比较窗口间 bias 变化量，选择最优窗口
+ * - 达到收敛条件后判定标定成功
  */
 bool AccelCalibration_Start(void)
 {
@@ -1776,7 +2505,7 @@ bool AccelCalibration_Start(void)
     float global_mean_norm = 0.0f;
     float global_m2_norm = 0.0f;
 
-    /* 每次启动标定前清空历史状态 */
+    /* 每次启动标定前复位历史状态 */
     AccelCalibration_Reset();
 
     for (window_idx = 0U;
@@ -1808,21 +2537,21 @@ bool AccelCalibration_Start(void)
             float accel_norm_g;
             float gyro_norm_dps;
 
-            /* 读取一帧 IMU 1kHz 数据 */
+            /* 获取一帧 IMU 1kHz 数据 */
             IMU_Update_1000HZ();
             window_tries++;
             total_tries++;
             system_delay_us(ICM42688_SAMPLE_INTERVAL_US);
 
-            accel_sensor_g[0] = g_imu_filter.acc_filt_x;
-            accel_sensor_g[1] = g_imu_filter.acc_filt_y;
-            accel_sensor_g[2] = g_imu_filter.acc_filt_z;
+            accel_sensor_g[0] = g_imufilter_1000hz.accx;
+            accel_sensor_g[1] = g_imufilter_1000hz.accy;
+            accel_sensor_g[2] = g_imufilter_1000hz.accz;
 
-            gyro_sensor_dps[0] = g_imu_filter.gyro_filt_x;
-            gyro_sensor_dps[1] = g_imu_filter.gyro_filt_y;
-            gyro_sensor_dps[2] = g_imu_filter.gyro_filt_z;
+            gyro_sensor_dps[0] = g_imufilter_1000hz.gyrox;
+            gyro_sensor_dps[1] = g_imufilter_1000hz.gyroy;
+            gyro_sensor_dps[2] = g_imufilter_1000hz.gyroz;
 
-            /* 先做基础有效性筛选 */
+            /* 数据有效性筛选 */
             if (!imu_sample_valid(accel_sensor_g[0], accel_sensor_g[1], accel_sensor_g[2],
                                   gyro_sensor_dps[0], gyro_sensor_dps[1], gyro_sensor_dps[2]))
             {
@@ -1833,7 +2562,7 @@ bool AccelCalibration_Start(void)
             rotate_imu_to_body(accel_sensor_g, accel_body_g);
             rotate_imu_to_body(gyro_sensor_dps, gyro_body_dps);
 
-            /* 再做静止条件筛选（|a|≈1g 且角速度小） */
+            /* 近似静止条件筛选：|a|≈1g 且角速度小 */
             if (!static_calibration_sample_valid(accel_body_g, gyro_body_dps, &accel_norm_g, &gyro_norm_dps))
             {
                 g_accel_calibration.invalid_sample_count++;
@@ -1842,7 +2571,7 @@ bool AccelCalibration_Start(void)
 
             get_gravity_body_g(&gx, &gy, &gz);
 
-            /* 在机体系下估计 bias = measured - static_sign * gravity */
+            /* 在机体系累加估算 bias = measured - static_sign * gravity */
             window_bias_sum_x += (accel_body_g[0] - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gx);
             window_bias_sum_y += (accel_body_g[1] - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gy);
             window_bias_sum_z += (accel_body_g[2] - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gz);
@@ -1871,7 +2600,7 @@ bool AccelCalibration_Start(void)
             current_bias[1] = window_bias_sum_y / (float)window_valid;
             current_bias[2] = window_bias_sum_z / (float)window_valid;
 
-                /* 评分越小越好：加速度波动小、角速度波动小、bias 小 */
+                /* 得分越小越好：加速度波动小、角速度波动小、bias 小 */
                 score = window_acc_std +
                     0.25f * window_gyro_std +
                     0.50f * vec3_norm(current_bias[0], current_bias[1], current_bias[2]);
@@ -1912,7 +2641,7 @@ bool AccelCalibration_Start(void)
             selected_bias[2] = current_bias[2];
             have_prev_window = true;
 
-            /* 连续收敛窗口达到阈值后结束 */
+            /* 收敛窗口连续达到阈值则完成 */
             if ((total_valid_samples >= ACCEL_CALIBRATION_SAMPLES) &&
                 (converged_windows >= ACCEL_CALIBRATION_CONVERGE_WINDOWS))
             {
@@ -1928,7 +2657,7 @@ bool AccelCalibration_Start(void)
         return false;
     }
 
-    /* 未严格收敛时，退化为使用“最佳窗口”结果 */
+    /* 未收敛时退回使用最优窗口的 bias */
     if (!converged && have_best_window)
     {
         selected_bias[0] = best_bias[0];
@@ -1942,7 +2671,7 @@ bool AccelCalibration_Start(void)
     clamp_bias();
 
     {
-        /* 启动 scale 初值：让全局平均模长尽量接近 1g */
+        /* 计算 scale 初值：使全局平均模长接近 1g */
         float startup_scale = 1.0f;
 
         if (is_finitef_local(global_mean_norm) && (global_mean_norm > 0.2f))
@@ -1966,7 +2695,7 @@ bool AccelCalibration_Start(void)
     }
 
     {
-        /* 根据标定阶段观测到的平均模长，微调重力常数 */
+        /* 根据标定阶段观测到的平均模长微调重力常数估计 */
         const float g_est = global_mean_norm * ACCEL_CALIBRATION_GRAVITY_MSS;
         if (is_finitef_local(g_est) && (g_est > 6.0f) && (g_est < 13.0f))
         {
@@ -1979,7 +2708,7 @@ bool AccelCalibration_Start(void)
     }
 
     {
-        /* 最终通过条件：收敛，或“最佳窗口 + 样本足够 + 质量达标” */
+        /* 判定是否通过：质量达标 + 样本足够 + 收敛或最优 */
         const bool quality_ok = (g_accel_calibration.accel_norm_std_g <= ACCEL_CALIBRATION_START_ACCEPT_STD_G);
         const bool enough_samples = (total_valid_samples >= (ACCEL_CALIBRATION_SAMPLES / 2U));
         const bool calibrated = converged || (have_best_window && enough_samples && quality_ok);
@@ -1990,7 +2719,7 @@ bool AccelCalibration_Start(void)
     }
 }
 
-/* 函数功能：加速度校准与垂向预处理 1kHz 更新入口。返回值：无。 */
+/* 主更新函数：加速度校准与垂直加速度预处理，1kHz 主循环中调用 */
 void AccelCalibration_Update_1000HZ(void)
 {
     float accel_sensor_g[3];
@@ -2005,20 +2734,20 @@ void AccelCalibration_Update_1000HZ(void)
     float trim_y_g = 0.0f;
     float trim_z_g = 0.0f;
 
-    /* ===================== 重要函数：实时1kHz更新 ===================== */
+    /* ===================== 以下为实时1kHz更新 ===================== */
     sanitize_scale();
 
-    accel_sensor_g[0] = g_imu_filter.acc_filt_x;
-    accel_sensor_g[1] = g_imu_filter.acc_filt_y;
-    accel_sensor_g[2] = g_imu_filter.acc_filt_z;
+    accel_sensor_g[0] = g_imufilter_1000hz.accx;
+    accel_sensor_g[1] = g_imufilter_1000hz.accy;
+    accel_sensor_g[2] = g_imufilter_1000hz.accz;
 
-    gyro_sensor_dps[0] = g_imu_filter.gyro_filt_x;
-    gyro_sensor_dps[1] = g_imu_filter.gyro_filt_y;
-    gyro_sensor_dps[2] = g_imu_filter.gyro_filt_z;
+    gyro_sensor_dps[0] = g_imufilter_1000hz.gyrox;
+    gyro_sensor_dps[1] = g_imufilter_1000hz.gyroy;
+    gyro_sensor_dps[2] = g_imufilter_1000hz.gyroz;
 
     if (!imu_sample_valid(accel_sensor_g[0], accel_sensor_g[1], accel_sensor_g[2], gyro_sensor_dps[0], gyro_sensor_dps[1], gyro_sensor_dps[2]))
     {
-        /* 无效样本处理：平滑衰减，防止积分突变 */
+        /* 无效样本处理：对输出做平滑衰减，防止突变 */
         g_accel_calibration.invalid_sample_count++;
         g_accel_calibration.realtime_sample_valid = 0U;
 
@@ -2036,7 +2765,7 @@ void AccelCalibration_Update_1000HZ(void)
     rotate_imu_to_body(accel_sensor_g, g_accel_calibration.accel_raw_body_g);
     rotate_imu_to_body(gyro_sensor_dps, g_accel_calibration.gyro_raw_body_dps);
 
-    /* 在线微调（仅满足静止门限时有效） */
+    /* 在线微调更新（仅静止条件时有效） */
     get_gravity_body_g(&gravity_x_g, &gravity_y_g, &gravity_z_g);
 #if ACCEL_CALIBRATION_ENABLE_ONLINE_TRIM
     update_bias_online(
@@ -2050,13 +2779,24 @@ void AccelCalibration_Update_1000HZ(void)
         g_accel_calibration.gyro_raw_body_dps);
 #endif
 
-    /* 关键修正：raw -> (raw - bias) * scale */
-    g_accel_calibration.accel_corrected_body_g[0] =
-        (g_accel_calibration.accel_raw_body_g[0] - g_accel_calibration.accel_bias_g[0]) * g_accel_calibration.accel_scale[0];
-    g_accel_calibration.accel_corrected_body_g[1] =
-        (g_accel_calibration.accel_raw_body_g[1] - g_accel_calibration.accel_bias_g[1]) * g_accel_calibration.accel_scale[1];
-    g_accel_calibration.accel_corrected_body_g[2] =
-        (g_accel_calibration.accel_raw_body_g[2] - g_accel_calibration.accel_bias_g[2]) * g_accel_calibration.accel_scale[2];
+    /* corrected = M * (raw - bias) or legacy diagonal path */
+    if (g_accel_calibration.use_full_matrix != 0U)
+    {
+        float centered[3];
+        centered[0] = g_accel_calibration.accel_raw_body_g[0] - g_accel_calibration.accel_bias_g[0];
+        centered[1] = g_accel_calibration.accel_raw_body_g[1] - g_accel_calibration.accel_bias_g[1];
+        centered[2] = g_accel_calibration.accel_raw_body_g[2] - g_accel_calibration.accel_bias_g[2];
+        mat3_mul_vec(g_accel_calibration.accel_corr_matrix, centered, g_accel_calibration.accel_corrected_body_g);
+    }
+    else
+    {
+        g_accel_calibration.accel_corrected_body_g[0] =
+            (g_accel_calibration.accel_raw_body_g[0] - g_accel_calibration.accel_bias_g[0]) * g_accel_calibration.accel_scale[0];
+        g_accel_calibration.accel_corrected_body_g[1] =
+            (g_accel_calibration.accel_raw_body_g[1] - g_accel_calibration.accel_bias_g[1]) * g_accel_calibration.accel_scale[1];
+        g_accel_calibration.accel_corrected_body_g[2] =
+            (g_accel_calibration.accel_raw_body_g[2] - g_accel_calibration.accel_bias_g[2]) * g_accel_calibration.accel_scale[2];
+    }
     update_runtime_quality(
         g_accel_calibration.accel_corrected_body_g,
         g_accel_calibration.gyro_raw_body_dps);
@@ -2074,7 +2814,7 @@ void AccelCalibration_Update_1000HZ(void)
     trim_z_g = s_static_relock_trim_g[2];
 #endif
 
-    /* 去除重力，得到真实机体线加速度 */
+    /* 去重力：得到真实线性加速度 */
     accel_body_real_mps2[0] =
         (g_accel_calibration.accel_corrected_body_g[0] - trim_x_g - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gravity_x_g) *
         g_accel_calibration.gravity_mps2;
@@ -2094,10 +2834,10 @@ void AccelCalibration_Update_1000HZ(void)
     g_accel_calibration.accel_level_mps2[1] = accel_level_mps2[1];
     g_accel_calibration.accel_level_mps2[2] = accel_level_mps2[2];
 
-    /* 投影到 Down 轴并统一符号（供 EKF） */
+    /* 投影到 Down 轴并统一符号（供 EKF 用） */
     accel_down_mps2 = ACCEL_DOWN_SIGN_FOR_EKF * calc_accel_down_from_body(accel_body_real_mps2);
 
-    /* 两路低通：EKF 更快，输出更稳 */
+    /* 双路低通：EKF 通道和输出通道 */
     g_accel_calibration.accel_down_for_ekf_mps2 =
         ACC_DOWN_LPF_ALPHA_EKF * accel_down_mps2 +
         (1.0f - ACC_DOWN_LPF_ALPHA_EKF) * g_accel_calibration.accel_down_for_ekf_mps2;
@@ -2106,7 +2846,7 @@ void AccelCalibration_Update_1000HZ(void)
         ACC_DOWN_LPF_ALPHA_OUTPUT * accel_down_mps2 +
         (1.0f - ACC_DOWN_LPF_ALPHA_OUTPUT) * g_accel_calibration.accel_down_for_output_mps2;
 
-    /* 垂向积分（向上为正） */
+    /* 积分求速度和位置 */
     g_accel_calibration.vel_up_mps += (-g_accel_calibration.accel_down_for_ekf_mps2) * ACCEL_CALIBRATION_DT_S;
     g_accel_calibration.pos_up_m += g_accel_calibration.vel_up_mps * ACCEL_CALIBRATION_DT_S;
     g_accel_calibration.realtime_sample_valid = 1U;
@@ -2256,6 +2996,20 @@ bool AccelCalibration_LoadParams(const AccelCalibrationParams_t *params)
     g_accel_calibration.accel_scale[0] = params->accel_scale[0];
     g_accel_calibration.accel_scale[1] = params->accel_scale[1];
     g_accel_calibration.accel_scale[2] = params->accel_scale[2];
+    g_accel_calibration.use_full_matrix = params->use_full_matrix;
+    if (params->use_full_matrix != 0U)
+    {
+        memcpy(g_accel_calibration.accel_corr_matrix, params->accel_corr_matrix,
+               sizeof(g_accel_calibration.accel_corr_matrix));
+    }
+    else
+    {
+        /* Diagonal matrix from scale for consistency */
+        memset(g_accel_calibration.accel_corr_matrix, 0, sizeof(g_accel_calibration.accel_corr_matrix));
+        g_accel_calibration.accel_corr_matrix[0][0] = params->accel_scale[0];
+        g_accel_calibration.accel_corr_matrix[1][1] = params->accel_scale[1];
+        g_accel_calibration.accel_corr_matrix[2][2] = params->accel_scale[2];
+    }
     memcpy(g_accel_calibration.imu_to_body, params->imu_to_body, sizeof(g_accel_calibration.imu_to_body));
 
     if (is_finitef_local(params->gravity_mps2) && (params->gravity_mps2 > 6.0f) && (params->gravity_mps2 < 13.0f))
@@ -2295,6 +3049,8 @@ void AccelCalibration_GetParams(AccelCalibrationParams_t *params)
     params->accel_scale[0] = g_accel_calibration.accel_scale[0];
     params->accel_scale[1] = g_accel_calibration.accel_scale[1];
     params->accel_scale[2] = g_accel_calibration.accel_scale[2];
+    memcpy(params->accel_corr_matrix, g_accel_calibration.accel_corr_matrix, sizeof(params->accel_corr_matrix));
+    params->use_full_matrix = g_accel_calibration.use_full_matrix;
     memcpy(params->imu_to_body, g_accel_calibration.imu_to_body, sizeof(params->imu_to_body));
     params->gravity_mps2 = g_accel_calibration.gravity_mps2;
 }
@@ -2345,7 +3101,7 @@ uint8_t IMUCalib_IsBusy(void)
     return s_imu_calib.busy;
 }
 
-/* 函数功能：IMU校准状态机 1kHz 更新入口。返回值：无。 */
+/* 主更新函数：IMU校准状态机，1kHz 主循环中调用 */
 void IMUCalib_Update_1000HZ(void)
 {
     int32_t ret;
@@ -2442,6 +3198,25 @@ void IMUCalib_Update_1000HZ(void)
             }
             return;
         }
+    }
+
+    if (s_imu_calib.mode == IMU_CALIB_MODE_ELLIP)
+    {
+        ret = imu_calib_update_ellip_step();
+        if (ret > 0)
+        {
+            s_imu_calib.busy = 0U;
+            s_imu_calib.mode = IMU_CALIB_MODE_IDLE;
+        }
+        else if (ret < 0)
+        {
+            printf("cal,ellip,fail,%lu,%u\r\n",
+                   (unsigned long)s_ellip.total_samples,
+                   (unsigned int)s_ellip.orient_count);
+            s_imu_calib.busy = 0U;
+            s_imu_calib.mode = IMU_CALIB_MODE_IDLE;
+        }
+        return;
     }
 }
 

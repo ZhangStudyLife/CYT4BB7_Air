@@ -128,7 +128,6 @@ void Pos_Est_Update_1000HZ(void)
 void Pos_Est_Update_250HZ(void)
 {
 
-    static float rangeLpf = 0.f;                                                 // 激光测距低通
     static float accLpf[3] = {0.f};                                              /*加速度低通*/
                                                                                  // float weight = wBaro;				//气压权重，范围0-1，0表示完全信任气压高度，1表示完全信任激光高度       // 不用气压计试试
     static float fusedHeightLpf = 0.f;                                           // 融合高度低通

@@ -108,7 +108,6 @@
 
 #include "../code/HW_Drivers/ICM42688/ICM42688.h"
 #include "../code/HW_Drivers/PMW3901/PMW3901.h"
-#include "../code/Estimation/Height_Est/Height_Est.h"
 #include "../code/Estimation/Pos_Est/Pos_Est.h"
 #include "../code/Estimation/Attitude/IMU_TOP.h"
 #include "../code/Protocols/crsf/crsf.h"
@@ -119,8 +118,9 @@
 #include "../code/FlightController/fc_params.h"
 #include "../code/HW_Drivers/Beep/Beep.h"
 #include "../code/Protocols/wifi_vofa/wifi_vofa.h"
-
-
+#include "../code/Estimation/Attitude/IMU_Filtter.h"
+#include "../code/Estimation/Attitude/MahonyAhrs.h"
+#include "../code/Estimation/Height_Est/TOF_data.h"
 
 
 #endif

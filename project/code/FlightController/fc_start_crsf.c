@@ -252,6 +252,7 @@ static void FC_START_CRSF_StateMachine_Update(void)
 
         if (s_unlock_timer_tick >= (uint16_t)(FC_START_CRSF_UNLOCK_HOLD_TIME_MS / FC_START_CRSF_TASK_PERIOD_MS))
         {
+            TOF_Calibrate();
             FC_START_CRSF_PrepareTakeoff();
             s_takeoff_timer_tick = 0U;
             s_fc_start_state = FC_START_CRSF_STATE_TAKEOFF;

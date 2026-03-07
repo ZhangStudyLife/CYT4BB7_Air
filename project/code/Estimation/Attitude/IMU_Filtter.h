@@ -7,24 +7,29 @@
 extern "C" {
 #endif
 
-/* ======================== 采样参数 ======================== */
-#ifndef IMU_SAMPLE_RATE_HZ
+/* ======================== 采样率 ======================== */
 #define IMU_SAMPLE_RATE_HZ        (1000.0f)
-#endif
 
-/* ======================== 陀螺滤波链参数 ======================== */
-#define IMU_GYRO_NOTCH1_HZ        (220.0f)
-#define IMU_GYRO_NOTCH2_HZ        (440.0f)
-#define IMU_GYRO_NOTCH_Q          (5.0f)
-#define IMU_GYRO_LOWPASS_HZ       (70.0f)
+/* ======================== 1000Hz角速度环滤波参数 ======================== */
+/* 陷波: 消除电机基频振动 ~150Hz */
+#define GYRO_1K_NOTCH_HZ          (150.0f)
+#define GYRO_1K_NOTCH_Q           (5.0f)
+/* 低通: 截断陷波残余及高频噪声 */
+#define GYRO_1K_LPF_HZ            (120.0f)
 
-/* ======================== 加速度滤波链参数 ======================== */
-#define IMU_ACC_LOWPASS_EST_HZ    (20.0f)
-#define IMU_ACC_LOWPASS_POS_HZ    (10.0f)
+/* ======================== 500Hz姿态解算滤波参数 ======================== */
+/* 角速度低通: 80Hz带宽足以覆盖飞行姿态动态 */
+#define GYRO_500_LPF_HZ           (80.0f)
+/* 加速度低通: 飞行动态<10Hz, 30Hz留3倍余量 */
+#define ACC_500_LPF_HZ            (30.0f)
 
-#define IMU_FILTER_AXIS_NUM        (3U)
+/* ======================== 250Hz位置融合滤波参数 ======================== */
+/* 加速度低通: 位置动态<5Hz, 级联在500Hz的30Hz之后 */
+#define ACC_250_LPF_HZ            (15.0f)
 
-/* 二阶 IIR（Direct Form II Transposed） */
+#define IMU_AXIS_NUM              (3U)
+
+/* 二阶 IIR (Direct Form II Transposed) */
 typedef struct
 {
     float b0;
@@ -36,50 +41,38 @@ typedef struct
     float d2;
 } IMUBiquad_t;
 
-/* ======================== 滤波器状态 ======================== */
+/* 6轴IMU数据结构体: 陀螺仪(dps) + 加速度计(g) */
 typedef struct
 {
-    /* 原始输入（单位：gyro=dps, acc=g） */
-    float gyro_raw_x;
-    float gyro_raw_y;
-    float gyro_raw_z;
-    float acc_raw_x;
-    float acc_raw_y;
-    float acc_raw_z;
+    float gyrox;
+    float gyroy;
+    float gyroz;
+    float accx;
+    float accy;
+    float accz;
+} imudata_t;
 
-    /* 滤波输出（单位同输入） */
-    float gyro_filt_x;
-    float gyro_filt_y;
-    float gyro_filt_z;
-    float acc_filt_x;
-    float acc_filt_y;
-    float acc_filt_z;
+/* 1000Hz角速度环: gyro经Notch@150Hz + LPF@120Hz, acc为原始值 */
+extern imudata_t g_imufilter_1000hz;
+/* 500Hz姿态解算: gyro经LPF@80Hz, acc经LPF@30Hz (Butterworth 2阶) */
+extern imudata_t g_imudata_500hz;
+/* 250Hz位置融合: gyro同500Hz, acc经LPF@30Hz->LPF@15Hz级联 */
+extern imudata_t g_imudata_250hz;
 
-    /* 新命名输出：控制与估计分离 */
-    float gyro_ctrl_x;
-    float gyro_ctrl_y;
-    float gyro_ctrl_z;
-    float acc_est_x;
-    float acc_est_y;
-    float acc_est_z;
-    float acc_est_10_x;
-    float acc_est_10_y;
-    float acc_est_10_z;
+/**
+ * 函数功能: 初始化全部滤波器链 (3个环路)
+ * 输入参数: 无
+ * 返回值:   无
+ */
+void IMUFilter_Init(void);
 
-    /* 滤波器状态：每轴独立 */
-    IMUBiquad_t gyro_notch1[IMU_FILTER_AXIS_NUM];
-    IMUBiquad_t gyro_notch2[IMU_FILTER_AXIS_NUM];
-    IMUBiquad_t gyro_lpf[IMU_FILTER_AXIS_NUM];
-    IMUBiquad_t acc_lpf20[IMU_FILTER_AXIS_NUM];
-    IMUBiquad_t acc_lpf10[IMU_FILTER_AXIS_NUM];
-
-    /* 内部状态 */
-    uint8_t initialized;
-
-} IMUFilter_t;
-
-void IMUFilter_Init(IMUFilter_t *filter);
-void IMUFilter_Update(IMUFilter_t *filter);
+/**
+ * 函数功能: 1kHz调用, 对原始6轴数据执行全部滤波并填充3个输出结构体
+ * 输入参数: gx,gy,gz - 陀螺仪原始值(dps); ax,ay,az - 加速度计原始值(g)
+ * 返回值:   无
+ */
+void IMUFilter_Update(float gx, float gy, float gz,
+                      float ax, float ay, float az);
 
 #ifdef __cplusplus
 }

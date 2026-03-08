@@ -20,7 +20,7 @@ extern uint16 g_tof2_height_mm;
 extern uint16 g_tof3_height_mm;
 /* TOF通道4显示高度（中心高度估计）各通道中心高度估计（几何修正+零偏后），单位：mm，无效时为VL53L1X_INVALID_DISTANCE_MM */
 extern uint16 g_tof4_height_mm;
-/* 融合高度有效标志，1=有效，0=无效 */
+/* 融合高度有效标志，1=有效，0=无效  */ 
 extern uint8 g_tof_fused_valid;
 /* 通道1原始有效标志，1=有效，0=无效 */
 extern uint8 g_tof1_valid;

@@ -170,12 +170,13 @@ void Pos_Est_Update_250HZ(void)
     estimator.acc[0] = accLpf[1]; /*更新估测加速度，单位cm/s^2*/
     estimator.acc[1] = accLpf[0];
     estimator.acc[2] = accLpf[2];                                    /* Z轴单位:mm/s^2 */
-    float errPosZ = (float)g_tof_fused_height_mm - estimator.pos[2]; /* Z轴误差统一:mm */
+    float errPosZ = (float)fusedHeightLpf - estimator.pos[2]; /* Z轴误差统一:mm */
 
-    /* 位置预估: Z-axis */
-    inavFilterPredict(2, POS_EST_250HZ_DT, estimator.acc[2]);
     /* 位置校正: Z-axis，权重0.35与正点原子wBaro一致，避免过度校正导致速度振荡 */
     inavFilterCorrectPos(2, POS_EST_250HZ_DT, errPosZ, 0.35f);
+    /* 位置预估: Z-axis */
+    inavFilterPredict(2, POS_EST_250HZ_DT, estimator.acc[2]);
+
 
     float opflowDt = POS_EST_250HZ_DT;
 

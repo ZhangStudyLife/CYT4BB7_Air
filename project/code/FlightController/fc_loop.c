@@ -286,7 +286,7 @@ void FC_Loop_500Hz(void)
         int32_t pitch_ctrl = (int32_t)fc_clampf(PID_Update(&pitch_angle_pid, pitch_angle_target, pitch_angle_meas, dt), -limit, limit);
         int32_t yaw_ctrl = (int32_t)fc_clampf(PID_Update(&yaw_angle_pid, yaw_angle_target, yaw_angle_meas, dt), -limit, limit);
 
-        wifi_vofa_JustFloat(4u,roll_angle_target,g_euler.roll, pitch_angle_target, g_euler.pitch);
+
         (void)yaw_ctrl;
         roll_gyro_target = roll_ctrl;
         pitch_gyro_target = pitch_ctrl;

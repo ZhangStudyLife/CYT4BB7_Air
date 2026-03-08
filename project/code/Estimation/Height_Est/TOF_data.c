@@ -662,24 +662,24 @@ void TOF_Calibrate(void)
         valid_mask = VL53L1X_read_data(&data);
         (void)valid_mask;
 
-        raw2_valid = TOF_IsRawMeasurementValid(data.VL53L1X2_distance_mm,
-                                               data.VL53L1X2_range_status,
-                                               g_vl53l1x2_diag.ready,
-                                               g_vl53l1x2_diag.is_fresh);
-        raw3_valid = TOF_IsRawMeasurementValid(data.VL53L1X3_distance_mm,
-                                               data.VL53L1X3_range_status,
-                                               g_vl53l1x3_diag.ready,
-                                               g_vl53l1x3_diag.is_fresh);
+        raw2_valid = TOF_IsRawMeasurementValid(data.distance_mm[1],
+                                               data.range_status[1],
+                                               g_vl53l1x_diag[1].ready,
+                                               g_vl53l1x_diag[1].is_fresh);
+        raw3_valid = TOF_IsRawMeasurementValid(data.distance_mm[2],
+                                               data.range_status[2],
+                                               g_vl53l1x_diag[2].ready,
+                                               g_vl53l1x_diag[2].is_fresh);
 
         if (0U != raw2_valid)
         {
-            sum2 += TOF_CompensateVerticalByAttitude(data.VL53L1X2_distance_mm);
+            sum2 += TOF_CompensateVerticalByAttitude(data.distance_mm[1]);
             cnt2++;
         }
 
         if (0U != raw3_valid)
         {
-            sum3 += TOF_CompensateVerticalByAttitude(data.VL53L1X3_distance_mm);
+            sum3 += TOF_CompensateVerticalByAttitude(data.distance_mm[2]);
             cnt3++;
         }
 
@@ -743,10 +743,10 @@ void TOF_Update(void)
     (void)valid_mask;
 
     TOF_UpdateChannelObservation(&s_tof2_state,
-                                 data.VL53L1X2_distance_mm,
-                                 data.VL53L1X2_range_status,
-                                 g_vl53l1x2_diag.ready,
-                                 g_vl53l1x2_diag.is_fresh,
+                                 data.distance_mm[1],
+                                 data.range_status[1],
+                                 g_vl53l1x_diag[1].ready,
+                                 g_vl53l1x_diag[1].is_fresh,
                                  s_tof2_offset_mm,
                                  &ch2_display_mm,
                                  &ch2_display_valid,
@@ -754,10 +754,10 @@ void TOF_Update(void)
                                  &ch2_fusion_valid);
 
     TOF_UpdateChannelObservation(&s_tof3_state,
-                                 data.VL53L1X3_distance_mm,
-                                 data.VL53L1X3_range_status,
-                                 g_vl53l1x3_diag.ready,
-                                 g_vl53l1x3_diag.is_fresh,
+                                 data.distance_mm[2],
+                                 data.range_status[2],
+                                 g_vl53l1x_diag[2].ready,
+                                 g_vl53l1x_diag[2].is_fresh,
                                  s_tof3_offset_mm,
                                  &ch3_display_mm,
                                  &ch3_display_valid,

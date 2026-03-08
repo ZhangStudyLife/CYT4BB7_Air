@@ -54,62 +54,6 @@ static float fc_clampf(float value, float min_value, float max_value)
     return value;
 }
 
-/*
- * 函数功能: 计算浮点数绝对值，供角速度环增益调度使用
- * 输入参数: value - 输入值
- * 返回值  : value 的绝对值
- */
-static float fc_absf(float value)
-{
-    return (value >= 0.0f) ? value : -value;
-}
-
-/*
- * 函数功能: 对两个浮点值做线性插值，减少角速度环分段切换突变
- * 输入参数: start_value - 起点值
- *          end_value   - 终点值
- *          ratio       - 插值比例，范围 0.0~1.0
- * 返回值  : 插值后的结果
- */
-static float fc_lerpf(float start_value, float end_value, float ratio)
-{
-    return start_value + (end_value - start_value) * ratio;
-}
-
-/*
- * 函数功能: 按 Roll 角速度目标幅度动态调度 PID 增益
- * 输入参数: target_dps - Roll 角速度目标，单位 dps
- * 返回值  : 无
- */
-static void FC_RollGyroPid_ApplySchedule(float target_dps)
-{
-    const float schedule_start_dps = 8.0f;
-    const float schedule_end_dps = 25.0f;
-    const float kp_high_target = 3.18f;
-    const float ki_high_target = 0.52f;
-    const float kd_high_target = 0.034f;
-    float abs_target = fc_absf(target_dps);
-    float ratio;
-
-    if (abs_target <= schedule_start_dps)
-    {
-        ratio = 0.0f;
-    }
-    else if (abs_target >= schedule_end_dps)
-    {
-        ratio = 1.0f;
-    }
-    else
-    {
-        ratio = (abs_target - schedule_start_dps) / (schedule_end_dps - schedule_start_dps);
-    }
-
-    /* 小目标保持“钉钉子”稳态参数，大目标提高刚性并降低积分占比 */
-    roll_gyro_pid.kp = fc_lerpf(g_fc_params.roll_gyro_kp, kp_high_target, ratio);
-    roll_gyro_pid.ki = fc_lerpf(g_fc_params.roll_gyro_ki, ki_high_target, ratio);
-    roll_gyro_pid.kd = fc_lerpf(g_fc_params.roll_gyro_kd, kd_high_target, ratio);
-}
-
 void FC_ThrTrim_Update_100Hz(void)
 {
 }
@@ -139,6 +83,8 @@ void FC_Loop_Init(void)
              g_fc_params.pitch_gyro_kp, g_fc_params.pitch_gyro_ki, g_fc_params.pitch_gyro_kd,
              g_fc_params.pitch_gyro_kff, g_fc_params.gyro_dt,
              g_fc_params.pitch_gyro_i_limit, g_fc_params.pitch_gyro_d_lpf);
+    /* Pitch 角速度环与 Roll 保持相同的积分放松策略，降低连续目标变化时的积分拖拽 */
+    pitch_gyro_pid.iterm_relax_threshold = 40.0f;
     PID_Init(&yaw_gyro_pid,
              g_fc_params.yaw_gyro_kp, g_fc_params.yaw_gyro_ki, g_fc_params.yaw_gyro_kd,
              g_fc_params.yaw_gyro_kff, g_fc_params.gyro_dt,
@@ -358,27 +304,26 @@ void FC_Loop_1000Hz(void)
     if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
     {
         /* 读取当前角速度 */
-        float roll_gyro_raw = ICM42688.gyro_x;
+        float pitch_gyro_raw = ICM42688.gyro_y;
         float roll_gyro_meas = g_imufilter_1000hz.gyrox;
         float pitch_gyro_meas = g_imufilter_1000hz.gyroy;
         float yaw_gyro_meas = g_imufilter_1000hz.gyroz;
 
         /* 控制量限幅 */
         float limit = 10000.0f;
-        FC_RollGyroPid_ApplySchedule(roll_gyro_target);
         int32_t roll_ctrl = (int32_t)fc_clampf(PID_Update(&roll_gyro_pid, roll_gyro_target, roll_gyro_meas, dt), -limit, limit);
         int32_t pitch_ctrl = (int32_t)fc_clampf(PID_Update(&pitch_gyro_pid, pitch_gyro_target, pitch_gyro_meas, dt), -limit, limit);
         int32_t yaw_ctrl = (int32_t)fc_clampf(PID_Update(&yaw_gyro_pid, yaw_gyro_target, yaw_gyro_meas, dt), -limit, limit);
-        /* 角速度环调试：目标、原始陀螺、滤波后陀螺、控制输出和 PID 分项 */
+        /* 角速度环调试切换到 Pitch：目标、原始陀螺、滤波后陀螺、控制输出和 PID 分项 */
         wifi_vofa_JustFloat(8u,
-                            roll_gyro_target,
-                            roll_gyro_raw,
-                            roll_gyro_meas,
-                            roll_ctrl,
-                            roll_gyro_pid.p_term,
-                            roll_gyro_pid.i_term,
-                            roll_gyro_pid.d_term,
-                            roll_gyro_pid.error);
+                            pitch_gyro_target,
+                            pitch_gyro_raw,
+                            pitch_gyro_meas,
+                            pitch_ctrl,
+                            pitch_gyro_pid.p_term,
+                            pitch_gyro_pid.i_term,
+                            pitch_gyro_pid.d_term,
+                            pitch_gyro_pid.error);
         (void)yaw_ctrl;
         /* 电机混控：总油门 = 基础油门 + 高度控制输出 */
         g_motor_cmd.throttle = g_fc_params.base_throttle + (int32_t)height_vel_out;

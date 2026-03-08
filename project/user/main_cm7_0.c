@@ -107,7 +107,8 @@ int main(void)
                 s_tick_div_pos_250hz = 0U;
                 Pos_Est_Update_250HZ();
                 // wifi_vofa_JustFloat(3, g_euler.roll, g_euler.pitch, g_euler.yaw);
-                wifi_vofa_JustFloat(4u,VL53L1X_data.distance_mm[0],VL53L1X_data.distance_mm[1],VL53L1X_data.distance_mm[2],VL53L1X_data.distance_mm[3]);
+                wifi_vofa_JustFloat(9,VL53L1X_data.distance_mm[0],VL53L1X_data.distance_mm[1],VL53L1X_data.distance_mm[2],VL53L1X_data.distance_mm[3],
+                g_tof1_height_mm,g_tof2_height_mm,g_tof3_height_mm,g_tof4_height_mm,g_tof_fused_height_mm);
             }
 
             tick_1000_guard++;

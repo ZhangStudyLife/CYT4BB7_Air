@@ -16,6 +16,8 @@ static uint16_t s_unlock_timer_tick = 0U;
 static uint16_t s_takeoff_timer_tick = 0U;
 static uint8_t s_motor_armed = 0U;
 static uint8_t s_landing_request = 0U;
+/* 起飞前校准是否已完成：0=未执行，1=已执行（进入TAKEOFF状态时首次触发校准） */
+static uint8_t s_takeoff_calib_done = 0U;
 
 static uint8_t FC_START_CRSF_IsUnlockStickCommand(void)
 {
@@ -78,6 +80,7 @@ static void FC_START_CRSF_ForceStopToStandby(void)
     s_takeoff_timer_tick = 0U;
     s_unlock_timer_tick = 0U;
     s_landing_request = 0U;
+    s_takeoff_calib_done = 0U;   /* 重置校准标志，下次起飞时重新执行校准 */
 
     Motor_EmergencyStop();
     Motor_Disable();
@@ -252,7 +255,7 @@ static void FC_START_CRSF_StateMachine_Update(void)
 
         if (s_unlock_timer_tick >= (uint16_t)(FC_START_CRSF_UNLOCK_HOLD_TIME_MS / FC_START_CRSF_TASK_PERIOD_MS))
         {
-            TOF_Calibrate();
+            
             FC_START_CRSF_PrepareTakeoff();
             s_takeoff_timer_tick = 0U;
             s_fc_start_state = FC_START_CRSF_STATE_TAKEOFF;
@@ -260,6 +263,23 @@ static void FC_START_CRSF_StateMachine_Update(void)
         break;
 
     case FC_START_CRSF_STATE_TAKEOFF:
+        /* 阶段1：起飞前TOF校准（仅在电机启动前执行一次）
+         * TOF_Calibrate()会阻塞约1.5秒（500ms IMU采样 + 1000ms TOF采样）。
+         * 校准完成后检查四路TOF偏差：超过10cm则回STANDBY拒绝起飞。 */
+        if (0U == s_takeoff_calib_done)
+        {
+            TOF_Calibrate();
+            s_takeoff_calib_done = 1U;
+            if (0U == g_tof_calibration_ok)
+            {
+                /* 四路TOF偏差过大（>100mm），拒绝起飞，回到待机状态 */
+                Beep_Play(50,2,3); /* 50%占空比，2s周期，3次循环的报警提示 */
+                FC_START_CRSF_ForceStopToStandby();
+                break;
+            }
+            break;
+        }
+        /* 阶段2：正常起飞序列（电机渐进加速） */
         if (FC_START_CRSF_TakeoffState_Update() != 0U)
         {
             s_motor_armed = 1U;
@@ -297,6 +317,7 @@ void FC_START_CRSF_Init(void)
     s_takeoff_timer_tick = 0U;
     s_motor_armed = 0U;
     s_landing_request = 0U;
+    s_takeoff_calib_done = 0U;
 
     Motor_Disable();
 }

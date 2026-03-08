@@ -107,8 +107,7 @@ int main(void)
                 s_tick_div_pos_250hz = 0U;
                 Pos_Est_Update_250HZ();
                 // wifi_vofa_JustFloat(3, g_euler.roll, g_euler.pitch, g_euler.yaw);
-                wifi_vofa_JustFloat(9,VL53L1X_data.distance_mm[0],VL53L1X_data.distance_mm[1],VL53L1X_data.distance_mm[2],VL53L1X_data.distance_mm[3],
-                g_tof1_height_mm,g_tof2_height_mm,g_tof3_height_mm,g_tof4_height_mm,g_tof_fused_height_mm);
+
             }
 
             tick_1000_guard++;
@@ -123,7 +122,8 @@ int main(void)
             crsf_send_25hz();       /* CRSF 25Hz 发送函数，每 100Hz 调用一次 */
             CRSF_Update_100HZ();
             FC_Loop_100Hz();        /* 飞控外环（速度环/位置环）更新 */
-
+                wifi_vofa_JustFloat(12U,VL53L1X_data.distance_mm[0],VL53L1X_data.distance_mm[1],VL53L1X_data.distance_mm[2],VL53L1X_data.distance_mm[3],
+                g_tof1_height_mm,g_tof2_height_mm,g_tof3_height_mm,g_tof4_height_mm,g_tof_fused_height_mm,g_euler.pitch,g_euler.roll,g_tof_fused_source);
             /* 50Hz：位置估计辅助更新与飞控定高环 */
             s_tick_div_fc_start_50hz++;
             if (s_tick_div_fc_start_50hz >= 2)

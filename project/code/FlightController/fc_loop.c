@@ -38,8 +38,8 @@ FC_START_CRSF_flight_mode_e flight_mode;
 #define FC_HEIGHT_SRC_TOF (1U)
 #define FC_HEIGHT_SRC_BARO (2U)
 
-#define FC_ROLL_MECH_TRIM_DEG (-2.0)
-#define FC_PITCH_MECH_TRIM_DEG (4.0f)
+#define FC_ROLL_MECH_TRIM_DEG (-1.0f)
+#define FC_PITCH_MECH_TRIM_DEG (5.0f)
 
 static float fc_clampf(float value, float min_value, float max_value)
 {
@@ -286,6 +286,7 @@ void FC_Loop_500Hz(void)
         int32_t pitch_ctrl = (int32_t)fc_clampf(PID_Update(&pitch_angle_pid, pitch_angle_target, pitch_angle_meas, dt), -limit, limit);
         int32_t yaw_ctrl = (int32_t)fc_clampf(PID_Update(&yaw_angle_pid, yaw_angle_target, yaw_angle_meas, dt), -limit, limit);
 
+        wifi_vofa_JustFloat(4u,roll_angle_target,g_euler.roll, pitch_angle_target, g_euler.pitch);
         (void)yaw_ctrl;
         roll_gyro_target = roll_ctrl;
         pitch_gyro_target = pitch_ctrl;
@@ -315,15 +316,15 @@ void FC_Loop_1000Hz(void)
         int32_t pitch_ctrl = (int32_t)fc_clampf(PID_Update(&pitch_gyro_pid, pitch_gyro_target, pitch_gyro_meas, dt), -limit, limit);
         int32_t yaw_ctrl = (int32_t)fc_clampf(PID_Update(&yaw_gyro_pid, yaw_gyro_target, yaw_gyro_meas, dt), -limit, limit);
         /* 角速度环调试切换到 Pitch：目标、原始陀螺、滤波后陀螺、控制输出和 PID 分项 */
-        wifi_vofa_JustFloat(8u,
-                            pitch_gyro_target,
-                            pitch_gyro_raw,
-                            pitch_gyro_meas,
-                            pitch_ctrl,
-                            pitch_gyro_pid.p_term,
-                            pitch_gyro_pid.i_term,
-                            pitch_gyro_pid.d_term,
-                            pitch_gyro_pid.error);
+        // wifi_vofa_JustFloat(8u,
+        //                     pitch_gyro_target,
+        //                     pitch_gyro_raw,
+        //                     pitch_gyro_meas,
+        //                     pitch_ctrl,
+        //                     pitch_gyro_pid.p_term,
+        //                     pitch_gyro_pid.i_term,
+        //                     pitch_gyro_pid.d_term,
+        //                     pitch_gyro_pid.error);
         (void)yaw_ctrl;
         /* 电机混控：总油门 = 基础油门 + 高度控制输出 */
         g_motor_cmd.throttle = g_fc_params.base_throttle + (int32_t)height_vel_out;

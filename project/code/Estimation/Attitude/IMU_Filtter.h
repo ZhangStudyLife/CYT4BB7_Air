@@ -13,7 +13,7 @@ extern "C" {
 /* ======================== 1000Hz角速度环滤波参数 ======================== */
 /* 陷波: 消除电机基频振动 ~150Hz */
 #define GYRO_1K_NOTCH_HZ          (150.0f)
-#define GYRO_1K_NOTCH_Q           (5.0f)
+#define GYRO_1K_NOTCH_Q           (4.0f)
 /* 低通: 截断陷波残余及高频噪声 */
 #define GYRO_1K_LPF_HZ            (120.0f)
 

@@ -30,12 +30,12 @@ void FC_Params_Init(void)
     g_fc_params.base_throttle = 3500; /* 悬停油门 */
 
     /* ===== Roll轴角速度环参数 ===== */
-    g_fc_params.roll_gyro_kp = 2.5f;
-    g_fc_params.roll_gyro_ki = 3.0f;
-    g_fc_params.roll_gyro_kd = 0.0f;
+    g_fc_params.roll_gyro_kp = 3.0f;
+    g_fc_params.roll_gyro_ki = 0.8f;
+    g_fc_params.roll_gyro_kd = 0.030f;
     g_fc_params.roll_gyro_kff = 0.0f;
-    g_fc_params.roll_gyro_i_limit = 1400.0f;
-    g_fc_params.roll_gyro_d_lpf = 0.08f;
+    g_fc_params.roll_gyro_i_limit = 300.0f;
+    g_fc_params.roll_gyro_d_lpf = 0.12f;
 
     /* ===== Pitch轴角速度环参数 ===== */
     g_fc_params.pitch_gyro_kp = 2.5f;

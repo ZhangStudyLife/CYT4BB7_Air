@@ -305,7 +305,6 @@ void FC_Loop_1000Hz(void)
     if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
     {
         /* 读取当前角速度 */
-        float pitch_gyro_raw = ICM42688.gyro_y;
         float roll_gyro_meas = g_imufilter_1000hz.gyrox;
         float pitch_gyro_meas = g_imufilter_1000hz.gyroy;
         float yaw_gyro_meas = g_imufilter_1000hz.gyroz;

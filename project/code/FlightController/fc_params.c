@@ -118,11 +118,12 @@ void FC_Params_Init(void)
     g_fc_params.vel_y_d_lpf = 0.0f;
 
     /* ===== Z轴速度环参数 ===== */
-    g_fc_params.vel_z_kp = 900.0f;
-    g_fc_params.vel_z_ki = 140.0f;
-    g_fc_params.vel_z_kd = 90.0f;
+    /* 保留电池压降下的积分补偿能力，同时提高 P 响应并削弱 D 对测速毛刺的放大 */
+    g_fc_params.vel_z_kp = 1100.0f;
+    g_fc_params.vel_z_ki = 95.0f;
+    g_fc_params.vel_z_kd = 38.0f;
     g_fc_params.vel_z_kff = 0.0f;
-    g_fc_params.vel_z_i_limit = 500.0f;
-    g_fc_params.vel_z_d_lpf = 0.14f;
+    g_fc_params.vel_z_i_limit = 450.0f;
+    g_fc_params.vel_z_d_lpf = 0.08f;
 }
 

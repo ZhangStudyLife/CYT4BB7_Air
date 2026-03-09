@@ -111,6 +111,8 @@ void FC_Loop_Init(void)
     height_vel_pid.aw_gain = 0.30f;
     height_vel_pid.output_min = -1500.0f;
     height_vel_pid.output_max = 1500.0f;
+    /* 高度速度目标快速变化时提前放松积分，保留电池压降积分补偿，同时避免阶跃时积分抢主控制 */
+    height_vel_pid.iterm_relax_threshold = 1.5f;
 }
 
 void FC_Loop_Reset(void)

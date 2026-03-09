@@ -94,9 +94,9 @@ void FC_Params_Init(void)
     g_fc_params.pos_y_d_lpf = 0.0f;
 
     /* ===== Z轴位置环参数 ===== */
-    g_fc_params.pos_z_kp = 1.8f;
+    g_fc_params.pos_z_kp = 1.0f;
     g_fc_params.pos_z_ki = 0.0f;
-    g_fc_params.pos_z_kd = 0.12f;
+    g_fc_params.pos_z_kd = 0.08f;
     g_fc_params.pos_z_kff = 0.0f;
     g_fc_params.pos_z_i_limit = 0.0f;
     g_fc_params.pos_z_d_lpf = 0.20f;

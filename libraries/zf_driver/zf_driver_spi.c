@@ -775,7 +775,7 @@ void spi_read_8bit_registers (spi_index_enum spi_n, const uint8 register_name, u
 //-------------------------------------------------------------------------------------------------------------------
 uint16 spi_read_16bit_register (spi_index_enum spi_n, const uint16 register_name)
 {
-    uint8 read_data = 0;
+    uint16 read_data = 0;
     
     switch_transition_length(spi_n, 16);					// 切换单次通信长度为16位
     

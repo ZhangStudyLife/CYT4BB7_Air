@@ -253,8 +253,7 @@ void FC_Loop_100Hz(void)
         }
     }
 
-
-    wifi_vofa_JustFloat(7, height_pos_out, g_height_vz_mps, height_vz_raw_mps, height_vel_pid.p_term, height_vel_pid.i_term, height_vel_pid.d_term);
+    // wifi_vofa_JustFloat(7, height_pos_out, g_height_vz_mps, height_vz_raw_mps, height_vel_pid.p_term, height_vel_pid.i_term, height_vel_pid.d_term);
 
     /* 光流调试：前4路保持原有顺序，后4路补充纹理质量与原始像素统计 */
     // wifi_vofa_JustFloat(8u,

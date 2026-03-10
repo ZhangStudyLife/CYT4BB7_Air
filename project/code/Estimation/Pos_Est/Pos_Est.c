@@ -141,18 +141,54 @@ void Pos_Est_Update_250HZ(void)
     ay *= 100.0f;
     az *= 100.0f;
     az_up *= 1000.0f; /* Z轴统一使用mm/s^2 */
-    if (ax > 4.0f) { ax -= 4.0f; }
-    else if (ax < -4.0f) { ax += 4.0f; }
-    else { ax = 0.0f; }
-    if (ay > 4.0f) { ay -= 4.0f; }
-    else if (ay < -4.0f) { ay += 4.0f; }
-    else { ay = 0.0f; }
-    if (az > 4.0f) { az -= 4.0f; }
-    else if (az < -4.0f) { az += 4.0f; }
-    else { az = 0.0f; }
-    if (az_up > 40.0f) { az_up -= 40.0f; }
-    else if (az_up < -40.0f) { az_up += 40.0f; }
-    else { az_up = 0.0f; }
+    if (ax > 4.0f)
+    {
+        ax -= 4.0f;
+    }
+    else if (ax < -4.0f)
+    {
+        ax += 4.0f;
+    }
+    else
+    {
+        ax = 0.0f;
+    }
+    if (ay > 4.0f)
+    {
+        ay -= 4.0f;
+    }
+    else if (ay < -4.0f)
+    {
+        ay += 4.0f;
+    }
+    else
+    {
+        ay = 0.0f;
+    }
+    if (az > 4.0f)
+    {
+        az -= 4.0f;
+    }
+    else if (az < -4.0f)
+    {
+        az += 4.0f;
+    }
+    else
+    {
+        az = 0.0f;
+    }
+    if (az_up > 40.0f)
+    {
+        az_up -= 40.0f;
+    }
+    else if (az_up < -40.0f)
+    {
+        az_up += 40.0f;
+    }
+    else
+    {
+        az_up = 0.0f;
+    }
     accLpf[0] += (ax - accLpf[0]) * 0.1f;    /*加速度低通*/
     accLpf[1] += (ay - accLpf[1]) * 0.1f;    /*加速度低通*/
     accLpf[2] += (az_up - accLpf[2]) * 0.1f; /*加速度低通*/
@@ -169,14 +205,13 @@ void Pos_Est_Update_250HZ(void)
     // 飞机垂直向上加速    estimator.acc[2]是正
     estimator.acc[0] = accLpf[1]; /*更新估测加速度，单位cm/s^2*/
     estimator.acc[1] = accLpf[0];
-    estimator.acc[2] = accLpf[2];                                    /* Z轴单位:mm/s^2 */
+    estimator.acc[2] = accLpf[2];                             /* Z轴单位:mm/s^2 */
     float errPosZ = (float)fusedHeightLpf - estimator.pos[2]; /* Z轴误差统一:mm */
 
     /* 位置校正: Z-axis，权重0.35与正点原子wBaro一致，避免过度校正导致速度振荡 */
     inavFilterCorrectPos(2, POS_EST_250HZ_DT, errPosZ, 0.35f);
     /* 位置预估: Z-axis */
     inavFilterPredict(2, POS_EST_250HZ_DT, estimator.acc[2]);
-
 
     float opflowDt = POS_EST_250HZ_DT;
 
@@ -199,8 +234,6 @@ void Pos_Est_Update_250HZ(void)
     /* 速度校正: XY-axis */
     inavFilterCorrectVel(0, opflowDt, opResidualXVel, wXYVel);
     inavFilterCorrectVel(1, opflowDt, opResidualYVel, wXYVel);
-
-
 }
 
 void Pos_Est_Update_100HZ(void)
@@ -223,14 +256,32 @@ void Pos_Est_Update_100HZ(void)
      * 俯仰/横滚会导致图像平面出现“伪位移”，
      * 使用 tan(角度) 进行一阶几何补偿。
      */
+    float rollCompDeg = Pos_Est_Clampf(g_euler.roll,
+                                       -15.0f, 15.0f);
+    float pitchCompDeg = Pos_Est_Clampf(g_euler.pitch,
+                                        -20.0f, 20.0f);
+
+    float tanRoll = Pos_Est_Tan(rollCompDeg * DEG2RAD);
+    float tanPitch = Pos_Est_Tan(pitchCompDeg * DEG2RAD);
+
     float tanRoll = Pos_Est_Tan(g_euler.roll * DEG2RAD);
     float tanPitch = Pos_Est_Tan(g_euler.pitch * DEG2RAD);
 
     opFlow.pixComp[0] = 480.f * tanRoll;                         /*右向轴由横滚补偿：右倾时光流看到地面左移，补偿抵消*/
-    opFlow.pixComp[1] = -480.f * tanPitch;                       /*前向轴由俯仰补偿：符号取反以正确抵消姿态耦合*/
+    opFlow.pixComp[1] = -420.f * tanPitch;                       /*前向轴由俯仰补偿：符号取反以正确抵消姿态耦合*/
     opFlow.pixValid[0] = (opFlow.pixSum[0] + opFlow.pixComp[0]); /*实际输出像素*/
     opFlow.pixValid[1] = (opFlow.pixSum[1] + opFlow.pixComp[1]);
-
+    wifi_vofa_JustFloat(10u,
+                        height,
+                        g_euler.roll,
+                        g_euler.pitch,
+                        opFlow.pixSum[0],
+                        opFlow.pixSum[1],
+                        g_pmw3901_raw.squal,
+                        opFlow.pixComp[0],
+                        opFlow.pixComp[1],
+                        opFlow.pixValid[0],
+                        opFlow.pixValid[1]);
     /* 位移换算系数：1m 标定值 * 当前高度(m) */
     static uint8_t heightWasLow = 1U;
     float coeff = RESOLUTION * height;
@@ -285,5 +336,4 @@ void Pos_Est_Update_100HZ(void)
     opFlow.posSum[1] += opFlow.deltaPos[1]; /*累积位移 cm*/
 
     opFlow.isOpFlowOk = (g_pmw3901_raw.squal >= POS_EST_SQUAL_MIN) ? 1U : 0U; /*光流状态*/
-
 }

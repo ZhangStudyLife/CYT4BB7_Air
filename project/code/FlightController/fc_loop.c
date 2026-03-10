@@ -201,6 +201,8 @@ void FC_Loop_100Hz(void)
     {
         if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
         {
+            PID_Reset(&velx_pid);
+            PID_Reset(&vely_pid);
             float ch0 = fc_clampf((float)CRSF_STD[0], -1000.0f, 1000.0f);
             float ch1 = fc_clampf((float)CRSF_STD[1], -1000.0f, 1000.0f);
             float ch2 = fc_clampf((float)CRSF_STD[2], -1000.0f, 1000.0f);
@@ -228,15 +230,15 @@ void FC_Loop_100Hz(void)
             float ch2 = fc_clampf((float)CRSF_STD[2], -1000.0f, 1000.0f);
 
             target_height_m = (ch2 + 1000.0f) * (1 / 2000.0f);                                                /* CH2: 0m~1m */
-            velx_target = fc_clampf(ch0 * (300.0f / 1000.0f), -300.0f, 300.0f);  /* CH0: -1000~1000 映射为 X 轴速度目标 -300~300cm/s */
-            vely_target = fc_clampf(-ch1 * (300.0f / 1000.0f), -300.0f, 300.0f); /* CH1: -1000~1000 映射为 Y 轴速度目标 -300~300cm/s */
-            velx_out = PID_Update(&velx_pid, velx_target, estimator.vel[0], dt);
-            vely_out = PID_Update(&vely_pid, vely_target, estimator.vel[1], dt);
+            velx_target = fc_clampf(ch0 * (200.0f / 1000.0f), -200.0f, 200.0f);  /* CH0: -1000~1000 映射为 X 轴速度目标 -200~200cm/s */
+            vely_target = fc_clampf(-ch1 * (200.0f / 1000.0f), -200.0f, 200.0f); /* CH1: -1000~1000 映射为 Y 轴速度目标 -200~200cm/s */
+            velx_out = PID_Update(&velx_pid, velx_target, opFlow.velLpf[0], dt);
+            vely_out = PID_Update(&vely_pid, vely_target, -opFlow.velLpf[1], dt);
             velx_out = fc_clampf(velx_out, -20.0f, 20.0f);/*目标角度的限幅-20°-20°*/
             vely_out = fc_clampf(vely_out, -20.0f, 20.0f);/*目标角度的限幅-20°-20°*/
 
-            roll_angle_target = velx_out ;  
-            pitch_angle_target = vely_out; 
+            roll_angle_target = velx_out + FC_ROLL_MECH_TRIM_DEG ;  
+            pitch_angle_target = vely_out + FC_PITCH_MECH_TRIM_DEG; 
 
             height_vel_out = PID_Update(&height_vel_pid, height_pos_out, g_height_vz_mps, dt);
             height_vel_out = fc_clampf(height_vel_out, height_vel_out_min, height_vel_out_max);
@@ -247,12 +249,14 @@ void FC_Loop_100Hz(void)
             s_tof_hist_inited = 0U;
             vely_out = 0.0f;
             velx_out = 0.0f;
-            roll_angle_target = velx_out ;  
-            pitch_angle_target = vely_out; 
+            roll_angle_target = velx_out + FC_ROLL_MECH_TRIM_DEG ;  
+            pitch_angle_target = vely_out + FC_PITCH_MECH_TRIM_DEG; 
             height_vel_out = 0.0f;
         }
     }
-
+    // wifi_vofa_JustFloat(7u,flight_mode,opFlow.velLpf[0],velx_target,velx_pid.p_term,velx_pid.i_term,roll_angle_target,g_euler.roll);
+    wifi_vofa_JustFloat(13u,flight_mode,opFlow.velLpf[1],vely_target,vely_pid.p_term,vely_pid.i_term,pitch_angle_target,g_euler.pitch,
+    opFlow.velLpf[0],velx_target,velx_pid.p_term,velx_pid.i_term,roll_angle_target,g_euler.roll);
     // wifi_vofa_JustFloat(7, height_pos_out, g_height_vz_mps, height_vz_raw_mps, height_vel_pid.p_term, height_vel_pid.i_term, height_vel_pid.d_term);
 
     /* 光流调试：前4路保持原有顺序，后4路补充纹理质量与原始像素统计 */

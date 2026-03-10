@@ -264,28 +264,15 @@ void Pos_Est_Update_100HZ(void)
     float tanRoll = Pos_Est_Tan(rollCompDeg * DEG2RAD);
     float tanPitch = Pos_Est_Tan(pitchCompDeg * DEG2RAD);
 
-    float tanRoll = Pos_Est_Tan(g_euler.roll * DEG2RAD);
-    float tanPitch = Pos_Est_Tan(g_euler.pitch * DEG2RAD);
-
     opFlow.pixComp[0] = 480.f * tanRoll;                         /*右向轴由横滚补偿：右倾时光流看到地面左移，补偿抵消*/
     opFlow.pixComp[1] = -420.f * tanPitch;                       /*前向轴由俯仰补偿：符号取反以正确抵消姿态耦合*/
     opFlow.pixValid[0] = (opFlow.pixSum[0] + opFlow.pixComp[0]); /*实际输出像素*/
     opFlow.pixValid[1] = (opFlow.pixSum[1] + opFlow.pixComp[1]);
-    wifi_vofa_JustFloat(10u,
-                        height,
-                        g_euler.roll,
-                        g_euler.pitch,
-                        opFlow.pixSum[0],
-                        opFlow.pixSum[1],
-                        g_pmw3901_raw.squal,
-                        opFlow.pixComp[0],
-                        opFlow.pixComp[1],
-                        opFlow.pixValid[0],
-                        opFlow.pixValid[1]);
+
     /* 位移换算系数：1m 标定值 * 当前高度(m) */
     static uint8_t heightWasLow = 1U;
-    float coeff = RESOLUTION * height;
-    if (height < 0.15f) /*高度过低时不更新位置，避免地面效应干扰*/
+    float coeff = RESOLUTION * (height - 0.05f);            // 光流安装位置实际比TOF低 5CM
+    if (height < 0.2f) /*高度过低时不更新位置，避免地面效应干扰*/
     {
         coeff = 0.0f;
         heightWasLow = 1U;
@@ -314,13 +301,13 @@ void Pos_Est_Update_100HZ(void)
     opFlow.deltaVel[0] = opFlow.deltaPos[0] / POS_EST_100HZ_DT; /*速度 cm/s*/
     opFlow.deltaVel[1] = opFlow.deltaPos[1] / POS_EST_100HZ_DT;
 
-    opFlow.velLpf[0] += (opFlow.deltaVel[0] - opFlow.velLpf[0]) * 0.15f; /*速度低通 cm/s，alpha=0.15降噪*/
-    opFlow.velLpf[1] += (opFlow.deltaVel[1] - opFlow.velLpf[1]) * 0.15f; /*速度低通 cm/s，alpha=0.15降噪*/
+    opFlow.velLpf[0] += (opFlow.deltaVel[0] - opFlow.velLpf[0]) * 0.25f; /*速度低通 cm/s，alpha=0.25降噪*/
+    opFlow.velLpf[1] += (opFlow.deltaVel[1] - opFlow.velLpf[1]) * 0.25f; /*速度低通 cm/s，alpha=0.25降噪*/
 
     /* 速度限幅，防止异常输入影响下游位置控制 */
     opFlow.velLpf[0] = Pos_Est_Clampf(opFlow.velLpf[0], -POS_EST_VEL_LIMIT, POS_EST_VEL_LIMIT); /*速度限幅 cm/s*/
     opFlow.velLpf[1] = Pos_Est_Clampf(opFlow.velLpf[1], -POS_EST_VEL_LIMIT, POS_EST_VEL_LIMIT); /*速度限幅 cm/s*/
-
+    // wifi_vofa_JustFloat(8u, opFlow.deltaPos[0], opFlow.deltaPos[1], opFlow.deltaVel[0], opFlow.deltaVel[1], height, g_euler.pitch,opFlow.velLpf[0],opFlow.velLpf[1]);
     /* 位移死区：0.2cm≈1.6像素@0.6m，过滤单像素噪声对posSum的累积漂移 */
     if (Pos_Est_Absf(opFlow.deltaPos[0]) < 0.2f)
     {

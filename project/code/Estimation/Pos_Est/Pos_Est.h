@@ -14,7 +14,7 @@ extern "C" {
 #define RESOLUTION			(0.2131946f)/*1m高度下 1个像素对应的位移，单位cm*/
 #define POS_EST_100HZ_DT (0.01f) /* 100Hz周期的时间间隔，单位秒 */
 #define POS_EST_250HZ_DT (0.004f) /* 250Hz周期的时间间隔，单位秒 */
-#define POS_EST_VEL_LIMIT (100.0f) /* 速度限幅，单位cm/s */
+#define POS_EST_VEL_LIMIT (200.0f) /* 速度限幅，单位cm/s */
 
 typedef struct opFlow_s 
 {

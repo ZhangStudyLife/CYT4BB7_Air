@@ -94,32 +94,32 @@ void FC_Params_Init(void)
     g_fc_params.pos_y_d_lpf = 0.0f;
 
     /* ===== Z轴位置环参数 ===== */
-    g_fc_params.pos_z_kp = 1.0f;
+    g_fc_params.pos_z_kp = 0.8f;
     g_fc_params.pos_z_ki = 0.0f;
-    g_fc_params.pos_z_kd = 0.08f;
+    g_fc_params.pos_z_kd = 0.06f;
     g_fc_params.pos_z_kff = 0.0f;
     g_fc_params.pos_z_i_limit = 0.0f;
     g_fc_params.pos_z_d_lpf = 0.20f;
 
     /* ===== X轴速度环参数 ===== */
-    g_fc_params.vel_x_kp = 0.12f;
+    g_fc_params.vel_x_kp = 0.08f;
     g_fc_params.vel_x_ki = 0.0f;
     g_fc_params.vel_x_kd = 0.0f;
     g_fc_params.vel_x_kff = 0.0f;
-    g_fc_params.vel_x_i_limit = 5.0f;
+    g_fc_params.vel_x_i_limit = 3.0f;
     g_fc_params.vel_x_d_lpf = 0.0f;
 
     /* ===== Y轴速度环参数 ===== */
-    g_fc_params.vel_y_kp = 0.12f;
+    g_fc_params.vel_y_kp = 0.08f;
     g_fc_params.vel_y_ki = 0.0f;
     g_fc_params.vel_y_kd = 0.0f;
     g_fc_params.vel_y_kff = 0.0f;
-    g_fc_params.vel_y_i_limit = 5.0f;
+    g_fc_params.vel_y_i_limit = 3.0f;
     g_fc_params.vel_y_d_lpf = 0.0f;
 
     /* ===== Z轴速度环参数 ===== */
     /* 保留电池压降下的积分补偿能力，同时提高 P 响应并削弱 D 对测速毛刺的放大 */
-    g_fc_params.vel_z_kp = 1100.0f;
+    g_fc_params.vel_z_kp = 900.0f;
     g_fc_params.vel_z_ki = 95.0f;
     g_fc_params.vel_z_kd = 38.0f;
     g_fc_params.vel_z_kff = 0.0f;

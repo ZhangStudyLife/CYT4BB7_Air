@@ -120,9 +120,12 @@ void Pos_Est_Init(void)
 
 float gx_sum = 0.0f;
 float gy_sum = 0.0f;
-uint16_t count = 0U;
+uint16_t gyro_count = 0U;
 void Pos_Est_Update_1000HZ(void)
 {
+    gx_sum += g_imudata_250hz.gyrox;
+    gy_sum += g_imudata_250hz.gyroy;
+    gyro_count += 1;
 }
 
 void Pos_Est_Update_250HZ(void)
@@ -135,8 +138,8 @@ void Pos_Est_Update_250HZ(void)
 
     float ax, ay, az;
     float az_up;
-    AccelCalibration_GetLevelAccelMps2(&ax, &ay, &az); /*获取水平系线加速度，单位m/s^2*/
-    az_up = AccelCalibration_GetVerticalAccelUpMps2();
+    // AccelCalibration_GetLevelAccelMps2(&ax, &ay, &az); /*获取水平系线加速度，单位m/s^2*/
+    // az_up = AccelCalibration_GetVerticalAccelUpMps2();
     ax *= 100.0f; /*转换为cm/s^2*/
     ay *= 100.0f;
     az *= 100.0f;
@@ -240,69 +243,96 @@ void Pos_Est_Update_100HZ(void)
 {
     PMW3901_Update_100HZ(); /* 先更新光流数据，确保读取到最新的像素增量和质量指标 */
 
-    int16_t pixelDx = g_pmw3901_raw.deltaX;
-    int16_t pixelDy = g_pmw3901_raw.deltaY;
+    float pixelDx = (float)g_pmw3901_raw.deltaX;
+    float pixelDy = (float)g_pmw3901_raw.deltaY;
+    int16_t spual_pmw = g_pmw3901_raw.squal;
+    float height = g_tof_fused_height_mm / 1000.0f; /*读取高度信息 单位m*/
 
     /* 异常值剔除：阈值35像素，过滤PMW3901周期性突发噪声（实测静止时突发可达±20像素） */
-    if (Pos_Est_Absf(pixelDx) < 40 && Pos_Est_Absf(pixelDy) < 40)
+    if (Pos_Est_Absf(pixelDx) > 40)
     {
-        opFlow.pixSum[0] += pixelDx;
-        opFlow.pixSum[1] += pixelDy;
+        pixelDx = 0;
+    }
+    if (Pos_Est_Absf(pixelDx) > 40)
+    {
+        pixelDx = 0;
     }
 
-    float height = g_tof_fused_height_mm / 1000.0f; /*读取高度信息 单位m*/
-    /*
-     * 姿态补偿：
-     * 俯仰/横滚会导致图像平面出现“伪位移”，
-     * 使用 tan(角度) 进行一阶几何补偿。
-     */
-    float rollCompDeg = Pos_Est_Clampf(g_euler.roll,
-                                       -15.0f, 15.0f);
-    float pitchCompDeg = Pos_Est_Clampf(g_euler.pitch,
-                                        -20.0f, 20.0f);
+    float gyroRollDps = 0.0f;
+    float gyroPitchDps = 0.0f;
+    if (gyro_count != 0)
+    {
+        gyroRollDps = gx_sum / gyro_count;
+        gyroPitchDps = gy_sum / gyro_count;
+        gx_sum = 0;
+        gy_sum = 0;
+        gyro_count = 0;
+    }
+    gyroRollDps = Pos_Est_Clampf(g_imudata_250hz.gyrox, -68.0f,
+                                 68.0f);
+    gyroPitchDps = Pos_Est_Clampf(g_imudata_250hz.gyroy, -68.0f,
+                                  68.0f);
 
-    float tanRoll = Pos_Est_Tan(rollCompDeg * DEG2RAD);
-    float tanPitch = Pos_Est_Tan(pitchCompDeg * DEG2RAD);
-
-    opFlow.pixComp[0] = 480.f * tanRoll;                         /*右向轴由横滚补偿：右倾时光流看到地面左移，补偿抵消*/
-    opFlow.pixComp[1] = -420.f * tanPitch;                       /*前向轴由俯仰补偿：符号取反以正确抵消姿态耦合*/
-    opFlow.pixValid[0] = (opFlow.pixSum[0] + opFlow.pixComp[0]); /*实际输出像素*/
-    opFlow.pixValid[1] = (opFlow.pixSum[1] + opFlow.pixComp[1]);
+    /* 对光流像素增量做一阶低通，进一步抑制随机噪声 */
+    static float pixelDxLpf = 0.0f;
+    static float pixelDyLpf = 0.0f;
+    pixelDxLpf += (pixelDx - pixelDxLpf) * 0.4f;
+    pixelDyLpf += (pixelDy - pixelDyLpf) * 0.4f;
+    pixelDx = pixelDxLpf;
+    pixelDy = pixelDyLpf;
+    /* 对陀螺仪角速度做 5 点因果均值，使用环形缓冲降低计算开销 */
+    static float gyroRollHist[5] = {0.0f};
+    static float gyroPitchHist[5] = {0.0f};
+    static float gyroRollSum = 0.0f;
+    static float gyroPitchSum = 0.0f;
+    static uint8_t gyroHistIndex = 0U;
+    gyroRollSum += gyroRollDps - gyroRollHist[gyroHistIndex];
+    gyroPitchSum += gyroPitchDps - gyroPitchHist[gyroHistIndex];
+    gyroRollHist[gyroHistIndex] = gyroRollDps;
+    gyroPitchHist[gyroHistIndex] = gyroPitchDps;
+    gyroHistIndex++;
+    if (gyroHistIndex >= 5U)
+    {
+        gyroHistIndex = 0U;
+    }
+    gyroRollDps = gyroRollSum * 0.2f;
+    gyroPitchDps = gyroPitchSum * 0.2f;
 
     /* 位移换算系数：1m 标定值 * 当前高度(m) */
     static uint8_t heightWasLow = 1U;
-    float coeff = RESOLUTION * (height - 0.05f);            // 光流安装位置实际比TOF低 5CM
-    if (height < 0.2f) /*高度过低时不更新位置，避免地面效应干扰*/
+    float coeff = RESOLUTION * (height - 0.05f); // 光流安装位置实际比TOF低 5CM
+    if (height < 0.2f)                           /*高度过低时不更新位置，避免地面效应干扰*/
     {
         coeff = 0.0f;
         heightWasLow = 1U;
     }
 
-    /* 首帧跳过：从低高度过渡到有效高度时，同步pixValidLast防止
-     * pixValid-pixValidLast(=0)产生巨大跳变（如pitch=20°时可跳22cm） */
-    if (heightWasLow && coeff > 0.0f)
-    {
-        heightWasLow = 0U;
-        opFlow.pixValidLast[0] = opFlow.pixValid[0];
-        opFlow.pixValidLast[1] = opFlow.pixValid[1];
-    }
-
-    /*
-     * 位移增量 = 系数 * 两次有效像素差
-     * 注意：此处使用 pixValid 与上次 pixValid 的差，
-     * 不是直接使用当前帧 deltaX/deltaY，可抑制短时噪声。
-     */
-    opFlow.deltaPos[0] = coeff * (opFlow.pixValid[0] - opFlow.pixValidLast[0]); /*2帧之间位移变化量，单位cm*/
-    opFlow.deltaPos[1] = coeff * (opFlow.pixValid[1] - opFlow.pixValidLast[1]);
-    opFlow.pixValidLast[0] = opFlow.pixValid[0]; /*上一次实际输出像素*/
-    opFlow.pixValidLast[1] = opFlow.pixValid[1];
+    // 进行姿态解耦 , 补偿数据是上位机测量出来的拟合的
+    opFlow.deltaPos[0] = (pixelDx + 0.1719264517 * gyroRollDps)*coeff;   // 1m高度下 1像素对应的位移cm * 当前高度m，得到当前高度下1像素对应的位移cm，乘以像素增量得到位移cm
+    opFlow.deltaPos[1] = (pixelDy - 0.1664168828 * gyroPitchDps)*coeff; // 1m高度下 1像素对应的位移cm * 当前高度m，得到当前高度下1像素对应的位移cm，乘以像素增量得到位移cm
 
     /* 速度 = 位移 / dt，单位 cm/s */
     opFlow.deltaVel[0] = opFlow.deltaPos[0] / POS_EST_100HZ_DT; /*速度 cm/s*/
     opFlow.deltaVel[1] = opFlow.deltaPos[1] / POS_EST_100HZ_DT;
 
-    opFlow.velLpf[0] += (opFlow.deltaVel[0] - opFlow.velLpf[0]) * 0.25f; /*速度低通 cm/s，alpha=0.25降噪*/
-    opFlow.velLpf[1] += (opFlow.deltaVel[1] - opFlow.velLpf[1]) * 0.25f; /*速度低通 cm/s，alpha=0.25降噪*/
+    {
+        static float velKalmanP[2] = {1.0f, 1.0f};     /*速度卡尔曼误差协方差*/
+        const float velKalmanQ = 0.05f;                 /*过程噪声协方差Q*/
+        const float velKalmanR = 0.3f;                 /*测量噪声协方差R*/
+        float velKalmanK;                              /*卡尔曼增益*/
+
+        /* X轴速度一阶卡尔曼滤波 */
+        velKalmanP[0] += velKalmanQ;
+        velKalmanK = velKalmanP[0] / (velKalmanP[0] + velKalmanR);
+        opFlow.velLpf[0] += velKalmanK * (opFlow.deltaVel[0] - opFlow.velLpf[0]);
+        velKalmanP[0] = (1.0f - velKalmanK) * velKalmanP[0];
+
+        /* Y轴速度一阶卡尔曼滤波 */
+        velKalmanP[1] += velKalmanQ;
+        velKalmanK = velKalmanP[1] / (velKalmanP[1] + velKalmanR);
+        opFlow.velLpf[1] += velKalmanK * (opFlow.deltaVel[1] - opFlow.velLpf[1]);
+        velKalmanP[1] = (1.0f - velKalmanK) * velKalmanP[1];
+    }
 
     /* 速度限幅，防止异常输入影响下游位置控制 */
     opFlow.velLpf[0] = Pos_Est_Clampf(opFlow.velLpf[0], -POS_EST_VEL_LIMIT, POS_EST_VEL_LIMIT); /*速度限幅 cm/s*/
@@ -323,4 +353,10 @@ void Pos_Est_Update_100HZ(void)
     opFlow.posSum[1] += opFlow.deltaPos[1]; /*累积位移 cm*/
 
     opFlow.isOpFlowOk = (g_pmw3901_raw.squal >= POS_EST_SQUAL_MIN) ? 1U : 0U; /*光流状态*/
+
+    wifi_vofa_JustFloat(13,g_pmw3901_raw.deltaX,g_pmw3901_raw.deltaY,pixelDx, pixelDy, spual_pmw,
+                        gyroRollDps, gyroPitchDps,
+                        opFlow.deltaPos[0], opFlow.deltaPos[1],
+                    opFlow.deltaVel[0],opFlow.deltaVel[1],
+                opFlow.velLpf[0],opFlow.velLpf[1]);
 }

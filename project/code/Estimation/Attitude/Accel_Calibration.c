@@ -535,14 +535,17 @@ static void get_gravity_body_g(float *gx, float *gy, float *gz)
 
 static float calc_accel_down_from_body(const float accel_body_mps2[3])
 {
+    /* 输入为机体系FRD线性加速度，输出为水平系Down方向加速度。
+     * 忽略yaw，仅去除roll/pitch对坐标轴的倾斜影响。
+     */
     /* ʹ����̬�ǽ�У�������ϵ���ٶ�ͶӰ�� NED �� Down �� */
     const float sin_pitch = g_euler.sin_pitch;
     const float cos_pitch = g_euler.cos_pitch;
     const float sin_roll = g_euler.sin_roll;
     const float cos_roll = g_euler.cos_roll;
 
-    const float r31 = -cos_roll * sin_pitch;
-    const float r32 = sin_roll;
+    const float r31 = -sin_pitch;
+    const float r32 = sin_roll * cos_pitch;
     const float r33 = cos_roll * cos_pitch;
 
     return r31 * accel_body_mps2[0] +
@@ -552,6 +555,10 @@ static float calc_accel_down_from_body(const float accel_body_mps2[3])
 
 static void rotate_body_linear_to_level(const float accel_body_mps2[3], float accel_level_mps2[3])
 {
+    /* 输入为机体系FRD线性加速度，单位m/s^2。
+     * 输出为水平系线性加速度：+X机头前方，+Y机体右侧，+Z为Down。
+     * 当关闭 yaw 参与时，仅去除roll/pitch导致的坐标倾斜。
+     */
     const float sin_pitch = g_euler.sin_pitch;
     const float cos_pitch = g_euler.cos_pitch;
     const float sin_roll = g_euler.sin_roll;
@@ -577,28 +584,28 @@ static void rotate_body_linear_to_level(const float accel_body_mps2[3], float ac
     const float cos_yaw = cosf(yaw_rad);
 
     r11 = cos_pitch * cos_yaw;
-    r12 = cos_pitch * sin_yaw;
-    r13 = -sin_pitch;
+    r12 = sin_roll * sin_pitch * cos_yaw - cos_roll * sin_yaw;
+    r13 = cos_roll * sin_pitch * cos_yaw + sin_roll * sin_yaw;
 
-    r21 = sin_roll * sin_pitch * cos_yaw - cos_roll * sin_yaw;
+    r21 = cos_pitch * sin_yaw;
     r22 = sin_roll * sin_pitch * sin_yaw + cos_roll * cos_yaw;
-    r23 = sin_roll * cos_pitch;
+    r23 = cos_roll * sin_pitch * sin_yaw - sin_roll * cos_yaw;
 
-    r31 = cos_roll * sin_pitch * cos_yaw + sin_roll * sin_yaw;
-    r32 = cos_roll * sin_pitch * sin_yaw - sin_roll * cos_yaw;
+    r31 = -sin_pitch;
+    r32 = sin_roll * cos_pitch;
     r33 = cos_roll * cos_pitch;
 #else
     /* yaw=0: ���� roll/pitch ��ת�����Ե�ǰ����ƫб���򻯼��� */
     r11 = cos_pitch;
-    r12 = 0.0f;
-    r13 = -sin_pitch;
+    r12 = sin_roll * sin_pitch;
+    r13 = cos_roll * sin_pitch;
 
-    r21 = sin_roll * sin_pitch;
+    r21 = 0.0f;
     r22 = cos_roll;
-    r23 = sin_roll * cos_pitch;
+    r23 = -sin_roll;
 
-    r31 = cos_roll * sin_pitch;
-    r32 = -sin_roll;
+    r31 = -sin_pitch;
+    r32 = sin_roll * cos_pitch;
     r33 = cos_roll * cos_pitch;
 #endif
 

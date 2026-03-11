@@ -7,6 +7,7 @@
 #endif
 #define GRAVITY_CMSS (980.f)                                  /*重力加速度 单位cm/s/s*/
 #define INAV_ACC_BIAS_ACCEPTANCE_VALUE (GRAVITY_CMSS * 0.25f) // Max accepted bias correction of 0.25G - unlikely we are going to be that much off anyway
+#define POS_EST_DEG_TO_RAD (3.14159265359f / 180.0f)                  /*角度转弧度转换系数*/
 
 volatile opFlow_t opFlow = {0};
 estimator_t estimator =
@@ -136,57 +137,68 @@ void Pos_Est_Update_250HZ(void)
     static float fusedHeightLpf = 0.f;                                           // 融合高度低通
     fusedHeightLpf += (g_tof_fused_height_mm / 1000.0f - fusedHeightLpf) * 0.1f; // 单位m，融合高度低通
 
-    float ax, ay, az;
-    float az_up;
-    // AccelCalibration_GetLevelAccelMps2(&ax, &ay, &az); /*获取水平系线加速度，单位m/s^2*/
-    // az_up = AccelCalibration_GetVerticalAccelUpMps2();
+    float ax, ay, az;                                  /* 水平系线性加速度，单位m/s^2；+ax=机头前方，+ay=机体右侧，+az=Down，忽略yaw，仅去除roll/pitch影响 */
+    float ax_raw_g, ay_raw_g, az_raw_g;               /* 250Hz滤波后的机体系比力，单位g；+ax前，+ay右，+az下，静止平放约为0/0/-1g */
+    float az_up;                                       /* 竖直Up方向线性加速度，单位m/s^2；静止时应接近0 */
+
+    /* 原始输入坐标系：
+     * g_imudata_250hz.acc* 为机体系FRD比力，单位g，包含重力项。
+     * +X前，+Y右，+Z下；静止平放时 accz≈-1g。
+     */
+    ax_raw_g = g_imudata_250hz.accx;
+    ay_raw_g = g_imudata_250hz.accy;
+    az_raw_g = g_imudata_250hz.accz;
+
+    /* 输出坐标系：
+     * ax/ay/az 为“水平系线性加速度”，由校准模块完成去重力与姿态解耦。
+     * 仅消除 roll/pitch 对前后/左右加速度的影响，不引入 yaw 旋转。
+     * 因此飞机朝向变化不会改变前后/左右轴定义：
+     * +ax 始终表示机头前方加速度，+ay 始终表示机体右侧加速度，+az 为 Down。
+     */
+    AccelCalibration_GetLevelAccelMps2(&ax, &ay, &az);
+    az_up = AccelCalibration_GetVerticalAccelUpMps2();
+
+    wifi_vofa_JustFloat(11, ax_raw_g, ay_raw_g, az_raw_g, 
+        ax, ay, az,
+        g_euler.roll, g_euler.pitch,g_euler.yaw,
+        opFlow.velLpf[0],opFlow.velLpf[1]
+    );
     ax *= 100.0f; /*转换为cm/s^2*/
     ay *= 100.0f;
     az *= 100.0f;
     az_up *= 1000.0f; /* Z轴统一使用mm/s^2 */
-    if (ax > 4.0f)
+    if (ax > 6.0f)
     {
-        ax -= 4.0f;
+        ax -= 6.0f;
     }
-    else if (ax < -4.0f)
+    else if (ax < -6.0f)
     {
-        ax += 4.0f;
+        ax += 6.0f;
     }
     else
     {
         ax = 0.0f;
     }
-    if (ay > 4.0f)
+    if (ay > 6.0f)
     {
-        ay -= 4.0f;
+        ay -= 6.0f;
     }
-    else if (ay < -4.0f)
+    else if (ay < -6.0f)
     {
-        ay += 4.0f;
+        ay += 6.0f;
     }
     else
     {
         ay = 0.0f;
     }
-    if (az > 4.0f)
+
+    if (az_up > 70.0f)
     {
-        az -= 4.0f;
+        az_up -= 70.0f;
     }
-    else if (az < -4.0f)
+    else if (az_up < -70.0f)
     {
-        az += 4.0f;
-    }
-    else
-    {
-        az = 0.0f;
-    }
-    if (az_up > 40.0f)
-    {
-        az_up -= 40.0f;
-    }
-    else if (az_up < -40.0f)
-    {
-        az_up += 40.0f;
+        az_up += 70.0f;
     }
     else
     {
@@ -354,9 +366,10 @@ void Pos_Est_Update_100HZ(void)
 
     opFlow.isOpFlowOk = (g_pmw3901_raw.squal >= POS_EST_SQUAL_MIN) ? 1U : 0U; /*光流状态*/
 
-    wifi_vofa_JustFloat(13,g_pmw3901_raw.deltaX,g_pmw3901_raw.deltaY,pixelDx, pixelDy, spual_pmw,
-                        gyroRollDps, gyroPitchDps,
-                        opFlow.deltaPos[0], opFlow.deltaPos[1],
-                    opFlow.deltaVel[0],opFlow.deltaVel[1],
-                opFlow.velLpf[0],opFlow.velLpf[1]);
+    // wifi_vofa_JustFloat(13,g_pmw3901_raw.deltaX,g_pmw3901_raw.deltaY,pixelDx, pixelDy, spual_pmw,
+    //                     gyroRollDps, gyroPitchDps,
+    //                     opFlow.deltaPos[0], opFlow.deltaPos[1],
+    //                 opFlow.deltaVel[0],opFlow.deltaVel[1],
+    //             opFlow.velLpf[0],opFlow.velLpf[1]);
+
 }

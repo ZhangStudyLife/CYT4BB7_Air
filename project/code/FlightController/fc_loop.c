@@ -232,8 +232,8 @@ void FC_Loop_100Hz(void)
             target_height_m = (ch2 + 1000.0f) * (1 / 2000.0f);                                                /* CH2: 0m~1m */
             velx_target = fc_clampf(ch0 * (200.0f / 1000.0f), -200.0f, 200.0f);  /* CH0: -1000~1000 映射为 X 轴速度目标 -200~200cm/s */
             vely_target = fc_clampf(-ch1 * (200.0f / 1000.0f), -200.0f, 200.0f); /* CH1: -1000~1000 映射为 Y 轴速度目标 -200~200cm/s */
-            velx_out = PID_Update(&velx_pid, velx_target, opFlow.velLpf[0], dt);
-            vely_out = PID_Update(&vely_pid, vely_target, -opFlow.velLpf[1], dt);
+            velx_out = PID_Update(&velx_pid, velx_target, estimator.vel[0], dt);
+            vely_out = PID_Update(&vely_pid, vely_target, -estimator.vel[1], dt);
             velx_out = fc_clampf(velx_out, -20.0f, 20.0f);/*目标角度的限幅-20°-20°*/
             vely_out = fc_clampf(vely_out, -20.0f, 20.0f);/*目标角度的限幅-20°-20°*/
 

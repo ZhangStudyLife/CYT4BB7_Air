@@ -185,4 +185,13 @@ nul
 # 数据
 # ---------------------------------------------------
 data/
-project/code/Estimation/Pos_Est/new_pmw3901_data/
+project/code/Estimation/Pos_Est/new_pmw3901_data/**
+!project/code/Estimation/Pos_Est/new_pmw3901_data/
+!project/code/Estimation/Pos_Est/new_pmw3901_data/analyze_better_vel_acc_spectrum.py
+!project/code/Estimation/Pos_Est/new_pmw3901_data/select_acc_filter_candidate.py
+!project/code/Estimation/Pos_Est/new_pmw3901_data/compare_cf_ekf_replay.py
+!project/code/Estimation/Pos_Est/new_pmw3901_data/vel_acc_common.py
+project/code/Estimation/Pos_Est/inav_better_vel/**
+!project/code/Estimation/Pos_Est/inav_better_vel/
+!project/code/Estimation/Pos_Est/inav_better_vel/analyze_inav_better_vel.py
+!project/code/Estimation/Pos_Est/inav_better_vel/compare_inav_better_vel_runs.py

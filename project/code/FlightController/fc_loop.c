@@ -395,7 +395,7 @@ void FC_Loop_100Hz(void)
     }
 
 
-    wifi_vofa_JustFloat(3u,g_euler.roll,g_euler.pitch,g_euler.yaw);
+    // wifi_vofa_JustFloat(3u,g_euler.roll,g_euler.pitch,g_euler.yaw);
 
     // wifi_vofa_JustFloat(4u,g_pmw3901_raw.deltaX,g_pmw3901_raw.deltaY,roll_angle_target,pitch_angle_target);
 

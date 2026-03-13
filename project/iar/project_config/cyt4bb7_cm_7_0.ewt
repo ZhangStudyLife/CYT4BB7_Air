@@ -1475,6 +1475,12 @@
             <group>
                 <name>Pos_Est</name>
                 <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\FlowGyroDecoupler.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\FlowGyroDecoupler.h</name>
+                </file>
+                <file>
                     <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\Pos_Est.c</name>
                 </file>
                 <file>

@@ -128,7 +128,7 @@ static const pmw3901_reg_cfg_t pmw3901_init_stage2[] =
     { 0x7F, 0x00 }
 };
 
-/* PMW3901光流传感器原始数据，由PMW3901_Update_100HZ()周期性填充，已做极性映射 */
+/* PMW3901光流传感器原始数据，由PMW3901_Update_50HZ()周期性填充，已做极性映射 */
 volatile pmw3901_raw_t g_pmw3901_raw = {0};
 /* 初始化完成标志，1=已初始化，0=未初始化或初始化失败 */
 static uint8 pmw3901_inited = 0U;
@@ -366,7 +366,7 @@ uint8 PMW3901_Init(void)
     }
 
     /* 执行首次有效数据读取 */
-    PMW3901_Update_100HZ();
+    PMW3901_Update_50HZ();
     return 0U;
 }
 
@@ -392,7 +392,7 @@ uint8 PMW3901_ReInit(void)
  * @param  无
  * @return 无
  */
-void PMW3901_Update_100HZ(void)
+void PMW3901_Update_50HZ(void)
 {
     pmw3901_raw_t burst_data = {0};
 

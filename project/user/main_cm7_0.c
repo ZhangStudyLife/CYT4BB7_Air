@@ -105,7 +105,7 @@ int main(void)
             if (s_tick_div_pos_250hz >= 4U)
             {
                 s_tick_div_pos_250hz = 0U;
-                Pos_Est_Update_250HZ();
+                //Pos_Est_Update_250HZ();
                 // wifi_vofa_JustFloat(3, g_euler.roll, g_euler.pitch, g_euler.yaw);
 
             }
@@ -126,9 +126,10 @@ int main(void)
             s_tick_div_fc_start_50hz++;
             if (s_tick_div_fc_start_50hz >= 2)
             {
-                Pos_Est_Update_100HZ();
+                Pos_Est_Update_50HZ();
                 s_tick_div_fc_start_50hz = 0U;
                 FC_Loop_50Hz();
+                wifi_vofa_JustFloat(8u,g_pmw3901_raw.deltaX,g_pmw3901_raw.deltaY,g_imudata_250hz.gyrox,g_imudata_250hz.gyroy,FlowGyroDecoupler_GetDecX(), FlowGyroDecoupler_GetDecY(),Pos_Est_vel_x, Pos_Est_vel_y);
             }
 
             /* 10Hz：飞控启动状态机更新与紧急停桨检测 */

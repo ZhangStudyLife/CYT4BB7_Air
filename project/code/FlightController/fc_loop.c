@@ -194,10 +194,10 @@ void FC_Loop_100Hz(void)
 
     g_height_est_m = height_m;
     g_height_vz_mps = s_height_vz_lpf_mps;
-    g_height_est_valid = g_tof_fused_valid;  /* 同步高度有效标志给位置估计模块 */
+    g_height_est_valid = g_tof_fused_valid; /* 同步高度有效标志给位置估计模块 */
 
-    flight_mode = FC_START_CRSF_Get_Flight_Mode(); /*检测遥控器的模式*/
-    if(flight_mode == FC_START_CRSF_FLIGHT_MODE_0 || flight_mode == FC_START_CRSF_FLIGHT_MODE_2)/*目标角度*/
+    flight_mode = FC_START_CRSF_Get_Flight_Mode();                                                /*检测遥控器的模式*/
+    if (flight_mode == FC_START_CRSF_FLIGHT_MODE_0 || flight_mode == FC_START_CRSF_FLIGHT_MODE_2) /*目标角度*/
     {
         if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
         {
@@ -207,7 +207,7 @@ void FC_Loop_100Hz(void)
             float ch1 = fc_clampf((float)CRSF_STD[1], -1000.0f, 1000.0f);
             float ch2 = fc_clampf((float)CRSF_STD[2], -1000.0f, 1000.0f);
 
-            target_height_m = (ch2 + 1000.0f) * (1 / 2000.0f);                                                /* CH2: 0m~1m */
+            target_height_m = (ch2 + 1000.0f) * (1 / 2000.0f); /* CH2: 0m~1m */
 
             roll_angle_target = fc_clampf(ch0 * (40.0f / 1000.0f) + FC_ROLL_MECH_TRIM_DEG, -40.0f, 40.0f);    /* roll>0 右倾 */
             pitch_angle_target = fc_clampf(-ch1 * (40.0f / 1000.0f) + FC_PITCH_MECH_TRIM_DEG, -40.0f, 40.0f); /* pitch>0 抬头，前倾为负 */
@@ -221,39 +221,41 @@ void FC_Loop_100Hz(void)
             height_vel_out = 0.0f;
         }
     }
-    else if(flight_mode == FC_START_CRSF_FLIGHT_MODE_1)/*定速模式*/
+    else if (flight_mode == FC_START_CRSF_FLIGHT_MODE_1) /*定速模式*/
     {
-         if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
+        if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
         {
             float ch0 = fc_clampf((float)CRSF_STD[0], -1000.0f, 1000.0f);
             float ch1 = fc_clampf((float)CRSF_STD[1], -1000.0f, 1000.0f);
             float ch2 = fc_clampf((float)CRSF_STD[2], -1000.0f, 1000.0f);
 
-            target_height_m = (ch2 + 1000.0f) * (1 / 2000.0f);                                                /* CH2: 0m~1m */
+            target_height_m = (ch2 + 1000.0f) * (1 / 2000.0f);                   /* CH2: 0m~1m */
             velx_target = fc_clampf(ch0 * (200.0f / 1000.0f), -200.0f, 200.0f);  /* CH0: -1000~1000 映射为 X 轴速度目标 -200~200cm/s */
             vely_target = fc_clampf(-ch1 * (200.0f / 1000.0f), -200.0f, 200.0f); /* CH1: -1000~1000 映射为 Y 轴速度目标 -200~200cm/s */
-            velx_out = PID_Update(&velx_pid, velx_target, estimator.vel[0], dt);
-            vely_out = PID_Update(&vely_pid, vely_target, -estimator.vel[1], dt);
-            velx_out = fc_clampf(velx_out, -20.0f, 20.0f);/*目标角度的限幅-20°-20°*/
-            vely_out = fc_clampf(vely_out, -20.0f, 20.0f);/*目标角度的限幅-20°-20°*/
+            velx_out = PID_Update(&velx_pid, velx_target, -Pos_Est_vel_x, dt);
+            vely_out = PID_Update(&vely_pid, vely_target, -Pos_Est_vel_y, dt);
+            velx_out = fc_clampf(velx_out, -20.0f, 20.0f); /*目标角度的限幅-20°-20°*/
+            vely_out = fc_clampf(vely_out, -20.0f, 20.0f); /*目标角度的限幅-20°-20°*/
 
-            roll_angle_target = velx_out + FC_ROLL_MECH_TRIM_DEG ;  
-            pitch_angle_target = vely_out + FC_PITCH_MECH_TRIM_DEG; 
+            roll_angle_target = velx_out + FC_ROLL_MECH_TRIM_DEG;
+            pitch_angle_target = vely_out + FC_PITCH_MECH_TRIM_DEG;
 
             height_vel_out = PID_Update(&height_vel_pid, height_pos_out, g_height_vz_mps, dt);
             height_vel_out = fc_clampf(height_vel_out, height_vel_out_min, height_vel_out_max);
-
         }
         else
         {
             s_tof_hist_inited = 0U;
             vely_out = 0.0f;
             velx_out = 0.0f;
-            roll_angle_target = velx_out + FC_ROLL_MECH_TRIM_DEG ;  
-            pitch_angle_target = vely_out + FC_PITCH_MECH_TRIM_DEG; 
+            roll_angle_target = velx_out + FC_ROLL_MECH_TRIM_DEG;
+            pitch_angle_target = vely_out + FC_PITCH_MECH_TRIM_DEG;
             height_vel_out = 0.0f;
         }
     }
+
+    // wifi_vofa_JustFloat(4u,g_pmw3901_raw.deltaX,g_pmw3901_raw.deltaY,roll_angle_target,pitch_angle_target);
+
     // wifi_vofa_JustFloat(7u,flight_mode,opFlow.velLpf[0],velx_target,velx_pid.p_term,velx_pid.i_term,roll_angle_target,g_euler.roll);
     // wifi_vofa_JustFloat(15u,flight_mode,
     //      estimator.vel[1],opFlow.velLpf[1],vely_target,
@@ -295,7 +297,6 @@ void FC_Loop_500Hz(void)
         int32_t roll_ctrl = (int32_t)fc_clampf(PID_Update(&roll_angle_pid, roll_angle_target, roll_angle_meas, dt), -limit, limit);
         int32_t pitch_ctrl = (int32_t)fc_clampf(PID_Update(&pitch_angle_pid, pitch_angle_target, pitch_angle_meas, dt), -limit, limit);
         int32_t yaw_ctrl = (int32_t)fc_clampf(PID_Update(&yaw_angle_pid, yaw_angle_target, yaw_angle_meas, dt), -limit, limit);
-
 
         (void)yaw_ctrl;
         roll_gyro_target = roll_ctrl;

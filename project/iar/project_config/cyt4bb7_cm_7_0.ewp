@@ -3770,6 +3770,12 @@
             </group>
         </group>
         <file>
+            <name>$PROJ_DIR$\..\..\code\filter.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\filter.h</name>
+        </file>
+        <file>
             <name>$PROJ_DIR$\..\..\code\本文件夹作用.txt</name>
         </file>
     </group>

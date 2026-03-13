@@ -8,15 +8,23 @@
 #endif
 
 /* ======================== SPI硬件引脚配置 ======================== */
+#ifndef PMW3901_SPI
 #define PMW3901_SPI              (SPI_3)             /* 使用SPI3外设 */
+#endif
+#ifndef PMW3901_MOSI_PIN
 #define PMW3901_MOSI_PIN         (SPI3_MOSI_P03_1)   /* 主出从入引脚 P03_1 */
+#endif
+#ifndef PMW3901_MISO_PIN
 #define PMW3901_MISO_PIN         (SPI3_MISO_P03_0)   /* 主入从出引脚 P03_0 */
+#endif
 #define PMW3901_SCK_PIN          (SPI3_CLK_P03_2)    /* 时钟引脚 P03_2 */
 #define PMW3901_CS_Pin           (P03_3)             /* 片选引脚 P03_3，软件控制 */
+#ifndef PMW3901_SPI_SPEED
 #define PMW3901_SPI_SPEED        (2 * 1000 * 1000)   /* SPI通信速率 2MHz */
+#endif
 
 /* ======================== 光流极性映射 ======================== */
-#define PMW3901_SIGN_X           (-1)                 /* X轴极性：芯片X方向与机体X方向同向 */
+#define PMW3901_SIGN_X           (1)                 /* X轴极性：芯片X方向与机体X方向同向 */
 #define PMW3901_SIGN_Y           (1)                /* Y轴极性：芯片Y方向与机体Y方向反向 */
 
 /* 寄存器写入校验开关：0=直接写入不验证（内部寄存器多为非公开寄存器，回读值可能与写入值不同） */
@@ -92,6 +100,6 @@ uint8 PMW3901_ReInit(void);
  * @param  无
  * @return 无
  */
-void PMW3901_Update_100HZ(void);
+void PMW3901_Update_50HZ(void);
 
 #endif /* PMW3901_H_ */

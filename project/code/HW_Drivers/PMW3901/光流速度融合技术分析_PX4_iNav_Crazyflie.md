@@ -786,7 +786,7 @@ PMW3901 (SPI3, 100Hz)
            │ 每 10ms 一次（100Hz）
            ▼
 ┌──────────────────────────────────────┐
-│  Pos_Est_Update_100HZ()             │
+│  Pos_Est_Update_50HZ()             │
 │  ① pix_x = -deltaX, pix_y = -deltaY│
 │  ② 读取 & 重置角度积累器             │
 │  ③ 使用 prev_deg 补偿（延迟一帧）    │
@@ -832,7 +832,7 @@ PMW3901 (SPI3, 100Hz)
 #### 8.1.1 倾斜校正
 
 ```c
-// 在 Pos_Est_Update_100HZ() 中添加
+// 在 Pos_Est_Update_50HZ() 中添加
 float cos_tilt = cosf(roll_rad) * cosf(pitch_rad);
 if (cos_tilt < 0.5f) cos_tilt = 0.5f;  // 限制最大60°倾斜
 float range_mm = height_mm / cos_tilt;

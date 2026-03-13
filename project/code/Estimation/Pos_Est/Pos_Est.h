@@ -19,5 +19,7 @@ void Pos_Est_Update_50HZ(void);
 
 extern float Pos_Est_vel_x;
 extern float Pos_Est_vel_y;
+extern float Pos_Est_vel_x_kf;
+extern float Pos_Est_vel_y_kf;
 
 #endif /* POS_EST_H */

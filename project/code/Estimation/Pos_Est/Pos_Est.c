@@ -1,14 +1,22 @@
 #include "Pos_Est.h"
+#include "filter.h"
 
 extern volatile uint32 tick_1000us_cnt;
 
-float Pos_Est_vel_x = 0.0f;
-float Pos_Est_vel_y = 0.0f;
+float Pos_Est_vel_x    = 0.0f;
+float Pos_Est_vel_y    = 0.0f;
+float Pos_Est_vel_x_kf = 0.0f;  /* Q=200, R=600 */
+float Pos_Est_vel_y_kf = 0.0f;
+
+static Kalman1D_t s_kf_x;
+static Kalman1D_t s_kf_y;
 
 void Pos_Est_Init(void)
 {
     PMW3901_Init();
     FlowGyroDecoupler_Init();
+    Kalman1D_Init(&s_kf_x, 200.0f, 600.0f, 1.0f, 0.0f);
+    Kalman1D_Init(&s_kf_y, 200.0f, 600.0f, 1.0f, 0.0f);
 }
 
 void Pos_Est_Reinit(void)
@@ -37,4 +45,7 @@ void Pos_Est_Update_50HZ(void)
     }
     Pos_Est_vel_x = dec_x * coeff * 50; // CM/S        50HZ调用
     Pos_Est_vel_y = dec_y * coeff * 50; // CM/S
+
+    Pos_Est_vel_x_kf = Kalman1D_Update(&s_kf_x, Pos_Est_vel_x);
+    Pos_Est_vel_y_kf = Kalman1D_Update(&s_kf_y, Pos_Est_vel_y);
 }

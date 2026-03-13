@@ -16,10 +16,6 @@ extern "C" {
 #define FLOW_BY               (0.0f)
 #define FLOW_MAX_WINDOW_MS    (30U)   /* 超过此窗口视为异常 */
 
-#define FLOW_KF_Q             (0.25f) /* 卡尔曼过程噪声 */
-#define FLOW_KF_R             (6.0f)  /* 卡尔曼观测噪声 */
-#define FLOW_KF_P0            (1.0f)  /* 初始协方差 */
-
 /* ===================== 接口函数 ===================== */
 void  FlowGyroDecoupler_Init(void);
 void  FlowGyroDecoupler_Reinit(void);

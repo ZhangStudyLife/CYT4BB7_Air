@@ -22,22 +22,6 @@ static uint8          s_has_prev   = 0U;
 static float s_dec_x = 0.0f;
 static float s_dec_y = 0.0f;
 
-static float s_kf_hat_x = 0.0f;
-static float s_kf_hat_y = 0.0f;
-static float s_kf_p_x   = FLOW_KF_P0;
-static float s_kf_p_y   = FLOW_KF_P0;
-
-/* ===================== 内部：卡尔曼更新 ===================== */
-static float KF_Update(float z, float *hat, float *p)
-{
-    float k;
-    *p  = *p + FLOW_KF_Q;
-    k   = *p / (*p + FLOW_KF_R);
-    *hat = *hat + k * (z - *hat);
-    *p  = (1.0f - k) * (*p);
-    return *hat;
-}
-
 /* ===================== 内部：区间积分 ===================== */
 static uint8 Integrate(uint32 t0, uint32 t1, float *dtheta_x, float *dtheta_y)
 {
@@ -84,10 +68,6 @@ void FlowGyroDecoupler_Init(void)
     s_has_prev   = 0U;
     s_dec_x      = 0.0f;
     s_dec_y      = 0.0f;
-    s_kf_hat_x   = 0.0f;
-    s_kf_hat_y   = 0.0f;
-    s_kf_p_x     = FLOW_KF_P0;
-    s_kf_p_y     = FLOW_KF_P0;
 }
 
 void FlowGyroDecoupler_Reinit(void)
@@ -135,10 +115,6 @@ uint8 FlowGyroDecoupler_Update50Hz(uint32 t_read_ms, int16_t delta_x, int16_t de
 
     s_dec_x = (float)delta_x - (FLOW_KX * dtheta_x + FLOW_BX);
     s_dec_y = (float)delta_y - (FLOW_KY * dtheta_y + FLOW_BY);
-
-    /* 卡尔曼平滑 */
-    s_dec_x = KF_Update(s_dec_x, &s_kf_hat_x, &s_kf_p_x);
-    s_dec_y = KF_Update(s_dec_y, &s_kf_hat_y, &s_kf_p_y);
 
     return 1U;
 }

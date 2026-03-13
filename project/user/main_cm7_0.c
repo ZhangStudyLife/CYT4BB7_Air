@@ -129,7 +129,7 @@ int main(void)
                 Pos_Est_Update_50HZ();
                 s_tick_div_fc_start_50hz = 0U;
                 FC_Loop_50Hz();
-                wifi_vofa_JustFloat(8u,g_pmw3901_raw.deltaX,g_pmw3901_raw.deltaY,g_imudata_250hz.gyrox,g_imudata_250hz.gyroy,FlowGyroDecoupler_GetDecX(), FlowGyroDecoupler_GetDecY(),Pos_Est_vel_x, Pos_Est_vel_y);
+                // wifi_vofa_JustFloat(8u,g_pmw3901_raw.deltaX,g_pmw3901_raw.deltaY,g_imudata_250hz.gyrox,g_imudata_250hz.gyroy,FlowGyroDecoupler_GetDecX(), FlowGyroDecoupler_GetDecY(),Pos_Est_vel_x, Pos_Est_vel_y);
             }
 
             /* 10Hz：飞控启动状态机更新与紧急停桨检测 */

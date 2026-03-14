@@ -118,6 +118,13 @@ typedef struct
     float vel_z_kff;      /* 前馈增益 */
     float vel_z_i_limit;
     float vel_z_d_lpf;
+
+    /* ===== 模式1 速度跟杆前馈与刹车参数 ===== */
+    float mode1_track_ff_deg_per_cmps;   /* 模式1 跟杆前馈斜率，单位 deg/(cm/s) */
+    float mode1_track_ff_limit_deg;      /* 模式1 跟杆前馈限幅，单位 deg */
+    float mode1_brake_kp;                /* 模式1 刹车阶段速度环 P 增益 */
+    float mode1_brake_angle_limit_deg;   /* 模式1 刹车阶段姿态角限幅，单位 deg */
+    float mode1_brake_exit_vel_cmps;     /* 模式1 退出刹车的速度阈值，单位 cm/s */
 } fc_params_t;
 
 /* ==================== 全局参数实例 ==================== */

@@ -23,15 +23,31 @@ static float s_mode1_neutral_timer_s = 0.0f;
 static float s_mode1_brake_settle_timer_s = 0.0f;
 
 /* 模式1 遥控量到速度目标的换算比例，单位 cm/s */
-static const float s_mode1_rc_to_speed_scale = 0.1f;
+static const float s_mode1_rc_to_speed_scale = 0.25f;
 /* 模式1 最大水平目标速度，单位 cm/s */
-static const float s_mode1_vel_limit_cmps = 100.0f;
+static const float s_mode1_vel_limit_cmps = 250.0f;
 /* 模式1 常规跟杆姿态角限幅，单位 deg */
-static const float s_mode1_track_angle_limit_deg = 20.0f;
+static const float s_mode1_track_angle_limit_deg = 25.0f;
+/* 模式1 跟杆前馈限幅，单位 deg */
+static const float s_mode1_track_ff_limit_deg = 15.0f;
 /* 模式1 摇杆回中死区阈值 */
 static const float s_mode1_stick_center_db = 60.0f;
 /* 模式1 摇杆重新激活阈值 */
 static const float s_mode1_stick_reactivate_db = 80.0f;
+/* 模式1 进入刹车前的回中保持时间，单位 s */
+static const float s_mode1_brake_entry_delay_s = 0.04f;
+/* 模式1 刹车退出保持时间，单位 s */
+static const float s_mode1_brake_exit_hold_s = 0.16f;
+/* 模式1 刹车阶段姿态角限幅，单位 deg */
+static const float s_mode1_brake_angle_limit_deg = 25.0f;
+/* 模式1 刹车阶段低速速度死区，单位 cm/s */
+static const float s_mode1_brake_deadzone_cmps = 3.0f;
+/* 模式1 零速阻尼阶段低速速度死区，单位 cm/s */
+static const float s_mode1_zero_damp_deadzone_cmps = 1.0f;
+/* 模式1 刹车混合切换低阈值，单位 cm/s */
+static const float s_mode1_brake_blend_low_cmps = 8.0f;
+/* 模式1 刹车混合切换高阈值，单位 cm/s */
+static const float s_mode1_brake_blend_high_cmps = 20.0f;
 /* 模式1 刹车阶段 anti-windup 回算增益 */
 static const float s_mode1_brake_aw_gain = 0.25f;
 
@@ -375,7 +391,7 @@ void FC_Mode1_50Hz(float dt)
         if (s_mode1_state == FC_MODE1_STATE_TRACK)
         {
             s_mode1_neutral_timer_s += dt;
-            if (s_mode1_neutral_timer_s >= g_fc_params.mode1_brake_entry_delay_s)
+            if (s_mode1_neutral_timer_s >= s_mode1_brake_entry_delay_s)
             {
                 FC_Mode1_EnterBrake();
             }
@@ -392,7 +408,7 @@ void FC_Mode1_50Hz(float dt)
                 s_mode1_brake_settle_timer_s = 0.0f;
             }
 
-            if (s_mode1_brake_settle_timer_s >= g_fc_params.mode1_brake_exit_hold_s)
+            if (s_mode1_brake_settle_timer_s >= s_mode1_brake_exit_hold_s)
             {
                 FC_Mode1_EnterZeroDamp();
             }
@@ -404,11 +420,11 @@ void FC_Mode1_50Hz(float dt)
         velx_target = FC_Mode1_MapStickToVel(ch0);
         vely_target = FC_Mode1_MapStickToVel(-ch1);
         track_ff_x = FC_Mode_Clamp(g_fc_params.mode1_track_ff_deg_per_cmps * velx_target,
-                                   -g_fc_params.mode1_track_ff_limit_deg,
-                                   g_fc_params.mode1_track_ff_limit_deg);
+                                   -s_mode1_track_ff_limit_deg,
+                                   s_mode1_track_ff_limit_deg);
         track_ff_y = FC_Mode_Clamp(g_fc_params.mode1_track_ff_deg_per_cmps * vely_target,
-                                   -g_fc_params.mode1_track_ff_limit_deg,
-                                   g_fc_params.mode1_track_ff_limit_deg);
+                                   -s_mode1_track_ff_limit_deg,
+                                   s_mode1_track_ff_limit_deg);
         velx_feedback = -Pos_Est_vel_x_kf;
         vely_feedback = -Pos_Est_vel_y_kf;
         angle_limit_deg = s_mode1_track_angle_limit_deg;
@@ -427,16 +443,16 @@ void FC_Mode1_50Hz(float dt)
     else if (s_mode1_state == FC_MODE1_STATE_BRAKE)
     {
         velx_feedback = FC_Mode1_BlendBrakeFeedback(-Pos_Est_vel_x, -Pos_Est_vel_x_kf,
-                                                    g_fc_params.mode1_brake_blend_low_cmps,
-                                                    g_fc_params.mode1_brake_blend_high_cmps,
-                                                    g_fc_params.mode1_brake_deadzone_cmps,
+                                                    s_mode1_brake_blend_low_cmps,
+                                                    s_mode1_brake_blend_high_cmps,
+                                                    s_mode1_brake_deadzone_cmps,
                                                     &mode1_brake_raw_weight_x);
         vely_feedback = FC_Mode1_BlendBrakeFeedback(-Pos_Est_vel_y, -Pos_Est_vel_y_kf,
-                                                    g_fc_params.mode1_brake_blend_low_cmps,
-                                                    g_fc_params.mode1_brake_blend_high_cmps,
-                                                    g_fc_params.mode1_brake_deadzone_cmps,
+                                                    s_mode1_brake_blend_low_cmps,
+                                                    s_mode1_brake_blend_high_cmps,
+                                                    s_mode1_brake_deadzone_cmps,
                                                     0);
-        angle_limit_deg = g_fc_params.mode1_brake_angle_limit_deg;
+        angle_limit_deg = s_mode1_brake_angle_limit_deg;
         mode1_feedback_used_x = velx_feedback;
         state_timer_ms = s_mode1_brake_settle_timer_s * 1000.0f;
 
@@ -450,9 +466,9 @@ void FC_Mode1_50Hz(float dt)
     else
     {
         velx_feedback = FC_Mode1_ApplyVelDeadzone(-Pos_Est_vel_x_kf,
-                                                  g_fc_params.mode1_zero_damp_deadzone_cmps);
+                                                  s_mode1_zero_damp_deadzone_cmps);
         vely_feedback = FC_Mode1_ApplyVelDeadzone(-Pos_Est_vel_y_kf,
-                                                  g_fc_params.mode1_zero_damp_deadzone_cmps);
+                                                  s_mode1_zero_damp_deadzone_cmps);
         angle_limit_deg = s_mode1_track_angle_limit_deg;
         mode1_feedback_used_x = velx_feedback;
         state_timer_ms = 0.0f;

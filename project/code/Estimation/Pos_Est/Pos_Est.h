@@ -21,5 +21,7 @@ extern float Pos_Est_vel_x;
 extern float Pos_Est_vel_y;
 extern float Pos_Est_vel_x_kf;
 extern float Pos_Est_vel_y_kf;
+extern float Pos_Est_pos_x;
+extern float Pos_Est_pos_y;
 
 #endif /* POS_EST_H */

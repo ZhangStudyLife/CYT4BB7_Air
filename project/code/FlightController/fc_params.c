@@ -103,18 +103,18 @@ void FC_Params_Init(void)
 
     /* ===== X轴速度环参数 ===== */
     g_fc_params.vel_x_kp = 0.12f;
-    g_fc_params.vel_x_ki = 0.02f;
+    g_fc_params.vel_x_ki = 0.03f;
     g_fc_params.vel_x_kd = 0.0f;
     g_fc_params.vel_x_kff = 0.0f;
-    g_fc_params.vel_x_i_limit = 3.0f;
+    g_fc_params.vel_x_i_limit = 4.5f;
     g_fc_params.vel_x_d_lpf = 0.0f;
 
     /* ===== Y轴速度环参数 ===== */
     g_fc_params.vel_y_kp = 0.12f;
-    g_fc_params.vel_y_ki = 0.02f;
+    g_fc_params.vel_y_ki = 0.03f;
     g_fc_params.vel_y_kd = 0.0f;
     g_fc_params.vel_y_kff = 0.0f;
-    g_fc_params.vel_y_i_limit = 3.0f;
+    g_fc_params.vel_y_i_limit = 4.5f;
     g_fc_params.vel_y_d_lpf = 0.0f;
 
     /* ===== Z轴速度环参数 ===== */
@@ -128,15 +128,7 @@ void FC_Params_Init(void)
 
     /* ===== 模式1 跟杆前馈与刹车参数 ===== */
     g_fc_params.mode1_track_ff_deg_per_cmps = 0.06f;
-    g_fc_params.mode1_track_ff_limit_deg = 6.0f;
     g_fc_params.mode1_brake_kp = 0.18f;
-    g_fc_params.mode1_brake_angle_limit_deg = 25.0f;
-    g_fc_params.mode1_brake_entry_delay_s = 0.04f;
-    g_fc_params.mode1_brake_exit_hold_s = 0.16f;
     g_fc_params.mode1_brake_exit_vel_cmps = 10.0f;
-    g_fc_params.mode1_brake_deadzone_cmps = 3.0f;
-    g_fc_params.mode1_zero_damp_deadzone_cmps = 1.0f;
-    g_fc_params.mode1_brake_blend_low_cmps = 8.0f;
-    g_fc_params.mode1_brake_blend_high_cmps = 20.0f;
 }
 

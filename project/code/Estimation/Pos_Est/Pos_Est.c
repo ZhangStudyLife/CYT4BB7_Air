@@ -15,10 +15,10 @@ float Pos_Est_vel_x_last = 0.0f;
 float Pos_Est_vel_y = 0.0f;
 float Pos_Est_vel_y_last = 0.0f;
 
-/* 位置估计的 X 轴位置，单位 cm */              // 往左飞为正 , 往右飞为负
+/* 位置估计的 X 轴位置，单位 cm */ // 往左飞为正 , 往右飞为负
 float Pos_Est_pos_x = 0.0f;
 float Pos_Est_pos_x_last = 0.0f;
-/* 位置估计的 Y 轴位置，单位 cm */              //  往前飞为正，往后飞为负
+/* 位置估计的 Y 轴位置，单位 cm */ //  往前飞为正，往后飞为负
 float Pos_Est_pos_y = 0.0f;
 float Pos_Est_pos_y_last = 0.0f;
 
@@ -161,7 +161,5 @@ void Pos_Est_Update_50HZ(void)
     Pos_Est_pos_y = Pos_Est_pos_y_last + 0.5 * (Pos_Est_vel_y_last + Pos_Est_vel_y) * 0.02f;
 
     wifi_vofa_JustFloat(12u, opflow_vel_x, opflow_vel_y, acc_x_lp, acc_y_lp,
-                        vel_x_pred, vel_y_pred, Pos_Est_vel_x,Pos_Est_vel_y,Pos_Est_vel_x_kf, Pos_Est_vel_y_kf,Pos_Est_pos_x,Pos_Est_pos_y);
+                        vel_x_pred, vel_y_pred, Pos_Est_vel_x, Pos_Est_vel_y, Pos_Est_vel_x_kf, Pos_Est_vel_y_kf, Pos_Est_pos_x, Pos_Est_pos_y);
 }
-
-

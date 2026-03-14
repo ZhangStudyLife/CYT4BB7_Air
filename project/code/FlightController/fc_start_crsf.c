@@ -88,40 +88,6 @@ static void FC_START_CRSF_ForceStopToStandby(void)
     s_fc_start_state = FC_START_CRSF_STATE_STANDBY;
 }
 
-static void FC_START_CRSF_Mode0_Update(void)
-{
-    /* TODO: add CH6 mode 0 behavior */
-}
-
-static void FC_START_CRSF_Mode1_Update(void)
-{
-    /* TODO: add CH6 mode 1 behavior */
-}
-
-static void FC_START_CRSF_Mode2_Update(void)
-{
-    /* TODO: add CH6 mode 2 behavior */
-}
-
-static void FC_START_CRSF_RunFlightModeHook(void)
-{
-    switch (s_fc_flight_mode)
-    {
-    case FC_START_CRSF_FLIGHT_MODE_0:
-        FC_START_CRSF_Mode0_Update();
-        break;
-
-    case FC_START_CRSF_FLIGHT_MODE_1:
-        FC_START_CRSF_Mode1_Update();
-        break;
-
-    case FC_START_CRSF_FLIGHT_MODE_2:
-    default:
-        FC_START_CRSF_Mode2_Update();
-        break;
-    }
-}
-
 #define FC_START_CRSF_TAKEOFF_PAIR1_MOTOR_A (MOTOR_1)
 #define FC_START_CRSF_TAKEOFF_PAIR1_MOTOR_B (MOTOR_4)
 #define FC_START_CRSF_TAKEOFF_PAIR2_MOTOR_A (MOTOR_2)
@@ -289,7 +255,6 @@ static void FC_START_CRSF_StateMachine_Update(void)
 
     case FC_START_CRSF_STATE_FLYING:
         FC_START_CRSF_UpdateModeFromCH6();
-        FC_START_CRSF_RunFlightModeHook();
         if (s_landing_request != 0U)
         {
             s_fc_start_state = FC_START_CRSF_STATE_LANDING;

@@ -10,8 +10,17 @@ float opflow_vel_y = 0.0f; // 往前飞为正，往后飞为负
 
 /* 位置估计的 X 轴速度，单位 cm/s */
 float Pos_Est_vel_x = 0.0f;
+float Pos_Est_vel_x_last = 0.0f;
 /* 位置估计的 Y 轴速度，单位 cm/s */
 float Pos_Est_vel_y = 0.0f;
+float Pos_Est_vel_y_last = 0.0f;
+
+/* 位置估计的 X 轴位置，单位 cm */              // 往左飞为正 , 往右飞为负
+float Pos_Est_pos_x = 0.0f;
+float Pos_Est_pos_x_last = 0.0f;
+/* 位置估计的 Y 轴位置，单位 cm */              //  往前飞为正，往后飞为负
+float Pos_Est_pos_y = 0.0f;
+float Pos_Est_pos_y_last = 0.0f;
 
 /* X 轴速度 Kalman 滤波输出，单位 cm/s */
 float Pos_Est_vel_x_kf = 0.0f;
@@ -46,8 +55,12 @@ void Pos_Est_Init(void)
     Kalman1D_Init(&s_kf_y, 200.0f, 600.0f, 1.0f, 0.0f);
 
     /* 保留原有一阶低通输出 */
-    LPF1_Init(&s_acc_lp_x, 0.008f);
-    LPF1_Init(&s_acc_lp_y, 0.008f);
+    LPF1_Init(&s_acc_lp_x, 0.04f);
+    LPF1_Init(&s_acc_lp_y, 0.04f);
+    Pos_Est_pos_x = 0.0f;
+    Pos_Est_pos_y = 0.0f;
+    Pos_Est_pos_x_last = 0.0f;
+    Pos_Est_pos_y_last = 0.0f;
 }
 
 /*
@@ -60,10 +73,16 @@ void Pos_Est_Reinit(void)
 {
     PMW3901_ReInit();
     FlowGyroDecoupler_Reinit();
+    Kalman1D_Reset(&s_kf_x);
+    Kalman1D_Reset(&s_kf_y);
     LPF1_Reset(&s_acc_lp_x);
     LPF1_Reset(&s_acc_lp_y);
     acc_x_lp = 0.0f;
     acc_y_lp = 0.0f;
+    Pos_Est_pos_x = 0.0f;
+    Pos_Est_pos_y = 0.0f;
+    Pos_Est_pos_x_last = 0.0f;
+    Pos_Est_pos_y_last = 0.0f;
 }
 
 /*
@@ -124,6 +143,9 @@ void Pos_Est_Update_50HZ(void)
     // 预测速度 , 拿取上一帧的 KF 输出作为当前帧的预测值，加入加速度积分预测下一帧速度的先验
     float vel_y_pred = Pos_Est_vel_y_kf + acc_x_lp * dt;
 
+    Pos_Est_vel_x_last = Pos_Est_vel_x;
+    Pos_Est_vel_y_last = Pos_Est_vel_y;
+
     // 本次测量的新的光流数据+预测速度 进行互补滤波，得到位置估计的速度输出
     Pos_Est_vel_x = vel_x_pred + k_flow * (opflow_vel_x - vel_x_pred);
     Pos_Est_vel_y = vel_y_pred + k_flow * (opflow_vel_y - vel_y_pred);
@@ -131,6 +153,15 @@ void Pos_Est_Update_50HZ(void)
     // 加个低通滤波，平滑一下
     Pos_Est_vel_x_kf = Kalman1D_Update(&s_kf_x, Pos_Est_vel_x);
     Pos_Est_vel_y_kf = Kalman1D_Update(&s_kf_y, Pos_Est_vel_y);
-    wifi_vofa_JustFloat(10u, opflow_vel_x, opflow_vel_y, acc_x_lp, acc_y_lp,
-                        vel_x_pred, vel_y_pred, Pos_Est_vel_x,Pos_Est_vel_y,Pos_Est_vel_x_kf, Pos_Est_vel_y_kf);
+
+    Pos_Est_pos_x_last = Pos_Est_pos_x;
+    Pos_Est_pos_y_last = Pos_Est_pos_y;
+
+    Pos_Est_pos_x = Pos_Est_pos_x_last + 0.5 * (Pos_Est_vel_x_last + Pos_Est_vel_x) * 0.02f;
+    Pos_Est_pos_y = Pos_Est_pos_y_last + 0.5 * (Pos_Est_vel_y_last + Pos_Est_vel_y) * 0.02f;
+
+    wifi_vofa_JustFloat(12u, opflow_vel_x, opflow_vel_y, acc_x_lp, acc_y_lp,
+                        vel_x_pred, vel_y_pred, Pos_Est_vel_x,Pos_Est_vel_y,Pos_Est_vel_x_kf, Pos_Est_vel_y_kf,Pos_Est_pos_x,Pos_Est_pos_y);
 }
+
+

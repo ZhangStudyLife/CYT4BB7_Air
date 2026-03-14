@@ -1730,6 +1730,18 @@
                 <name>$PROJ_DIR$\..\..\code\FlightController\fc_loop.h</name>
             </file>
             <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode0.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode1.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode2.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode.h</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\..\..\code\FlightController\fc_params.c</name>
             </file>
             <file>

@@ -1,0 +1,66 @@
+#include "fc_mode.h"
+
+/* 模式2手动姿态映射比例，单位度每遥控归一化单位 */
+static const float s_mode2_rc_to_angle_scale = 0.04f;
+/* 模式2手动姿态最大角度，单位度 */
+static const float s_mode2_manual_angle_limit_deg = 40.0f;
+
+/*
+ * 函数名: FC_Mode2_Init
+ * 功能: 初始化模式2控制资源
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode2_Init(void)
+{
+    FC_Mode2_Reset();
+}
+
+/*
+ * 函数名: FC_Mode2_Reset
+ * 功能: 将模式2姿态目标复位到机械配平
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode2_Reset(void)
+{
+    roll_angle_target = FC_Mode_Get_Roll_Mech_Trim_Deg();
+    pitch_angle_target = FC_Mode_Get_Pitch_Mech_Trim_Deg();
+}
+
+/*
+ * 函数名: FC_Mode2_100Hz
+ * 功能: 在模式2下根据摇杆生成手动姿态目标
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode2_100Hz(void)
+{
+    float ch0;
+    float ch1;
+
+    if (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING)
+    {
+        return;
+    }
+
+    ch0 = FC_Mode_Clamp((float)CRSF_STD[0], -1000.0f, 1000.0f);
+    ch1 = FC_Mode_Clamp((float)CRSF_STD[1], -1000.0f, 1000.0f);
+
+    roll_angle_target = FC_Mode_Clamp(ch0 * s_mode2_rc_to_angle_scale + FC_Mode_Get_Roll_Mech_Trim_Deg(),
+                                      -s_mode2_manual_angle_limit_deg, s_mode2_manual_angle_limit_deg);
+    pitch_angle_target = FC_Mode_Clamp(-ch1 * s_mode2_rc_to_angle_scale + FC_Mode_Get_Pitch_Mech_Trim_Deg(),
+                                       -s_mode2_manual_angle_limit_deg, s_mode2_manual_angle_limit_deg);
+}
+
+/*
+ * 函数名: FC_Mode2_50Hz
+ * 功能: 执行模式2的50Hz控制占位
+ * 输入参数:
+ *   dt - 本次50Hz调用周期，单位 s
+ * 返回值: 无
+ */
+void FC_Mode2_50Hz(float dt)
+{
+    (void)dt;
+}

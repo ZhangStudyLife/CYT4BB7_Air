@@ -21,7 +21,7 @@ void FC_Params_Init(void)
     /* ===== 控制周期参数 ===== */
     g_fc_params.gyro_dt = 0.001f; /* 1kHz */
     g_fc_params.angle_dt = 0.002f; /* 500Hz */
-    g_fc_params.pos_xy_dt = 0.01f; /* 100Hz */
+    g_fc_params.pos_xy_dt = 0.02f; /* 50Hz */
     g_fc_params.pos_z_dt = 0.02f;  /* 50Hz */
     g_fc_params.vel_xy_dt = 0.02f;  /* 50Hz */
     g_fc_params.vel_z_dt = 0.01f;  /* 100Hz */
@@ -78,19 +78,19 @@ void FC_Params_Init(void)
     g_fc_params.yaw_angle_d_lpf = 0.0f;
 
     /* ===== X轴位置环参数 ===== */
-    g_fc_params.pos_x_kp = 12.0f;
+    g_fc_params.pos_x_kp = 0.90f;
     g_fc_params.pos_x_ki = 0.0f;
     g_fc_params.pos_x_kd = 0.0f;
     g_fc_params.pos_x_kff = 0.0f;
-    g_fc_params.pos_x_i_limit = 0.8f;
+    g_fc_params.pos_x_i_limit = 0.0f;
     g_fc_params.pos_x_d_lpf = 0.0f;
 
     /* ===== Y轴位置环参数 ===== */
-    g_fc_params.pos_y_kp = 6.0f;
+    g_fc_params.pos_y_kp = 0.90f;
     g_fc_params.pos_y_ki = 0.0f;
     g_fc_params.pos_y_kd = 0.0f;
     g_fc_params.pos_y_kff = 0.0f;
-    g_fc_params.pos_y_i_limit = 0.8f;
+    g_fc_params.pos_y_i_limit = 0.0f;
     g_fc_params.pos_y_d_lpf = 0.0f;
 
     /* ===== Z轴位置环参数 ===== */
@@ -102,19 +102,19 @@ void FC_Params_Init(void)
     g_fc_params.pos_z_d_lpf = 0.20f;
 
     /* ===== X轴速度环参数 ===== */
-    g_fc_params.vel_x_kp = 0.1f;
-    g_fc_params.vel_x_ki = 0.1f;
+    g_fc_params.vel_x_kp = 0.12f;
+    g_fc_params.vel_x_ki = 0.04f;
     g_fc_params.vel_x_kd = 0.0f;
     g_fc_params.vel_x_kff = 0.0f;
-    g_fc_params.vel_x_i_limit = 10.0f;
+    g_fc_params.vel_x_i_limit = 6.0f;
     g_fc_params.vel_x_d_lpf = 0.0f;
 
     /* ===== Y轴速度环参数 ===== */
-    g_fc_params.vel_y_kp = 0.1f;
-    g_fc_params.vel_y_ki = 0.1f;   
+    g_fc_params.vel_y_kp = 0.12f;
+    g_fc_params.vel_y_ki = 0.04f;
     g_fc_params.vel_y_kd = 0.0f;
     g_fc_params.vel_y_kff = 0.0f;
-    g_fc_params.vel_y_i_limit = 10.0f;
+    g_fc_params.vel_y_i_limit = 6.0f;
     g_fc_params.vel_y_d_lpf = 0.0f;
 
     /* ===== Z轴速度环参数 ===== */

@@ -103,18 +103,18 @@ void FC_Params_Init(void)
 
     /* ===== X轴速度环参数 ===== */
     g_fc_params.vel_x_kp = 0.12f;
-    g_fc_params.vel_x_ki = 0.04f;
+    g_fc_params.vel_x_ki = 0.02f;
     g_fc_params.vel_x_kd = 0.0f;
     g_fc_params.vel_x_kff = 0.0f;
-    g_fc_params.vel_x_i_limit = 6.0f;
+    g_fc_params.vel_x_i_limit = 3.0f;
     g_fc_params.vel_x_d_lpf = 0.0f;
 
     /* ===== Y轴速度环参数 ===== */
     g_fc_params.vel_y_kp = 0.12f;
-    g_fc_params.vel_y_ki = 0.04f;
+    g_fc_params.vel_y_ki = 0.02f;
     g_fc_params.vel_y_kd = 0.0f;
     g_fc_params.vel_y_kff = 0.0f;
-    g_fc_params.vel_y_i_limit = 6.0f;
+    g_fc_params.vel_y_i_limit = 3.0f;
     g_fc_params.vel_y_d_lpf = 0.0f;
 
     /* ===== Z轴速度环参数 ===== */

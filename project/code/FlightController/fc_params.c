@@ -127,10 +127,16 @@ void FC_Params_Init(void)
     g_fc_params.vel_z_d_lpf = 0.08f;
 
     /* ===== 模式1 跟杆前馈与刹车参数 ===== */
-    g_fc_params.mode1_track_ff_deg_per_cmps = 0.05f;
+    g_fc_params.mode1_track_ff_deg_per_cmps = 0.06f;
     g_fc_params.mode1_track_ff_limit_deg = 6.0f;
     g_fc_params.mode1_brake_kp = 0.18f;
     g_fc_params.mode1_brake_angle_limit_deg = 25.0f;
-    g_fc_params.mode1_brake_exit_vel_cmps = 12.0f;
+    g_fc_params.mode1_brake_entry_delay_s = 0.04f;
+    g_fc_params.mode1_brake_exit_hold_s = 0.16f;
+    g_fc_params.mode1_brake_exit_vel_cmps = 10.0f;
+    g_fc_params.mode1_brake_deadzone_cmps = 3.0f;
+    g_fc_params.mode1_zero_damp_deadzone_cmps = 1.0f;
+    g_fc_params.mode1_brake_blend_low_cmps = 8.0f;
+    g_fc_params.mode1_brake_blend_high_cmps = 20.0f;
 }
 

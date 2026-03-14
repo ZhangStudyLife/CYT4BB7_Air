@@ -5,7 +5,7 @@
 typedef enum
 {
     FC_MODE1_STATE_TRACK = 0U,     /* 正常跟杆速度模式 */
-    FC_MODE1_STATE_BRAKE = 1U,     /* 摇杆回中后的强刹车模式 */
+    FC_MODE1_STATE_BRAKE = 1U,     /* 回中后的强刹车模式 */
     FC_MODE1_STATE_ZERO_DAMP = 2U  /* 刹停后的零速阻尼模式 */
 } fc_mode1_state_e;
 
@@ -15,35 +15,31 @@ static pid_t s_mode1_velx_pid;
 static pid_t s_mode1_vely_pid;
 /* 模式1 当前状态 */
 static fc_mode1_state_e s_mode1_state = FC_MODE1_STATE_ZERO_DAMP;
-/* 模式1 摇杆是否处于活跃状态 */
+/* 模式1 摇杆是否处于激活状态 */
 static uint8_t s_mode1_stick_active = 0U;
-/* 模式1 摇杆回中持续时间，单位 s */
+/* 模式1 摇杆回中累计时间，单位 s */
 static float s_mode1_neutral_timer_s = 0.0f;
-/* 模式1 刹车阶段低速稳定计时，单位 s */
+/* 模式1 刹车退出保持时间，单位 s */
 static float s_mode1_brake_settle_timer_s = 0.0f;
 
-/* 模式1 遥控到速度映射比例，单位 cm/s 每遥控归一化单位 */
+/* 模式1 遥控量到速度目标的换算比例，单位 cm/s */
 static const float s_mode1_rc_to_speed_scale = 0.1f;
 /* 模式1 最大水平目标速度，单位 cm/s */
 static const float s_mode1_vel_limit_cmps = 100.0f;
-/* 模式1 普通跟杆姿态角限幅，单位 deg */
+/* 模式1 常规跟杆姿态角限幅，单位 deg */
 static const float s_mode1_track_angle_limit_deg = 20.0f;
 /* 模式1 摇杆回中死区阈值 */
 static const float s_mode1_stick_center_db = 60.0f;
 /* 模式1 摇杆重新激活阈值 */
 static const float s_mode1_stick_reactivate_db = 80.0f;
-/* 模式1 进入强刹车的回中保持时间，单位 s */
-static const float s_mode1_brake_entry_delay_s = 0.06f;
-/* 模式1 退出强刹车所需的低速保持时间，单位 s */
-static const float s_mode1_brake_exit_hold_s = 0.20f;
-/* 模式1 强刹车 anti-windup 回算增益 */
+/* 模式1 刹车阶段 anti-windup 回算增益 */
 static const float s_mode1_brake_aw_gain = 0.25f;
 
 /*
  * 函数名: FC_Mode1_Abs
  * 功能: 计算浮点数绝对值
  * 输入参数:
- *   value - 输入浮点数
+ *   value - 输入值
  * 返回值:
  *   输入值的绝对值
  */
@@ -53,8 +49,91 @@ static float FC_Mode1_Abs(float value)
 }
 
 /*
+ * 函数名: FC_Mode1_ApplyVelDeadzone
+ * 功能: 对速度反馈施加对称死区，压掉零速附近的小幅游走
+ * 输入参数:
+ *   vel      - 输入速度，单位 cm/s
+ *   deadzone - 速度死区，单位 cm/s
+ * 返回值:
+ *   经过死区处理后的速度
+ */
+static float FC_Mode1_ApplyVelDeadzone(float vel, float deadzone)
+{
+    float abs_vel = FC_Mode1_Abs(vel);
+    float abs_deadzone = FC_Mode1_Abs(deadzone);
+
+    if (abs_vel <= abs_deadzone)
+    {
+        return 0.0f;
+    }
+
+    return (vel >= 0.0f) ? (abs_vel - abs_deadzone) : -(abs_vel - abs_deadzone);
+}
+
+/*
+ * 函数名: FC_Mode1_CalcBrakeRawWeight
+ * 功能: 按速度大小计算刹车阶段 raw 反馈权重
+ * 输入参数:
+ *   vel_kf_abs - kf 速度绝对值，单位 cm/s
+ *   low_cmps   - 低速切换阈值，单位 cm/s
+ *   high_cmps  - 高速切换阈值，单位 cm/s
+ * 返回值:
+ *   raw 反馈权重，范围 0~1
+ */
+static float FC_Mode1_CalcBrakeRawWeight(float vel_kf_abs, float low_cmps, float high_cmps)
+{
+    if (high_cmps <= low_cmps)
+    {
+        return (vel_kf_abs > low_cmps) ? 1.0f : 0.0f;
+    }
+
+    if (vel_kf_abs <= low_cmps)
+    {
+        return 0.0f;
+    }
+
+    if (vel_kf_abs >= high_cmps)
+    {
+        return 1.0f;
+    }
+
+    return (vel_kf_abs - low_cmps) / (high_cmps - low_cmps);
+}
+
+/*
+ * 函数名: FC_Mode1_BlendBrakeFeedback
+ * 功能: 在刹车阶段按速度大小混合 raw 与 kf 速度反馈，并施加低速死区
+ * 输入参数:
+ *   vel_raw        - raw 速度反馈，单位 cm/s
+ *   vel_kf         - kf 速度反馈，单位 cm/s
+ *   low_cmps       - 低速切换阈值，单位 cm/s
+ *   high_cmps      - 高速切换阈值，单位 cm/s
+ *   deadzone       - 低速死区，单位 cm/s
+ *   raw_weight_out - 输出 raw 权重的指针，可为空
+ * 返回值:
+ *   经过混合和死区处理后的刹车反馈速度
+ */
+static float FC_Mode1_BlendBrakeFeedback(float vel_raw,
+                                         float vel_kf,
+                                         float low_cmps,
+                                         float high_cmps,
+                                         float deadzone,
+                                         float *raw_weight_out)
+{
+    float raw_weight = FC_Mode1_CalcBrakeRawWeight(FC_Mode1_Abs(vel_kf), low_cmps, high_cmps);
+    float vel_blend = raw_weight * vel_raw + (1.0f - raw_weight) * vel_kf;
+
+    if (raw_weight_out != 0)
+    {
+        *raw_weight_out = raw_weight;
+    }
+
+    return FC_Mode1_ApplyVelDeadzone(vel_blend, deadzone);
+}
+
+/*
  * 函数名: FC_Mode1_MapStickToVel
- * 功能: 将单轴遥控量映射为速度目标，并在中位死区内直接归零
+ * 功能: 将单轴遥控输入映射为速度目标，并在中位死区内直接归零
  * 输入参数:
  *   ch_value - 单轴遥控输入，范围约 -1000~1000
  * 返回值:
@@ -73,7 +152,7 @@ static float FC_Mode1_MapStickToVel(float ch_value)
 
 /*
  * 函数名: FC_Mode1_ConfigPid
- * 功能: 按当前模式写入速度环 PID 的工作参数
+ * 功能: 按当前状态写入速度环 PID 的工作参数
  * 输入参数:
  *   pid          - 需要配置的 PID 实例
  *   kp           - 比例增益
@@ -81,7 +160,7 @@ static float FC_Mode1_MapStickToVel(float ch_value)
  *   kd           - 微分增益
  *   kff          - 前馈增益
  *   i_limit      - 积分限幅
- *   output_limit - 输出限幅绝对值
+ *   output_limit - 输出绝对限幅
  *   aw_enable    - 是否启用 anti-windup
  *   aw_gain      - anti-windup 回算增益
  * 返回值:
@@ -169,12 +248,12 @@ static void FC_Mode1_EnterZeroDamp(void)
 
 /*
  * 函数名: FC_Mode1_UpdateStickActive
- * 功能: 按滞回阈值更新摇杆活跃状态
+ * 功能: 按滞回阈值更新摇杆激活状态
  * 输入参数:
  *   ch0 - 横滚摇杆输入
  *   ch1 - 俯仰摇杆输入
  * 返回值:
- *   1 表示摇杆活跃，0 表示摇杆回中
+ *   1 表示摇杆激活，0 表示摇杆回中
  */
 static uint8_t FC_Mode1_UpdateStickActive(float ch0, float ch1)
 {
@@ -203,7 +282,7 @@ static uint8_t FC_Mode1_UpdateStickActive(float ch0, float ch1)
 
 /*
  * 函数名: FC_Mode1_Init
- * 功能: 初始化模式1 水平速度环控制资源
+ * 功能: 初始化模式1 的水平速度环资源
  * 输入参数: 无
  * 返回值: 无
  */
@@ -239,7 +318,7 @@ void FC_Mode1_Reset(void)
 
 /*
  * 函数名: FC_Mode1_100Hz
- * 功能: 模式1 当前不需要 100Hz 专用控制，保留空实现
+ * 功能: 模式1 当前不需要 100Hz 专用逻辑，保留空实现
  * 输入参数: 无
  * 返回值: 无
  */
@@ -249,7 +328,7 @@ void FC_Mode1_100Hz(void)
 
 /*
  * 函数名: FC_Mode1_50Hz
- * 功能: 执行模式1 的 50Hz 跟杆、强刹车与零速阻尼控制
+ * 功能: 执行模式1 的 50Hz 跟杆、刹车和零速阻尼控制
  * 输入参数:
  *   dt - 本次 50Hz 调用周期，单位 s
  * 返回值: 无
@@ -260,14 +339,16 @@ void FC_Mode1_50Hz(float dt)
     float ch1;
     float velx_target = 0.0f;
     float vely_target = 0.0f;
-    float velx_feedback;
-    float vely_feedback;
+    float velx_feedback = 0.0f;
+    float vely_feedback = 0.0f;
     float velx_out;
     float vely_out;
     float track_ff_x = 0.0f;
     float track_ff_y = 0.0f;
     float angle_limit_deg;
-    float feedback_is_kf = 1.0f;
+    float state_timer_ms = 0.0f;
+    float mode1_feedback_used_x = 0.0f;
+    float mode1_brake_raw_weight_x = 0.0f;
     uint8_t stick_active_now;
 
     if (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING)
@@ -285,6 +366,7 @@ void FC_Mode1_50Hz(float dt)
         {
             FC_Mode1_EnterTrack();
         }
+
         s_mode1_neutral_timer_s = 0.0f;
         s_mode1_brake_settle_timer_s = 0.0f;
     }
@@ -293,15 +375,15 @@ void FC_Mode1_50Hz(float dt)
         if (s_mode1_state == FC_MODE1_STATE_TRACK)
         {
             s_mode1_neutral_timer_s += dt;
-            if (s_mode1_neutral_timer_s >= s_mode1_brake_entry_delay_s)
+            if (s_mode1_neutral_timer_s >= g_fc_params.mode1_brake_entry_delay_s)
             {
                 FC_Mode1_EnterBrake();
             }
         }
         else if (s_mode1_state == FC_MODE1_STATE_BRAKE)
         {
-            if ((FC_Mode1_Abs(-Pos_Est_vel_x) < g_fc_params.mode1_brake_exit_vel_cmps) &&
-                (FC_Mode1_Abs(-Pos_Est_vel_y) < g_fc_params.mode1_brake_exit_vel_cmps))
+            if ((FC_Mode1_Abs(Pos_Est_vel_x_kf) < g_fc_params.mode1_brake_exit_vel_cmps) &&
+                (FC_Mode1_Abs(Pos_Est_vel_y_kf) < g_fc_params.mode1_brake_exit_vel_cmps))
             {
                 s_mode1_brake_settle_timer_s += dt;
             }
@@ -310,7 +392,7 @@ void FC_Mode1_50Hz(float dt)
                 s_mode1_brake_settle_timer_s = 0.0f;
             }
 
-            if (s_mode1_brake_settle_timer_s >= s_mode1_brake_exit_hold_s)
+            if (s_mode1_brake_settle_timer_s >= g_fc_params.mode1_brake_exit_hold_s)
             {
                 FC_Mode1_EnterZeroDamp();
             }
@@ -330,7 +412,8 @@ void FC_Mode1_50Hz(float dt)
         velx_feedback = -Pos_Est_vel_x_kf;
         vely_feedback = -Pos_Est_vel_y_kf;
         angle_limit_deg = s_mode1_track_angle_limit_deg;
-        feedback_is_kf = 1.0f;
+        mode1_feedback_used_x = velx_feedback;
+        state_timer_ms = s_mode1_neutral_timer_s * 1000.0f;
 
         FC_Mode1_ConfigPid(&s_mode1_velx_pid,
                            g_fc_params.vel_x_kp, g_fc_params.vel_x_ki, g_fc_params.vel_x_kd,
@@ -343,10 +426,19 @@ void FC_Mode1_50Hz(float dt)
     }
     else if (s_mode1_state == FC_MODE1_STATE_BRAKE)
     {
-        velx_feedback = -Pos_Est_vel_x;
-        vely_feedback = -Pos_Est_vel_y;
+        velx_feedback = FC_Mode1_BlendBrakeFeedback(-Pos_Est_vel_x, -Pos_Est_vel_x_kf,
+                                                    g_fc_params.mode1_brake_blend_low_cmps,
+                                                    g_fc_params.mode1_brake_blend_high_cmps,
+                                                    g_fc_params.mode1_brake_deadzone_cmps,
+                                                    &mode1_brake_raw_weight_x);
+        vely_feedback = FC_Mode1_BlendBrakeFeedback(-Pos_Est_vel_y, -Pos_Est_vel_y_kf,
+                                                    g_fc_params.mode1_brake_blend_low_cmps,
+                                                    g_fc_params.mode1_brake_blend_high_cmps,
+                                                    g_fc_params.mode1_brake_deadzone_cmps,
+                                                    0);
         angle_limit_deg = g_fc_params.mode1_brake_angle_limit_deg;
-        feedback_is_kf = 0.0f;
+        mode1_feedback_used_x = velx_feedback;
+        state_timer_ms = s_mode1_brake_settle_timer_s * 1000.0f;
 
         FC_Mode1_ConfigPid(&s_mode1_velx_pid,
                            g_fc_params.mode1_brake_kp, 0.0f, 0.0f,
@@ -357,10 +449,13 @@ void FC_Mode1_50Hz(float dt)
     }
     else
     {
-        velx_feedback = -Pos_Est_vel_x_kf;
-        vely_feedback = -Pos_Est_vel_y_kf;
+        velx_feedback = FC_Mode1_ApplyVelDeadzone(-Pos_Est_vel_x_kf,
+                                                  g_fc_params.mode1_zero_damp_deadzone_cmps);
+        vely_feedback = FC_Mode1_ApplyVelDeadzone(-Pos_Est_vel_y_kf,
+                                                  g_fc_params.mode1_zero_damp_deadzone_cmps);
         angle_limit_deg = s_mode1_track_angle_limit_deg;
-        feedback_is_kf = 1.0f;
+        mode1_feedback_used_x = velx_feedback;
+        state_timer_ms = 0.0f;
 
         FC_Mode1_ConfigPid(&s_mode1_velx_pid,
                            g_fc_params.vel_x_kp, g_fc_params.vel_x_ki, g_fc_params.vel_x_kd,
@@ -392,10 +487,10 @@ void FC_Mode1_50Hz(float dt)
                         roll_angle_target,
                         g_euler.roll,
                         Pos_Est_pos_x,
-                        roll_gyro_target,
-                        g_imufilter_1000hz.gyrox,
                         (float)s_mode1_state,
-                        s_mode1_neutral_timer_s * 1000.0f,
-                        feedback_is_kf,
-                        track_ff_x);
+                        state_timer_ms,
+                        mode1_feedback_used_x,
+                        mode1_brake_raw_weight_x,
+                        track_ff_x,
+                        g_imufilter_1000hz.gyrox);
 }

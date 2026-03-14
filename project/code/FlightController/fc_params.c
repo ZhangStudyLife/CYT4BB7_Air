@@ -125,5 +125,12 @@ void FC_Params_Init(void)
     g_fc_params.vel_z_kff = 0.0f;
     g_fc_params.vel_z_i_limit = 450.0f;
     g_fc_params.vel_z_d_lpf = 0.08f;
+
+    /* ===== 模式1 跟杆前馈与刹车参数 ===== */
+    g_fc_params.mode1_track_ff_deg_per_cmps = 0.05f;
+    g_fc_params.mode1_track_ff_limit_deg = 6.0f;
+    g_fc_params.mode1_brake_kp = 0.18f;
+    g_fc_params.mode1_brake_angle_limit_deg = 25.0f;
+    g_fc_params.mode1_brake_exit_vel_cmps = 12.0f;
 }
 

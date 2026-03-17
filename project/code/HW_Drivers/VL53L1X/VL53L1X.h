@@ -1,10 +1,10 @@
 /*********************************************************************************************************************
  * VL53L1X 四路TOF测距驱动头文件
  * 通道与机臂对应关系（机体系 FRD，电机编号见AGENTS.md）：
- *   - TOF1（索引0）: 1号电机臂（右下），SCL=P13_2, SDA=P13_3
- *   - TOF2（索引1）: 2号电机臂（右上），SCL=P08_1, SDA=P08_2
- *   - TOF3（索引2）: 3号电机臂（左下），SCL=P07_6, SDA=P07_7
- *   - TOF4（索引3）: 4号电机臂（左上），SCL=P17_3, SDA=P17_4
+ *   - TOF1（索引0）: 1号电机臂（右下/右后），SCL=P06_4, SDA=P06_3
+ *   - TOF2（索引1）: 2号电机臂（右上/右前），SCL=P23_4, SDA=P23_7
+ *   - TOF3（索引2）: 3号电机臂（左下/左后），SCL=P13_2, SDA=P13_3
+ *   - TOF4（索引3）: 4号电机臂（左上/左前），SCL=P17_3, SDA=P17_4
  * 读取策略：四路同步软IIC，四路读取时间 ≈ 单路读取时间。
  ********************************************************************************************************************/
 
@@ -22,24 +22,26 @@
 #define VL53L1X_CHANNEL_COUNT           (4U)
 
 /* TOF1（1号机臂，右下电机）软IIC SCL引脚。 */
-#define VL53L1X1_SCL_PIN    P13_2
+#define VL53L1X1_SCL_PIN    P06_4
 /* TOF1（1号机臂，右下电机）软IIC SDA引脚。 */
-#define VL53L1X1_SDA_PIN    P13_3
+#define VL53L1X1_SDA_PIN    P06_3
 
 /* TOF2（2号机臂，右上电机）软IIC SCL引脚。 */
-#define VL53L1X2_SCL_PIN    P08_1
+#define VL53L1X2_SCL_PIN    P23_4
 /* TOF2（2号机臂，右上电机）软IIC SDA引脚。 */
-#define VL53L1X2_SDA_PIN    P08_2
+#define VL53L1X2_SDA_PIN    P23_7
 
 /* TOF3（3号机臂，左下电机）软IIC SCL引脚。 */
-#define VL53L1X3_SCL_PIN    P07_6
+#define VL53L1X3_SCL_PIN    P13_2
 /* TOF3（3号机臂，左下电机）软IIC SDA引脚。 */
-#define VL53L1X3_SDA_PIN    P07_7
+#define VL53L1X3_SDA_PIN    P13_3
 
 /* TOF4（4号机臂，左上电机）软IIC SCL引脚。 */
 #define VL53L1X4_SCL_PIN    P17_3
 /* TOF4（4号机臂，左上电机）软IIC SDA引脚。 */
 #define VL53L1X4_SDA_PIN    P17_4
+
+/* 注意：TOF3 当前占用的 P13_2/P13_3 与 BMP388 默认软SPI的 SCK/MISO 引脚冲突，如需同时启用必须重分配其中一方引脚。 */
 
 /**
  * @brief 四路TOF测距输出数据结构体。

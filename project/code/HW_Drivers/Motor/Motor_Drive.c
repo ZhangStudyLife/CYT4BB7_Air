@@ -11,14 +11,14 @@
 /* ======================== 引脚映射配置 ======================== */
 /*
  * 电机引脚分配：
- * M1 = P10.2 → TCPWM_CH30_P10_2
- * M2 = P10.3 → TCPWM_CH31_P10_3
+ * M1 = P05_0 → TCPWM_CH09_P05_0
+ * M2 = P05_1 → TCPWM_CH10_P05_1
  * M3 = P9.0  → TCPWM_CH24_P09_0
  * M4 = P9.1  → TCPWM_CH25_P09_1
  */
 static const pwm_channel_enum MOTOR_PWM_CH[MOTOR_NUM] = {
-    TCPWM_CH30_P10_2,   /* M1: 右后 */
-    TCPWM_CH31_P10_3,   /* M2: 右前 */
+    TCPWM_CH09_P05_0,   /* M1: 右后 */
+    TCPWM_CH10_P05_1,   /* M2: 右前 */
     TCPWM_CH24_P09_0,   /* M3: 左后 */
     TCPWM_CH25_P09_1    /* M4: 左前 */
 };

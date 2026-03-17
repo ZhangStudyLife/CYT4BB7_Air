@@ -1,29 +1,30 @@
 #include "crsf.h"
 #include "zf_common_headfile.h"
 
-#define CRSF_UART_INDEX        (UART_2)
-#define CRSF_UART_TX_PIN       (UART2_TX_P10_1)
-#define CRSF_UART_RX_PIN       (UART2_RX_P10_0)
-#define CRSF_UART_BAUDRATE     (420000)
+/* CRSF 接收机使用 UART4，引脚为 P14_1(TX) / P14_0(RX)，底层在 zf_driver_uart 中映射到 SCB2。 */
+#define CRSF_UART_INDEX        (UART_4)          /* CRSF 使用的串口号。 */
+#define CRSF_UART_TX_PIN       (UART4_TX_P14_1) /* CRSF 回传使用的发送引脚。 */
+#define CRSF_UART_RX_PIN       (UART4_RX_P14_0) /* CRSF 接收机数据输入引脚。 */
+#define CRSF_UART_BAUDRATE     (420000)         /* CRSF 串口波特率，单位 bit/s。 */
 
-#define CRSF_TIMER_INDEX       (TC_TIME2_CH0)
-#define CRSF_LINK_TIMEOUT_US   (100000)
+#define CRSF_TIMER_INDEX       (TC_TIME2_CH0)   /* CRSF 链路超时检测使用的定时器通道。 */
+#define CRSF_LINK_TIMEOUT_US   (100000)         /* CRSF 判定失联的超时时间，单位 us。 */
 
-#define CRSF_CH_MID            (992)
-#define CRSF_CH_LOW            (172)
-#define CRSF_SYNC_ADDR_FC      (0xC8)
-#define CRSF_ADDR_TX           (0xEA)
-#define CRSF_FRAME_MAX_LEN     (64)
-#define CRSF_FRAME_MIN_LEN     (2)
-#define CRSF_TYPE_RC_CHANNELS  (0x16)
-#define CRSF_TYPE_ATTITUDE     (0x1E)
-#define CRSF_RC_PAYLOAD_LEN    (22)
-#define CRSF_ATT_PAYLOAD_LEN   (6)
+#define CRSF_CH_MID            (992)            /* 居中类通道的默认中位值。 */
+#define CRSF_CH_LOW            (172)            /* 油门/开关类通道的默认低位值。 */
+#define CRSF_SYNC_ADDR_FC      (0xC8)           /* 发往飞控的 CRSF 同步地址。 */
+#define CRSF_ADDR_TX           (0xEA)           /* 飞控回传时使用的设备地址。 */
+#define CRSF_FRAME_MAX_LEN     (64)             /* CRSF 单帧最大长度。 */
+#define CRSF_FRAME_MIN_LEN     (2)              /* CRSF 单帧最小长度。 */
+#define CRSF_TYPE_RC_CHANNELS  (0x16)           /* CRSF 遥控通道帧类型。 */
+#define CRSF_TYPE_ATTITUDE     (0x1E)           /* CRSF 姿态回传帧类型。 */
+#define CRSF_RC_PAYLOAD_LEN    (22)             /* 10 通道 RC 数据负载长度。 */
+#define CRSF_ATT_PAYLOAD_LEN   (6)              /* 姿态回传负载长度。 */
 
-volatile uint16_t CRSF_CH[CRSF_CH_COUNT] = {0};
-volatile int16_t CRSF_STD[CRSF_CH_COUNT] = {0};
-volatile uint32_t CRSF_LAST_UPDATE_TIME = 0;
-volatile uint8_t CRSF_LINK_UP = 0;
+volatile uint16_t CRSF_CH[CRSF_CH_COUNT] = {0}; /* CRSF 原始通道值，范围 0~2047。 */
+volatile int16_t CRSF_STD[CRSF_CH_COUNT] = {0}; /* CRSF 标准化后的通道值。 */
+volatile uint32_t CRSF_LAST_UPDATE_TIME = 0;    /* 最近一次收到有效 CRSF 帧的时间戳，单位 us。 */
+volatile uint8_t CRSF_LINK_UP = 0;              /* CRSF 链路状态，1=正常，0=失联。 */
 
 static uint8_t crsf_rx_len = 0;
 static uint8_t crsf_rx_pos = 0;

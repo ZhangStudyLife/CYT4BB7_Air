@@ -76,6 +76,7 @@ int main(void)
     pit_us_init(PIT_CH0, 1000);    /* PIT 定时器初始化，1000us 中断节拍（1kHz 基准） */
     pit_ms_init(PIT_CH1, 10);      /* PIT 定时器初始化，10ms 中断节拍（100Hz 基准） */
 
+
     while (true)
     {
         uint16 tick_1000_guard = 0U; /* 单次 while 循环内 1kHz 任务最大处理帧数防护 */
@@ -129,6 +130,9 @@ int main(void)
                 Pos_Est_Update_50HZ();
                 s_tick_div_fc_start_50hz = 0U;
                 FC_Loop_50Hz();
+            wifi_vofa_JustFloat(9u,ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,ICM42688.acc_x,ICM42688.acc_y,ICM42688.acc_z,g_euler.roll, g_euler.pitch, g_euler.yaw);
+
+
                 // wifi_vofa_JustFloat(8u,g_pmw3901_raw.deltaX,g_pmw3901_raw.deltaY,g_imudata_250hz.gyrox,g_imudata_250hz.gyroy,FlowGyroDecoupler_GetDecX(), FlowGyroDecoupler_GetDecY(),Pos_Est_vel_x, Pos_Est_vel_y);
             }
 

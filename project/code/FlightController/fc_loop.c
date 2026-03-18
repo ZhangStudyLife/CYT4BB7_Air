@@ -428,15 +428,15 @@ void FC_Loop_1000Hz(void)
         int32_t pitch_ctrl = (int32_t)fc_clampf(PID_Update(&pitch_gyro_pid, pitch_gyro_target, pitch_gyro_meas, dt), -limit, limit);
         int32_t yaw_ctrl = (int32_t)fc_clampf(PID_Update(&yaw_gyro_pid, yaw_gyro_target, yaw_gyro_meas, dt), -limit, limit);
         /* 角速度环调试切换到 Pitch：目标、原始陀螺、滤波后陀螺、控制输出和 PID 分项 */
-        // wifi_vofa_JustFloat(8u,
-        //                     pitch_gyro_target,
-        //                     pitch_gyro_raw,
-        //                     pitch_gyro_meas,
-        //                     pitch_ctrl,
-        //                     pitch_gyro_pid.p_term,
-        //                     pitch_gyro_pid.i_term,
-        //                     pitch_gyro_pid.d_term,
-        //                     pitch_gyro_pid.error);
+        // wifi_justfloat_JustFloat(pitch_gyro_target,
+        //                         pitch_gyro_raw,
+        //                         pitch_gyro_meas,
+        //                         pitch_ctrl,
+        //                         pitch_gyro_pid.p_term,
+        //                         pitch_gyro_pid.i_term,
+        //                         pitch_gyro_pid.d_term,
+        //                         pitch_gyro_pid.error,
+        //                         8u);
         (void)yaw_ctrl;
         /* 电机混控：总油门 = 基础油门 + 高度控制输出 */
         {

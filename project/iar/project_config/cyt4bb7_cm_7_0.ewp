@@ -3496,12 +3496,30 @@
                 </configuration>
             </group>
             <group>
-                <name>wifi_vofa</name>
+                <name>wifi</name>
                 <file>
-                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi_vofa\wifi_vofa.c</name>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_cmd\wifi_cmd.c</name>
                 </file>
                 <file>
-                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi_vofa\wifi_vofa.h</name>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_cmd\wifi_cmd.h</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_params\wifi_params.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_params\wifi_params.h</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_cal_imu\wifi_cal_imu.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_cal_imu\wifi_cal_imu.h</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_justfloat\wifi_justfloat.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_justfloat\wifi_justfloat.h</name>
                 </file>
                 <configuration>
                     <name>Debug</name>
@@ -3660,7 +3678,7 @@
                                 <state>$PROJ_DIR$\..\..\..\libraries\zf_components</state>
                                 <state>$PROJ_DIR$\..\..\user</state>
                                 <state>$PROJ_DIR$\..\..\code</state>
-                                <state>$PROJ_DIR$\..\..\code\Protocols\wifi_vofa</state>
+                                <state>$PROJ_DIR$\..\..\code\Protocols\wifi</state>
                             </option>
                             <option>
                                 <name>CCStdIncCheck</name>
@@ -3786,12 +3804,6 @@
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\code\filter.h</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\code\Protocols\wifi_params\wifi_params.c</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\code\Protocols\wifi_params\wifi_params.h</name>
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\code\本文件夹作用.txt</name>

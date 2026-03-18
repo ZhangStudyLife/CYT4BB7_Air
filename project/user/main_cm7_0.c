@@ -4,7 +4,10 @@
  ********************************************************************************************************************/
 
 #include "zf_common_headfile.h"
-#include "Protocols/wifi_params/wifi_params.h"
+#include "Protocols/wifi/wifi_cmd/wifi_cmd.h"
+#include "Protocols/wifi/wifi_params/wifi_params.h"
+#include "Protocols/wifi/wifi_cal_imu/wifi_cal_imu.h"
+#include "Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
 
 /* 1kHz 基准节拍计数器，单位 us tick */
 volatile uint32 tick_1000us_cnt = 0U;
@@ -23,7 +26,6 @@ static uint8 s_tick_div_fc_start_10hz = 0U;
 static uint8 s_tick_div_fc_start_50hz = 0U;
 static uint8 s_tick_div_fc_start_1hz = 0U;
 
-
 int main(void)
 {
     wifi_params_diag_t wifi_params_diag = {0}; /* WiFi 参数调节诊断信息，用于 VOFA 回传最近一次文本命令处理状态 */
@@ -34,7 +36,7 @@ int main(void)
 
     Beep_Init();
     pit_ms_init(PIT_CH2, 10);
-    wifi_vofa_Init();
+    wifi_cmd_Init();
     TOF_Init();
     PMW3901_Init();
     IMU_Init_All();
@@ -45,10 +47,12 @@ int main(void)
     (void)FC_Params_LoadFromFlash(); /* 优先加载掉电保存参数，无有效数据时保持默认值 */
     Pos_Est_Init();                  /* 确保参数装载后重新清理位置估计状态 */
     FC_Loop_Init();
+    wifi_justfloat_Init();
     wifi_params_Init();
+    wifi_cal_imu_Init();
     Motor_Init();
     FC_START_CRSF_Init();
-    wifi_vofa_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
+    wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
     pit_us_init(PIT_CH0, 1000);
     pit_ms_init(PIT_CH1, 10);
 
@@ -63,7 +67,6 @@ int main(void)
 
             IMU_Update_1000HZ();
             Pos_Est_Update_1000HZ();
-            wifi_vofa_JustFloat(6u, g_euler.roll, g_euler.pitch, g_euler.yaw, ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z);
             s_tick_div_fc_loop_500hz++;
             if (s_tick_div_fc_loop_500hz >= 2U)
             {
@@ -91,7 +94,7 @@ int main(void)
             crsf_send_25hz();
             CRSF_Update_100HZ();
             FC_Loop_100Hz();
-            wifi_vofa_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
+            wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
 
             s_tick_div_fc_start_50hz++;
             if (s_tick_div_fc_start_50hz >= 2U)
@@ -101,16 +104,14 @@ int main(void)
                 FC_Loop_50Hz();
 
                 wifi_params_GetDiag(&wifi_params_diag);
-
             }
+
             s_tick_div_fc_start_1hz++;
-            if (s_tick_div_fc_start_1hz >= 2)
+            if (s_tick_div_fc_start_1hz >= 2U)
             {
                 s_tick_div_fc_start_1hz = 0U;
                 /* 1Hz 定时保存参数到 Flash，确保掉电保存 */
-
             }
-
 
             s_tick_div_fc_start_10hz++;
             if (s_tick_div_fc_start_10hz >= 10U)
@@ -128,7 +129,6 @@ int main(void)
         }
 
         /* ===== 后台任务 ===== */
-        IMUCalib_CommandPoll();
-        wifi_params_Poll(); /* 非待机态仅清空并拒绝命令，避免落地后误执行历史调参包 */
+        wifi_cmd_Poll();
     }
 }

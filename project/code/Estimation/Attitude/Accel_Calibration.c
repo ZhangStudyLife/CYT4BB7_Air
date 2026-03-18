@@ -13,6 +13,7 @@
 #include <float.h>
 #include <ctype.h>
 #include <math.h>
+#include <stdarg.h>
 #include <string.h>
 
 #define DEG_TO_RAD                               (0.017453292519943295f)
@@ -150,6 +151,8 @@ typedef struct
 
 AccelCalibration_t g_accel_calibration = {0};
 static IMUCalibRuntime_t s_imu_calib = {0};
+/* IMU 校准文本输出回调，优先用于 WiFi 文本提示 */
+static IMUCalibTextSink_t s_imu_calib_text_sink = NULL;
 
 /* ========================= Ellipsoid calibration runtime ========================= */
 #define ELLIP_MAX_ORIENT         (20U)
@@ -215,6 +218,43 @@ static float vec3_norm(float x, float y, float z)
 static float fabsf_local(float v)
 {
     return (v >= 0.0f) ? v : -v;
+}
+
+/*
+ * 函数功能: 输出 IMU 校准过程文本
+ * 输入参数:
+ *   format - printf 风格格式串
+ *   ...    - 格式化参数
+ * 返回值: 无
+ */
+static void imu_calib_emit_text(const char *format, ...)
+{
+    char text[192];
+    va_list args;
+    int len;
+
+    if (NULL == format)
+    {
+        return;
+    }
+
+    va_start(args, format);
+    len = vsnprintf(text, sizeof(text), format, args);
+    va_end(args);
+    if (len <= 0)
+    {
+        return;
+    }
+
+    text[sizeof(text) - 1U] = '\0';
+    if (NULL != s_imu_calib_text_sink)
+    {
+        s_imu_calib_text_sink(text);
+    }
+    else
+    {
+        printf("%s\r\n", text);
+    }
 }
 
 static void set_identity_matrix(float matrix[3][3])
@@ -1294,6 +1334,7 @@ static void imu_calib_start_gyro(void)
     ICM42688_SetGyroBiasDps(0.0f, 0.0f, 0.0f, 0U);
     s_imu_calib.busy = 1U;
     s_imu_calib.mode = IMU_CALIB_MODE_GYRO;
+    imu_calib_emit_text("OK imu gyro 开始 请保持飞机静止");
 }
 
 static void imu_calib_prepare_acc6_state(void)
@@ -1315,27 +1356,6 @@ static void imu_calib_prepare_acc6_state(void)
     memset(s_imu_calib.acc6_face_dom_m2, 0, sizeof(s_imu_calib.acc6_face_dom_m2));
 }
 
-static void imu_calib_start_acc6(void)
-{
-    imu_calib_reset_runtime();
-    s_imu_calib.busy = 1U;
-    s_imu_calib.mode = IMU_CALIB_MODE_ACC6;
-    imu_calib_prepare_acc6_state();
-}
-
-static void imu_calib_start_all(void)
-{
-    imu_calib_reset_runtime();
-    ICM42688_GetGyroBiasDps(&s_imu_calib.gyro_prev_bias_dps[0],
-                            &s_imu_calib.gyro_prev_bias_dps[1],
-                            &s_imu_calib.gyro_prev_bias_dps[2],
-                            &s_imu_calib.gyro_prev_enabled);
-    ICM42688_SetGyroBiasDps(0.0f, 0.0f, 0.0f, 0U);
-    s_imu_calib.busy = 1U;
-    s_imu_calib.mode = IMU_CALIB_MODE_ALL;
-    s_imu_calib.all_stage = IMU_CALIB_ALL_STAGE_GYRO;
-}
-
 /* ========================= Ellipsoid calibration ========================= */
 
 static void imu_calib_start_ellip(void)
@@ -1344,6 +1364,8 @@ static void imu_calib_start_ellip(void)
     memset(&s_ellip, 0, sizeof(s_ellip));
     s_imu_calib.busy = 1U;
     s_imu_calib.mode = IMU_CALIB_MODE_ELLIP;
+    imu_calib_emit_text("OK imu accel 开始 请缓慢切换多个静止姿态");
+    imu_calib_emit_text("OK imu accel 提示 每次放稳后保持静止 系统会自动采集姿态点");
 }
 
 static int32_t imu_calib_update_ellip_step(void)
@@ -1358,7 +1380,8 @@ static int32_t imu_calib_update_ellip_step(void)
     s_ellip.total_samples++;
     if (s_ellip.total_samples >= ELLIP_TIMEOUT_SAMPLES)
     {
-        printf("cal,ellip,timeout\r\n");
+        imu_calib_emit_text("ERR imu accel 失败 原因=超时 total_samples=%lu",
+                            (unsigned long)s_ellip.total_samples);
         return -1;
     }
 
@@ -1421,7 +1444,9 @@ static int32_t imu_calib_update_ellip_step(void)
             s_ellip.orient_samples = 0U;
             memset(s_ellip.orient_sum, 0, sizeof(s_ellip.orient_sum));
             memset(s_ellip.orient_m2, 0, sizeof(s_ellip.orient_m2));
-            printf("cal,ellip,collecting,%u\r\n", (unsigned int)s_ellip.orient_count);
+            imu_calib_emit_text("OK imu accel 开始采集 pose=%u target=%u",
+                                (unsigned int)(s_ellip.orient_count + 1U),
+                                (unsigned int)ELLIP_ORIENT_SAMPLES);
         }
         return 0;
     }
@@ -1460,7 +1485,9 @@ static int32_t imu_calib_update_ellip_step(void)
 
         if (std_max > ELLIP_ORIENT_STD_MAX_G)
         {
-            printf("cal,ellip,orient_noisy,%u,%f\r\n", (unsigned int)s_ellip.orient_count, (double)std_max);
+            imu_calib_emit_text("ERR imu accel 姿态点噪声过大 pose=%u std_g=%f",
+                                (unsigned int)(s_ellip.orient_count + 1U),
+                                (double)std_max);
             /* Reset and retry this orientation */
             s_ellip.collecting = 0U;
             s_ellip.orient_samples = 0U;
@@ -1492,7 +1519,8 @@ static int32_t imu_calib_update_ellip_step(void)
 
                 if (cos_angle > cos_min_angle)
                 {
-                    printf("cal,ellip,orient_too_close,%u\r\n", (unsigned int)oi);
+                    imu_calib_emit_text("ERR imu accel 姿态点过近 ref=%u",
+                                        (unsigned int)(oi + 1U));
                     s_ellip.collecting = 0U;
                     s_ellip.orient_samples = 0U;
                     s_ellip.stable_samples = 0U;
@@ -1508,11 +1536,11 @@ static int32_t imu_calib_update_ellip_step(void)
         s_ellip.orient_mean[s_ellip.orient_count][2] = s_ellip.orient_sum[2];
         s_ellip.orient_count++;
 
-        printf("cal,ellip,orient_done,%u,%f,%f,%f\r\n",
-               (unsigned int)s_ellip.orient_count,
-               (double)s_ellip.orient_sum[0],
-               (double)s_ellip.orient_sum[1],
-               (double)s_ellip.orient_sum[2]);
+        imu_calib_emit_text("OK imu accel 姿态点完成 pose=%u mean_g=%f,%f,%f",
+                            (unsigned int)s_ellip.orient_count,
+                            (double)s_ellip.orient_sum[0],
+                            (double)s_ellip.orient_sum[1],
+                            (double)s_ellip.orient_sum[2]);
 
         s_ellip.collecting = 0U;
         s_ellip.orient_samples = 0U;
@@ -1525,16 +1553,19 @@ static int32_t imu_calib_update_ellip_step(void)
             float bias[3];
             float M[3][3];
 
-            printf("cal,ellip,solving,%u\r\n", (unsigned int)s_ellip.orient_count);
+            imu_calib_emit_text("OK imu accel 开始求解 pose_count=%u",
+                                (unsigned int)s_ellip.orient_count);
 
             if (ellip_fit_solve(s_ellip.orient_mean, s_ellip.orient_count, bias, M) != 0)
             {
                 if (s_ellip.orient_count >= ELLIP_MAX_ORIENT)
                 {
-                    printf("cal,ellip,solve_fail\r\n");
+                    imu_calib_emit_text("ERR imu accel 失败 原因=求解失败 pose_count=%u",
+                                        (unsigned int)s_ellip.orient_count);
                     return -1;
                 }
-                printf("cal,ellip,solve_fail_retry\r\n");
+                imu_calib_emit_text("OK imu accel 求解未通过 请继续增加姿态点 current=%u",
+                                    (unsigned int)s_ellip.orient_count);
                 s_ellip.wait_move = 1U;
                 return 0;
             }
@@ -1547,7 +1578,10 @@ static int32_t imu_calib_update_ellip_step(void)
 
                 if (bias_norm > ELLIP_POST_BIAS_NORM_MAX_G)
                 {
-                    printf("cal,ellip,post_fail,bias_norm,%f\r\n", (double)bias_norm);
+                    imu_calib_emit_text("%s imu accel %s value=%f",
+                                        (s_ellip.orient_count >= ELLIP_MAX_ORIENT) ? "ERR" : "OK",
+                                        (s_ellip.orient_count >= ELLIP_MAX_ORIENT) ? "失败 原因=偏置过大" : "求解未通过 原因=偏置过大",
+                                        (double)bias_norm);
                     if (s_ellip.orient_count >= ELLIP_MAX_ORIENT)
                     {
                         return -1;
@@ -1562,7 +1596,11 @@ static int32_t imu_calib_update_ellip_step(void)
                     {
                         if ((M[di][di] < ELLIP_POST_DIAG_MIN) || (M[di][di] > ELLIP_POST_DIAG_MAX))
                         {
-                            printf("cal,ellip,post_fail,diag,%u,%f\r\n", (unsigned int)di, (double)M[di][di]);
+                            imu_calib_emit_text("%s imu accel %s axis=%u value=%f",
+                                                (s_ellip.orient_count >= ELLIP_MAX_ORIENT) ? "ERR" : "OK",
+                                                (s_ellip.orient_count >= ELLIP_MAX_ORIENT) ? "失败 原因=矩阵对角异常" : "求解未通过 原因=矩阵对角异常",
+                                                (unsigned int)di,
+                                                (double)M[di][di]);
                             if (s_ellip.orient_count >= ELLIP_MAX_ORIENT)
                             {
                                 return -1;
@@ -1595,7 +1633,10 @@ static int32_t imu_calib_update_ellip_step(void)
 
                 if (max_norm_err > ELLIP_POST_NORM_ERR_MAX_G)
                 {
-                    printf("cal,ellip,post_fail,norm_err,%f\r\n", (double)max_norm_err);
+                    imu_calib_emit_text("%s imu accel %s value=%f",
+                                        (s_ellip.orient_count >= ELLIP_MAX_ORIENT) ? "ERR" : "OK",
+                                        (s_ellip.orient_count >= ELLIP_MAX_ORIENT) ? "失败 原因=范数误差过大" : "求解未通过 原因=范数误差过大",
+                                        (double)max_norm_err);
                     if (s_ellip.orient_count >= ELLIP_MAX_ORIENT)
                     {
                         return -1;
@@ -1618,7 +1659,7 @@ static int32_t imu_calib_update_ellip_step(void)
 
                 if (!AccelCalibration_LoadParams(&params))
                 {
-                    printf("cal,ellip,apply_fail\r\n");
+                    imu_calib_emit_text("ERR imu accel 失败 原因=应用失败");
                     return -1;
                 }
             }
@@ -1626,13 +1667,15 @@ static int32_t imu_calib_update_ellip_step(void)
             /* Save to flash */
             {
                 uint8_t save_ok = IMUCalib_SaveCurrentToFlash();
-                printf("cal,ellip,ok,%u,bias,%f,%f,%f\r\n",
-                       (unsigned int)save_ok,
-                       (double)bias[0], (double)bias[1], (double)bias[2]);
-                printf("cal,ellip,matrix,%f,%f,%f,%f,%f,%f,%f,%f,%f\r\n",
-                       (double)M[0][0], (double)M[0][1], (double)M[0][2],
-                       (double)M[1][0], (double)M[1][1], (double)M[1][2],
-                       (double)M[2][0], (double)M[2][1], (double)M[2][2]);
+                imu_calib_emit_text("OK imu accel 完成 save=%u bias_g=%f,%f,%f",
+                                    (unsigned int)save_ok,
+                                    (double)bias[0], (double)bias[1], (double)bias[2]);
+                imu_calib_emit_text("OK imu accel 矩阵 r0=%f,%f,%f",
+                                    (double)M[0][0], (double)M[0][1], (double)M[0][2]);
+                imu_calib_emit_text("OK imu accel 矩阵 r1=%f,%f,%f",
+                                    (double)M[1][0], (double)M[1][1], (double)M[1][2]);
+                imu_calib_emit_text("OK imu accel 矩阵 r2=%f,%f,%f",
+                                    (double)M[2][0], (double)M[2][1], (double)M[2][2]);
             }
             return 1;
         }
@@ -1640,7 +1683,8 @@ static int32_t imu_calib_update_ellip_step(void)
         /* Not enough orientations yet, continue */
         if (s_ellip.orient_count >= ELLIP_MAX_ORIENT)
         {
-            printf("cal,ellip,max_orient_reached\r\n");
+            imu_calib_emit_text("ERR imu accel 失败 原因=姿态点已达上限 count=%u",
+                                (unsigned int)s_ellip.orient_count);
             return -1;
         }
     }
@@ -1785,10 +1829,10 @@ static int32_t imu_calib_update_gyro_step(void)
                 s_imu_calib.gyro_stable_progress_bucket = stable_bucket;
                 if ((stable_bucket >= 1U) && (stable_bucket <= 3U))
                 {
-                    printf("cal,gyro,stabilizing,%u,%lu,%u\r\n",
-                           (unsigned int)(stable_bucket * 25U),
-                           (unsigned long)s_imu_calib.gyro_static_stable_samples,
-                           (unsigned int)IMU_CALIB_GYRO_PRE_STABLE_SAMPLES);
+                    imu_calib_emit_text("OK imu gyro 预稳定 progress=%u samples=%lu/%u",
+                                        (unsigned int)(stable_bucket * 25U),
+                                        (unsigned long)s_imu_calib.gyro_static_stable_samples,
+                                        (unsigned int)IMU_CALIB_GYRO_PRE_STABLE_SAMPLES);
                 }
             }
             return 0;
@@ -1797,7 +1841,8 @@ static int32_t imu_calib_update_gyro_step(void)
         if (s_imu_calib.gyro_stable_progress_bucket < 4U)
         {
             s_imu_calib.gyro_stable_progress_bucket = 4U;
-            printf("cal,gyro,collect,start\r\n");
+            imu_calib_emit_text("OK imu gyro 进入采集阶段 target=%u",
+                                (unsigned int)IMU_CALIB_GYRO_TARGET_VALID_SAMPLES);
         }
     }
 
@@ -1818,10 +1863,10 @@ static int32_t imu_calib_update_gyro_step(void)
                 s_imu_calib.gyro_collect_progress_bucket = collect_bucket;
                 if ((collect_bucket >= 1U) && (collect_bucket <= 3U))
                 {
-                    printf("cal,gyro,progress,%u,%lu,%u\r\n",
-                           (unsigned int)(collect_bucket * 25U),
-                           (unsigned long)s_imu_calib.gyro_valid_samples,
-                           (unsigned int)IMU_CALIB_GYRO_TARGET_VALID_SAMPLES);
+                    imu_calib_emit_text("OK imu gyro 采集 progress=%u valid=%lu/%u",
+                                        (unsigned int)(collect_bucket * 25U),
+                                        (unsigned long)s_imu_calib.gyro_valid_samples,
+                                        (unsigned int)IMU_CALIB_GYRO_TARGET_VALID_SAMPLES);
                 }
             }
         }
@@ -1849,19 +1894,23 @@ static int32_t imu_calib_update_gyro_step(void)
             (fabsf_local(by) > IMU_CALIB_GYRO_BIAS_MAX_DPS) ||
             (fabsf_local(bz) > IMU_CALIB_GYRO_BIAS_MAX_DPS))
         {
-            printf("cal,gyro,quality_fail,%f,%f,%f,%f,%f,%f\r\n",
-                   bx, by, bz, std_x, std_y, std_z);
+            imu_calib_emit_text("ERR imu gyro 失败 原因=质量不足 bias_dps=%f,%f,%f std_dps=%f,%f,%f",
+                                bx, by, bz, std_x, std_y, std_z);
             return -1;
         }
 
         ICM42688_SetGyroBiasDps(bx, by, bz, 1U);
-        printf("cal,gyro,ok,%lu,%f,%f,%f,%f,%f,%f\r\n",
-               (unsigned long)s_imu_calib.gyro_valid_samples, bx, by, bz, std_x, std_y, std_z);
+        imu_calib_emit_text("OK imu gyro 完成 samples=%lu bias_dps=%f,%f,%f std_dps=%f,%f,%f",
+                            (unsigned long)s_imu_calib.gyro_valid_samples,
+                            bx, by, bz, std_x, std_y, std_z);
         return 1;
     }
 
     if (s_imu_calib.gyro_total_samples >= IMU_CALIB_GYRO_TIMEOUT_SAMPLES)
     {
+        imu_calib_emit_text("ERR imu gyro 失败 原因=超时 valid=%lu total=%lu",
+                            (unsigned long)s_imu_calib.gyro_valid_samples,
+                            (unsigned long)s_imu_calib.gyro_total_samples);
         return -1;
     }
 
@@ -2335,34 +2384,6 @@ static void imu_calib_process_command(char *line)
         return;
     }
 
-    if (strcmp(line, "cal acc6 start") == 0)
-    {
-        if (s_imu_calib.busy != 0U)
-        {
-            printf("cal,busy\r\n");
-            return;
-        }
-        irq_state = interrupt_global_disable();
-        imu_calib_start_acc6();
-        interrupt_global_enable(irq_state);
-        printf("cal,acc6,start\r\n");
-        return;
-    }
-
-    if (strcmp(line, "cal all start") == 0)
-    {
-        if (s_imu_calib.busy != 0U)
-        {
-            printf("cal,busy\r\n");
-            return;
-        }
-        irq_state = interrupt_global_disable();
-        imu_calib_start_all();
-        interrupt_global_enable(irq_state);
-        printf("cal,all,start\r\n");
-        return;
-    }
-
     if (strcmp(line, "cal ellip start") == 0)
     {
         if (s_imu_calib.busy != 0U)
@@ -2384,7 +2405,7 @@ static void imu_calib_print_boot_reminder(void)
 {
     printf("cal,remind,cmd,cal status\r\n");
     printf("cal,remind,cmd,cal dump\r\n");
-    printf("cal,remind,cmd,cal all start\r\n");
+    printf("cal,remind,cmd,cal gyro start\r\n");
     printf("cal,remind,cmd,cal ellip start\r\n");
     printf("cal,remind,cmd,cal load\r\n");
     printf("cal,remind,cmd,cal save\r\n");
@@ -3125,7 +3146,140 @@ uint8_t IMUCalib_IsBusy(void)
     return s_imu_calib.busy;
 }
 
+/*
+ * 函数功能: 设置 IMU 校准文本输出回调
+ * 输入参数:
+ *   sink - 文本输出回调，传入 NULL 表示关闭外部回调
+ * 返回值: 无
+ */
+void IMUCalib_SetTextSink(IMUCalibTextSink_t sink)
+{
+    s_imu_calib_text_sink = sink;
+}
+
+/*
+ * 函数功能: 读取 Flash 中保存的 IMU 校准参数
+ * 输入参数:
+ *   info - 输出的可读化校准信息结构体指针
+ * 返回值:
+ *   1 - 调用成功，info->valid 指示是否存在有效数据
+ *   0 - 输入参数无效
+ */
+uint8_t IMUCalib_ReadFlashInfo(IMUCalibFlashInfo_t *info)
+{
+    IMUCalibBlob_t blob;
+    const uint32_t words = (uint32_t)((sizeof(IMUCalibBlob_t) + sizeof(uint32_t) - 1U) / sizeof(uint32_t));
+
+    if (NULL == info)
+    {
+        return 0U;
+    }
+
+    memset(info, 0, sizeof(*info));
+    memset(&blob, 0, sizeof(blob));
+    flash_read_page(0U, IMU_CALIB_FLASH_PAGE, (uint32_t *)&blob, words);
+
+    if (0U == imu_calib_blob_is_valid(&blob))
+    {
+        info->valid = 0U;
+        info->version = (uint16_t)blob.version;
+        return 1U;
+    }
+
+    info->valid = 1U;
+    info->version = (uint16_t)blob.version;
+    if (blob.version == IMU_CALIB_FLASH_VERSION_V1)
+    {
+        const IMUCalibBlobV1_t *v1 = (const IMUCalibBlobV1_t *)&blob;
+
+        memcpy(info->gyro_bias_dps, v1->gyro_bias_dps, sizeof(info->gyro_bias_dps));
+        memcpy(info->accel_bias_g, v1->accel_bias_g, sizeof(info->accel_bias_g));
+        memset(info->accel_corr_matrix, 0, sizeof(info->accel_corr_matrix));
+        info->accel_corr_matrix[0][0] = v1->accel_scale[0];
+        info->accel_corr_matrix[1][1] = v1->accel_scale[1];
+        info->accel_corr_matrix[2][2] = v1->accel_scale[2];
+        memcpy(info->imu_to_body, v1->imu_to_body, sizeof(info->imu_to_body));
+        info->use_full_matrix = 0U;
+        return 1U;
+    }
+
+    memcpy(info->gyro_bias_dps, blob.gyro_bias_dps, sizeof(info->gyro_bias_dps));
+    memcpy(info->accel_bias_g, blob.accel_bias_g, sizeof(info->accel_bias_g));
+    memcpy(info->accel_corr_matrix, blob.accel_corr_matrix, sizeof(info->accel_corr_matrix));
+    memcpy(info->imu_to_body, blob.imu_to_body, sizeof(info->imu_to_body));
+    info->use_full_matrix = (fabsf_local(blob.accel_corr_matrix[0][1]) +
+                             fabsf_local(blob.accel_corr_matrix[0][2]) +
+                             fabsf_local(blob.accel_corr_matrix[1][0]) +
+                             fabsf_local(blob.accel_corr_matrix[1][2]) +
+                             fabsf_local(blob.accel_corr_matrix[2][0]) +
+                             fabsf_local(blob.accel_corr_matrix[2][1]) > 1.0e-6f) ? 1U : 0U;
+    return 1U;
+}
+
 /* �����º�����IMUУ׼״̬����1kHz ��ѭ���е��� */
+uint8_t IMUCalib_StartGyro(void)
+{
+    uint32_t irq_state;
+
+    if (0U != s_imu_calib.busy)
+    {
+        return 0U;
+    }
+
+    irq_state = interrupt_global_disable();
+    if (0U == s_imu_calib.busy)
+    {
+        imu_calib_start_gyro();
+        interrupt_global_enable(irq_state);
+        return 1U;
+    }
+
+    interrupt_global_enable(irq_state);
+    return 0U;
+}
+
+/*
+ * 函数功能: 启动加速度椭球校准流程
+ * 输入参数: 无
+ * 返回值:
+ *   1 - 启动成功
+ *   0 - 当前忙，启动失败
+ */
+uint8_t IMUCalib_StartAccel(void)
+{
+    uint32_t irq_state;
+
+    if (0U != s_imu_calib.busy)
+    {
+        return 0U;
+    }
+
+    irq_state = interrupt_global_disable();
+    if (0U == s_imu_calib.busy)
+    {
+        imu_calib_start_ellip();
+        interrupt_global_enable(irq_state);
+        return 1U;
+    }
+
+    interrupt_global_enable(irq_state);
+    return 0U;
+}
+
+void IMUCalib_GetStatus(IMUCalibStatus_t *status)
+{
+    if (NULL == status)
+    {
+        return;
+    }
+
+    status->busy = s_imu_calib.busy;
+    status->mode = s_imu_calib.mode;
+    status->pose_count = s_ellip.orient_count;
+    status->reserved = 0U;
+    status->progress_percent = imu_calib_progress_percent();
+}
+
 void IMUCalib_Update_1000HZ(void)
 {
     int32_t ret;
@@ -3145,9 +3299,6 @@ void IMUCalib_Update_1000HZ(void)
         }
         else if (ret < 0)
         {
-            printf("cal,gyro,fail,%lu,%lu\r\n",
-                   (unsigned long)s_imu_calib.gyro_valid_samples,
-                   (unsigned long)s_imu_calib.gyro_total_samples);
             ICM42688_SetGyroBiasDps(s_imu_calib.gyro_prev_bias_dps[0],
                                     s_imu_calib.gyro_prev_bias_dps[1],
                                     s_imu_calib.gyro_prev_bias_dps[2],
@@ -3234,9 +3385,6 @@ void IMUCalib_Update_1000HZ(void)
         }
         else if (ret < 0)
         {
-            printf("cal,ellip,fail,%lu,%u\r\n",
-                   (unsigned long)s_ellip.total_samples,
-                   (unsigned int)s_ellip.orient_count);
             s_imu_calib.busy = 0U;
             s_imu_calib.mode = IMU_CALIB_MODE_IDLE;
         }

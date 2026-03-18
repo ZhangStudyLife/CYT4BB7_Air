@@ -28,7 +28,7 @@ float height_vel_out = 0.0f;
 /* 高度位置环输出，单位米每秒 */
 float height_pos_out = 0.0f;
 /* 目标高度，单位米 */
-float target_height_m = 1.0f;
+float target_height_m = 0.0f;
 extern volatile uint32 tick_1000us_cnt;
 
 /* 当前高度速度估计，仅供本文件高度速度环使用，单位 m/s */

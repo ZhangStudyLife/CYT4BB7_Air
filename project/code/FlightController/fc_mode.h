@@ -40,7 +40,7 @@ static inline float FC_Mode_Clamp(float value, float min_value, float max_value)
  */
 static inline float FC_Mode_Get_Roll_Mech_Trim_Deg(void)
 {
-    return -2.6f;
+    return 1.5f;
 }
 
 /*
@@ -52,7 +52,7 @@ static inline float FC_Mode_Get_Roll_Mech_Trim_Deg(void)
  */
 static inline float FC_Mode_Get_Pitch_Mech_Trim_Deg(void)
 {
-    return 4.2f;
+    return -7.0f;
 }
 
 /*

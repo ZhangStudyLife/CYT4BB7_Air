@@ -125,7 +125,7 @@ void Pos_Est_Update_50HZ(void)
     float vel_x_pred;
     float vel_y_pred;
     const float dt = 0.02f;
-    const float k_flow = 0.28f;
+    const float k_flow = 0.6f;
 
     PMW3901_Update_50HZ();
     FlowGyroDecoupler_Update50Hz(tick_1000us_cnt, g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY);

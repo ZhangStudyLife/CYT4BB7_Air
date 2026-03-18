@@ -53,8 +53,8 @@ static inline float FC_Mode_Get_Roll_Mech_Trim_Deg(void)
  */
 static inline float FC_Mode_Get_Pitch_Mech_Trim_Deg(void)
 {
-    // return -7.0f;
-    return 0.0f;
+    return -7.0f;
+    // return 0.0f;
 }
 
 /*

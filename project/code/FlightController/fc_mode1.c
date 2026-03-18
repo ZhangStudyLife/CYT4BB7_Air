@@ -362,8 +362,6 @@ void FC_Mode1_50Hz(float dt)
     float track_ff_x = 0.0f;
     float track_ff_y = 0.0f;
     float angle_limit_deg;
-    float state_timer_ms = 0.0f;
-    float mode1_feedback_used_x = 0.0f;
     float mode1_brake_raw_weight_x = 0.0f;
     uint8_t stick_active_now;
 
@@ -428,9 +426,6 @@ void FC_Mode1_50Hz(float dt)
         velx_feedback = -Pos_Est_vel_x_kf;
         vely_feedback = -Pos_Est_vel_y_kf;
         angle_limit_deg = s_mode1_track_angle_limit_deg;
-        mode1_feedback_used_x = velx_feedback;
-        state_timer_ms = s_mode1_neutral_timer_s * 1000.0f;
-
         FC_Mode1_ConfigPid(&s_mode1_velx_pid,
                            g_fc_params.vel_x_kp, g_fc_params.vel_x_ki, g_fc_params.vel_x_kd,
                            g_fc_params.vel_x_kff, g_fc_params.vel_x_i_limit,
@@ -453,9 +448,6 @@ void FC_Mode1_50Hz(float dt)
                                                     s_mode1_brake_deadzone_cmps,
                                                     0);
         angle_limit_deg = s_mode1_brake_angle_limit_deg;
-        mode1_feedback_used_x = velx_feedback;
-        state_timer_ms = s_mode1_brake_settle_timer_s * 1000.0f;
-
         FC_Mode1_ConfigPid(&s_mode1_velx_pid,
                            g_fc_params.mode1_brake_kp, 0.0f, 0.0f,
                            0.0f, 0.0f, angle_limit_deg, 1U, s_mode1_brake_aw_gain);
@@ -470,9 +462,6 @@ void FC_Mode1_50Hz(float dt)
         vely_feedback = FC_Mode1_ApplyVelDeadzone(-Pos_Est_vel_y_kf,
                                                   s_mode1_zero_damp_deadzone_cmps);
         angle_limit_deg = s_mode1_track_angle_limit_deg;
-        mode1_feedback_used_x = velx_feedback;
-        state_timer_ms = 0.0f;
-
         FC_Mode1_ConfigPid(&s_mode1_velx_pid,
                            g_fc_params.vel_x_kp, g_fc_params.vel_x_ki, g_fc_params.vel_x_kd,
                            g_fc_params.vel_x_kff, g_fc_params.vel_x_i_limit,

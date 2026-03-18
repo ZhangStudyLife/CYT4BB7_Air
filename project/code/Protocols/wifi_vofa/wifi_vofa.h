@@ -30,7 +30,7 @@
 
 #ifndef UDP_LOCAL_PORT
 /* 本机UDP本地端口 */
-#define UDP_LOCAL_PORT      "1346"
+#define UDP_LOCAL_PORT      "6666"
 #endif
 
 #define WIFI_VOFA_CONNECT_WINDOW_MS   (10000U)
@@ -44,6 +44,7 @@ typedef struct
     uint32 avg_us;
     uint32 ok_count;
     uint32 fail_count;
+    uint32 skip_count;
 } wifi_vofa_tx_stats_t;
 
 #define WIFI_VOFA_CAST_1(a1) (double)(a1)
@@ -76,6 +77,12 @@ void wifi_vofa_Init(void);
 
 /* 连接状态查询：1-已连接可发�?0-未连�?*/
 uint8 wifi_vofa_IsReady(void);
+/* 璁剧疆褰撳墠鏄惁澶勪簬寰呮満涓旀湭瑙ｉ攣鐘舵€侊紝鐢ㄤ簬鎺у埗寰呮満鎬侀仴娴嬮棬鎺?*/
+void wifi_vofa_SetStandbyContext(uint8 is_standby);
+/* 璁剧疆寰呮満鎬侀仴娴嬪彂閫佺敤鎴峰紑鍏筹細1-鍏佽鍙戦€侊紝0-鍋滄鍙戦€?*/
+void wifi_vofa_SetStandbyUserEnable(uint8 enable);
+/* 璇诲彇寰呮満鎬侀仴娴嬪彂閫佺敤鎴峰紑鍏崇姸鎬?*/
+uint8 wifi_vofa_GetStandbyUserEnable(void);
 
 /* JustFloat发送：首参数为通道数，后续参数按double传入（内部转float�?*/
 uint8 wifi_vofa_JustFloat_Impl(uint8 data_num, ...);

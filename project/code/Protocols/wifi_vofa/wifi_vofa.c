@@ -15,6 +15,8 @@
 
 static uint8 s_wifi_vofa_ready = 0U;
 static uint8 s_wifi_vofa_timer_inited = 0U;
+static uint8 s_wifi_vofa_standby_context = 0U;
+static uint8 s_wifi_vofa_standby_user_enable = 1U;
 
 typedef struct
 {
@@ -24,6 +26,7 @@ typedef struct
     uint64 sum_us;
     uint32 ok_count;
     uint32 fail_count;
+    uint32 skip_count;
 } wifi_vofa_tx_profile_t;
 
 static wifi_vofa_tx_profile_t s_wifi_vofa_tx_profile = {0};
@@ -33,6 +36,17 @@ static void wifi_vofa_tx_profile_reset(void)
 {
     memset(&s_wifi_vofa_tx_profile, 0, sizeof(s_wifi_vofa_tx_profile));
     s_wifi_vofa_tx_profile.min_us = 0xFFFFFFFFU;
+}
+
+/* 鍒ゆ柇褰撳墠杩欐 JustFloat 鏄惁搴斿綋鐪熸涓嬪彂 */
+static uint8 wifi_vofa_should_send(void)
+{
+    if ((0U != s_wifi_vofa_standby_context) && (0U == s_wifi_vofa_standby_user_enable))
+    {
+        return 0U;
+    }
+
+    return 1U;
 }
 
 static void wifi_vofa_tx_profile_update(uint32 cost_us, uint8 ok)
@@ -86,6 +100,8 @@ void wifi_vofa_Init(void)
     if (0U == ret)
     {
         s_wifi_vofa_ready = 1U;
+        s_wifi_vofa_standby_context = 0U;
+        s_wifi_vofa_standby_user_enable = 1U;
     }
     else
     {
@@ -99,6 +115,24 @@ void wifi_vofa_Init(void)
 uint8 wifi_vofa_IsReady(void)
 {
     return s_wifi_vofa_ready;
+}
+
+/* 璁剧疆褰撳墠鏄惁澶勪簬寰呮満涓旀湭瑙ｉ攣鐘舵€侊紝浣滀负寰呮満閬ユ祴闂ㄦ帶渚濇嵁 */
+void wifi_vofa_SetStandbyContext(uint8 is_standby)
+{
+    s_wifi_vofa_standby_context = (0U == is_standby) ? 0U : 1U;
+}
+
+/* 璁剧疆寰呮満鎬侀仴娴嬪彂閫佺敤鎴峰紑鍏筹紝鍙奖鍝嶅緟鏈烘€?*/
+void wifi_vofa_SetStandbyUserEnable(uint8 enable)
+{
+    s_wifi_vofa_standby_user_enable = (0U == enable) ? 0U : 1U;
+}
+
+/* 璇诲彇寰呮満鎬侀仴娴嬪彂閫佺敤鎴峰紑鍏崇姸鎬?*/
+uint8 wifi_vofa_GetStandbyUserEnable(void)
+{
+    return s_wifi_vofa_standby_user_enable;
 }
 
 /* 对外重置统计 */
@@ -122,6 +156,7 @@ void wifi_vofa_GetTxStats(wifi_vofa_tx_stats_t *stats)
     stats->max_us = s_wifi_vofa_tx_profile.max_us;
     stats->ok_count = s_wifi_vofa_tx_profile.ok_count;
     stats->fail_count = s_wifi_vofa_tx_profile.fail_count;
+    stats->skip_count = s_wifi_vofa_tx_profile.skip_count;
 
     avg_us = (s_wifi_vofa_tx_profile.ok_count > 0U)
                  ? (s_wifi_vofa_tx_profile.sum_us / (uint64)s_wifi_vofa_tx_profile.ok_count)
@@ -157,6 +192,12 @@ uint8 wifi_vofa_JustFloat_Impl(uint8 data_num, ...)
     }
 
     /* 可变参数读取：float会按double传递，需按double取出 */
+    if (0U == wifi_vofa_should_send())
+    {
+        s_wifi_vofa_tx_profile.skip_count++;
+        return 0U;
+    }
+
     va_start(ap, data_num);
     for (i = 0U; i < data_num; i++)
     {

@@ -43,6 +43,9 @@ static FC_START_CRSF_state_e s_prev_fc_state = FC_START_CRSF_STATE_INIT;
 static const float s_fc_height_vel_out_min = -1500.0f;
 /* 高度速度环输出最大限幅 */
 static const float s_fc_height_vel_out_max = 1500.0f;
+static const float s_fc_deg_to_rad = 0.017453293f;
+static const float s_fc_tilt_cos_min = 0.75f;
+static const float s_fc_tilt_comp_throttle_max = 10000.0f;
 
 /*
  * 函数名: fc_clampf
@@ -66,6 +69,32 @@ static float fc_clampf(float value, float min_value, float max_value)
     }
     return value;
 }
+
+
+/*
+ * 函数名: FC_Apply_Tilt_Throttle_Compensation
+ * 功能: 使用当前 Roll/Pitch 原始姿态角，对总油门做保守的垂向分力补偿
+ * 输入参数:
+ *   throttle_raw - 补偿前总油门，单位 mixer 输入
+ * 返回值:
+ *   补偿后的总油门，已限幅到[0, s_fc_tilt_comp_throttle_max]
+ */
+static float FC_Apply_Tilt_Throttle_Compensation(float throttle_raw)
+{
+    float cos_term;
+
+    if (throttle_raw <= 0.0f)
+    {
+        return 0.0f;
+    }
+
+    /* 直接使用当前原始姿态角，补偿相对重力方向的总倾斜损失 */
+    cos_term = cosf(g_euler.roll * s_fc_deg_to_rad) * cosf(g_euler.pitch * s_fc_deg_to_rad);
+    cos_term = fc_clampf(cos_term, s_fc_tilt_cos_min, 1.0f);
+
+    return fc_clampf(throttle_raw / cos_term, 0.0f, s_fc_tilt_comp_throttle_max);
+}
+
 
 /*
  * 函数名: FC_Map_TargetHeightFromCh2
@@ -410,7 +439,11 @@ void FC_Loop_1000Hz(void)
         //                     pitch_gyro_pid.error);
         (void)yaw_ctrl;
         /* 电机混控：总油门 = 基础油门 + 高度控制输出 */
-        g_motor_cmd.throttle = g_fc_params.base_throttle + (int32_t)height_vel_out;
+        {
+            float throttle_cmd_raw = g_fc_params.base_throttle + height_vel_out;
+            float throttle_cmd_comp = FC_Apply_Tilt_Throttle_Compensation(throttle_cmd_raw);
+            g_motor_cmd.throttle = (int32_t)throttle_cmd_comp;
+        }
         g_motor_cmd.roll = roll_ctrl;
         g_motor_cmd.pitch = -pitch_ctrl;
         g_motor_cmd.yaw = yaw_ctrl;

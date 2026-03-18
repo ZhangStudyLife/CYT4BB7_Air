@@ -118,6 +118,8 @@
 #include "../code/FlightController/fc_params.h"
 #include "../code/HW_Drivers/Beep/Beep.h"
 #include "../code/Protocols/wifi/wifi_cmd/wifi_cmd.h"
+#include "../code/Protocols/wifi/wifi_params/wifi_params.h"
+#include "../code/Protocols/wifi/wifi_cal_imu/wifi_cal_imu.h"
 #include "../code/Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
 #include "../code/Estimation/Attitude/IMU_Filtter.h"
 #include "../code/Estimation/Attitude/MahonyAhrs.h"

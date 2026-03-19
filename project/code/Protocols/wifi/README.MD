@@ -158,13 +158,13 @@ JustFloat 线协议没有变化，但公开调用形式已经改成尾参数量�
 旧写法：
 
 ```c
-wifi_justfloat_JustFloat(a, b, c, d, e, f, 6u);
+wifi_justfloat(a, b, c, d, e, f);
 ```
 
 新写法：
 
 ```c
-wifi_justfloat_JustFloat(a, b, c, d, e, f, 6u);
+wifi_justfloat(a, b, c, d, e, f);
 ```
 
 注意：

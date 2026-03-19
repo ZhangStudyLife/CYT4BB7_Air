@@ -481,7 +481,7 @@ void FC_Mode1_50Hz(float dt)
     roll_angle_target = velx_out + FC_Mode_Get_Roll_Mech_Trim_Deg();
     pitch_angle_target = vely_out + FC_Mode_Get_Pitch_Mech_Trim_Deg();
 
-    // wifi_justfloat_JustFloat(-opflow_vel_x,
+    // wifi_justfloat(-opflow_vel_x,
     //                         -Pos_Est_vel_x,
     //                         -Pos_Est_vel_x_kf,
     //                         velx_target,

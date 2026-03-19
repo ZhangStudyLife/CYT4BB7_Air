@@ -347,6 +347,23 @@ void FC_Loop_100Hz(void)
     s_flight_mode = FC_START_CRSF_Get_Flight_Mode(); /* 检测遥控器的模式 */
     FC_Handle_Mode_Transition_100Hz(s_flight_mode, fc_state);
 
+    wifi_justfloat(g_tof1_height_mm,
+                   g_tof2_height_mm,
+                   g_tof3_height_mm,
+                   g_tof4_height_mm,
+                   VL53L1X_data.distance_mm[0],
+                   VL53L1X_data.distance_mm[1],
+                   VL53L1X_data.distance_mm[2],
+                   VL53L1X_data.distance_mm[3],
+                   g_vl53l1x_diag[0].ready,
+                   g_vl53l1x_diag[1].ready,
+                   g_vl53l1x_diag[2].ready,
+                   g_vl53l1x_diag[3].ready,
+                   VL53L1X_data.range_status[0],
+                   VL53L1X_data.range_status[1],
+                   VL53L1X_data.range_status[2],
+                   VL53L1X_data.range_status[3]);
+
     if (fc_state == FC_START_CRSF_STATE_FLYING)
     {
         ch2 = fc_clampf((float)CRSF_STD[2], -1000.0f, 1000.0f);
@@ -428,7 +445,7 @@ void FC_Loop_1000Hz(void)
         int32_t pitch_ctrl = (int32_t)fc_clampf(PID_Update(&pitch_gyro_pid, pitch_gyro_target, pitch_gyro_meas, dt), -limit, limit);
         int32_t yaw_ctrl = (int32_t)fc_clampf(PID_Update(&yaw_gyro_pid, yaw_gyro_target, yaw_gyro_meas, dt), -limit, limit);
         /* 角速度环调试切换到 Pitch：目标、原始陀螺、滤波后陀螺、控制输出和 PID 分项 */
-        // wifi_justfloat_JustFloat(pitch_gyro_target,
+        // wifi_justfloat(pitch_gyro_target,
         //                         pitch_gyro_raw,
         //                         pitch_gyro_meas,
         //                         pitch_ctrl,

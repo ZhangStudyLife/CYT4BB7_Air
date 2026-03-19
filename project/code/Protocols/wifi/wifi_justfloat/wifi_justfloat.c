@@ -156,7 +156,7 @@ void wifi_justfloat_GetTxStats(wifi_justfloat_tx_stats_t *stats)
     stats->avg_us = (uint32_t)avg_us;
 }
 
-uint8_t wifi_justfloat_JustFloat_Impl(uint8_t declared_num, uint8_t actual_num, ...)
+uint8_t wifi_justfloat_Impl(uint8_t declared_num, uint8_t actual_num, ...)
 {
     uint8_t i;
     uint8_t ret;

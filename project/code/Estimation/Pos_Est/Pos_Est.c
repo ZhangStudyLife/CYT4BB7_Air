@@ -4,6 +4,9 @@
 
 extern volatile uint32 tick_1000us_cnt;
 
+/* 50Hz 末端速度一阶低通截止频率 10Hz，对应 alpha = 1 - exp(-2πfc/fs) */
+#define POS_EST_VEL_OUT_LPF_ALPHA   (0.71539046f)
+
 /* 光流解算得到的 X 轴速度，单位 cm/s，往左飞为正，往右飞为负 */
 float opflow_vel_x = 0.0f;
 /* 光流解算得到的 Y 轴速度，单位 cm/s，往前飞为正，往后飞为负 */
@@ -32,14 +35,14 @@ float Pos_Est_vel_x_kf = 0.0f;
 /* Y 轴速度 Kalman 输出，单位 cm/s */
 float Pos_Est_vel_y_kf = 0.0f;
 
-/* X 轴速度一维 Kalman 滤波器状态 */
-static Kalman1D_t s_kf_x;
-/* Y 轴速度一维 Kalman 滤波器状态 */
-static Kalman1D_t s_kf_y;
 /* X 轴加速度一阶低通状态 */
 static LPF1_t s_acc_lp_x;
 /* Y 轴加速度一阶低通状态 */
 static LPF1_t s_acc_lp_y;
+/* X 轴末端速度一阶低通状态 */
+static LPF1_t s_vel_out_lp_x;
+/* Y 轴末端速度一阶低通状态 */
+static LPF1_t s_vel_out_lp_y;
 
 /* X 轴加速度一阶低通输出，单位 cm/s^2，飞机往前加速为正，往后加速为负 */
 float acc_x_lp = 0.0f;
@@ -56,16 +59,17 @@ void Pos_Est_Init(void)
 {
     PMW3901_Init();
     FlowGyroDecoupler_Init();
-    Kalman1D_Init(&s_kf_x, 200.0f, 900.0f, 1.0f, 0.0f);
-    Kalman1D_Init(&s_kf_y, 200.0f, 900.0f, 1.0f, 0.0f);
-
     LPF1_Init(&s_acc_lp_x, 0.04f);
     LPF1_Init(&s_acc_lp_y, 0.04f);
+    LPF1_Init(&s_vel_out_lp_x, POS_EST_VEL_OUT_LPF_ALPHA);
+    LPF1_Init(&s_vel_out_lp_y, POS_EST_VEL_OUT_LPF_ALPHA);
 
     Pos_Est_pos_x = 0.0f;
     Pos_Est_pos_y = 0.0f;
     Pos_Est_pos_x_last = 0.0f;
     Pos_Est_pos_y_last = 0.0f;
+    Pos_Est_vel_x_kf = 0.0f;
+    Pos_Est_vel_y_kf = 0.0f;
 }
 
 /*
@@ -78,13 +82,15 @@ void Pos_Est_Reinit(void)
 {
     PMW3901_ReInit();
     FlowGyroDecoupler_Reinit();
-    Kalman1D_Reset(&s_kf_x);
-    Kalman1D_Reset(&s_kf_y);
     LPF1_Reset(&s_acc_lp_x);
     LPF1_Reset(&s_acc_lp_y);
+    LPF1_Reset(&s_vel_out_lp_x);
+    LPF1_Reset(&s_vel_out_lp_y);
 
     acc_x_lp = 0.0f;
     acc_y_lp = 0.0f;
+    Pos_Est_vel_x_kf = 0.0f;
+    Pos_Est_vel_y_kf = 0.0f;
     Pos_Est_pos_x = 0.0f;
     Pos_Est_pos_y = 0.0f;
     Pos_Est_pos_x_last = 0.0f;
@@ -156,9 +162,9 @@ void Pos_Est_Update_50HZ(void)
     Pos_Est_vel_x = vel_x_pred + g_fc_params.pos_est_k_flow * (opflow_vel_x - vel_x_pred);
     Pos_Est_vel_y = vel_y_pred + g_fc_params.pos_est_k_flow * (opflow_vel_y - vel_y_pred);
 
-    /* 速度再做一层轻量 Kalman 平滑 */
-    Pos_Est_vel_x_kf = Kalman1D_Update(&s_kf_x, Pos_Est_vel_x);
-    Pos_Est_vel_y_kf = Kalman1D_Update(&s_kf_y, Pos_Est_vel_y);
+    /* 速度末端改为一阶低通，50Hz 下截止频率 10Hz */
+    Pos_Est_vel_x_kf = LPF1_Update(&s_vel_out_lp_x, Pos_Est_vel_x);
+    Pos_Est_vel_y_kf = LPF1_Update(&s_vel_out_lp_y, Pos_Est_vel_y);
 
     Pos_Est_pos_x_last = Pos_Est_pos_x;
     Pos_Est_pos_y_last = Pos_Est_pos_y;
@@ -166,17 +172,5 @@ void Pos_Est_Update_50HZ(void)
     Pos_Est_pos_x = Pos_Est_pos_x_last + 0.5f * (Pos_Est_vel_x_last + Pos_Est_vel_x) * dt;
     Pos_Est_pos_y = Pos_Est_pos_y_last + 0.5f * (Pos_Est_vel_y_last + Pos_Est_vel_y) * dt;
 
-    // wifi_justfloat_JustFloat(opflow_vel_x,
-    //                         opflow_vel_y,
-    //                         acc_x_lp,
-    //                         acc_y_lp,
-    //                         vel_x_pred,
-    //                         vel_y_pred,
-    //                         Pos_Est_vel_x,
-    //                         Pos_Est_vel_y,
-    //                         Pos_Est_vel_x_kf,
-    //                         Pos_Est_vel_y_kf,
-    //                         Pos_Est_pos_x,
-    //                         Pos_Est_pos_y,
-    //                         12u);
+
 }

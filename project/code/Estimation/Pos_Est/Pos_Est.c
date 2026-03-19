@@ -1,5 +1,6 @@
 #include "Pos_Est.h"
 #include "filter.h"
+#include "FlightController/fc_params.h"
 
 extern volatile uint32 tick_1000us_cnt;
 
@@ -125,7 +126,6 @@ void Pos_Est_Update_50HZ(void)
     float vel_x_pred;
     float vel_y_pred;
     const float dt = 0.02f;
-    const float k_flow = 0.6f;
 
     PMW3901_Update_50HZ();
     FlowGyroDecoupler_Update50Hz(tick_1000us_cnt, g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY);
@@ -153,8 +153,8 @@ void Pos_Est_Update_50HZ(void)
     Pos_Est_vel_y_last = Pos_Est_vel_y;
 
     /* 用光流测量对惯性预测做互补校正 */
-    Pos_Est_vel_x = vel_x_pred + k_flow * (opflow_vel_x - vel_x_pred);
-    Pos_Est_vel_y = vel_y_pred + k_flow * (opflow_vel_y - vel_y_pred);
+    Pos_Est_vel_x = vel_x_pred + g_fc_params.pos_est_k_flow * (opflow_vel_x - vel_x_pred);
+    Pos_Est_vel_y = vel_y_pred + g_fc_params.pos_est_k_flow * (opflow_vel_y - vel_y_pred);
 
     /* 速度再做一层轻量 Kalman 平滑 */
     Pos_Est_vel_x_kf = Kalman1D_Update(&s_kf_x, Pos_Est_vel_x);

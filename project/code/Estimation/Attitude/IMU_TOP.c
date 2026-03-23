@@ -10,7 +10,7 @@ MahonyAhrs_Euler_t g_euler;       /* 当前姿态欧拉角（度�?*/
 uint8 g_imu_ready = 0U;           /* IMU 是否完成初始化与自检 */
 uint32 g_imu_update_count = 0U;   /* 1kHz ���¼��� */
 static uint8 s_imu_initializing = 0U;
-
+extern uint32 tick_1000us_cnt;
 /* ======================== 本地工具函数 ======================== */
 static uint8 IMU_IsFiniteFloat(float value)
 {
@@ -230,6 +230,7 @@ void IMU_Update_1000HZ(void)
 	/* 步骤5: 计算欧拉角（单位: 度）并缓�?*/
 	g_euler = MahonyAhrs_GetEulerDegrees(&g_mahony_ahrs);
 	g_imu_update_count++;
+	            wifi_justfloat(tick_1000us_cnt,ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,ICM42688.acc_x, ICM42688.acc_y, ICM42688.acc_z);
 }
 
 uint8 IMU_Is_Ready(void)

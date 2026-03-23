@@ -32,7 +32,7 @@ typedef struct
     float roll_gyro_kd;
     float roll_gyro_kff;   /* 前馈增益 */
     float roll_gyro_i_limit;
-    float roll_gyro_d_lpf;
+    float roll_gyro_d_lpf;     /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== Pitch 轴角速度环参数 ===== */
     float pitch_gyro_kp;
@@ -40,7 +40,7 @@ typedef struct
     float pitch_gyro_kd;
     float pitch_gyro_kff;  /* 前馈增益 */
     float pitch_gyro_i_limit;
-    float pitch_gyro_d_lpf;
+    float pitch_gyro_d_lpf;    /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== Yaw 轴角速度环参数 ===== */
     float yaw_gyro_kp;
@@ -48,7 +48,7 @@ typedef struct
     float yaw_gyro_kd;
     float yaw_gyro_kff;    /* 前馈增益 */
     float yaw_gyro_i_limit;
-    float yaw_gyro_d_lpf;
+    float yaw_gyro_d_lpf;      /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== Roll 轴角度环参数 ===== */
     float roll_angle_kp;
@@ -56,7 +56,7 @@ typedef struct
     float roll_angle_kd;
     float roll_angle_kff;  /* 前馈增益 */
     float roll_angle_i_limit;
-    float roll_angle_d_lpf;
+    float roll_angle_d_lpf;    /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== Pitch 轴角度环参数 ===== */
     float pitch_angle_kp;
@@ -64,7 +64,7 @@ typedef struct
     float pitch_angle_kd;
     float pitch_angle_kff; /* 前馈增益 */
     float pitch_angle_i_limit;
-    float pitch_angle_d_lpf;
+    float pitch_angle_d_lpf;   /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== Yaw 轴角度环参数 ===== */
     float yaw_angle_kp;
@@ -72,7 +72,7 @@ typedef struct
     float yaw_angle_kd;
     float yaw_angle_kff;   /* 前馈增益 */
     float yaw_angle_i_limit;
-    float yaw_angle_d_lpf;
+    float yaw_angle_d_lpf;     /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== X 轴位置环参数 ===== */
     float pos_x_kp;
@@ -80,7 +80,7 @@ typedef struct
     float pos_x_kd;
     float pos_x_kff;       /* 前馈增益 */
     float pos_x_i_limit;
-    float pos_x_d_lpf;
+    float pos_x_d_lpf;         /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== Y 轴位置环参数 ===== */
     float pos_y_kp;
@@ -88,7 +88,7 @@ typedef struct
     float pos_y_kd;
     float pos_y_kff;       /* 前馈增益 */
     float pos_y_i_limit;
-    float pos_y_d_lpf;
+    float pos_y_d_lpf;         /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== Z 轴位置环参数 ===== */
     float pos_z_kp;
@@ -96,7 +96,7 @@ typedef struct
     float pos_z_kd;
     float pos_z_kff;       /* 前馈增益 */
     float pos_z_i_limit;
-    float pos_z_d_lpf;
+    float pos_z_d_lpf;         /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== X 轴速度环参数 ===== */
     float vel_x_kp;
@@ -104,7 +104,7 @@ typedef struct
     float vel_x_kd;
     float vel_x_kff;       /* 前馈增益 */
     float vel_x_i_limit;
-    float vel_x_d_lpf;
+    float vel_x_d_lpf;         /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== Y 轴速度环参数 ===== */
     float vel_y_kp;
@@ -112,7 +112,7 @@ typedef struct
     float vel_y_kd;
     float vel_y_kff;       /* 前馈增益 */
     float vel_y_i_limit;
-    float vel_y_d_lpf;
+    float vel_y_d_lpf;         /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== Z 轴速度环参数 ===== */
     float vel_z_kp;
@@ -120,7 +120,7 @@ typedef struct
     float vel_z_kd;
     float vel_z_kff;       /* 前馈增益 */
     float vel_z_i_limit;
-    float vel_z_d_lpf;
+    float vel_z_d_lpf;         /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== 模式 1 常调参数 ===== */
     float mode1_track_ff_deg_per_cmps; /* 模式 1 跟杆前馈斜率，单位 deg/(cm/s) */

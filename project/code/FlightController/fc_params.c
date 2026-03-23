@@ -12,7 +12,7 @@
 /* 飞控参数 Flash 魔数：用于识别有效参数块 */
 #define FC_PARAMS_FLASH_MAGIC   (0x46504346UL)
 /* 飞控参数 Flash 版本号：结构变更时递增 */
-#define FC_PARAMS_FLASH_VERSION (2U)
+#define FC_PARAMS_FLASH_VERSION (3U)
 
 /* 飞控参数 Flash 数据块：保存头信息和完整参数结构体 */
 typedef struct
@@ -84,7 +84,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->roll_gyro_kd = 0.030f;
     params->roll_gyro_kff = 0.0f;
     params->roll_gyro_i_limit = 300.0f;
-    params->roll_gyro_d_lpf = 0.12f;
+    params->roll_gyro_d_lpf = 30.0f;
 
     /* ===== Pitch 轴角速度环参数 ===== */
     params->pitch_gyro_kp = 3.0f;
@@ -92,7 +92,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pitch_gyro_kd = 0.030f;
     params->pitch_gyro_kff = 0.0f;
     params->pitch_gyro_i_limit = 300.0f;
-    params->pitch_gyro_d_lpf = 0.12f;
+    params->pitch_gyro_d_lpf = 30.0f;
 
     /* ===== Yaw 轴角速度环参数 ===== */
     params->yaw_gyro_kp = 14.0f;
@@ -100,7 +100,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->yaw_gyro_kd = 0.0f;
     params->yaw_gyro_kff = 0.0f;
     params->yaw_gyro_i_limit = 1800.0f;
-    params->yaw_gyro_d_lpf = 0.18f;
+    params->yaw_gyro_d_lpf = 30.0f;
 
     /* ===== Roll 轴角度环参数 ===== */
     params->roll_angle_kp = 5.0f;
@@ -148,7 +148,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pos_z_kd = 0.06f;
     params->pos_z_kff = 0.0f;
     params->pos_z_i_limit = 0.0f;
-    params->pos_z_d_lpf = 0.20f;
+    params->pos_z_d_lpf = 2.0f;
 
     /* ===== X 轴速度环参数 ===== */
     params->vel_x_kp = 0.12f;
@@ -172,7 +172,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->vel_z_kd = 38.0f;
     params->vel_z_kff = 0.0f;
     params->vel_z_i_limit = 450.0f;
-    params->vel_z_d_lpf = 0.08f;
+    params->vel_z_d_lpf = 1.3f;
 
     /* ===== 模式 1 跟杆前馈与刹车参数 ===== */
     params->mode1_track_ff_deg_per_cmps = 0.06f;

@@ -1,4 +1,4 @@
-# WiFi 协议总线说明
+# WiFi 协议总览说明
 
 ## 1. 模块结构
 
@@ -49,16 +49,21 @@
 
 ## 4. IMU 校准命令
 
-当前对外只保留两类 IMU 校准：
+当前对外保留三类 IMU 校准入口：
 
 - `imu start gyro`
 - `imu start accel`
+- `imu start accel_man`
 
 以及以下辅助命令：
 
 - `imu help`
+- `imu help start`
+- `imu help acc`
 - `imu help status`
 - `imu status`
+- `imu acc collect`
+- `imu acc stop`
 - `imu load`
 - `imu save`
 - `imu clear`
@@ -67,10 +72,10 @@
 说明：
 
 - `imu status` 与 `imu flash` 任意状态都允许执行
-- `imu load/save/clear/start ...` 只在待机且未解锁时允许执行
+- `imu load/save/clear/start .../imu acc ...` 只在待机且未解锁时允许执行
 - 校准进行中再次下发 `imu load/save/clear/start ...` 会返回 `ERR imu busy`
-- 加速度校准使用椭球法，不再对外暴露六面法和 `all` 组合校准
-- `imu start gyro` 与 `imu start accel` 会主动输出中文过程提示
+- `imu start accel` 为自动椭球校准
+- `imu start accel_man` 为手动椭球校准
 
 ### 4.1 角速度校准
 
@@ -94,7 +99,7 @@
 - `OK imu gyro 采集 progress=50 valid=30000/60000`
 - `OK imu gyro 完成 samples=60000 bias_dps=0.01,-0.02,0.03 std_dps=0.05,0.04,0.05`
 
-### 4.2 加速度校准
+### 4.2 加速度自动椭球校准
 
 命令：
 
@@ -103,9 +108,9 @@
 行为：
 
 - 启动后会输出开始提示
-- 每次进入新的静止姿态点时会输出采集提示
-- 姿态点采集完成会输出该点均值
-- 姿态点过近、噪声过大、求解失败等情况都会主动提示
+- 每次进入新的静止姿态点时会自动开始采样
+- 姿态点采样完成后会输出该点均值
+- 姿态点过近、噪声过大、求解失败等情况会主动提示
 - 求解成功后会自动保存到 Flash，并输出偏置与矩阵
 
 示例回包：
@@ -118,7 +123,50 @@
 - `OK imu accel 完成 save=1 bias_g=0.02,-0.01,0.03`
 - `OK imu accel 矩阵 r0=1.01,0.00,-0.01`
 
-### 4.3 Flash 校准参数查询
+### 4.3 加速度手动椭球校准
+
+命令：
+
+- `imu start accel_man`
+- `imu acc collect`
+- `imu acc stop`
+
+行为：
+
+- `imu start accel_man` 只进入手动校准准备态，不会自动开始采点
+- `imu acc collect` 会先检测静止，再采集 `5000` 个样本形成 1 个姿态点
+- 手动模式不做“姿态点过近”拒绝，适合人工采集 `50~100+` 个不同姿态点
+- 每个姿态点完成后都会回传 `mean_g`、`std_g`、`std_max_g`
+- `imu acc stop` 会结束手动会话，并对已完成姿态点做椭球拟合
+- 若 `stop` 时当前点未采满，该未完成点会被丢弃
+- 拟合成功后会自动保存到 Flash，并输出矩阵和质量指标
+
+最终质量指标：
+
+- `pose_count`
+- `mean_pose_std_g`
+- `max_pose_std_g`
+- `bias_norm_g`
+- `fit_rms_g`
+- `max_norm_err_g`
+- `bias_g`
+- `accel_matrix r0/r1/r2`
+
+示例回包：
+
+- `OK imu accel_man 开始 请手动切换多个静止姿态`
+- `OK imu accel_man 提示 单次采点请发 imu acc collect`
+- `OK imu accel_man 等待静止 pose=1 stable_target=1250`
+- `OK imu accel_man 开始采集 pose=1 target=5000`
+- `OK imu accel_man 姿态点完成 pose=1 mean_g=0.01,-0.02,-0.99 std_g=0.002,0.003,0.004 std_max_g=0.004`
+- `OK imu accel_man 提示 继续采点请发 imu acc collect`
+- `OK imu accel_man 提示 结束并求解请发 imu acc stop`
+- `OK imu accel_man 开始求解 pose_count=50`
+- `OK imu accel_man 结果 pose_count=50 mean_pose_std_g=0.003 max_pose_std_g=0.008`
+- `OK imu accel_man 结果 bias_norm_g=0.067 fit_rms_g=0.006 max_norm_err_g=0.018`
+- `OK imu accel_man 完成 save=1 bias_g=0.006,-0.001,0.065`
+
+### 4.4 Flash 校准参数查询
 
 命令：
 
@@ -146,6 +194,7 @@
 - `OK list end`
 - `OK imu gyro 开始 请保持飞机静止`
 - `OK imu accel 开始 请缓慢切换多个静止姿态`
+- `OK imu accel_man 开始 请手动切换多个静止姿态`
 - `OK imu flash begin version=2 full_matrix=1`
 - `ERR state`
 - `ERR unknown param`
@@ -153,29 +202,13 @@
 
 ## 6. JustFloat 接口
 
-JustFloat 线协议没有变化，但公开调用形式已经改成尾参数量形式：
-
-旧写法：
-
-```c
-wifi_justfloat(a, b, c, d, e, f);
-```
-
-新写法：
-
-```c
-wifi_justfloat(a, b, c, d, e, f);
-```
+JustFloat 线协议没有变化，调用方式保持不变。
 
 注意：
 
-- 最后一个参数必须是通道总数
-- 实际参数个数与尾部数量不一致时发送会失败
-- 最大支持 `16` 个浮点通道
+- 最多支持 `16` 个浮点通道
+- 发送端与上位机端应保持通道顺序一致
 
 ## 7. 兼容性说明
 
-旧目录仍保留在磁盘上：
-
-
-但主循环与 IAR 工程入口已经切到新的 `project/code/Protocols/wifi/` 目录。
+旧目录仍保留在磁盘上，但主循环与 IAR 工程入口已经切到新的 `project/code/Protocols/wifi/` 目录。

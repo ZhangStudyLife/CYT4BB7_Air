@@ -468,7 +468,9 @@ static uint8_t wifi_params_process_help_topic(const char *topic)
         (void)wifi_cmd_SendLine("用法2: imu status");
         (void)wifi_cmd_SendLine("用法3: imu start gyro");
         (void)wifi_cmd_SendLine("用法4: imu start accel");
-        (void)wifi_cmd_SendLine("用法5: imu flash");
+        (void)wifi_cmd_SendLine("用法5: imu start accel_man");
+        (void)wifi_cmd_SendLine("用法6: imu acc collect / imu acc stop");
+        (void)wifi_cmd_SendLine("用法7: imu flash");
         (void)wifi_cmd_SendLine("功能: 访问 IMU 校准命令集");
         (void)wifi_cmd_SendLine("说明: 更详细说明请执行 imu help");
         (void)wifi_cmd_SendLine("OK help imu");

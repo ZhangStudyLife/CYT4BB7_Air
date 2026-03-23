@@ -9,6 +9,7 @@ MahonyAhrs_t g_mahony_ahrs;       /* Mahony 姿态解算器状�?*/
 MahonyAhrs_Euler_t g_euler;       /* 当前姿态欧拉角（度�?*/
 uint8 g_imu_ready = 0U;           /* IMU 是否完成初始化与自检 */
 uint32 g_imu_update_count = 0U;   /* 1kHz ���¼��� */
+static imudata_t s_imu_raw_calib_1000hz = {0}; /* 当前 1kHz 原始 IMU 快照，供校准链读取 */
 static uint8 s_imu_initializing = 0U;
 extern uint32 tick_1000us_cnt;
 /* ======================== 本地工具函数 ======================== */
@@ -25,6 +26,43 @@ static uint8 IMU_IsFiniteFloat(float value)
 	}
 
 	return 1U;
+}
+
+/*
+ * 函数功能: 读取当前 1kHz 周期内供校准使用的原始 IMU 物理量快照。
+ * 输入参数:
+ *   gx, gy, gz - 输出陀螺仪原始角速度，单位 dps；已做符号映射并扣除陀螺仪零偏
+ *   ax, ay, az - 输出加速度计原始比力，单位 g；仅做量程换算与符号映射
+ * 输出参数/返回值:
+ *   通过指针返回当前帧原始 IMU 快照；空指针会被忽略
+ */
+void IMU_GetRawSampleForCalibration(float *gx, float *gy, float *gz,
+                                    float *ax, float *ay, float *az)
+{
+	if (gx != NULL)
+	{
+		*gx = s_imu_raw_calib_1000hz.gyrox;
+	}
+	if (gy != NULL)
+	{
+		*gy = s_imu_raw_calib_1000hz.gyroy;
+	}
+	if (gz != NULL)
+	{
+		*gz = s_imu_raw_calib_1000hz.gyroz;
+	}
+	if (ax != NULL)
+	{
+		*ax = s_imu_raw_calib_1000hz.accx;
+	}
+	if (ay != NULL)
+	{
+		*ay = s_imu_raw_calib_1000hz.accy;
+	}
+	if (az != NULL)
+	{
+		*az = s_imu_raw_calib_1000hz.accz;
+	}
 }
 
 /*
@@ -94,6 +132,7 @@ void IMU_Init_All(void)
 	g_imu_ready = 0U;
 	s_imu_initializing = 1U;
 	g_imu_update_count = 0U;
+	s_imu_raw_calib_1000hz = (imudata_t){0};
 
 	/* 步骤1: 上电初始�?ICM42688 驱动 */
 	ICM42688_Init(&ICM42688_CONFIG);
@@ -186,7 +225,7 @@ void IMU_SelectAhrsInput(float *gx, float *gy, float *gz,
 	*az = cal_az;
 }
 
-/* �������ܣ�IMU 1kHz ������ڣ���ɲ������˲�����̬���¡�����ֵ���ޡ� */
+/* IMU 1kHz*/
 void IMU_Update_1000HZ(void)
 {
 	/* 步骤1: �?ICM42688 读取一帧原始传感器数据 */
@@ -204,6 +243,14 @@ void IMU_Update_1000HZ(void)
 
 	/* 1. 原始数据 (gyro已去零偏) */
 	ICM42688_Get_Data();
+
+	/* 缓存当前帧原始 IMU 物理量，供校准流程直接读取 */
+	s_imu_raw_calib_1000hz.gyrox = ICM42688.gyro_x;
+	s_imu_raw_calib_1000hz.gyroy = ICM42688.gyro_y;
+	s_imu_raw_calib_1000hz.gyroz = ICM42688.gyro_z;
+	s_imu_raw_calib_1000hz.accx = ICM42688.acc_x;
+	s_imu_raw_calib_1000hz.accy = ICM42688.acc_y;
+	s_imu_raw_calib_1000hz.accz = ICM42688.acc_z;
 
 	/* 2. 加速度计校准前置（传感器坐标系） */
 	float cal_ax = ICM42688.acc_x;

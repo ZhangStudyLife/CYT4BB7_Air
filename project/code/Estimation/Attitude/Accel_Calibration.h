@@ -1,7 +1,7 @@
 /********************************************************************
  * 文件名  : Accel_Calibration.h
  * 说明    : ICM42688 加速度计校准、重力去除与 IMU 校准接口声明
- * 约束    : 当前对外只保留两类 IMU 校准能力
+ * 约束    : 当前对外保留两类 IMU 校准能力
  *           1. 角速度静态校准
  *           2. 加速度椭球校准
  ********************************************************************/
@@ -94,6 +94,19 @@ typedef struct
 #define IMU_CALIB_FLASH_VERSION              (2U)           /* 当前 Flash 数据版本 */
 #define IMU_CALIB_FLASH_PAGE                 (95U)          /* IMU 校准参数存储页 */
 
+#define IMU_CALIB_STATUS_MODE_IDLE           (0U)           /* IMU 校准空闲模式 */
+#define IMU_CALIB_STATUS_MODE_GYRO           (1U)           /* 陀螺仪静态校准模式 */
+#define IMU_CALIB_STATUS_MODE_ACC6           (2U)           /* 六面加速度校准模式 */
+#define IMU_CALIB_STATUS_MODE_ALL            (3U)           /* 组合校准模式 */
+#define IMU_CALIB_STATUS_MODE_ELLIP          (4U)           /* 自动椭球加速度校准模式 */
+#define IMU_CALIB_STATUS_MODE_ELLIP_MANUAL   (5U)           /* 手动椭球加速度校准模式 */
+
+#define IMU_CALIB_MANUAL_SUBSTATE_NONE       (0U)           /* 手动校准未进入子状态 */
+#define IMU_CALIB_MANUAL_SUBSTATE_READY      (1U)           /* 手动校准准备态 */
+#define IMU_CALIB_MANUAL_SUBSTATE_WAIT_STATIC (2U)          /* 手动校准等待静止 */
+#define IMU_CALIB_MANUAL_SUBSTATE_COLLECTING (3U)           /* 手动校准采集当前姿态点 */
+#define IMU_CALIB_MANUAL_SUBSTATE_SOLVING    (4U)           /* 手动校准正在求解 */
+
 typedef struct
 {
     uint32_t magic;
@@ -113,19 +126,21 @@ typedef struct
     uint8_t busy;              /* 当前是否正在执行校准 */
     uint8_t mode;              /* 当前校准模式 */
     uint8_t pose_count;        /* 加速度校准已完成的姿态点数量 */
-    uint8_t reserved;          /* 保留字段 */
+    uint8_t substate;          /* 手动校准子状态 */
     uint32_t progress_percent; /* 当前校准进度百分比 */
+    uint32_t current_samples;  /* 当前子阶段累计样本数 */
+    uint32_t target_samples;   /* 当前子阶段目标样本数 */
 } IMUCalibStatus_t;
 
 typedef struct
 {
-    uint8_t valid;                   /* Flash 中是否存在有效校准数据 */
-    uint8_t use_full_matrix;         /* 1 表示使用完整 3x3 校正矩阵 */
-    uint16_t version;                /* Flash 中校准数据版本 */
-    float gyro_bias_dps[3];          /* 陀螺仪零偏，单位 dps */
-    float accel_bias_g[3];           /* 加速度偏置，单位 g */
-    float accel_corr_matrix[3][3];   /* 加速度 3x3 校正矩阵 */
-    float imu_to_body[3][3];         /* IMU 到机体的安装旋转矩阵 */
+    uint8_t valid;                 /* Flash 中是否存在有效校准数据 */
+    uint8_t use_full_matrix;       /* 1 表示使用完整 3x3 校正矩阵 */
+    uint16_t version;              /* Flash 中校准数据版本 */
+    float gyro_bias_dps[3];        /* 陀螺仪零偏，单位 dps */
+    float accel_bias_g[3];         /* 加速度偏置，单位 g */
+    float accel_corr_matrix[3][3]; /* 加速度 3x3 校正矩阵 */
+    float imu_to_body[3][3];       /* IMU 到机体的安装旋转矩阵 */
 } IMUCalibFlashInfo_t;
 
 typedef void (*IMUCalibTextSink_t)(const char *text);
@@ -201,12 +216,18 @@ uint8_t IMUCalib_ClearFlash(void);
 uint8_t IMUCalib_IsBusy(void);
 /* 设置 IMU 校准过程文本输出回调 */
 void IMUCalib_SetTextSink(IMUCalibTextSink_t sink);
-/* 读取 Flash 中保存的 IMU 校准参数并转成人类可读结构 */
+/* 读取 Flash 中保存的 IMU 校准参数并转成人类可读结果 */
 uint8_t IMUCalib_ReadFlashInfo(IMUCalibFlashInfo_t *info);
-/* 启动角速度静态校准 */
+/* 启动陀螺仪静态校准 */
 uint8_t IMUCalib_StartGyro(void);
-/* 启动加速度椭球校准 */
+/* 启动加速度自动椭球校准 */
 uint8_t IMUCalib_StartAccel(void);
+/* 启动加速度手动椭球校准准备流程 */
+uint8_t IMUCalib_StartAccelManual(void);
+/* 在手动椭球模式下触发一次姿态点采集 */
+uint8_t IMUCalib_ManualCollect(void);
+/* 在手动椭球模式下停止采点并开始求解 */
+uint8_t IMUCalib_ManualStop(void);
 /* 读取当前 IMU 校准状态 */
 void IMUCalib_GetStatus(IMUCalibStatus_t *status);
 

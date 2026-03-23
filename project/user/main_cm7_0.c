@@ -49,6 +49,7 @@ int main(void)
 
             IMU_Update_1000HZ();
             Pos_Est_Update_1000HZ();
+
             s_tick_div_fc_loop_500hz++;
             if (s_tick_div_fc_loop_500hz >= 2U)
             {

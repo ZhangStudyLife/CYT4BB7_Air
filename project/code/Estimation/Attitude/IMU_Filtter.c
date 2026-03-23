@@ -1,33 +1,38 @@
 #include "IMU_Filtter.h"
+
 #include <math.h>
 
 #define IMU_FILTER_PI  (3.14159265359f)
 
-/* ======================== 3个环路输出结构体 ======================== */
-imudata_t g_imufilter_1000hz;  /* 1000Hz角速度环输出 */
-imudata_t g_imudata_500hz;     /* 500Hz姿态解算输出 */
-imudata_t g_imudata_250hz;     /* 250Hz位置融合输出 */
+/* 1000Hz 控制器输入链路滤波输出 */
+imudata_t g_imufilter_1000hz;
+/* 500Hz 姿态链路滤波输出 */
+imudata_t g_imudata_500hz;
+/* 250Hz 融合链路滤波输出 */
+imudata_t g_imudata_250hz;
 
-/* ======================== 滤波器内部状态 ======================== */
+/* IMU 内部滤波器状态 */
 static struct
 {
-    /* 1000Hz角速度环: Notch@150Hz -> LPF@120Hz */
-    IMUBiquad_t gyro_notch[IMU_AXIS_NUM];
-    IMUBiquad_t gyro_lpf_1k[IMU_AXIS_NUM];
+    IMUBiquad_t gyro_notch0[IMU_AXIS_NUM]; /* 陀螺仪第一级陷波 */
+    IMUBiquad_t gyro_notch1[IMU_AXIS_NUM]; /* 陀螺仪第二级陷波 */
+    IMUBiquad_t gyro_lpf[IMU_AXIS_NUM];    /* 陀螺仪低通 */
 
-    /* 500Hz姿态解算: Gyro LPF@80Hz, Acc LPF@30Hz */
-    IMUBiquad_t gyro_lpf_500[IMU_AXIS_NUM];
-    IMUBiquad_t acc_lpf_500[IMU_AXIS_NUM];
+    IMUBiquad_t accel_notch0[IMU_AXIS_NUM]; /* 加速度计第一级陷波 */
+    IMUBiquad_t accel_notch1[IMU_AXIS_NUM]; /* 加速度计第二级陷波 */
+    IMUBiquad_t accel_lpf[IMU_AXIS_NUM];    /* 加速度计低通 */
 
-    /* 250Hz位置融合: Acc LPF@15Hz (级联在30Hz输出之后) */
-    IMUBiquad_t acc_lpf_250[IMU_AXIS_NUM];
-
-    uint8_t initialized;
+    uint8_t initialized; /* 首帧直通标志 */
 } s_filt;
 
-/* ======================== Biquad 基础函数 ======================== */
-
-/* 执行一次二阶IIR滤波 */
+/**
+ * 函数功能: 执行一次二阶 IIR 滤波。
+ * 输入参数:
+ *   f  - 目标滤波器状态。
+ *   in - 当前输入样本。
+ * 返回值:
+ *   本次滤波输出值。
+ */
 static float IMUBiquad_Apply(IMUBiquad_t *f, float in)
 {
     float out = f->b0 * in + f->d1;
@@ -36,14 +41,27 @@ static float IMUBiquad_Apply(IMUBiquad_t *f, float in)
     return out;
 }
 
-/* 初始化二阶Butterworth低通, Q=0.7071 */
+/**
+ * 函数功能: 初始化二阶 Butterworth 低通滤波器。
+ * 输入参数:
+ *   f  - 目标滤波器状态。
+ *   fs - 采样频率，单位 Hz。
+ *   fc - 截止频率，单位 Hz。
+ * 返回值: 无。
+ */
 static void IMUBiquad_InitLPF(IMUBiquad_t *f, float fs, float fc)
 {
-    float w0    = 2.0f * IMU_FILTER_PI * fc / fs;
-    float sw0   = sinf(w0);
-    float cw0   = cosf(w0);
-    float alpha = sw0 / (2.0f * 0.70710678f);
-    float a0    = 1.0f + alpha;
+    float w0;
+    float sw0;
+    float cw0;
+    float alpha;
+    float a0;
+
+    w0 = 2.0f * IMU_FILTER_PI * fc / fs;
+    sw0 = sinf(w0);
+    cw0 = cosf(w0);
+    alpha = sw0 / (2.0f * 0.70710678f);
+    a0 = 1.0f + alpha;
 
     f->b0 = (1.0f - cw0) * 0.5f / a0;
     f->b1 = (1.0f - cw0) / a0;
@@ -54,114 +72,124 @@ static void IMUBiquad_InitLPF(IMUBiquad_t *f, float fs, float fc)
     f->d2 = 0.0f;
 }
 
-/* 初始化二阶陷波滤波器 */
+/**
+ * 函数功能: 初始化二阶陷波滤波器。
+ * 输入参数:
+ *   f  - 目标滤波器状态。
+ *   fs - 采样频率，单位 Hz。
+ *   fc - 中心频率，单位 Hz。
+ *   q  - 品质因数。
+ * 返回值: 无。
+ */
 static void IMUBiquad_InitNotch(IMUBiquad_t *f, float fs, float fc, float q)
 {
-    float w0    = 2.0f * IMU_FILTER_PI * fc / fs;
-    float sw0   = sinf(w0);
-    float cw0   = cosf(w0);
-    float alpha = sw0 / (2.0f * q);
-    float a0    = 1.0f + alpha;
+    float w0;
+    float sw0;
+    float cw0;
+    float alpha;
+    float a0;
 
-    f->b0 =  1.0f / a0;
+    w0 = 2.0f * IMU_FILTER_PI * fc / fs;
+    sw0 = sinf(w0);
+    cw0 = cosf(w0);
+    alpha = sw0 / (2.0f * q);
+    a0 = 1.0f + alpha;
+
+    f->b0 = 1.0f / a0;
     f->b1 = (-2.0f * cw0) / a0;
-    f->b2 =  1.0f / a0;
+    f->b2 = 1.0f / a0;
     f->a1 = (-2.0f * cw0) / a0;
     f->a2 = (1.0f - alpha) / a0;
     f->d1 = 0.0f;
     f->d2 = 0.0f;
 }
 
-/* ======================== 对外接口 ======================== */
-
-/* 初始化全部滤波器链 */
+/**
+ * 函数功能: 初始化 IMU 输入链路的全部滤波器。
+ * 输入参数: 无。
+ * 返回值: 无。
+ */
 void IMUFilter_Init(void)
 {
-    uint8_t i;
+    uint8_t axis;
 
-    for (i = 0U; i < IMU_AXIS_NUM; i++)
+    for (axis = 0U; axis < IMU_AXIS_NUM; axis++)
     {
-        /* 1000Hz角速度环: 陷波 + 低通 */
-        IMUBiquad_InitNotch(&s_filt.gyro_notch[i],   IMU_SAMPLE_RATE_HZ, GYRO_1K_NOTCH_HZ, GYRO_1K_NOTCH_Q);
-        IMUBiquad_InitLPF(&s_filt.gyro_lpf_1k[i],    IMU_SAMPLE_RATE_HZ, GYRO_1K_LPF_HZ);
+        /* 陀螺仪统一链路：Notch0 -> Notch1 -> LPF */
+        IMUBiquad_InitNotch(&s_filt.gyro_notch0[axis], IMU_SAMPLE_RATE_HZ, IMU_NOTCH0_HZ, IMU_NOTCH0_Q);
+        IMUBiquad_InitNotch(&s_filt.gyro_notch1[axis], IMU_SAMPLE_RATE_HZ, IMU_NOTCH1_HZ, IMU_NOTCH1_Q);
+        IMUBiquad_InitLPF(&s_filt.gyro_lpf[axis], IMU_SAMPLE_RATE_HZ, IMU_GYRO_LPF_HZ);
 
-        /* 500Hz姿态解算: 独立低通 */
-        IMUBiquad_InitLPF(&s_filt.gyro_lpf_500[i],   IMU_SAMPLE_RATE_HZ, GYRO_500_LPF_HZ);
-        IMUBiquad_InitLPF(&s_filt.acc_lpf_500[i],    IMU_SAMPLE_RATE_HZ, ACC_500_LPF_HZ);
-
-        /* 250Hz位置融合: 级联低通 */
-        IMUBiquad_InitLPF(&s_filt.acc_lpf_250[i],    IMU_SAMPLE_RATE_HZ, ACC_250_LPF_HZ);
+        /* 加速度计统一链路：Notch0 -> Notch1 -> LPF */
+        IMUBiquad_InitNotch(&s_filt.accel_notch0[axis], IMU_SAMPLE_RATE_HZ, IMU_NOTCH0_HZ, IMU_NOTCH0_Q);
+        IMUBiquad_InitNotch(&s_filt.accel_notch1[axis], IMU_SAMPLE_RATE_HZ, IMU_NOTCH1_HZ, IMU_NOTCH1_Q);
+        IMUBiquad_InitLPF(&s_filt.accel_lpf[axis], IMU_SAMPLE_RATE_HZ, IMU_ACCEL_LPF_HZ);
     }
 
     s_filt.initialized = 0U;
-
-    /* 清零输出结构体 */
     g_imufilter_1000hz = (imudata_t){0};
-    g_imudata_500hz    = (imudata_t){0};
-    g_imudata_250hz    = (imudata_t){0};
+    g_imudata_500hz = (imudata_t){0};
+    g_imudata_250hz = (imudata_t){0};
 }
 
-/* 1kHz主循环调用: 执行全部滤波链并填充3个输出结构体 */
+/**
+ * 函数功能: 以 1kHz 输入原始 IMU 数据，执行统一的双陷波加低通滤波，
+ *           并填充 1000Hz、500Hz、250Hz 三个输出结构体。
+ * 输入参数:
+ *   gx, gy, gz - 陀螺仪三轴输入，单位 dps。
+ *   ax, ay, az - 加速度计三轴输入，单位 g。
+ * 返回值: 无。
+ */
 void IMUFilter_Update(float gx, float gy, float gz,
                       float ax, float ay, float az)
 {
     float gyro_in[IMU_AXIS_NUM];
-    float acc_in[IMU_AXIS_NUM];
-    float g1k[IMU_AXIS_NUM];   /* 1000Hz角速度环输出 */
-    float g500[IMU_AXIS_NUM];  /* 500Hz姿态解算陀螺输出 */
-    float a500[IMU_AXIS_NUM];  /* 500Hz姿态解算加速度输出 */
-    float a250[IMU_AXIS_NUM];  /* 250Hz位置融合加速度输出 */
-    uint8_t i;
+    float accel_in[IMU_AXIS_NUM];
+    float gyro_out[IMU_AXIS_NUM];
+    float accel_out[IMU_AXIS_NUM];
+    uint8_t axis;
 
-    gyro_in[0] = gx;  gyro_in[1] = gy;  gyro_in[2] = gz;
-    acc_in[0]  = ax;  acc_in[1]  = ay;  acc_in[2]  = az;
+    gyro_in[0] = gx;
+    gyro_in[1] = gy;
+    gyro_in[2] = gz;
+    accel_in[0] = ax;
+    accel_in[1] = ay;
+    accel_in[2] = az;
 
-    /* 首帧直通, 避免滤波器启动瞬态 */
     if (0U == s_filt.initialized)
     {
         g_imufilter_1000hz = (imudata_t){gx, gy, gz, ax, ay, az};
-        g_imudata_500hz    = (imudata_t){gx, gy, gz, ax, ay, az};
-        g_imudata_250hz    = (imudata_t){gx, gy, gz, ax, ay, az};
+        g_imudata_500hz = (imudata_t){gx, gy, gz, ax, ay, az};
+        g_imudata_250hz = (imudata_t){gx, gy, gz, ax, ay, az};
         s_filt.initialized = 1U;
         return;
     }
 
-    /* 逐轴执行滤波链 */
-    for (i = 0U; i < IMU_AXIS_NUM; i++)
+    for (axis = 0U; axis < IMU_AXIS_NUM; axis++)
     {
-        /* 1000Hz角速度环: Notch@150Hz -> LPF@120Hz */
-        float notch_out = IMUBiquad_Apply(&s_filt.gyro_notch[i], gyro_in[i]);
-        g1k[i] = IMUBiquad_Apply(&s_filt.gyro_lpf_1k[i], notch_out);
+        float gyro_stage0;
+        float gyro_stage1;
+        float accel_stage0;
+        float accel_stage1;
 
-        /* 500Hz姿态解算: 独立LPF */
-        g500[i] = IMUBiquad_Apply(&s_filt.gyro_lpf_500[i], gyro_in[i]);
-        a500[i] = IMUBiquad_Apply(&s_filt.acc_lpf_500[i],  acc_in[i]);
+        /* 统一陀螺仪链路：双陷波后进入 60Hz 二阶低通 */
+        gyro_stage0 = IMUBiquad_Apply(&s_filt.gyro_notch0[axis], gyro_in[axis]);
+        gyro_stage1 = IMUBiquad_Apply(&s_filt.gyro_notch1[axis], gyro_stage0);
+        gyro_out[axis] = IMUBiquad_Apply(&s_filt.gyro_lpf[axis], gyro_stage1);
 
-        /* 250Hz位置融合: 30Hz输出级联15Hz, 等效4阶陡降 */
-        a250[i] = IMUBiquad_Apply(&s_filt.acc_lpf_250[i], a500[i]);
+        /* 统一加速度计链路：双陷波后进入 15Hz 二阶低通 */
+        accel_stage0 = IMUBiquad_Apply(&s_filt.accel_notch0[axis], accel_in[axis]);
+        accel_stage1 = IMUBiquad_Apply(&s_filt.accel_notch1[axis], accel_stage0);
+        accel_out[axis] = IMUBiquad_Apply(&s_filt.accel_lpf[axis], accel_stage1);
     }
 
-    /* 填充1000Hz角速度环输出: gyro滤波, acc原始 */
-    g_imufilter_1000hz.gyrox = g1k[0];
-    g_imufilter_1000hz.gyroy = g1k[1];
-    g_imufilter_1000hz.gyroz = g1k[2];
-    g_imufilter_1000hz.accx  = ax;
-    g_imufilter_1000hz.accy  = ay;
-    g_imufilter_1000hz.accz  = az;
+    g_imufilter_1000hz.gyrox = gyro_out[0];
+    g_imufilter_1000hz.gyroy = gyro_out[1];
+    g_imufilter_1000hz.gyroz = gyro_out[2];
+    g_imufilter_1000hz.accx = accel_out[0];
+    g_imufilter_1000hz.accy = accel_out[1];
+    g_imufilter_1000hz.accz = accel_out[2];
 
-    /* 填充500Hz姿态解算输出 */
-    g_imudata_500hz.gyrox = g500[0];
-    g_imudata_500hz.gyroy = g500[1];
-    g_imudata_500hz.gyroz = g500[2];
-    g_imudata_500hz.accx  = a500[0];
-    g_imudata_500hz.accy  = a500[1];
-    g_imudata_500hz.accz  = a500[2];
-
-    /* 填充250Hz位置融合输出: gyro同500Hz, acc级联滤波 */
-    g_imudata_250hz.gyrox = g500[0];
-    g_imudata_250hz.gyroy = g500[1];
-    g_imudata_250hz.gyroz = g500[2];
-    g_imudata_250hz.accx  = a250[0];
-    g_imudata_250hz.accy  = a250[1];
-    g_imudata_250hz.accz  = a250[2];
+    g_imudata_500hz = g_imufilter_1000hz;
+    g_imudata_250hz = g_imufilter_1000hz;
 }

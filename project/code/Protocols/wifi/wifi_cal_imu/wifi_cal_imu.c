@@ -60,26 +60,62 @@ static void wifi_cal_imu_reply_error(const char *reason)
  * 函数功能: 将内部模式码转成可读文本
  * 输入参数:
  *   mode - IMU 校准模式码
- * 返回值: 模式中文名称
+ * 返回值: 中文模式名
  */
 static const char *wifi_cal_imu_mode_name(uint8_t mode)
 {
-    if (1U == mode)
+    if (IMU_CALIB_STATUS_MODE_GYRO == mode)
     {
         return "角速度校准";
     }
 
-    if (4U == mode)
+    if (IMU_CALIB_STATUS_MODE_ELLIP == mode)
     {
-        return "加速度校准";
+        return "加速度自动校准";
     }
 
-    if ((2U == mode) || (3U == mode))
+    if (IMU_CALIB_STATUS_MODE_ELLIP_MANUAL == mode)
+    {
+        return "加速度手动校准";
+    }
+
+    if ((IMU_CALIB_STATUS_MODE_ACC6 == mode) || (IMU_CALIB_STATUS_MODE_ALL == mode))
     {
         return "内部保留模式";
     }
 
     return "空闲";
+}
+
+/*
+ * 函数功能: 将手动校准子状态码转成可读文本
+ * 输入参数:
+ *   substate - 手动校准子状态码
+ * 返回值: 中文子状态名
+ */
+static const char *wifi_cal_imu_manual_substate_name(uint8_t substate)
+{
+    if (IMU_CALIB_MANUAL_SUBSTATE_READY == substate)
+    {
+        return "准备";
+    }
+
+    if (IMU_CALIB_MANUAL_SUBSTATE_WAIT_STATIC == substate)
+    {
+        return "等待静止";
+    }
+
+    if (IMU_CALIB_MANUAL_SUBSTATE_COLLECTING == substate)
+    {
+        return "采集中";
+    }
+
+    if (IMU_CALIB_MANUAL_SUBSTATE_SOLVING == substate)
+    {
+        return "求解中";
+    }
+
+    return "无";
 }
 
 /*
@@ -94,12 +130,15 @@ static void wifi_cal_imu_send_help_overview(void)
     (void)wifi_cmd_SendLine("用法2: imu status");
     (void)wifi_cmd_SendLine("用法3: imu start gyro");
     (void)wifi_cmd_SendLine("用法4: imu start accel");
-    (void)wifi_cmd_SendLine("用法5: imu load / imu save / imu clear / imu flash");
-    (void)wifi_cmd_SendLine("说明1: imu status 与 imu flash 任意状态都可执行");
-    (void)wifi_cmd_SendLine("说明2: 其他 imu 命令仅待机且未解锁时允许执行");
-    (void)wifi_cmd_SendLine("说明3: 命令字不区分大小写 文本命令必须以 CRLF 结束");
-    (void)wifi_cmd_SendLine("示例1: imu help start");
-    (void)wifi_cmd_SendLine("示例2: imu flash");
+    (void)wifi_cmd_SendLine("用法5: imu start accel_man");
+    (void)wifi_cmd_SendLine("用法6: imu acc collect / imu acc stop");
+    (void)wifi_cmd_SendLine("用法7: imu load / imu save / imu clear / imu flash");
+    (void)wifi_cmd_SendLine("说明1: imu status 与 imu flash 任意状态都允许执行");
+    (void)wifi_cmd_SendLine("说明2: 其他 imu 写命令仅待机且未解锁时允许执行");
+    (void)wifi_cmd_SendLine("说明3: 手动校准请先执行 imu start accel_man，再按 imu acc collect / imu acc stop");
+    (void)wifi_cmd_SendLine("示例1: imu help acc");
+    (void)wifi_cmd_SendLine("示例2: imu start accel_man");
+    (void)wifi_cmd_SendLine("说明4: accel 与 accel_man 均基于未校准原始加速度采样");
     (void)wifi_cmd_SendLine("OK imu help");
 }
 
@@ -112,10 +151,10 @@ static void wifi_cal_imu_send_help_status(void)
 {
     (void)wifi_cmd_SendLine("主题: imu status");
     (void)wifi_cmd_SendLine("用法: imu status");
-    (void)wifi_cmd_SendLine("功能: 查询当前 IMU 校准是否忙、模式、进度和姿态点数量");
+    (void)wifi_cmd_SendLine("功能: 查询当前 IMU 校准忙闲、模式、进度、姿态点与手动子状态");
     (void)wifi_cmd_SendLine("限制: 任意状态都允许执行");
     (void)wifi_cmd_SendLine("示例: imu status");
-    (void)wifi_cmd_SendLine("成功回包: OK imu status 状态=空闲 模式=空闲 进度=0%% 姿态点=0");
+    (void)wifi_cmd_SendLine("成功回包示例: OK imu status 状态=空闲 模式=空闲 进度=0%% 姿态点=0");
     (void)wifi_cmd_SendLine("OK imu help status");
 }
 
@@ -177,16 +216,37 @@ static void wifi_cal_imu_send_help_start(void)
     (void)wifi_cmd_SendLine("主题: imu start");
     (void)wifi_cmd_SendLine("用法1: imu start gyro");
     (void)wifi_cmd_SendLine("用法2: imu start accel");
-    (void)wifi_cmd_SendLine("功能: 启动角速度校准或加速度椭球校准");
+    (void)wifi_cmd_SendLine("用法3: imu start accel_man");
+    (void)wifi_cmd_SendLine("功能: 启动角速度校准、加速度自动校准或加速度手动校准");
     (void)wifi_cmd_SendLine("限制: 仅待机且未解锁时允许执行");
     (void)wifi_cmd_SendLine("说明1: gyro 要求飞机全程静止");
-    (void)wifi_cmd_SendLine("说明2: accel 只需切换多个静止姿态 不再使用六面法");
-    (void)wifi_cmd_SendLine("说明3: 过程提示会主动通过 WiFi 文本回包输出");
-    (void)wifi_cmd_SendLine("示例1: imu start gyro");
-    (void)wifi_cmd_SendLine("示例2: imu start accel");
-    (void)wifi_cmd_SendLine("成功回包示例1: OK imu gyro 开始 请保持飞机静止");
-    (void)wifi_cmd_SendLine("成功回包示例2: OK imu accel 开始 请缓慢切换多个静止姿态");
+    (void)wifi_cmd_SendLine("说明2: accel 为自动椭球校准，自动检测静止并自动收点");
+    (void)wifi_cmd_SendLine("说明3: accel_man 为手动椭球校准，进入准备态后请发 imu acc collect / imu acc stop");
+    (void)wifi_cmd_SendLine("示例1: imu start accel");
+    (void)wifi_cmd_SendLine("示例2: imu start accel_man");
     (void)wifi_cmd_SendLine("OK imu help start");
+}
+
+/*
+ * 函数功能: 输出 acc 子命令帮助
+ * 输入参数: 无
+ * 返回值: 无
+ */
+static void wifi_cal_imu_send_help_acc(void)
+{
+    (void)wifi_cmd_SendLine("主题: imu acc");
+    (void)wifi_cmd_SendLine("用法1: imu acc collect");
+    (void)wifi_cmd_SendLine("用法2: imu acc stop");
+    (void)wifi_cmd_SendLine("功能: 手动加速度椭球校准的采点与停止求解命令");
+    (void)wifi_cmd_SendLine("限制1: 仅在 imu start accel_man 后可用");
+    (void)wifi_cmd_SendLine("限制2: 仅待机且未解锁时允许执行");
+    (void)wifi_cmd_SendLine("说明1: imu acc collect 会先检测静止，再采集 5000 个样本形成一个姿态点");
+    (void)wifi_cmd_SendLine("说明2: imu acc stop 会结束手动会话，并对已完成姿态点做椭球拟合");
+    (void)wifi_cmd_SendLine("说明3: 若 stop 时当前点未采满，该未完成点会被丢弃");
+    (void)wifi_cmd_SendLine("示例1: imu acc collect");
+    (void)wifi_cmd_SendLine("示例2: imu acc stop");
+    (void)wifi_cmd_SendLine("说明4: accel_man 采样源为未校准原始加速度，不走旧矩阵和控制链滤波");
+    (void)wifi_cmd_SendLine("OK imu help acc");
 }
 
 /*
@@ -201,7 +261,7 @@ static void wifi_cal_imu_send_help_flash(void)
     (void)wifi_cmd_SendLine("功能: 读取 Flash 中保存的 IMU 校准参数并按人类可读形式输出");
     (void)wifi_cmd_SendLine("限制: 任意状态都允许执行");
     (void)wifi_cmd_SendLine("说明1: 无有效数据时返回 OK imu flash empty");
-    (void)wifi_cmd_SendLine("说明2: 有效数据时会输出零偏、偏置、校正矩阵和安装矩阵");
+    (void)wifi_cmd_SendLine("说明2: 有效数据时会输出陀螺仪零偏、加速度偏置、校正矩阵和安装矩阵");
     (void)wifi_cmd_SendLine("示例: imu flash");
     (void)wifi_cmd_SendLine("成功回包: OK imu flash begin version=2 full_matrix=1");
     (void)wifi_cmd_SendLine("OK imu help flash");
@@ -252,6 +312,12 @@ static uint8_t wifi_cal_imu_process_help_topic(const char *topic)
         return 1U;
     }
 
+    if (0 == wifi_cmd_ascii_stricmp(topic, "acc"))
+    {
+        wifi_cal_imu_send_help_acc();
+        return 1U;
+    }
+
     if (0 == wifi_cmd_ascii_stricmp(topic, "flash"))
     {
         wifi_cal_imu_send_help_flash();
@@ -293,6 +359,19 @@ static void wifi_cal_imu_process_status(void)
     IMUCalibStatus_t status = {0};
 
     IMUCalib_GetStatus(&status);
+    if (status.mode == IMU_CALIB_STATUS_MODE_ELLIP_MANUAL)
+    {
+        (void)wifi_cmd_SendLine("OK imu status 状态=%s 模式=%s 子状态=%s 进度=%lu%% 姿态点=%u 当前样本=%lu/%lu",
+                                (0U != status.busy) ? "忙" : "空闲",
+                                wifi_cal_imu_mode_name(status.mode),
+                                wifi_cal_imu_manual_substate_name(status.substate),
+                                (unsigned long)status.progress_percent,
+                                (unsigned int)status.pose_count,
+                                (unsigned long)status.current_samples,
+                                (unsigned long)status.target_samples);
+        return;
+    }
+
     (void)wifi_cmd_SendLine("OK imu status 状态=%s 模式=%s 进度=%lu%% 姿态点=%u",
                             (0U != status.busy) ? "忙" : "空闲",
                             wifi_cal_imu_mode_name(status.mode),
@@ -446,7 +525,7 @@ static void wifi_cal_imu_process_flash(void)
 /*
  * 函数功能: 按模式启动 IMU 校准
  * 输入参数:
- *   mode - 校准模式字符串，仅允许 gyro 或 accel
+ *   mode - 校准模式字符串
  * 返回值: 无
  */
 static void wifi_cal_imu_process_start(const char *mode)
@@ -473,6 +552,10 @@ static void wifi_cal_imu_process_start(const char *mode)
     {
         ok = IMUCalib_StartAccel();
     }
+    else if (0 == wifi_cmd_ascii_stricmp(mode, "accel_man"))
+    {
+        ok = IMUCalib_StartAccelManual();
+    }
     else
     {
         wifi_cal_imu_reply_error("unknown");
@@ -480,6 +563,80 @@ static void wifi_cal_imu_process_start(const char *mode)
     }
 
     if (0U == ok)
+    {
+        wifi_cal_imu_reply_error("busy");
+    }
+}
+
+/*
+ * 函数功能: 处理手动加速度采点命令
+ * 输入参数: 无
+ * 返回值: 无
+ */
+static void wifi_cal_imu_process_acc_collect(void)
+{
+    IMUCalibStatus_t status = {0};
+
+    if (0U == wifi_cal_imu_is_edit_allowed())
+    {
+        wifi_cal_imu_reply_error("state");
+        return;
+    }
+
+    IMUCalib_GetStatus(&status);
+    if ((status.busy == 0U) || (status.mode != IMU_CALIB_STATUS_MODE_ELLIP_MANUAL))
+    {
+        wifi_cal_imu_reply_error("state");
+        return;
+    }
+
+    if (status.pose_count >= 128U)
+    {
+        wifi_cal_imu_reply_error("limit");
+        return;
+    }
+
+    if (status.substate != IMU_CALIB_MANUAL_SUBSTATE_READY)
+    {
+        wifi_cal_imu_reply_error("busy");
+        return;
+    }
+
+    if (0U == IMUCalib_ManualCollect())
+    {
+        wifi_cal_imu_reply_error("busy");
+    }
+}
+
+/*
+ * 函数功能: 处理手动加速度停止求解命令
+ * 输入参数: 无
+ * 返回值: 无
+ */
+static void wifi_cal_imu_process_acc_stop(void)
+{
+    IMUCalibStatus_t status = {0};
+
+    if (0U == wifi_cal_imu_is_edit_allowed())
+    {
+        wifi_cal_imu_reply_error("state");
+        return;
+    }
+
+    IMUCalib_GetStatus(&status);
+    if ((status.busy == 0U) || (status.mode != IMU_CALIB_STATUS_MODE_ELLIP_MANUAL))
+    {
+        wifi_cal_imu_reply_error("state");
+        return;
+    }
+
+    if (status.substate == IMU_CALIB_MANUAL_SUBSTATE_SOLVING)
+    {
+        wifi_cal_imu_reply_error("busy");
+        return;
+    }
+
+    if (0U == IMUCalib_ManualStop())
     {
         wifi_cal_imu_reply_error("busy");
     }
@@ -564,14 +721,7 @@ void wifi_cal_imu_ProcessLine(char *line)
     {
         if (NULL == token_arg2)
         {
-            if (NULL != token_arg1)
-            {
-                wifi_cal_imu_process_help(token_arg1);
-            }
-            else
-            {
-                wifi_cal_imu_process_help(NULL);
-            }
+            wifi_cal_imu_process_help(token_arg1);
             return;
         }
 
@@ -680,6 +830,31 @@ void wifi_cal_imu_ProcessLine(char *line)
         if ((NULL != token_arg1) && (0U != wifi_cmd_is_help_flag(token_arg1)) && (NULL == token_arg2))
         {
             wifi_cal_imu_send_help_start();
+            return;
+        }
+
+        wifi_cal_imu_reply_error("format");
+        return;
+    }
+
+    if (0 == strcmp(token_cmd, "acc"))
+    {
+        if ((NULL != token_arg1) && (0 == strcmp(token_arg1, "collect")) && (NULL == token_arg2))
+        {
+            wifi_cal_imu_process_acc_collect();
+            return;
+        }
+
+        if ((NULL != token_arg1) && (0 == strcmp(token_arg1, "stop")) && (NULL == token_arg2))
+        {
+            wifi_cal_imu_process_acc_stop();
+            return;
+        }
+
+        if (((NULL != token_arg1) && (0U != wifi_cmd_is_help_flag(token_arg1)) && (NULL == token_arg2)) ||
+            ((NULL == token_arg1) && (NULL == token_arg2)))
+        {
+            wifi_cal_imu_send_help_acc();
             return;
         }
 

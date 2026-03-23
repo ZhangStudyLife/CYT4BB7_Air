@@ -8,6 +8,7 @@
  ********************************************************************/
 
 #include "Accel_Calibration.h"
+#include "IMU_TOP.h"
 #include "zf_common_headfile.h"
 
 #include <float.h>
@@ -91,7 +92,8 @@ typedef enum
     IMU_CALIB_MODE_GYRO = 1,
     IMU_CALIB_MODE_ACC6 = 2,
     IMU_CALIB_MODE_ALL = 3,
-    IMU_CALIB_MODE_ELLIP = 4
+    IMU_CALIB_MODE_ELLIP = 4,
+    IMU_CALIB_MODE_ELLIP_MANUAL = 5
 } IMUCalibMode_e;
 
 typedef enum
@@ -170,6 +172,9 @@ static IMUCalibTextSink_t s_imu_calib_text_sink = NULL;
 #define ELLIP_POST_DIAG_MAX      (1.15f)
 #define ELLIP_POST_BIAS_NORM_MAX_G (0.35f)
 #define ELLIP_MOVING_GYRO_DPS    (8.0f)
+#define ELLIP_MANUAL_MAX_ORIENT  (128U)     /* 手动椭球模式允许缓存的最大姿态点数 */
+#define ELLIP_MANUAL_ORIENT_SAMPLES (5000U) /* 手动椭球模式单个姿态点采样数 */
+#define ELLIP_MANUAL_TIMEOUT_SAMPLES (1800000U) /* 手动椭球模式总超时，约 30 分钟 */
 
 typedef struct
 {
@@ -184,7 +189,21 @@ typedef struct
     uint8_t wait_move;      /* 1 = waiting for user to move to next orientation */
 } EllipCalibRuntime_t;
 
+typedef struct
+{
+    float orient_mean[ELLIP_MANUAL_MAX_ORIENT][3];
+    float pose_std_max[ELLIP_MANUAL_MAX_ORIENT];
+    float collect_mean[3];
+    float collect_m2[3];
+    uint32_t orient_samples;
+    uint8_t orient_count;
+    uint32_t total_samples;
+    uint32_t stable_samples;
+    uint8_t substate;
+} ManualEllipCalibRuntime_t;
+
 static EllipCalibRuntime_t s_ellip = {0};
+static ManualEllipCalibRuntime_t s_ellip_manual = {0};
 #if ACCEL_CALIBRATION_STATIC_RELOCK_ENABLE
 static float s_static_relock_trim_g[3] = {0.0f, 0.0f, 0.0f};
 static uint8_t s_static_relock_trim_ready = 0U;
@@ -538,6 +557,120 @@ static int32_t ellip_fit_solve(const float orient[][3], uint8_t n, float bias[3]
     return 0;
 }
 
+typedef enum
+{
+    ELLIP_VALIDATE_OK = 0,
+    ELLIP_VALIDATE_ERR_BIAS = -1,
+    ELLIP_VALIDATE_ERR_DIAG = -2,
+    ELLIP_VALIDATE_ERR_NORM = -3
+} EllipValidateResult_e;
+
+static int32_t ellip_validate_solution(const float orient[][3],
+                                       uint8_t orient_count,
+                                       const float bias[3],
+                                       const float M[3][3],
+                                       float *bias_norm_g,
+                                       float *fit_rms_g,
+                                       float *max_norm_err_g,
+                                       uint8_t *diag_axis,
+                                       float *diag_value)
+{
+    float bias_norm;
+    float sum_sq_norm_err = 0.0f;
+    float max_norm_err = 0.0f;
+    uint8_t i;
+
+    if ((NULL == orient) || (NULL == bias) || (NULL == M) || (orient_count == 0U))
+    {
+        return ELLIP_VALIDATE_ERR_NORM;
+    }
+
+    bias_norm = vec3_norm(bias[0], bias[1], bias[2]);
+    if (bias_norm_g != NULL)
+    {
+        *bias_norm_g = bias_norm;
+    }
+    if (bias_norm > ELLIP_POST_BIAS_NORM_MAX_G)
+    {
+        return ELLIP_VALIDATE_ERR_BIAS;
+    }
+
+    for (i = 0U; i < 3U; i++)
+    {
+        if ((M[i][i] < ELLIP_POST_DIAG_MIN) || (M[i][i] > ELLIP_POST_DIAG_MAX))
+        {
+            if (diag_axis != NULL)
+            {
+                *diag_axis = i;
+            }
+            if (diag_value != NULL)
+            {
+                *diag_value = M[i][i];
+            }
+            return ELLIP_VALIDATE_ERR_DIAG;
+        }
+    }
+
+    for (i = 0U; i < orient_count; i++)
+    {
+        float centered[3];
+        float corrected[3];
+        float corr_norm;
+        float norm_err;
+        uint8_t axis;
+
+        for (axis = 0U; axis < 3U; axis++)
+        {
+            centered[axis] = orient[i][axis] - bias[axis];
+        }
+
+        mat3_mul_vec(M, centered, corrected);
+        corr_norm = vec3_norm(corrected[0], corrected[1], corrected[2]);
+        norm_err = fabsf_local(corr_norm - 1.0f);
+        sum_sq_norm_err += norm_err * norm_err;
+        if (norm_err > max_norm_err)
+        {
+            max_norm_err = norm_err;
+        }
+    }
+
+    if (fit_rms_g != NULL)
+    {
+        *fit_rms_g = sqrtf(sum_sq_norm_err / (float)orient_count);
+    }
+    if (max_norm_err_g != NULL)
+    {
+        *max_norm_err_g = max_norm_err;
+    }
+
+    if (max_norm_err > ELLIP_POST_NORM_ERR_MAX_G)
+    {
+        return ELLIP_VALIDATE_ERR_NORM;
+    }
+
+    return ELLIP_VALIDATE_OK;
+}
+
+static int32_t ellip_apply_solution(const float bias[3], const float M[3][3])
+{
+    AccelCalibrationParams_t params;
+
+    if ((NULL == bias) || (NULL == M))
+    {
+        return -1;
+    }
+
+    AccelCalibration_GetParams(&params);
+    memcpy(params.accel_bias_g, bias, sizeof(params.accel_bias_g));
+    memcpy(params.accel_corr_matrix, M, sizeof(params.accel_corr_matrix));
+    params.accel_scale[0] = M[0][0];
+    params.accel_scale[1] = M[1][1];
+    params.accel_scale[2] = M[2][2];
+    params.use_full_matrix = 1U;
+
+    return AccelCalibration_LoadParams(&params) ? 0 : -1;
+}
+
 static bool euler_ready(void)
 {
     /* �� sin^2+cos^2��1 �ж���̬�����Ǻ�����Ч���ų�δ��ʼ����̬���� */
@@ -743,6 +876,29 @@ static void rotate_imu_to_body(const float vec_in[3], float vec_out[3])
     {
         mat3_mul_vec(g_accel_calibration.imu_to_body, vec_in, vec_out);
     }
+}
+
+/*
+ * 函数功能: 读取当前帧供 IMU 校准使用的原始传感器物理量。
+ * 输入参数:
+ *   accel_sensor_g - 输出传感器坐标系原始加速度，单位 g；仅量程换算与符号映射
+ *   gyro_sensor_dps - 输出传感器坐标系原始角速度，单位 dps；已扣除陀螺仪零偏
+ * 输出参数/返回值:
+ *   通过数组返回当前帧原始 IMU 数据；空指针时直接返回
+ */
+static void imu_calib_get_raw_sensor_sample(float accel_sensor_g[3], float gyro_sensor_dps[3])
+{
+    if ((accel_sensor_g == NULL) || (gyro_sensor_dps == NULL))
+    {
+        return;
+    }
+
+    IMU_GetRawSampleForCalibration(&gyro_sensor_dps[0],
+                                   &gyro_sensor_dps[1],
+                                   &gyro_sensor_dps[2],
+                                   &accel_sensor_g[0],
+                                   &accel_sensor_g[1],
+                                   &accel_sensor_g[2]);
 }
 
 static void update_running_stats(float sample, float *mean, float *m2, uint32_t sample_count)
@@ -1320,6 +1476,8 @@ static void imu_calib_print_flash_params(void)
 static void imu_calib_reset_runtime(void)
 {
     memset(&s_imu_calib, 0, sizeof(s_imu_calib));
+    memset(&s_ellip, 0, sizeof(s_ellip));
+    memset(&s_ellip_manual, 0, sizeof(s_ellip_manual));
     s_imu_calib.acc6_candidate_face = -1;
     s_imu_calib.acc6_collect_face = -1;
 }
@@ -1356,6 +1514,75 @@ static void imu_calib_prepare_acc6_state(void)
     memset(s_imu_calib.acc6_face_dom_m2, 0, sizeof(s_imu_calib.acc6_face_dom_m2));
 }
 
+static void imu_calib_manual_emit_next_commands(void)
+{
+    imu_calib_emit_text("OK imu accel_man 提示 继续采点请发 imu acc collect");
+    imu_calib_emit_text("OK imu accel_man 提示 结束并求解请发 imu acc stop");
+}
+
+static void imu_calib_manual_reset_current_pose(void)
+{
+    s_ellip_manual.stable_samples = 0U;
+    s_ellip_manual.orient_samples = 0U;
+    memset(s_ellip_manual.collect_mean, 0, sizeof(s_ellip_manual.collect_mean));
+    memset(s_ellip_manual.collect_m2, 0, sizeof(s_ellip_manual.collect_m2));
+}
+
+static void imu_calib_manual_enter_ready_state(void)
+{
+    imu_calib_manual_reset_current_pose();
+    s_ellip_manual.substate = IMU_CALIB_MANUAL_SUBSTATE_READY;
+}
+
+static void imu_calib_manual_calc_pose_std_stats(float *mean_pose_std_g, float *max_pose_std_g)
+{
+    float mean_std = 0.0f;
+    float max_std = 0.0f;
+    uint8_t i;
+
+    if (s_ellip_manual.orient_count == 0U)
+    {
+        if (mean_pose_std_g != NULL)
+        {
+            *mean_pose_std_g = 0.0f;
+        }
+        if (max_pose_std_g != NULL)
+        {
+            *max_pose_std_g = 0.0f;
+        }
+        return;
+    }
+
+    for (i = 0U; i < s_ellip_manual.orient_count; i++)
+    {
+        mean_std += s_ellip_manual.pose_std_max[i];
+        if (s_ellip_manual.pose_std_max[i] > max_std)
+        {
+            max_std = s_ellip_manual.pose_std_max[i];
+        }
+    }
+
+    if (mean_pose_std_g != NULL)
+    {
+        *mean_pose_std_g = mean_std / (float)s_ellip_manual.orient_count;
+    }
+    if (max_pose_std_g != NULL)
+    {
+        *max_pose_std_g = max_std;
+    }
+}
+
+static void imu_calib_manual_begin_collect(void)
+{
+    imu_calib_manual_reset_current_pose();
+    s_ellip_manual.substate = IMU_CALIB_MANUAL_SUBSTATE_WAIT_STATIC;
+    imu_calib_emit_text("OK imu accel_man 等待静止 pose=%u stable_target=%u",
+                        (unsigned int)(s_ellip_manual.orient_count + 1U),
+                        (unsigned int)ELLIP_PRE_STABLE_SAMPLES);
+    imu_calib_emit_text("OK imu accel_man 提示 静止通过后自动采集 target=%u",
+                        (unsigned int)ELLIP_MANUAL_ORIENT_SAMPLES);
+}
+
 /* ========================= Ellipsoid calibration ========================= */
 
 static void imu_calib_start_ellip(void)
@@ -1366,6 +1593,255 @@ static void imu_calib_start_ellip(void)
     s_imu_calib.mode = IMU_CALIB_MODE_ELLIP;
     imu_calib_emit_text("OK imu accel 开始 请缓慢切换多个静止姿态");
     imu_calib_emit_text("OK imu accel 提示 每次放稳后保持静止 系统会自动采集姿态点");
+}
+
+static void imu_calib_start_ellip_manual(void)
+{
+    imu_calib_reset_runtime();
+    s_imu_calib.busy = 1U;
+    s_imu_calib.mode = IMU_CALIB_MODE_ELLIP_MANUAL;
+    s_ellip_manual.substate = IMU_CALIB_MANUAL_SUBSTATE_READY;
+    imu_calib_emit_text("OK imu accel_man 开始 请手动切换多个静止姿态");
+    imu_calib_emit_text("OK imu accel_man 提示 单次采点请发 imu acc collect");
+    imu_calib_emit_text("OK imu accel_man 提示 结束并求解请发 imu acc stop");
+}
+
+static int32_t imu_calib_manual_solve(void)
+{
+    float bias[3];
+    float M[3][3];
+    float bias_norm_g = 0.0f;
+    float fit_rms_g = 0.0f;
+    float max_norm_err_g = 0.0f;
+    float mean_pose_std_g = 0.0f;
+    float max_pose_std_g = 0.0f;
+    float diag_value = 0.0f;
+    uint8_t diag_axis = 0U;
+    int32_t validate_ret;
+
+    if (s_ellip_manual.orient_count < ELLIP_MIN_ORIENT)
+    {
+        imu_calib_emit_text("ERR imu accel_man 失败 原因=姿态点不足 count=%u min=%u",
+                            (unsigned int)s_ellip_manual.orient_count,
+                            (unsigned int)ELLIP_MIN_ORIENT);
+        return -1;
+    }
+
+    imu_calib_manual_calc_pose_std_stats(&mean_pose_std_g, &max_pose_std_g);
+
+    if (ellip_fit_solve(s_ellip_manual.orient_mean, s_ellip_manual.orient_count, bias, M) != 0)
+    {
+        imu_calib_emit_text("ERR imu accel_man 失败 原因=求解失败 pose_count=%u",
+                            (unsigned int)s_ellip_manual.orient_count);
+        return -1;
+    }
+
+    validate_ret = ellip_validate_solution(s_ellip_manual.orient_mean,
+                                           s_ellip_manual.orient_count,
+                                           bias,
+                                           M,
+                                           &bias_norm_g,
+                                           &fit_rms_g,
+                                           &max_norm_err_g,
+                                           &diag_axis,
+                                           &diag_value);
+    if (validate_ret == ELLIP_VALIDATE_ERR_BIAS)
+    {
+        imu_calib_emit_text("ERR imu accel_man 失败 原因=偏置过大 value=%f",
+                            (double)bias_norm_g);
+        return -1;
+    }
+    if (validate_ret == ELLIP_VALIDATE_ERR_DIAG)
+    {
+        imu_calib_emit_text("ERR imu accel_man 失败 原因=矩阵对角异常 axis=%u value=%f",
+                            (unsigned int)diag_axis,
+                            (double)diag_value);
+        return -1;
+    }
+    if (validate_ret == ELLIP_VALIDATE_ERR_NORM)
+    {
+        imu_calib_emit_text("ERR imu accel_man 失败 原因=范数误差过大 fit_rms_g=%f max_norm_err_g=%f",
+                            (double)fit_rms_g,
+                            (double)max_norm_err_g);
+        return -1;
+    }
+
+    if (ellip_apply_solution(bias, M) != 0)
+    {
+        imu_calib_emit_text("ERR imu accel_man 失败 原因=应用失败");
+        return -1;
+    }
+
+    {
+        uint8_t save_ok = IMUCalib_SaveCurrentToFlash();
+        imu_calib_emit_text("OK imu accel_man 结果 pose_count=%u mean_pose_std_g=%f max_pose_std_g=%f",
+                            (unsigned int)s_ellip_manual.orient_count,
+                            (double)mean_pose_std_g,
+                            (double)max_pose_std_g);
+        imu_calib_emit_text("OK imu accel_man 结果 bias_norm_g=%f fit_rms_g=%f max_norm_err_g=%f",
+                            (double)bias_norm_g,
+                            (double)fit_rms_g,
+                            (double)max_norm_err_g);
+        imu_calib_emit_text("OK imu accel_man 完成 save=%u bias_g=%f,%f,%f",
+                            (unsigned int)save_ok,
+                            (double)bias[0],
+                            (double)bias[1],
+                            (double)bias[2]);
+        imu_calib_emit_text("OK imu accel_man 矩阵 r0=%f,%f,%f",
+                            (double)M[0][0], (double)M[0][1], (double)M[0][2]);
+        imu_calib_emit_text("OK imu accel_man 矩阵 r1=%f,%f,%f",
+                            (double)M[1][0], (double)M[1][1], (double)M[1][2]);
+        imu_calib_emit_text("OK imu accel_man 矩阵 r2=%f,%f,%f",
+                            (double)M[2][0], (double)M[2][1], (double)M[2][2]);
+    }
+
+    return 1;
+}
+
+static int32_t imu_calib_update_ellip_manual_step(void)
+{
+    float accel_sensor_g[3];
+    float gyro_sensor_dps[3];
+    float accel_body_g[3];
+    float gyro_body_dps[3];
+    float accel_norm_g;
+    float gyro_norm_dps;
+
+    if (s_ellip_manual.substate == IMU_CALIB_MANUAL_SUBSTATE_READY)
+    {
+        return 0;
+    }
+
+    s_ellip_manual.total_samples++;
+    if (s_ellip_manual.total_samples >= ELLIP_MANUAL_TIMEOUT_SAMPLES)
+    {
+        imu_calib_emit_text("ERR imu accel_man 失败 原因=超时 total_samples=%lu",
+                            (unsigned long)s_ellip_manual.total_samples);
+        return -1;
+    }
+
+    if (s_ellip_manual.substate == IMU_CALIB_MANUAL_SUBSTATE_SOLVING)
+    {
+        return imu_calib_manual_solve();
+    }
+
+    imu_calib_get_raw_sensor_sample(accel_sensor_g, gyro_sensor_dps);
+
+    if (!imu_sample_valid(accel_sensor_g[0], accel_sensor_g[1], accel_sensor_g[2],
+                          gyro_sensor_dps[0], gyro_sensor_dps[1], gyro_sensor_dps[2]))
+    {
+        if (s_ellip_manual.substate == IMU_CALIB_MANUAL_SUBSTATE_WAIT_STATIC)
+        {
+            s_ellip_manual.stable_samples = 0U;
+            return 0;
+        }
+
+        imu_calib_emit_text("ERR imu accel_man 当前姿态点作废 原因=样本无效 samples=%lu",
+                            (unsigned long)s_ellip_manual.orient_samples);
+        imu_calib_manual_enter_ready_state();
+        imu_calib_manual_emit_next_commands();
+        return 0;
+    }
+
+    rotate_imu_to_body(accel_sensor_g, accel_body_g);
+    rotate_imu_to_body(gyro_sensor_dps, gyro_body_dps);
+
+    accel_norm_g = vec3_norm(accel_body_g[0], accel_body_g[1], accel_body_g[2]);
+    gyro_norm_dps = vec3_norm(gyro_body_dps[0], gyro_body_dps[1], gyro_body_dps[2]);
+
+    if ((gyro_norm_dps > ELLIP_STATIC_GYRO_MAX_DPS) ||
+        (accel_norm_g < ELLIP_STATIC_ACC_MIN_G) ||
+        (accel_norm_g > ELLIP_STATIC_ACC_MAX_G))
+    {
+        if (s_ellip_manual.substate == IMU_CALIB_MANUAL_SUBSTATE_WAIT_STATIC)
+        {
+            s_ellip_manual.stable_samples = 0U;
+            return 0;
+        }
+
+        imu_calib_emit_text("ERR imu accel_man 当前姿态点作废 原因=采集中检测到晃动 samples=%lu",
+                            (unsigned long)s_ellip_manual.orient_samples);
+        imu_calib_manual_enter_ready_state();
+        imu_calib_manual_emit_next_commands();
+        return 0;
+    }
+
+    if (s_ellip_manual.substate == IMU_CALIB_MANUAL_SUBSTATE_WAIT_STATIC)
+    {
+        s_ellip_manual.stable_samples++;
+        if (s_ellip_manual.stable_samples == ELLIP_PRE_STABLE_SAMPLES)
+        {
+            imu_calib_manual_reset_current_pose();
+            s_ellip_manual.substate = IMU_CALIB_MANUAL_SUBSTATE_COLLECTING;
+            imu_calib_emit_text("OK imu accel_man 开始采集 pose=%u target=%u",
+                                (unsigned int)(s_ellip_manual.orient_count + 1U),
+                                (unsigned int)ELLIP_MANUAL_ORIENT_SAMPLES);
+        }
+        return 0;
+    }
+
+    if (s_ellip_manual.substate != IMU_CALIB_MANUAL_SUBSTATE_COLLECTING)
+    {
+        return 0;
+    }
+
+    {
+        uint32_t n = s_ellip_manual.orient_samples + 1U;
+        uint8_t axis;
+        s_ellip_manual.orient_samples = n;
+        for (axis = 0U; axis < 3U; axis++)
+        {
+            update_running_stats(accel_body_g[axis],
+                                 &s_ellip_manual.collect_mean[axis],
+                                 &s_ellip_manual.collect_m2[axis],
+                                 n);
+        }
+    }
+
+    if (s_ellip_manual.orient_samples >= ELLIP_MANUAL_ORIENT_SAMPLES)
+    {
+        float std_x = std_from_m2(s_ellip_manual.collect_m2[0], s_ellip_manual.orient_samples);
+        float std_y = std_from_m2(s_ellip_manual.collect_m2[1], s_ellip_manual.orient_samples);
+        float std_z = std_from_m2(s_ellip_manual.collect_m2[2], s_ellip_manual.orient_samples);
+        float std_max = max3f_local(std_x, std_y, std_z);
+
+        if (std_max > ELLIP_ORIENT_STD_MAX_G)
+        {
+            imu_calib_emit_text("ERR imu accel_man 当前姿态点作废 原因=噪声过大 pose=%u std_g=%f",
+                                (unsigned int)(s_ellip_manual.orient_count + 1U),
+                                (double)std_max);
+            imu_calib_manual_enter_ready_state();
+            imu_calib_manual_emit_next_commands();
+            return 0;
+        }
+
+        s_ellip_manual.orient_mean[s_ellip_manual.orient_count][0] = s_ellip_manual.collect_mean[0];
+        s_ellip_manual.orient_mean[s_ellip_manual.orient_count][1] = s_ellip_manual.collect_mean[1];
+        s_ellip_manual.orient_mean[s_ellip_manual.orient_count][2] = s_ellip_manual.collect_mean[2];
+        s_ellip_manual.pose_std_max[s_ellip_manual.orient_count] = std_max;
+        s_ellip_manual.orient_count++;
+
+        imu_calib_emit_text("OK imu accel_man 姿态点完成 pose=%u mean_g=%f,%f,%f std_g=%f,%f,%f std_max_g=%f",
+                            (unsigned int)s_ellip_manual.orient_count,
+                            (double)s_ellip_manual.collect_mean[0],
+                            (double)s_ellip_manual.collect_mean[1],
+                            (double)s_ellip_manual.collect_mean[2],
+                            (double)std_x,
+                            (double)std_y,
+                            (double)std_z,
+                            (double)std_max);
+
+        imu_calib_manual_enter_ready_state();
+        if (s_ellip_manual.orient_count >= ELLIP_MANUAL_MAX_ORIENT)
+        {
+            imu_calib_emit_text("OK imu accel_man 提示 姿态点已达上限 请发 imu acc stop");
+            return 0;
+        }
+
+        imu_calib_manual_emit_next_commands();
+    }
+
+    return 0;
 }
 
 static int32_t imu_calib_update_ellip_step(void)
@@ -1385,12 +1861,7 @@ static int32_t imu_calib_update_ellip_step(void)
         return -1;
     }
 
-    accel_sensor_g[0] = g_imufilter_1000hz.accx;
-    accel_sensor_g[1] = g_imufilter_1000hz.accy;
-    accel_sensor_g[2] = g_imufilter_1000hz.accz;
-    gyro_sensor_dps[0] = g_imufilter_1000hz.gyrox;
-    gyro_sensor_dps[1] = g_imufilter_1000hz.gyroy;
-    gyro_sensor_dps[2] = g_imufilter_1000hz.gyroz;
+    imu_calib_get_raw_sensor_sample(accel_sensor_g, gyro_sensor_dps);
 
     if (!imu_sample_valid(accel_sensor_g[0], accel_sensor_g[1], accel_sensor_g[2],
                           gyro_sensor_dps[0], gyro_sensor_dps[1], gyro_sensor_dps[2]))
@@ -1783,15 +2254,17 @@ static const char *imu_calib_face_name(uint8_t face_idx)
 
 static int32_t imu_calib_update_gyro_step(void)
 {
-    float gx = g_imufilter_1000hz.gyrox;
-    float gy = g_imufilter_1000hz.gyroy;
-    float gz = g_imufilter_1000hz.gyroz;
-    float ax = g_imufilter_1000hz.accx;
-    float ay = g_imufilter_1000hz.accy;
-    float az = g_imufilter_1000hz.accz;
+    float gx = 0.0f;
+    float gy = 0.0f;
+    float gz = 0.0f;
+    float ax = 0.0f;
+    float ay = 0.0f;
+    float az = 0.0f;
     float gyro_norm_dps;
     float acc_norm_g;
     uint8_t static_ok;
+
+    IMU_GetRawSampleForCalibration(&gx, &gy, &gz, &ax, &ay, &az);
 
     if (!is_finitef_local(gx) || !is_finitef_local(gy) || !is_finitef_local(gz) ||
         !is_finitef_local(ax) || !is_finitef_local(ay) || !is_finitef_local(az))
@@ -1935,12 +2408,7 @@ static int32_t imu_calib_update_acc6_step(void)
         return -1;
     }
 
-    accel_sensor_g[0] = g_imufilter_1000hz.accx;
-    accel_sensor_g[1] = g_imufilter_1000hz.accy;
-    accel_sensor_g[2] = g_imufilter_1000hz.accz;
-    gyro_sensor_dps[0] = g_imufilter_1000hz.gyrox;
-    gyro_sensor_dps[1] = g_imufilter_1000hz.gyroy;
-    gyro_sensor_dps[2] = g_imufilter_1000hz.gyroz;
+    imu_calib_get_raw_sensor_sample(accel_sensor_g, gyro_sensor_dps);
 
     if (!imu_sample_valid(accel_sensor_g[0], accel_sensor_g[1], accel_sensor_g[2],
                           gyro_sensor_dps[0], gyro_sensor_dps[1], gyro_sensor_dps[2]))
@@ -2271,6 +2739,41 @@ static uint32_t imu_calib_progress_percent(void)
     {
         progress = (uint32_t)((100U * s_ellip.orient_count) / ELLIP_MIN_ORIENT);
     }
+    else if (s_imu_calib.mode == IMU_CALIB_MODE_ELLIP_MANUAL)
+    {
+        uint32_t base_progress = (uint32_t)((100U * s_ellip_manual.orient_count) / ELLIP_MIN_ORIENT);
+        progress = base_progress;
+
+        if (s_ellip_manual.orient_count < ELLIP_MIN_ORIENT)
+        {
+            uint32_t stage_current = 0U;
+            const uint32_t stage_target = ELLIP_PRE_STABLE_SAMPLES + ELLIP_MANUAL_ORIENT_SAMPLES;
+
+            if (s_ellip_manual.substate == IMU_CALIB_MANUAL_SUBSTATE_WAIT_STATIC)
+            {
+                stage_current = s_ellip_manual.stable_samples;
+            }
+            else if (s_ellip_manual.substate == IMU_CALIB_MANUAL_SUBSTATE_COLLECTING)
+            {
+                stage_current = ELLIP_PRE_STABLE_SAMPLES + s_ellip_manual.orient_samples;
+            }
+            else if (s_ellip_manual.substate == IMU_CALIB_MANUAL_SUBSTATE_SOLVING)
+            {
+                progress = 100U;
+            }
+
+            if ((stage_current > 0U) && (stage_target > 0U))
+            {
+                progress = (uint32_t)(((uint64_t)(s_ellip_manual.orient_count * 100U) +
+                                       ((uint64_t)stage_current * 100U / (uint64_t)stage_target)) /
+                                      (uint64_t)ELLIP_MIN_ORIENT);
+            }
+        }
+        else if (s_ellip_manual.substate == IMU_CALIB_MANUAL_SUBSTATE_SOLVING)
+        {
+            progress = 100U;
+        }
+    }
 
     if (progress > 100U)
     {
@@ -2571,13 +3074,7 @@ bool AccelCalibration_Start(void)
             total_tries++;
             system_delay_us(ICM42688_SAMPLE_INTERVAL_US);
 
-            accel_sensor_g[0] = g_imufilter_1000hz.accx;
-            accel_sensor_g[1] = g_imufilter_1000hz.accy;
-            accel_sensor_g[2] = g_imufilter_1000hz.accz;
-
-            gyro_sensor_dps[0] = g_imufilter_1000hz.gyrox;
-            gyro_sensor_dps[1] = g_imufilter_1000hz.gyroy;
-            gyro_sensor_dps[2] = g_imufilter_1000hz.gyroz;
+            imu_calib_get_raw_sensor_sample(accel_sensor_g, gyro_sensor_dps);
 
             /* ������Ч��ɸѡ */
             if (!imu_sample_valid(accel_sensor_g[0], accel_sensor_g[1], accel_sensor_g[2],
@@ -2780,6 +3277,7 @@ void AccelCalibration_ApplySensorCorrection(float *ax, float *ay, float *az)
 void AccelCalibration_Update_1000HZ(void)
 {
     float accel_sensor_g[3];
+    float accel_corrected_sensor_g[3];
     float gyro_sensor_dps[3];
     float gravity_x_g;
     float gravity_y_g;
@@ -2794,13 +3292,7 @@ void AccelCalibration_Update_1000HZ(void)
     /* ===================== ����Ϊʵʱ1kHz���� ===================== */
     sanitize_scale();
 
-    accel_sensor_g[0] = g_imufilter_1000hz.accx;
-    accel_sensor_g[1] = g_imufilter_1000hz.accy;
-    accel_sensor_g[2] = g_imufilter_1000hz.accz;
-
-    gyro_sensor_dps[0] = g_imufilter_1000hz.gyrox;
-    gyro_sensor_dps[1] = g_imufilter_1000hz.gyroy;
-    gyro_sensor_dps[2] = g_imufilter_1000hz.gyroz;
+    imu_calib_get_raw_sensor_sample(accel_sensor_g, gyro_sensor_dps);
 
     if (!imu_sample_valid(accel_sensor_g[0], accel_sensor_g[1], accel_sensor_g[2], gyro_sensor_dps[0], gyro_sensor_dps[1], gyro_sensor_dps[2]))
     {
@@ -2839,9 +3331,14 @@ void AccelCalibration_Update_1000HZ(void)
     /* 校准已在 ApplySensorCorrection 前置完成,
        g_imufilter_1000hz 中的 acc 已经是校准后的值,
        rotate_imu_to_body 后的 accel_raw_body_g 即为校准后机体系值 */
-    g_accel_calibration.accel_corrected_body_g[0] = g_accel_calibration.accel_raw_body_g[0];
-    g_accel_calibration.accel_corrected_body_g[1] = g_accel_calibration.accel_raw_body_g[1];
-    g_accel_calibration.accel_corrected_body_g[2] = g_accel_calibration.accel_raw_body_g[2];
+    /* 原始传感器值先做零偏/矩阵校准，再旋转到机体系，得到实时校准输出 */
+    accel_corrected_sensor_g[0] = accel_sensor_g[0];
+    accel_corrected_sensor_g[1] = accel_sensor_g[1];
+    accel_corrected_sensor_g[2] = accel_sensor_g[2];
+    AccelCalibration_ApplySensorCorrection(&accel_corrected_sensor_g[0],
+                                           &accel_corrected_sensor_g[1],
+                                           &accel_corrected_sensor_g[2]);
+    rotate_imu_to_body(accel_corrected_sensor_g, g_accel_calibration.accel_corrected_body_g);
     update_runtime_quality(
         g_accel_calibration.accel_corrected_body_g,
         g_accel_calibration.gyro_raw_body_dps);
@@ -3266,6 +3763,82 @@ uint8_t IMUCalib_StartAccel(void)
     return 0U;
 }
 
+uint8_t IMUCalib_StartAccelManual(void)
+{
+    uint32_t irq_state;
+
+    if (0U != s_imu_calib.busy)
+    {
+        return 0U;
+    }
+
+    irq_state = interrupt_global_disable();
+    if (0U == s_imu_calib.busy)
+    {
+        imu_calib_start_ellip_manual();
+        interrupt_global_enable(irq_state);
+        return 1U;
+    }
+
+    interrupt_global_enable(irq_state);
+    return 0U;
+}
+
+uint8_t IMUCalib_ManualCollect(void)
+{
+    uint32_t irq_state;
+
+    if ((0U == s_imu_calib.busy) || (s_imu_calib.mode != IMU_CALIB_MODE_ELLIP_MANUAL))
+    {
+        return 0U;
+    }
+
+    irq_state = interrupt_global_disable();
+    if ((s_imu_calib.busy != 0U) &&
+        (s_imu_calib.mode == IMU_CALIB_MODE_ELLIP_MANUAL) &&
+        (s_ellip_manual.substate == IMU_CALIB_MANUAL_SUBSTATE_READY) &&
+        (s_ellip_manual.orient_count < ELLIP_MANUAL_MAX_ORIENT))
+    {
+        imu_calib_manual_begin_collect();
+        interrupt_global_enable(irq_state);
+        return 1U;
+    }
+
+    interrupt_global_enable(irq_state);
+    return 0U;
+}
+
+uint8_t IMUCalib_ManualStop(void)
+{
+    uint32_t irq_state;
+
+    if ((0U == s_imu_calib.busy) || (s_imu_calib.mode != IMU_CALIB_MODE_ELLIP_MANUAL))
+    {
+        return 0U;
+    }
+
+    irq_state = interrupt_global_disable();
+    if ((s_imu_calib.busy != 0U) &&
+        (s_imu_calib.mode == IMU_CALIB_MODE_ELLIP_MANUAL) &&
+        (s_ellip_manual.substate != IMU_CALIB_MANUAL_SUBSTATE_SOLVING))
+    {
+        if (s_ellip_manual.substate == IMU_CALIB_MANUAL_SUBSTATE_COLLECTING)
+        {
+            imu_calib_emit_text("OK imu accel_man 提示 当前未完成姿态点已丢弃");
+        }
+
+        imu_calib_manual_reset_current_pose();
+        s_ellip_manual.substate = IMU_CALIB_MANUAL_SUBSTATE_SOLVING;
+        imu_calib_emit_text("OK imu accel_man 开始求解 pose_count=%u",
+                            (unsigned int)s_ellip_manual.orient_count);
+        interrupt_global_enable(irq_state);
+        return 1U;
+    }
+
+    interrupt_global_enable(irq_state);
+    return 0U;
+}
+
 void IMUCalib_GetStatus(IMUCalibStatus_t *status)
 {
     if (NULL == status)
@@ -3275,9 +3848,25 @@ void IMUCalib_GetStatus(IMUCalibStatus_t *status)
 
     status->busy = s_imu_calib.busy;
     status->mode = s_imu_calib.mode;
-    status->pose_count = s_ellip.orient_count;
-    status->reserved = 0U;
+    status->pose_count = (s_imu_calib.mode == IMU_CALIB_MODE_ELLIP_MANUAL) ? s_ellip_manual.orient_count : s_ellip.orient_count;
+    status->substate = (s_imu_calib.mode == IMU_CALIB_MODE_ELLIP_MANUAL) ? s_ellip_manual.substate : IMU_CALIB_MANUAL_SUBSTATE_NONE;
     status->progress_percent = imu_calib_progress_percent();
+    status->current_samples = 0U;
+    status->target_samples = 0U;
+
+    if (s_imu_calib.mode == IMU_CALIB_MODE_ELLIP_MANUAL)
+    {
+        if (s_ellip_manual.substate == IMU_CALIB_MANUAL_SUBSTATE_WAIT_STATIC)
+        {
+            status->current_samples = s_ellip_manual.stable_samples;
+            status->target_samples = ELLIP_PRE_STABLE_SAMPLES;
+        }
+        else if (s_ellip_manual.substate == IMU_CALIB_MANUAL_SUBSTATE_COLLECTING)
+        {
+            status->current_samples = s_ellip_manual.orient_samples;
+            status->target_samples = ELLIP_MANUAL_ORIENT_SAMPLES;
+        }
+    }
 }
 
 void IMUCalib_Update_1000HZ(void)
@@ -3390,6 +3979,22 @@ void IMUCalib_Update_1000HZ(void)
         }
         return;
     }
+
+    if (s_imu_calib.mode == IMU_CALIB_MODE_ELLIP_MANUAL)
+    {
+        ret = imu_calib_update_ellip_manual_step();
+        if (ret > 0)
+        {
+            s_imu_calib.busy = 0U;
+            s_imu_calib.mode = IMU_CALIB_MODE_IDLE;
+        }
+        else if (ret < 0)
+        {
+            s_imu_calib.busy = 0U;
+            s_imu_calib.mode = IMU_CALIB_MODE_IDLE;
+        }
+        return;
+    }
 }
 
 void IMUCalib_CommandPoll(void)
@@ -3433,5 +4038,3 @@ void IMUCalib_CommandPoll(void)
         }
     }
 }
-
-

@@ -3,10 +3,9 @@
  * 模块    : 姿态融合 - Mahony AHRS 四元数解算
  * 位置    : Estimation/Attitude
  * 职责    :
- *   1) 输入滤波后的陀螺仪角速度(deg/s)与加速度(g)
+ *   1) 输入滤波后的机体系角速度(deg/s)与比力(g)
  *   2) 输出姿态四元数与欧拉角
- *   3) 使用 PX4 常见互补融合策略（陀螺积分 + 重力矢量校正）
- * 不负责  : 传感器驱动初始化与底层采样（由 ICM42688 驱动完成）
+ *   3) 内部计算默认对齐 INAV 纯 6 轴姿态算法
  ********************************************************************/
 #ifndef MAHONY_AHRS_H
 #define MAHONY_AHRS_H
@@ -14,81 +13,84 @@
 #include <stdint.h>
 
 /* ======================== 采样率与物理常数 ======================== */
-#define MAHONY_SAMPLE_RATE                  1000.0f
-#define MAHONY_SAMPLE_DT                    (1.0f / MAHONY_SAMPLE_RATE)
-#define DEGREES_TO_RADIANS                  (3.14159265359f / 180.0f)
-#define RADIANS_TO_DEGREES                  (180.0f / 3.14159265359f)
+#define MAHONY_SAMPLE_RATE                    1000.0f   /* 姿态解算默认采样率，单位 Hz */
+#define MAHONY_SAMPLE_DT                      (1.0f / MAHONY_SAMPLE_RATE) /* 姿态解算默认采样周期，单位 s */
+#define DEGREES_TO_RADIANS                    (3.14159265359f / 180.0f)   /* 角度转弧度系数 */
+#define RADIANS_TO_DEGREES                    (180.0f / 3.14159265359f)   /* 弧度转角度系数 */
 
-/* ======================== 融合参数（PX4风格） ======================== */
-#define MAHONY_KP_DEFAULT                   1.4f
-#define MAHONY_KI_DEFAULT                   0.015f
+/* ======================== INAV 对齐参数 ======================== */
+#define MAHONY_KP_DEFAULT                     0.20f    /* INAV 默认 AHRS P 增益 */
+#define MAHONY_KI_DEFAULT                     0.005f   /* INAV 默认 AHRS I 增益 */
+#define MAHONY_INPUT_ACCEL_IS_SPECIFIC_FORCE  (1U)     /* 1=输入为比力，静止时约 -1g */
+#define MAHONY_ACCEL_MIN_MAGNITUDE            0.30f    /* 加速度有效最小模长，单位 g */
+#define MAHONY_ACCEL_MAX_MAGNITUDE            3.00f    /* 加速度有效最大模长，单位 g */
+#define MAHONY_ACCEL_NEARNESS_WIDTH_G         0.20f    /* INAV bellCurve 宽度，单位 g */
+#define MAHONY_ACCEL_WEIGHT_MIN               0.001f   /* 加速度修正最小权重阈值 */
+#define MAHONY_ACCEL_IGNORE_RATE_DPS          15.0f    /* INAV 默认加速度忽略角速度中心，单位 dps */
+#define MAHONY_ACCEL_IGNORE_SLOPE_DPS         5.0f     /* INAV 默认加速度忽略斜坡半宽，单位 dps */
+#define MAHONY_SPIN_RATE_LIMIT_DPS            20.0f    /* INAV 默认积分限速阈值，单位 dps */
+#define MAHONY_ROTATION_LPF_HZ                3.0f     /* INAV 默认角速度门控低通，单位 Hz */
+#define MAHONY_FAST_GAIN_SCALE                10.0f    /* 未解锁前快速收敛增益倍率 */
+#define MAHONY_FAST_GAIN_WINDOW_S             20.0f    /* 未解锁前快速收敛持续时间，单位 s */
+#define MAHONY_INTEGRAL_LIMIT_DEG             2.0f     /* INAV 风格积分限幅角度，单位 deg */
 
-/* 1: 输入加速度为比力（静止约 -1g），内部转换为重力方向用于校正 */
-#define MAHONY_INPUT_ACCEL_IS_SPECIFIC_FORCE (1U)
+/* ======================== 静止检测参数 ======================== */
+#define MAHONY_STATIC_GYRO_DPS_TH             1.5f     /* 静止判定角速度阈值，单位 dps */
+#define MAHONY_STATIC_ACC_ERR_G_TH            0.08f    /* 静止判定加速度模长误差阈值，单位 g */
+#define MAHONY_STATIC_LOCK_COUNT              (100U)   /* 静止判定锁定样本数 */
 
-/* 加速度可信区间与权重衰减带宽（单位 g） */
-#define MAHONY_ACCEL_MIN_MAGNITUDE          0.30f
-#define MAHONY_ACCEL_MAX_MAGNITUDE          3.00f
-#define MAHONY_ACCEL_TRUST_BAND_G           0.35f
-
-/* 陀螺零偏学习约束 */
-#define MAHONY_BIAS_LEARN_MAX_GYRO_DPS      25.0f
-#define MAHONY_BIAS_LEARN_MAX_ACC_ERR_G     0.20f
-#define MAHONY_BIAS_MAX_RAD_S               0.25f
-/* 0: 禁止 x/y 偏置积分学习，降低长时静止 roll/pitch 漂移 */
-#define MAHONY_BIAS_XY_ENABLE               (0U)
-#define MAHONY_YAW_CORR_ENABLE              (0U)
-#define MAHONY_STATIC_GYRO_DPS_TH           1.5f
-#define MAHONY_STATIC_ACC_ERR_G_TH          0.08f
-#define MAHONY_STATIC_LOCK_COUNT            (100U)
-#define MAHONY_YAW_BIAS_LP_ALPHA            0.004f
-#define MAHONY_YAW_GZ_DEADBAND_DPS          0.05f
-
-/* 数值稳定阈值 */
-#define MAHONY_VECTOR_NORM_MIN              1e-6f
+/* ======================== 数值稳定参数 ======================== */
+#define MAHONY_VECTOR_NORM_MIN                1e-6f    /* 向量/四元数最小模长阈值 */
+#define MAHONY_QUAT_SMALL_ANGLE_THRESHOLD     0.00489898f /* INAV 小角度增量四元数阈值 */
+#define MAHONY_QUAT_MIN_UPDATE                1e-20f   /* 四元数增量最小阈值 */
 
 /* ======================== 姿态状态结构体 ======================== */
 typedef struct
 {
-    float q0;
-    float q1;
-    float q2;
-    float q3;
+    float q0;                  /* 四元数实部 */
+    float q1;                  /* 四元数 i 分量 */
+    float q2;                  /* 四元数 j 分量 */
+    float q3;                  /* 四元数 k 分量 */
 
-    /* 动态零偏估计（rad/s） */
-    float gyro_bias_x;
-    float gyro_bias_y;
-    float gyro_bias_z;
-    float gyro_bias_z_static;
+    float gyro_bias_x;         /* X 轴漂移积分镜像，单位 rad/s */
+    float gyro_bias_y;         /* Y 轴漂移积分镜像，单位 rad/s */
+    float gyro_bias_z;         /* Z 轴漂移积分镜像，单位 rad/s */
+    float gyro_bias_z_static;  /* 保留旧字段，默认不参与姿态更新 */
 
-    /* 积分反馈项（与 gyro_bias 保持一致） */
-    float integral_fbx;
-    float integral_fby;
-    float integral_fbz;
+    float integral_fbx;        /* X 轴积分反馈状态，单位 rad/s */
+    float integral_fby;        /* Y 轴积分反馈状态，单位 rad/s */
+    float integral_fbz;        /* Z 轴积分反馈状态，单位 rad/s */
 
-    float kp;
-    float ki;
+    float gyro_lpf_x;          /* X 轴角速度门控低通状态，单位 rad/s */
+    float gyro_lpf_y;          /* Y 轴角速度门控低通状态，单位 rad/s */
+    float gyro_lpf_z;          /* Z 轴角速度门控低通状态，单位 rad/s */
+    float elapsed_time_s;      /* 自初始化以来累计运行时间，单位 s */
 
-    uint32_t update_count;
-    float accel_magnitude;
-    uint16_t static_count;
-    uint8_t is_static;
+    float kp;                  /* 当前姿态 P 增益 */
+    float ki;                  /* 当前姿态 I 增益 */
+
+    uint32_t update_count;     /* 姿态更新计数 */
+    float accel_magnitude;     /* 当前加速度模长，单位 g */
+    float acc_weight_nearness; /* 加速度 1g 接近度权重 */
+    float acc_weight_rate_ignore; /* 角速度门控权重 */
+    float acc_weight_final;    /* 最终用于姿态修正的加速度权重 */
+    uint16_t static_count;     /* 静止连续样本计数 */
+    uint8_t is_static;         /* 1=当前姿态输入满足静止条件 */
+    uint8_t gyro_lpf_ready;    /* 1=角速度门控低通已初始化 */
 
 } MahonyAhrs_t;
 
 /* ======================== 欧拉角输出结构体 ======================== */
 typedef struct
 {
-    /* 角度输出单位：度（GetEulerDegrees） */
-    float roll;
-    float pitch;
-    float yaw;
+    float roll;       /* 横滚角，GetEulerDegrees 输出单位为度 */
+    float pitch;      /* 俯仰角，GetEulerDegrees 输出单位为度 */
+    float yaw;        /* 偏航角，GetEulerDegrees 输出单位为度 */
 
-    /* 供控制侧直接复用的三角函数缓存 */
-    float sin_roll;
-    float cos_roll;
-    float sin_pitch;
-    float cos_pitch;
+    float sin_roll;   /* 横滚角正弦缓存 */
+    float cos_roll;   /* 横滚角余弦缓存 */
+    float sin_pitch;  /* 俯仰角正弦缓存 */
+    float cos_pitch;  /* 俯仰角余弦缓存 */
 
 } MahonyAhrs_Euler_t;
 

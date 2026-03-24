@@ -347,22 +347,7 @@ void FC_Loop_100Hz(void)
     s_flight_mode = FC_START_CRSF_Get_Flight_Mode(); /* 检测遥控器的模式 */
     FC_Handle_Mode_Transition_100Hz(s_flight_mode, fc_state);
 
-    // wifi_justfloat(g_tof1_height_mm,
-    //                g_tof2_height_mm,
-    //                g_tof3_height_mm,
-    //                g_tof4_height_mm,
-    //                VL53L1X_data.distance_mm[0],
-    //                VL53L1X_data.distance_mm[1],
-    //                VL53L1X_data.distance_mm[2],
-    //                VL53L1X_data.distance_mm[3],
-    //                g_vl53l1x_diag[0].ready,
-    //                g_vl53l1x_diag[1].ready,
-    //                g_vl53l1x_diag[2].ready,
-    //                g_vl53l1x_diag[3].ready,
-    //                VL53L1X_data.range_status[0],
-    //                VL53L1X_data.range_status[1],
-    //                VL53L1X_data.range_status[2],
-    //                VL53L1X_data.range_status[3]);
+
 
     if (fc_state == FC_START_CRSF_STATE_FLYING)
     {
@@ -395,6 +380,17 @@ void FC_Loop_100Hz(void)
         FC_Mode2_100Hz();
         break;
     }
+
+    wifi_justfloat(tick_1000us_cnt,
+        target_height_m, g_tof_fused_height_mm/1000.0f,
+                height_pos_pid.p_term, height_pos_pid.i_term, height_pos_pid.d_term,
+
+        height_pos_out,height_vz_raw_mps,s_height_vz_mps,
+        height_vel_pid.p_term, height_vel_pid.i_term, height_vel_pid.d_term,
+        height_vel_out,g_motor_cmd.throttle,
+        g_euler.roll, g_euler.pitch
+    );
+
 }
 
 void FC_Loop_500Hz(void)

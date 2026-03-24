@@ -277,22 +277,7 @@ void IMU_Update_1000HZ(void)
 	/* 步骤5: 计算欧拉角（单位: 度）并缓�?*/
 	g_euler = MahonyAhrs_GetEulerDegrees(&g_mahony_ahrs);
 	g_imu_update_count++;
-	wifi_justfloat(g_imufilter_1000hz.gyrox,
-	               g_imufilter_1000hz.gyroy,
-	               g_imufilter_1000hz.gyroz,
-	               g_imufilter_1000hz.accx,
-	               g_imufilter_1000hz.accy,
-	               g_imufilter_1000hz.accz,
-	               g_mahony_ahrs.accel_magnitude,
-	               g_mahony_ahrs.acc_weight_nearness,
-	               g_mahony_ahrs.acc_weight_rate_ignore,
-	               g_mahony_ahrs.acc_weight_final,
-	               g_mahony_ahrs.gyro_bias_x,
-	               g_mahony_ahrs.gyro_bias_y,
-	               g_mahony_ahrs.gyro_bias_z,
-	               g_euler.pitch,
-	               g_euler.roll,
-	               g_euler.yaw);
+
 }
 
 uint8 IMU_Is_Ready(void)

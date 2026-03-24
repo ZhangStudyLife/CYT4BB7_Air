@@ -101,80 +101,40 @@ static uint16_t FC_START_CRSF_MsToTicks(uint16_t time_ms)
 
 static uint8_t FC_START_CRSF_TakeoffState_Update(void)
 {
-    const uint16_t pair1_ramp_ticks = FC_START_CRSF_MsToTicks(FC_START_CRSF_TAKEOFF_PAIR1_RAMP_MS);
-    const uint16_t pair2_ramp_ticks = FC_START_CRSF_MsToTicks(FC_START_CRSF_TAKEOFF_PAIR2_RAMP_MS);
-    const uint16_t all_ramp_ticks = FC_START_CRSF_MsToTicks(FC_START_CRSF_TAKEOFF_TO_2500_RAMP_MS);
-    const uint16_t hold_ticks = FC_START_CRSF_MsToTicks(FC_START_CRSF_TAKEOFF_HOLD_2500_MS);
-    const uint16_t phase1_end = pair1_ramp_ticks;
-    const uint16_t phase2_end = (uint16_t)(phase1_end + pair2_ramp_ticks);
-    const uint16_t phase3_end = (uint16_t)(phase2_end + all_ramp_ticks);
-    const uint16_t phase4_end = (uint16_t)(phase3_end + hold_ticks);
-    int32_t motor_throttle[MOTOR_NUM] = {0};
-    uint16_t phase_tick = 0U;
-    int32_t ramp_throttle = 0;
+    // 新起飞逻辑：初始4电机油门1000，对角电机1/4从1000线性加速到1500（1秒），其余保持1000，加速后全部1500保持2秒
+    const uint16_t ramp_ticks = 10U; // 1秒（100ms*10）
+    const uint16_t hold_ticks = 20U; // 2秒（100ms*20）
+    const uint16_t total_ticks = ramp_ticks + hold_ticks;
+    int32_t motor_throttle[MOTOR_NUM] = {1000, 1000, 1000, 1000};
 
-    /* TODO: replace with closed-loop takeoff behavior */
-    if (!Motor_IsEnabled())
-    {
+    if (!Motor_IsEnabled()) {
         Motor_Enable();
     }
 
-    if (s_takeoff_timer_tick < phase4_end)
-    {
+    if (s_takeoff_timer_tick < total_ticks) {
         s_takeoff_timer_tick++;
     }
 
-    if (s_takeoff_timer_tick <= phase1_end)
-    {
-        phase_tick = s_takeoff_timer_tick;
-        ramp_throttle = (int32_t)((FC_START_CRSF_TAKEOFF_THR_STAGE1 * (int32_t)phase_tick) / (int32_t)pair1_ramp_ticks);
-        motor_throttle[FC_START_CRSF_TAKEOFF_PAIR1_MOTOR_A] = ramp_throttle;
-        motor_throttle[FC_START_CRSF_TAKEOFF_PAIR1_MOTOR_B] = ramp_throttle;
-    }
-    else if (s_takeoff_timer_tick <= phase2_end)
-    {
-        phase_tick = (uint16_t)(s_takeoff_timer_tick - phase1_end);
-        ramp_throttle = (int32_t)((FC_START_CRSF_TAKEOFF_THR_STAGE1 * (int32_t)phase_tick) / (int32_t)pair2_ramp_ticks);
-        motor_throttle[FC_START_CRSF_TAKEOFF_PAIR1_MOTOR_A] = FC_START_CRSF_TAKEOFF_THR_STAGE1;
-        motor_throttle[FC_START_CRSF_TAKEOFF_PAIR1_MOTOR_B] = FC_START_CRSF_TAKEOFF_THR_STAGE1;
-        motor_throttle[FC_START_CRSF_TAKEOFF_PAIR2_MOTOR_A] = ramp_throttle;
-
-        if ((FC_START_CRSF_TAKEOFF_PAIR2_MOTOR_B == FC_START_CRSF_TAKEOFF_PAIR1_MOTOR_A) ||
-            (FC_START_CRSF_TAKEOFF_PAIR2_MOTOR_B == FC_START_CRSF_TAKEOFF_PAIR1_MOTOR_B))
-        {
-            motor_throttle[FC_START_CRSF_TAKEOFF_PAIR2_MOTOR_B] = FC_START_CRSF_TAKEOFF_THR_STAGE1;
-        }
-        else
-        {
-            motor_throttle[FC_START_CRSF_TAKEOFF_PAIR2_MOTOR_B] = ramp_throttle;
-        }
-    }
-    else if (s_takeoff_timer_tick <= phase3_end)
-    {
-        phase_tick = (uint16_t)(s_takeoff_timer_tick - phase2_end);
-        ramp_throttle = FC_START_CRSF_TAKEOFF_THR_STAGE1 +
-                        (int32_t)(((FC_START_CRSF_TAKEOFF_THR_STAGE2 - FC_START_CRSF_TAKEOFF_THR_STAGE1) * (int32_t)phase_tick) /
-                                  (int32_t)all_ramp_ticks);
-
-        for (uint8_t i = 0U; i < MOTOR_NUM; i++)
-        {
-            motor_throttle[i] = ramp_throttle;
-        }
-    }
-    else
-    {
-        for (uint8_t i = 0U; i < MOTOR_NUM; i++)
-        {
-            motor_throttle[i] = FC_START_CRSF_TAKEOFF_THR_STAGE2;
+    if (s_takeoff_timer_tick <= ramp_ticks) {
+        // 对角电机M1/M4从1000线性加速到1500
+        int32_t ramp = 1000 + (int32_t)((500 * s_takeoff_timer_tick) / ramp_ticks);
+        motor_throttle[0] = ramp; // MOTOR_1
+        motor_throttle[3] = ramp; // MOTOR_4
+        // 其余电机保持1000
+        motor_throttle[1] = 1000; // MOTOR_2
+        motor_throttle[2] = 1000; // MOTOR_3
+    } else {
+        // 所有电机保持1500
+        for (uint8_t i = 0U; i < MOTOR_NUM; i++) {
+            motor_throttle[i] = 1500;
         }
     }
 
-    for (uint8_t i = 0U; i < MOTOR_NUM; i++)
-    {
+    for (uint8_t i = 0U; i < MOTOR_NUM; i++) {
         Motor_SetThrottle((motor_index_e)i, motor_throttle[i]);
     }
 
-    return (s_takeoff_timer_tick >= phase4_end) ? 1U : 0U;
+    return (s_takeoff_timer_tick >= total_ticks) ? 1U : 0U;
 }
 
 static uint8_t FC_START_CRSF_LandingState_Update(void)

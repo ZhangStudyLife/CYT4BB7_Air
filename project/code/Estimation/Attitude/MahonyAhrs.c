@@ -4,6 +4,9 @@
 
 #include "FlightController/fc_start_crsf.h"
 
+/* Mahony 解算前对 Z 轴陀螺输入施加的对称死区，单位 dps */
+#define MAHONY_GYRO_Z_DEADBAND_DPS  0.1f
+
 static float Mahony_Clamp(float value, float min_value, float max_value)
 {
     if (value < min_value)
@@ -14,6 +17,25 @@ static float Mahony_Clamp(float value, float min_value, float max_value)
     if (value > max_value)
     {
         return max_value;
+    }
+
+    return value;
+}
+
+/*
+ * 函数名: Mahony_ApplyDeadband
+ * 功能: 对输入量施加对称死区，小于等于死区阈值时直接归零
+ * 输入参数:
+ *   value    - 输入值
+ *   deadband - 死区阈值，要求为非负
+ * 返回值:
+ *   死区处理后的结果
+ */
+static float Mahony_ApplyDeadband(float value, float deadband)
+{
+    if (fabsf(value) <= fabsf(deadband))
+    {
+        return 0.0f;
     }
 
     return value;
@@ -349,6 +371,9 @@ void MahonyAhrs_Update(MahonyAhrs_t *ahrs,
     }
 
     ahrs->elapsed_time_s += dt;
+
+    /* 先压掉 Z 轴零点附近的残余漂移，再进入 Mahony 后续静止判定与姿态积分 */
+    gyro_z = Mahony_ApplyDeadband(gyro_z, MAHONY_GYRO_Z_DEADBAND_DPS);
 
     accel_mag = Mahony_VectorMagnitude(accel_x, accel_y, accel_z);
     ahrs->accel_magnitude = accel_mag;

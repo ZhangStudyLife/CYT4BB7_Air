@@ -70,7 +70,6 @@ static float fc_clampf(float value, float min_value, float max_value)
     return value;
 }
 
-
 /*
  * 函数名: FC_Apply_Tilt_Throttle_Compensation
  * 功能: 使用当前 Roll/Pitch 原始姿态角，对总油门做保守的垂向分力补偿
@@ -94,7 +93,6 @@ static float FC_Apply_Tilt_Throttle_Compensation(float throttle_raw)
 
     return fc_clampf(throttle_raw / cos_term, 0.0f, s_fc_tilt_comp_throttle_max);
 }
-
 
 /*
  * 函数名: FC_Map_TargetHeightFromCh2
@@ -445,15 +443,25 @@ void FC_Loop_1000Hz(void)
         int32_t pitch_ctrl = (int32_t)fc_clampf(PID_Update(&pitch_gyro_pid, pitch_gyro_target, pitch_gyro_meas, dt), -limit, limit);
         int32_t yaw_ctrl = (int32_t)fc_clampf(PID_Update(&yaw_gyro_pid, yaw_gyro_target, yaw_gyro_meas, dt), -limit, limit);
         /* 角速度环调试切换到 Pitch：目标、原始陀螺、滤波后陀螺、控制输出和 PID 分项 */
-        // wifi_justfloat(pitch_gyro_target,
-        //                         pitch_gyro_raw,
-        //                         pitch_gyro_meas,
-        //                         pitch_ctrl,
-        //                         pitch_gyro_pid.p_term,
-        //                         pitch_gyro_pid.i_term,
-        //                         pitch_gyro_pid.d_term,
-        //                         pitch_gyro_pid.error,
-        //                         8u);
+        wifi_justfloat(pitch_gyro_target,
+                       pitch_gyro_meas,
+                       pitch_ctrl,
+                       pitch_gyro_pid.p_term,
+                       pitch_gyro_pid.i_term,
+                       pitch_gyro_pid.d_term,
+
+                       roll_gyro_target,
+                       roll_gyro_meas,
+                       roll_ctrl,
+                       roll_gyro_pid.p_term,
+                       roll_gyro_pid.i_term,
+                       roll_gyro_pid.d_term,
+
+                       g_euler.roll,
+                       g_euler.pitch,
+                       g_euler.yaw
+
+        );
         (void)yaw_ctrl;
         /* 电机混控：总油门 = 基础油门 + 高度控制输出 */
         {

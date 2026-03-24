@@ -5,10 +5,10 @@
 
 /* ======================== IMU 全局状�?======================== */
 /* IMU滤波数据通过 g_imufilter_1000hz (IMU_Filtter.h) 访问 */
-MahonyAhrs_t g_mahony_ahrs;       /* Mahony 姿态解算器状�?*/
-MahonyAhrs_Euler_t g_euler;       /* 当前姿态欧拉角（度�?*/
-uint8 g_imu_ready = 0U;           /* IMU 是否完成初始化与自检 */
-uint32 g_imu_update_count = 0U;   /* 1kHz ���¼��� */
+MahonyAhrs_t g_mahony_ahrs;					   /* Mahony 姿态解算器状�?*/
+MahonyAhrs_Euler_t g_euler;					   /* 当前姿态欧拉角（度�?*/
+uint8 g_imu_ready = 0U;						   /* IMU 是否完成初始化与自检 */
+uint32 g_imu_update_count = 0U;				   /* 1kHz ���¼��� */
 static imudata_t s_imu_raw_calib_1000hz = {0}; /* 当前 1kHz 原始 IMU 快照，供校准链读取 */
 static uint8 s_imu_initializing = 0U;
 extern uint32 tick_1000us_cnt;
@@ -37,7 +37,7 @@ static uint8 IMU_IsFiniteFloat(float value)
  *   通过指针返回当前帧原始 IMU 快照；空指针会被忽略
  */
 void IMU_GetRawSampleForCalibration(float *gx, float *gy, float *gz,
-                                    float *ax, float *ay, float *az)
+									float *ax, float *ay, float *az)
 {
 	if (gx != NULL)
 	{
@@ -99,8 +99,8 @@ static uint8 IMU_Startup_SelfCheck(void)
 						 ICM42688.gyro_z * ICM42688.gyro_z);
 
 		acc_mag = sqrtf(ICM42688.acc_x * ICM42688.acc_x +
-					   ICM42688.acc_y * ICM42688.acc_y +
-					   ICM42688.acc_z * ICM42688.acc_z);
+						ICM42688.acc_y * ICM42688.acc_y +
+						ICM42688.acc_z * ICM42688.acc_z);
 
 		gyro_abs_sum += gyro_abs;
 		acc_mag_sum += acc_mag;
@@ -169,7 +169,7 @@ void IMU_Init_All(void)
 }
 
 void IMU_SelectAhrsInput(float *gx, float *gy, float *gz,
-								float *ax, float *ay, float *az)
+						 float *ax, float *ay, float *az)
 {
 	float cal_gx = 0.0f;
 	float cal_gy = 0.0f;
@@ -260,7 +260,7 @@ void IMU_Update_1000HZ(void)
 
 	/* 3. 校准后数据送入滤波器 */
 	IMUFilter_Update(ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,
-	                 cal_ax, cal_ay, cal_az);
+					 cal_ax, cal_ay, cal_az);
 
 	/* 4. 校准状态机 + 高级处理（当前帧） */
 	IMUCalib_Update_1000HZ();
@@ -277,26 +277,9 @@ void IMU_Update_1000HZ(void)
 	/* 步骤5: 计算欧拉角（单位: 度）并缓�?*/
 	g_euler = MahonyAhrs_GetEulerDegrees(&g_mahony_ahrs);
 	g_imu_update_count++;
-	wifi_justfloat(g_imufilter_1000hz.gyrox,
-	               g_imufilter_1000hz.gyroy,
-	               g_imufilter_1000hz.gyroz,
-	               g_imufilter_1000hz.accx,
-	               g_imufilter_1000hz.accy,
-	               g_imufilter_1000hz.accz,
-	               g_mahony_ahrs.accel_magnitude,
-	               g_mahony_ahrs.acc_weight_nearness,
-	               g_mahony_ahrs.acc_weight_rate_ignore,
-	               g_mahony_ahrs.acc_weight_final,
-	               g_mahony_ahrs.gyro_bias_x,
-	               g_mahony_ahrs.gyro_bias_y,
-	               g_mahony_ahrs.gyro_bias_z,
-	               g_euler.pitch,
-	               g_euler.roll,
-	               g_euler.yaw);
 }
 
 uint8 IMU_Is_Ready(void)
 {
 	return g_imu_ready;
 }
-

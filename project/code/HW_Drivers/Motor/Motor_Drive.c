@@ -17,10 +17,10 @@
  * M4 = P9.1  → TCPWM_CH25_P09_1
  */
 static const pwm_channel_enum MOTOR_PWM_CH[MOTOR_NUM] = {
-    TCPWM_CH09_P05_0,   /* M1: 右后 */
-    TCPWM_CH10_P05_1,   /* M2: 右前 */
-    TCPWM_CH24_P09_0,   /* M3: 左后 */
-    TCPWM_CH25_P09_1    /* M4: 左前 */
+    TCPWM_CH09_P05_0, /* M1: 右后 */
+    TCPWM_CH10_P05_1, /* M2: 右前 */
+    TCPWM_CH24_P09_0, /* M3: 左后 */
+    TCPWM_CH25_P09_1  /* M4: 左前 */
 };
 
 /* ======================== 混控矩阵定义（整数版本） ======================== */
@@ -45,10 +45,10 @@ static const pwm_channel_enum MOTOR_PWM_CH[MOTOR_NUM] = {
  */
 static const int32 MOTOR_MIX_MATRIX[MOTOR_NUM][3] = {
     /* { Roll,                    Pitch,                  Yaw    } */
-    { -MOTOR_MIX_ROLL_SCALE_I,  +MOTOR_MIX_PITCH_SCALE_I,  -10000 },  /* M1: 右后CW */
-    { -MOTOR_MIX_ROLL_SCALE_I,  -MOTOR_MIX_PITCH_SCALE_I,  +10000 },  /* M2: 右前CCW */
-    { +MOTOR_MIX_ROLL_SCALE_I,  +MOTOR_MIX_PITCH_SCALE_I,  +10000 },  /* M3: 左后CCW */
-    { +MOTOR_MIX_ROLL_SCALE_I,  -MOTOR_MIX_PITCH_SCALE_I,  -10000 }   /* M4: 左前CW */
+    {-MOTOR_MIX_ROLL_SCALE_I, +MOTOR_MIX_PITCH_SCALE_I, -10000}, /* M1: 右后CW */
+    {-MOTOR_MIX_ROLL_SCALE_I, -MOTOR_MIX_PITCH_SCALE_I, +10000}, /* M2: 右前CCW */
+    {+MOTOR_MIX_ROLL_SCALE_I, +MOTOR_MIX_PITCH_SCALE_I, +10000}, /* M3: 左后CCW */
+    {+MOTOR_MIX_ROLL_SCALE_I, -MOTOR_MIX_PITCH_SCALE_I, -10000}  /* M4: 左前CW */
 };
 
 /* ======================== 全局状态变量 ======================== */
@@ -65,8 +65,10 @@ motor_mixer_input_t g_motor_cmd = {0};
  */
 static inline int32 clamp_i(int32 value, int32 min_val, int32 max_val)
 {
-    if (value < min_val) return min_val;
-    if (value > max_val) return max_val;
+    if (value < min_val)
+        return min_val;
+    if (value > max_val)
+        return max_val;
     return value;
 }
 
@@ -105,7 +107,8 @@ static inline uint32 throttle_to_duty(int32 throttle)
  */
 static void motor_set_pwm(motor_index_e motor, uint32 duty)
 {
-    if (motor >= MOTOR_NUM) return;
+    if (motor >= MOTOR_NUM)
+        return;
 
     g_motor_state.duty[motor] = duty;
     pwm_set_duty(MOTOR_PWM_CH[motor], duty);
@@ -140,7 +143,8 @@ void Motor_Init(void)
 
 void Motor_SetThrottle(motor_index_e motor, int32 throttle)
 {
-    if (motor >= MOTOR_NUM) return;
+    if (motor >= MOTOR_NUM)
+        return;
 
     /* 未解锁时只输出最小油门 */
     if (!g_motor_state.is_armed)
@@ -181,7 +185,8 @@ void Motor_EmergencyStop(void)
 
 void Motor_Mixer(const motor_mixer_input_t *input)
 {
-    if (input == NULL) return;
+    if (input == NULL)
+        return;
 
     /* SWD拨码开关没有向下拨 不输出*/
     // SWD -> rc_get_channel(RC_CH_AUX1)
@@ -206,9 +211,9 @@ void Motor_Mixer(const motor_mixer_input_t *input)
 
     /* 限幅输入值（整数范围） */
     int32 throttle = clamp_i(input->throttle, 0, MOTOR_INPUT_MAX);
-    int32 roll     = clamp_i(input->roll,    MOTOR_INPUT_MIN, MOTOR_INPUT_MAX);
-    int32 pitch    = clamp_i(input->pitch,   MOTOR_INPUT_MIN, MOTOR_INPUT_MAX);
-    int32 yaw      = clamp_i(input->yaw,     MOTOR_INPUT_MIN, MOTOR_INPUT_MAX);
+    int32 roll = clamp_i(input->roll, MOTOR_INPUT_MIN, MOTOR_INPUT_MAX);
+    int32 pitch = clamp_i(input->pitch, MOTOR_INPUT_MIN, MOTOR_INPUT_MAX);
+    int32 yaw = clamp_i(input->yaw, MOTOR_INPUT_MIN, MOTOR_INPUT_MAX);
 
     /* 计算各电机输出 */
     int32 motor_out[MOTOR_NUM];
@@ -223,14 +228,16 @@ void Motor_Mixer(const motor_mixer_input_t *input)
          *
          * 各分量先乘后除，避免精度损失
          */
-        int32 roll_contrib  = (roll  * MOTOR_MIX_MATRIX[i][0]) / MOTOR_INPUT_MAX;
+        int32 roll_contrib = (roll * MOTOR_MIX_MATRIX[i][0]) / MOTOR_INPUT_MAX;
         int32 pitch_contrib = (pitch * MOTOR_MIX_MATRIX[i][1]) / MOTOR_INPUT_MAX;
-        int32 yaw_contrib   = (yaw   * MOTOR_MIX_MATRIX[i][2]) / MOTOR_INPUT_MAX;
+        int32 yaw_contrib = (yaw * MOTOR_MIX_MATRIX[i][2]) / MOTOR_INPUT_MAX;
 
         motor_out[i] = throttle + roll_contrib + pitch_contrib + yaw_contrib;
 
-        if (motor_out[i] > max_out) max_out = motor_out[i];
-        if (motor_out[i] < min_out) min_out = motor_out[i];
+        if (motor_out[i] > max_out)
+            max_out = motor_out[i];
+        if (motor_out[i] < min_out)
+            min_out = motor_out[i];
     }
 
     /* 饱和处理：如果超出范围，整体平移保持姿态控制能力 */
@@ -295,7 +302,7 @@ void Motor_IdleStart(void)
 
     for (uint16_t temp_throttle = 2000; temp_throttle < 3000; temp_throttle += 100)
     {
-        Motor_Mixer(&(motor_mixer_input_t){.throttle=temp_throttle, .roll=0, .pitch=0, .yaw=0});
+        Motor_Mixer(&(motor_mixer_input_t){.throttle = temp_throttle, .roll = 0, .pitch = 0, .yaw = 0});
         system_delay_ms(200);
     }
     system_delay_ms(1000);

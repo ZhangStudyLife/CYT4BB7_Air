@@ -5,7 +5,7 @@
 #include "FlightController/fc_start_crsf.h"
 
 /* Mahony 解算前对 Z 轴陀螺输入施加的对称死区，单位 dps */
-#define MAHONY_GYRO_Z_DEADBAND_DPS  0.1f
+#define MAHONY_GYRO_Z_DEADBAND_DPS 0.1f
 
 static float Mahony_Clamp(float value, float min_value, float max_value)
 {

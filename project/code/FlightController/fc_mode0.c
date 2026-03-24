@@ -3,7 +3,7 @@
 /* 模式0手动姿态映射比例，单位度每遥控归一化单位 */
 static const float s_mode0_rc_to_angle_scale = 0.04f;
 /* 模式0手动姿态最大角度，单位度 */
-static const float s_mode0_manual_angle_limit_deg = 40.0f;
+static const float s_mode0_manual_angle_limit_deg = 20.0f;
 
 /*
  * 函数名: FC_Mode0_Init

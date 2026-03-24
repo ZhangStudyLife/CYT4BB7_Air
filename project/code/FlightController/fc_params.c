@@ -11,8 +11,8 @@
 
 /* 飞控参数 Flash 魔数：用于识别有效参数块 */
 #define FC_PARAMS_FLASH_MAGIC   (0x46504346UL)
-/* 飞控参数 Flash 版本号：结构变更时递增 */
-#define FC_PARAMS_FLASH_VERSION (3U)
+/* 飞控参数 Flash 版本号：结构变化时递增 */
+#define FC_PARAMS_FLASH_VERSION (4U)
 
 /* 飞控参数 Flash 数据块：保存头信息和完整参数结构体 */
 typedef struct
@@ -75,8 +75,10 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->vel_xy_dt = 0.02f;  /* 50Hz */
     params->vel_z_dt = 0.01f;   /* 100Hz */
 
-    /* ===== 油门参数 ===== */
-    params->base_throttle = 3150; /* 悬停油门 */
+    /* ===== 油门与机械配平参数 ===== */
+    params->base_throttle = 3150;         /* 悬停油门 */
+    params->roll_mech_trim_deg = -0.5f;   /* Roll 机械配平角 */
+    params->pitch_mech_trim_deg = 3.0f;   /* Pitch 机械配平角 */
 
     /* ===== Roll 轴角速度环参数 ===== */
     params->roll_gyro_kp = 3.0f;

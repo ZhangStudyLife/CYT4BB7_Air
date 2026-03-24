@@ -43,6 +43,8 @@ typedef struct
 static const wifi_params_entry_t s_wifi_params_table[] =
 {
     WIFI_PARAMS_INT_ITEM("base_throttle", base_throttle, 0, 6000),
+    WIFI_PARAMS_FLOAT_ITEM("roll_mech_trim_deg", roll_mech_trim_deg, -30.0f, 30.0f),
+    WIFI_PARAMS_FLOAT_ITEM("pitch_mech_trim_deg", pitch_mech_trim_deg, -30.0f, 30.0f),
 
     WIFI_PARAMS_FLOAT_ITEM("roll_gyro_kp", roll_gyro_kp, 0.0f, 3000.0f),
     WIFI_PARAMS_FLOAT_ITEM("roll_gyro_ki", roll_gyro_ki, 0.0f, 3000.0f),

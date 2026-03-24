@@ -1,7 +1,7 @@
 /*****************************************************************************
  * 文件: fc_params.h
  * 模块: 飞控 - 参数集中管理
- * 职责: 定义飞控控制周期、油门基准和各控制环参数结构体，并提供 Flash 持久化接口
+ * 职责: 定义飞控控制周期、油门基准、机械配平角和各控制环参数结构体，并提供 Flash 持久化接口
  *****************************************************************************/
 
 #ifndef FC_PARAMS_H
@@ -23,104 +23,106 @@ typedef struct
     float vel_xy_dt; /* 水平速度环控制周期，单位 s */
     float vel_z_dt;  /* 垂直速度环控制周期，单位 s */
 
-    /* ===== 油门参数 ===== */
-    int32_t base_throttle; /* 悬停油门基准，单位 mixer 输入 */
+    /* ===== 油门与机械配平 ===== */
+    int32_t base_throttle;       /* 悬停油门基准，单位 mixer 输入 */
+    float roll_mech_trim_deg;    /* Roll 机械配平角，单位 deg */
+    float pitch_mech_trim_deg;   /* Pitch 机械配平角，单位 deg */
 
     /* ===== Roll 轴角速度环参数 ===== */
     float roll_gyro_kp;
     float roll_gyro_ki;
     float roll_gyro_kd;
-    float roll_gyro_kff;   /* 前馈增益 */
+    float roll_gyro_kff;     /* 前馈增益 */
     float roll_gyro_i_limit;
-    float roll_gyro_d_lpf;     /* D 项低通截止频率，单位 Hz，0 表示旁路 */
+    float roll_gyro_d_lpf;   /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== Pitch 轴角速度环参数 ===== */
     float pitch_gyro_kp;
     float pitch_gyro_ki;
     float pitch_gyro_kd;
-    float pitch_gyro_kff;  /* 前馈增益 */
+    float pitch_gyro_kff;    /* 前馈增益 */
     float pitch_gyro_i_limit;
-    float pitch_gyro_d_lpf;    /* D 项低通截止频率，单位 Hz，0 表示旁路 */
+    float pitch_gyro_d_lpf;  /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== Yaw 轴角速度环参数 ===== */
     float yaw_gyro_kp;
     float yaw_gyro_ki;
     float yaw_gyro_kd;
-    float yaw_gyro_kff;    /* 前馈增益 */
+    float yaw_gyro_kff;      /* 前馈增益 */
     float yaw_gyro_i_limit;
-    float yaw_gyro_d_lpf;      /* D 项低通截止频率，单位 Hz，0 表示旁路 */
+    float yaw_gyro_d_lpf;    /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== Roll 轴角度环参数 ===== */
     float roll_angle_kp;
     float roll_angle_ki;
     float roll_angle_kd;
-    float roll_angle_kff;  /* 前馈增益 */
+    float roll_angle_kff;    /* 前馈增益 */
     float roll_angle_i_limit;
-    float roll_angle_d_lpf;    /* D 项低通截止频率，单位 Hz，0 表示旁路 */
+    float roll_angle_d_lpf;  /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== Pitch 轴角度环参数 ===== */
     float pitch_angle_kp;
     float pitch_angle_ki;
     float pitch_angle_kd;
-    float pitch_angle_kff; /* 前馈增益 */
+    float pitch_angle_kff;   /* 前馈增益 */
     float pitch_angle_i_limit;
-    float pitch_angle_d_lpf;   /* D 项低通截止频率，单位 Hz，0 表示旁路 */
+    float pitch_angle_d_lpf; /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== Yaw 轴角度环参数 ===== */
     float yaw_angle_kp;
     float yaw_angle_ki;
     float yaw_angle_kd;
-    float yaw_angle_kff;   /* 前馈增益 */
+    float yaw_angle_kff;     /* 前馈增益 */
     float yaw_angle_i_limit;
-    float yaw_angle_d_lpf;     /* D 项低通截止频率，单位 Hz，0 表示旁路 */
+    float yaw_angle_d_lpf;   /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== X 轴位置环参数 ===== */
     float pos_x_kp;
     float pos_x_ki;
     float pos_x_kd;
-    float pos_x_kff;       /* 前馈增益 */
+    float pos_x_kff;         /* 前馈增益 */
     float pos_x_i_limit;
-    float pos_x_d_lpf;         /* D 项低通截止频率，单位 Hz，0 表示旁路 */
+    float pos_x_d_lpf;       /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== Y 轴位置环参数 ===== */
     float pos_y_kp;
     float pos_y_ki;
     float pos_y_kd;
-    float pos_y_kff;       /* 前馈增益 */
+    float pos_y_kff;         /* 前馈增益 */
     float pos_y_i_limit;
-    float pos_y_d_lpf;         /* D 项低通截止频率，单位 Hz，0 表示旁路 */
+    float pos_y_d_lpf;       /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== Z 轴位置环参数 ===== */
     float pos_z_kp;
     float pos_z_ki;
     float pos_z_kd;
-    float pos_z_kff;       /* 前馈增益 */
+    float pos_z_kff;         /* 前馈增益 */
     float pos_z_i_limit;
-    float pos_z_d_lpf;         /* D 项低通截止频率，单位 Hz，0 表示旁路 */
+    float pos_z_d_lpf;       /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== X 轴速度环参数 ===== */
     float vel_x_kp;
     float vel_x_ki;
     float vel_x_kd;
-    float vel_x_kff;       /* 前馈增益 */
+    float vel_x_kff;         /* 前馈增益 */
     float vel_x_i_limit;
-    float vel_x_d_lpf;         /* D 项低通截止频率，单位 Hz，0 表示旁路 */
+    float vel_x_d_lpf;       /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== Y 轴速度环参数 ===== */
     float vel_y_kp;
     float vel_y_ki;
     float vel_y_kd;
-    float vel_y_kff;       /* 前馈增益 */
+    float vel_y_kff;         /* 前馈增益 */
     float vel_y_i_limit;
-    float vel_y_d_lpf;         /* D 项低通截止频率，单位 Hz，0 表示旁路 */
+    float vel_y_d_lpf;       /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== Z 轴速度环参数 ===== */
     float vel_z_kp;
     float vel_z_ki;
     float vel_z_kd;
-    float vel_z_kff;       /* 前馈增益 */
+    float vel_z_kff;         /* 前馈增益 */
     float vel_z_i_limit;
-    float vel_z_d_lpf;         /* D 项低通截止频率，单位 Hz，0 表示旁路 */
+    float vel_z_d_lpf;       /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     /* ===== 模式 1 常调参数 ===== */
     float mode1_track_ff_deg_per_cmps; /* 模式 1 跟杆前馈斜率，单位 deg/(cm/s) */
@@ -131,7 +133,7 @@ typedef struct
     float pos_est_k_flow;              /* 光流速度融合权重，范围 0~1 */
 } fc_params_t;
 
-/* 飞控参数全局实例：运行时调参只会修改该 RAM 变量 */
+/* 飞控参数全局实例：运行时调参只会修改这份 RAM 变量 */
 extern fc_params_t g_fc_params;
 
 /*

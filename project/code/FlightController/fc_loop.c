@@ -456,7 +456,7 @@ void FC_Loop_1000Hz(void)
         {
             float throttle_cmd_raw = g_fc_params.base_throttle + height_vel_out;
             float throttle_cmd_comp = FC_Apply_Tilt_Throttle_Compensation(throttle_cmd_raw);
-            g_motor_cmd.throttle = fc_clampf((float)(int32_t)throttle_cmd_comp, 2600.0f, 4200.0f);
+            g_motor_cmd.throttle = (int32_t)fc_clampf((float)(int32_t)throttle_cmd_comp, 2600.0f, 4200.0f);
         }
         g_motor_cmd.roll = roll_ctrl;
         g_motor_cmd.pitch = -pitch_ctrl;

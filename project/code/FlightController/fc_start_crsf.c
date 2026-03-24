@@ -93,12 +93,6 @@ static void FC_START_CRSF_ForceStopToStandby(void)
 #define FC_START_CRSF_TAKEOFF_PAIR2_MOTOR_A (MOTOR_2)
 #define FC_START_CRSF_TAKEOFF_PAIR2_MOTOR_B (MOTOR_4)
 
-static uint16_t FC_START_CRSF_MsToTicks(uint16_t time_ms)
-{
-    uint16_t ticks = (uint16_t)(time_ms / FC_START_CRSF_TASK_PERIOD_MS);
-    return (ticks > 0U) ? ticks : 1U;
-}
-
 static uint8_t FC_START_CRSF_TakeoffState_Update(void)
 {
     // 新起飞逻辑：初始4电机油门1000，对角电机1/4从1000线性加速到1500（1秒），其余保持1000，加速后全部1500保持2秒

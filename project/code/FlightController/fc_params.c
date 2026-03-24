@@ -78,7 +78,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     /* ===== 油门与机械配平参数 ===== */
     params->base_throttle = 3150;         /* 悬停油门 */
     params->roll_mech_trim_deg = -0.5f;   /* Roll 机械配平角 */
-    params->pitch_mech_trim_deg = 3.0f;   /* Pitch 机械配平角 */
+    params->pitch_mech_trim_deg = 0.0f;   /* Pitch 机械配平角 */
 
     /* ===== Roll 轴角速度环参数 ===== */
     params->roll_gyro_kp = 3.0f;
@@ -106,7 +106,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
 
     /* ===== Roll 轴角度环参数 ===== */
     params->roll_angle_kp = 5.0f;
-    params->roll_angle_ki = 0.04f;
+    params->roll_angle_ki = 0.0f;
     params->roll_angle_kd = 0.0f;
     params->roll_angle_kff = 0.0f;
     params->roll_angle_i_limit = 110.0f;
@@ -114,7 +114,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
 
     /* ===== Pitch 轴角度环参数 ===== */
     params->pitch_angle_kp = 5.0f;
-    params->pitch_angle_ki = 0.04f;
+    params->pitch_angle_ki = 0.0f;
     params->pitch_angle_kd = 0.0f;
     params->pitch_angle_kff = 0.0f;
     params->pitch_angle_i_limit = 110.0f;

@@ -29,7 +29,7 @@ extern "C" {
 /* 陀螺仪主低通二阶 Butterworth 截止频率，单位 Hz */
 #define IMU_GYRO_LPF_HZ            (60.0f)
 /* 加速度计主低通二阶 Butterworth 截止频率，单位 Hz */
-#define IMU_ACCEL_LPF_HZ           (15.0f)
+#define IMU_ACCEL_LPF_HZ           (12.0f)
 
 /* IMU 三轴数量 */
 #define IMU_AXIS_NUM               (3U)

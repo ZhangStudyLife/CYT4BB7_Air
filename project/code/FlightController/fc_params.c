@@ -76,7 +76,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->vel_z_dt = 0.01f;   /* 100Hz */
 
     /* ===== 油门参数 ===== */
-    params->base_throttle = 3500; /* 悬停油门 */
+    params->base_throttle = 3150; /* 悬停油门 */
 
     /* ===== Roll 轴角速度环参数 ===== */
     params->roll_gyro_kp = 3.0f;

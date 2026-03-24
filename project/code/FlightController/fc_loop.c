@@ -44,7 +44,7 @@ static const float s_fc_height_vel_out_min = -1500.0f;
 /* 高度速度环输出最大限幅 */
 static const float s_fc_height_vel_out_max = 1500.0f;
 static const float s_fc_deg_to_rad = 0.017453293f;
-static const float s_fc_tilt_cos_min = 0.75f;
+static const float s_fc_tilt_cos_min = 0.9f;
 static const float s_fc_tilt_comp_throttle_max = 10000.0f;
 
 /*
@@ -103,10 +103,11 @@ static float FC_Apply_Tilt_Throttle_Compensation(float throttle_raw)
  *   ch2_std - CRSF 标准化通道值，范围[-1000,1000]
  * 返回值:
  *   目标高度，单位 m
+ * 0325 0129 : 修改映射关系,CH2 1000 对应1.2M,-1000 对应-0.2M(如果目标是0M,当前控制,会保持在0.1M,所以故意将-1000 映射到-0.2M,增加下行余量)
  */
 static float FC_Map_TargetHeightFromCh2(float ch2_std)
 {
-    return (ch2_std + 1000.0f) * 0.0005f;
+    return (ch2_std + 1000.0f) * 0.0007f - 0.2f;
 }
 
 /*
@@ -270,7 +271,7 @@ void FC_Loop_50Hz(void)
     {
         height_m = (float)g_tof_fused_height_mm * 0.001f;
         height_pos_out = PID_Update(&height_pos_pid, target_height_m, height_m, dt);
-        height_pos_out = fc_clampf(height_pos_out, -1.0f, 0.8f);
+        height_pos_out = fc_clampf(height_pos_out, -0.25f, 0.25f);
     }
     else
     {
@@ -455,7 +456,7 @@ void FC_Loop_1000Hz(void)
         {
             float throttle_cmd_raw = g_fc_params.base_throttle + height_vel_out;
             float throttle_cmd_comp = FC_Apply_Tilt_Throttle_Compensation(throttle_cmd_raw);
-            g_motor_cmd.throttle = (int32_t)throttle_cmd_comp;
+            g_motor_cmd.throttle = fc_clampf((float)(int32_t)throttle_cmd_comp, 2600.0f, 4200.0f);
         }
         g_motor_cmd.roll = roll_ctrl;
         g_motor_cmd.pitch = -pitch_ctrl;

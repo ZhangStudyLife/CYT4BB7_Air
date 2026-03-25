@@ -99,8 +99,8 @@ int main(void)
                 s_tick_div_fc_start_10hz = 0U;
                 FC_START_CRSF_Update();
 
-                if (g_euler.roll > 55.0f || g_euler.roll < -55.0f ||
-                    g_euler.pitch > 55.0f || g_euler.pitch < -55.0f)
+                if (g_euler.roll > 35.0f || g_euler.roll < -35.0f ||
+                    g_euler.pitch > 35.0f || g_euler.pitch < -35.0f)
                 {
                     FC_START_CRSF_Trigger_Emergency_Stop();
                 }

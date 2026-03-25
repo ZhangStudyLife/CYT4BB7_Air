@@ -43,6 +43,12 @@ static FC_START_CRSF_state_e s_prev_fc_state = FC_START_CRSF_STATE_INIT;
 static const float s_fc_height_vel_out_min = -1500.0f;
 /* 高度速度环输出最大限幅 */
 static const float s_fc_height_vel_out_max = 1500.0f;
+/* 姿态角外环输出到角速度目标的限幅，单位 deg/s */
+static const float s_fc_angle_out_limit = 260.0f;
+/* 姿态角外环 anti-windup 回算增益 */
+static const float s_fc_angle_aw_gain = 0.15f;
+/* 姿态角外环积分松弛阈值，目标变化过快时降低积分堆积 */
+static const float s_fc_angle_iterm_relax_threshold = 30.0f;
 static const float s_fc_deg_to_rad = 0.017453293f;
 static const float s_fc_tilt_cos_min = 0.9f;
 static const float s_fc_tilt_comp_throttle_max = 10000.0f;
@@ -164,10 +170,22 @@ void FC_Loop_Init(void)
              g_fc_params.roll_angle_kp, g_fc_params.roll_angle_ki, g_fc_params.roll_angle_kd,
              g_fc_params.roll_angle_kff, g_fc_params.angle_dt,
              g_fc_params.roll_angle_i_limit, g_fc_params.roll_angle_d_lpf);
+    /* Roll 姿态外环启用工程限幅和 anti-windup，避免持续偏差把角速度目标推得过猛 */
+    roll_angle_pid.aw_enable = 1U;
+    roll_angle_pid.aw_gain = s_fc_angle_aw_gain;
+    roll_angle_pid.output_min = -s_fc_angle_out_limit;
+    roll_angle_pid.output_max = s_fc_angle_out_limit;
+    roll_angle_pid.iterm_relax_threshold = s_fc_angle_iterm_relax_threshold;
     PID_Init(&pitch_angle_pid,
              g_fc_params.pitch_angle_kp, g_fc_params.pitch_angle_ki, g_fc_params.pitch_angle_kd,
              g_fc_params.pitch_angle_kff, g_fc_params.angle_dt,
              g_fc_params.pitch_angle_i_limit, g_fc_params.pitch_angle_d_lpf);
+    /* Pitch 姿态外环与 Roll 保持相同保护策略，减小两轴控制品质分叉 */
+    pitch_angle_pid.aw_enable = 1U;
+    pitch_angle_pid.aw_gain = s_fc_angle_aw_gain;
+    pitch_angle_pid.output_min = -s_fc_angle_out_limit;
+    pitch_angle_pid.output_max = s_fc_angle_out_limit;
+    pitch_angle_pid.iterm_relax_threshold = s_fc_angle_iterm_relax_threshold;
     PID_Init(&yaw_angle_pid,
              g_fc_params.yaw_angle_kp, g_fc_params.yaw_angle_ki, g_fc_params.yaw_angle_kd,
              g_fc_params.yaw_angle_kff, g_fc_params.angle_dt,
@@ -394,10 +412,10 @@ void FC_Loop_500Hz(void)
         float yaw_angle_meas = g_euler.yaw;
 
         /* 控制量限幅 */
-        float limit = 10000.0f;
-        int32_t roll_ctrl = (int32_t)fc_clampf(PID_Update(&roll_angle_pid, roll_angle_target, roll_angle_meas, dt), -limit, limit);
-        int32_t pitch_ctrl = (int32_t)fc_clampf(PID_Update(&pitch_angle_pid, pitch_angle_target, pitch_angle_meas, dt), -limit, limit);
-        int32_t yaw_ctrl = (int32_t)fc_clampf(PID_Update(&yaw_angle_pid, yaw_angle_target, yaw_angle_meas, dt), -limit, limit);
+        float limit = s_fc_angle_out_limit;
+        float roll_ctrl = fc_clampf(PID_Update(&roll_angle_pid, roll_angle_target, roll_angle_meas, dt), -limit, limit);
+        float pitch_ctrl = fc_clampf(PID_Update(&pitch_angle_pid, pitch_angle_target, pitch_angle_meas, dt), -limit, limit);
+        (void)PID_Update(&yaw_angle_pid, yaw_angle_target, yaw_angle_meas, dt);
 
         roll_gyro_target = roll_ctrl;
         pitch_gyro_target = pitch_ctrl;

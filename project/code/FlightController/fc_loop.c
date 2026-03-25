@@ -70,7 +70,6 @@ static float fc_clampf(float value, float min_value, float max_value)
     return value;
 }
 
-
 /*
  * 函数名: FC_Apply_Tilt_Throttle_Compensation
  * 功能: 使用当前 Roll/Pitch 原始姿态角，对总油门做保守的垂向分力补偿
@@ -94,7 +93,6 @@ static float FC_Apply_Tilt_Throttle_Compensation(float throttle_raw)
 
     return fc_clampf(throttle_raw / cos_term, 0.0f, s_fc_tilt_comp_throttle_max);
 }
-
 
 /*
  * 函数名: FC_Map_TargetHeightFromCh2
@@ -348,8 +346,6 @@ void FC_Loop_100Hz(void)
     s_flight_mode = FC_START_CRSF_Get_Flight_Mode(); /* 检测遥控器的模式 */
     FC_Handle_Mode_Transition_100Hz(s_flight_mode, fc_state);
 
-
-
     if (fc_state == FC_START_CRSF_STATE_FLYING)
     {
         ch2 = fc_clampf((float)CRSF_STD[2], -1000.0f, 1000.0f);
@@ -381,17 +377,6 @@ void FC_Loop_100Hz(void)
         FC_Mode2_100Hz();
         break;
     }
-
-    wifi_justfloat(tick_1000us_cnt,
-        target_height_m, g_tof_fused_height_mm/1000.0f,
-                height_pos_pid.p_term, height_pos_pid.i_term, height_pos_pid.d_term,
-
-        height_pos_out,height_vz_raw_mps,s_height_vz_mps,
-        height_vel_pid.p_term, height_vel_pid.i_term, height_vel_pid.d_term,
-        height_vel_out,g_motor_cmd.throttle,
-        g_euler.roll, g_euler.pitch
-    );
-
 }
 
 void FC_Loop_500Hz(void)
@@ -414,10 +399,15 @@ void FC_Loop_500Hz(void)
         int32_t pitch_ctrl = (int32_t)fc_clampf(PID_Update(&pitch_angle_pid, pitch_angle_target, pitch_angle_meas, dt), -limit, limit);
         int32_t yaw_ctrl = (int32_t)fc_clampf(PID_Update(&yaw_angle_pid, yaw_angle_target, yaw_angle_meas, dt), -limit, limit);
 
-        (void)yaw_ctrl;
         roll_gyro_target = roll_ctrl;
         pitch_gyro_target = pitch_ctrl;
         yaw_gyro_target = 0; // 不闭环航向角，保持当前值
+
+        wifi_justfloat(tick_1000us_cnt,
+                       roll_angle_target, roll_angle_meas, roll_angle_pid.p_term, roll_angle_pid.i_term, roll_angle_pid.d_term,
+                       roll_gyro_target, g_imufilter_1000hz.gyrox,
+                       pitch_angle_target, pitch_angle_meas, pitch_angle_pid.p_term, pitch_angle_pid.i_term, pitch_angle_pid.d_term,
+                       pitch_gyro_target, g_imufilter_1000hz.gyroy);
     }
 }
 

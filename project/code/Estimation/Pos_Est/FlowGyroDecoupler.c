@@ -88,9 +88,11 @@ uint8 FlowGyroDecoupler_Update50Hz(uint32 t_read_ms, int16_t delta_x, int16_t de
     uint32 t_eff;
     float  dtheta_x, dtheta_y;
 
-    if (t_read_ms < FLOW_TAU_MS) { return 0U; }
-    t_eff = t_read_ms - FLOW_TAU_MS;
+    // 如果读数时间过早（小于FLOW_TAU_MS），则无法进行有效积分，直接返回0表示未更新。
+    if (t_read_ms < FLOW_TAU_MS) { return 0U; }         // 小于12MS的读数不处理，直接丢弃，等待下次更新
+    t_eff = t_read_ms - FLOW_TAU_MS;                    // 计算有效时间点，补偿PMW3901的管线延迟（FLOW_TAU_MS），得到与陀螺数据对齐的时间戳
 
+    // 第一次进入 更新上一次有效时间点
     if (s_has_prev == 0U)
     {
         s_prev_t_eff = t_eff;

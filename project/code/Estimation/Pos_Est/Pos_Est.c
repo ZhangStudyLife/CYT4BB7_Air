@@ -155,7 +155,7 @@ void Pos_Est_Update_50HZ(void)
     /* Y: 光流前正后负，acc_x 前正后负，所以预测项同号 */
     vel_y_pred = Pos_Est_vel_y_kf + acc_x_lp * dt;
 
-    Pos_Est_vel_x_last = Pos_Est_vel_x;
+    Pos_Est_vel_x_last = Pos_Est_vel_x; 
     Pos_Est_vel_y_last = Pos_Est_vel_y;
 
     /* 用光流测量对惯性预测做互补校正 */
@@ -171,6 +171,5 @@ void Pos_Est_Update_50HZ(void)
 
     Pos_Est_pos_x = Pos_Est_pos_x_last + 0.5f * (Pos_Est_vel_x_last + Pos_Est_vel_x) * dt;
     Pos_Est_pos_y = Pos_Est_pos_y_last + 0.5f * (Pos_Est_vel_y_last + Pos_Est_vel_y) * dt;
-
 
 }

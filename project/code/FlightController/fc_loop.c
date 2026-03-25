@@ -421,11 +421,11 @@ void FC_Loop_500Hz(void)
         pitch_gyro_target = pitch_ctrl;
         yaw_gyro_target = 0; // 不闭环航向角，保持当前值
 
-        wifi_justfloat(tick_1000us_cnt,
-                       roll_angle_target, roll_angle_meas, roll_angle_pid.p_term, roll_angle_pid.i_term, roll_angle_pid.d_term,
-                       roll_gyro_target, g_imufilter_1000hz.gyrox,
-                       pitch_angle_target, pitch_angle_meas, pitch_angle_pid.p_term, pitch_angle_pid.i_term, pitch_angle_pid.d_term,
-                       pitch_gyro_target, g_imufilter_1000hz.gyroy);
+        // wifi_justfloat(tick_1000us_cnt,
+        //                roll_angle_target, roll_angle_meas, roll_angle_pid.p_term, roll_angle_pid.i_term, roll_angle_pid.d_term,
+        //                roll_gyro_target, g_imufilter_1000hz.gyrox,
+        //                pitch_angle_target, pitch_angle_meas, pitch_angle_pid.p_term, pitch_angle_pid.i_term, pitch_angle_pid.d_term,
+        //                pitch_gyro_target, g_imufilter_1000hz.gyroy);
     }
 }
 
@@ -451,7 +451,7 @@ void FC_Loop_1000Hz(void)
         int32_t yaw_ctrl = (int32_t)fc_clampf(PID_Update(&yaw_gyro_pid, yaw_gyro_target, yaw_gyro_meas, dt), -limit, limit);
         /* 角速度环调试切换到 Pitch：目标、原始陀螺、滤波后陀螺、控制输出和 PID 分项 */
         // wifi_justfloat(pitch_gyro_target,
-        //                         pitch_gyro_raw,
+        //                         pitch_gyro_raw,这两个CSV文件是我离线标定的数据
         //                         pitch_gyro_meas,
         //                         pitch_ctrl,
         //                         pitch_gyro_pid.p_term,
@@ -472,4 +472,9 @@ void FC_Loop_1000Hz(void)
 
         Motor_Mixer(&g_motor_cmd);
     }
+    wifi_justfloat(tick_1000us_cnt,
+        g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY,g_pmw3901_raw.squal,
+        g_imudata_250hz.gyrox, g_imudata_250hz.gyroy, g_imudata_250hz.gyroz,
+        g_imudata_250hz.accx, g_imudata_250hz.accy, g_imudata_250hz.accz,
+        g_euler.pitch, g_euler.roll, g_euler.yaw);
 }

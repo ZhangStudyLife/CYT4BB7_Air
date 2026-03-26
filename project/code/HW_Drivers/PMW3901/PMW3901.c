@@ -413,5 +413,30 @@ void PMW3901_Update_50HZ(void)
     /* 对像素位移施加极性映射，将芯片坐标系转换为机体坐标系 */
     burst_data.deltaX = (int16)(PMW3901_SIGN_X * burst_data.deltaX);
     burst_data.deltaY = (int16)(PMW3901_SIGN_Y * burst_data.deltaY);
+    if (burst_data.deltaX < -100)
+    {
+        burst_data.deltaX = 0;
+    }else if (burst_data.deltaX > 100)
+    {
+        burst_data.deltaX = 0;
+    }
+    if (burst_data.deltaY < -100)
+    {
+        burst_data.deltaY = 0;
+    }else if (burst_data.deltaY > 100)
+    {
+        burst_data.deltaY = 0;
+    }
+    if (burst_data.squal < 10)
+    {
+        burst_data.deltaX = 0;
+        burst_data.deltaY = 0;
+    }
+    if (burst_data.squal > 240)
+    {
+        burst_data.deltaX = 0;
+        burst_data.deltaY = 0;
+    }
+    
     g_pmw3901_raw = burst_data;
 }

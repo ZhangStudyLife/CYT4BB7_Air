@@ -472,9 +472,13 @@ void FC_Loop_1000Hz(void)
 
         Motor_Mixer(&g_motor_cmd);
     }
-    wifi_justfloat(tick_1000us_cnt,
-        g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY,g_pmw3901_raw.squal,
-        g_imudata_250hz.gyrox, g_imudata_250hz.gyroy, g_imudata_250hz.gyroz,
-        g_imudata_250hz.accx, g_imudata_250hz.accy, g_imudata_250hz.accz,
-        g_euler.pitch, g_euler.roll, g_euler.yaw);
+    float dec_x;
+    float dec_y;
+    dec_x = FlowGyroDecoupler_GetDecX();
+    dec_y = FlowGyroDecoupler_GetDecY();
+    // wifi_justfloat(tick_1000us_cnt,
+    //     g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY,g_pmw3901_raw.squal,
+    //     g_imudata_250hz.gyrox, g_imudata_250hz.gyroy, g_imudata_250hz.gyroz,
+    //     g_imudata_250hz.accx, g_imudata_250hz.accy, g_imudata_250hz.accz,
+    //     g_euler.pitch, g_euler.roll, g_euler.yaw,dec_x, dec_y);
 }

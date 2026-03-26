@@ -1,125 +1,108 @@
 #include "FlowGyroDecoupler.h"
 
-/* ===================== 内部类型 ===================== */
-typedef struct
-{
-    uint32 t_ms;
-    float  gx;
-    float  gy;
-} FlowGyroSample_t;
+/* 1000Hz采样下15Hz一阶低通系数 */
+#define FLOW_GYRO_LPF_ALPHA   (0.05f)
+/* 光流拟合系数 */
+#define FLOW_GYRO_FIT_K       (10.0f)
+/* 1000Hz积分步长，单位s */
+#define FLOW_GYRO_DT_S        (0.001f)
 
-typedef struct
-{
-    FlowGyroSample_t buf[FLOW_RING_SIZE];
-    uint16 head;
-} FlowGyroRing_t;
-
-/* ===================== 静态变量 ===================== */
-static FlowGyroRing_t s_ring       = {0};
-static uint32         s_prev_t_eff = 0U;
-static uint8          s_has_prev   = 0U;
-
+/* X轴陀螺低通状态 */
+static float s_gyro_lpf_x = 0.0f;
+/* Y轴陀螺低通状态 */
+static float s_gyro_lpf_y = 0.0f;
+/* X轴窗口累计补偿量 */
+static float s_fit_sum_x = 0.0f;
+/* Y轴窗口累计补偿量 */
+static float s_fit_sum_y = 0.0f;
+/* X轴去耦后的光流增量 */
 static float s_dec_x = 0.0f;
+/* Y轴去耦后的光流增量 */
 static float s_dec_y = 0.0f;
 
-/* ===================== 内部：区间积分 ===================== */
-static uint8 Integrate(uint32 t0, uint32 t1, float *dtheta_x, float *dtheta_y)
-{
-    uint16 i;
-    uint16 cnt   = 0U;
-    float  sum_x = 0.0f;
-    float  sum_y = 0.0f;
-
-    *dtheta_x = 0.0f;
-    *dtheta_y = 0.0f;
-
-    if (t1 <= t0) { return 0U; }
-
-    for (i = 0U; i < FLOW_RING_SIZE; i++)
-    {
-        const FlowGyroSample_t *s = &s_ring.buf[i];
-        if ((s->t_ms >= t0) && (s->t_ms < t1))
-        {
-            sum_x += s->gx * 0.001f;
-            sum_y += s->gy * 0.001f;
-            cnt++;
-        }
-    }
-
-    if (cnt == 0U) { return 0U; }
-
-    *dtheta_x = sum_x;
-    *dtheta_y = sum_y;
-    return 1U;
-}
-
-/* ===================== 公开接口 ===================== */
+/*
+ * 函数功能：初始化光流去陀螺补偿状态
+ * 输入参数：无
+ * 返回值：无
+ */
 void FlowGyroDecoupler_Init(void)
 {
-    uint16 i;
-    s_ring.head = 0U;
-    for (i = 0U; i < FLOW_RING_SIZE; i++)
-    {
-        s_ring.buf[i].t_ms = 0U;
-        s_ring.buf[i].gx   = 0.0f;
-        s_ring.buf[i].gy   = 0.0f;
-    }
-    s_prev_t_eff = 0U;
-    s_has_prev   = 0U;
+    s_gyro_lpf_x = 0.0f;
+    s_gyro_lpf_y = 0.0f;
+    s_fit_sum_x  = 0.0f;
+    s_fit_sum_y  = 0.0f;
     s_dec_x      = 0.0f;
     s_dec_y      = 0.0f;
 }
 
+/*
+ * 函数功能：重新初始化光流去陀螺补偿状态
+ * 输入参数：无
+ * 返回值：无
+ */
 void FlowGyroDecoupler_Reinit(void)
 {
     FlowGyroDecoupler_Init();
 }
 
+/*
+ * 函数功能：在1000Hz下对陀螺数据低通并累计窗口补偿量
+ * 输入参数：t_ms-时间戳；gyro_x-X轴角速度；gyro_y-Y轴角速度
+ * 返回值：无
+ */
 void FlowGyroDecoupler_Push1000Hz(uint32 t_ms, float gyro_x, float gyro_y)
 {
-    s_ring.head = (uint16)((s_ring.head + 1U) % FLOW_RING_SIZE);
-    s_ring.buf[s_ring.head].t_ms = t_ms;
-    s_ring.buf[s_ring.head].gx   = gyro_x;
-    s_ring.buf[s_ring.head].gy   = gyro_y;
+    (void)t_ms;
+
+    /* 对输入角速度做15Hz一阶低通 */
+    s_gyro_lpf_x += FLOW_GYRO_LPF_ALPHA * (gyro_x - s_gyro_lpf_x);
+    s_gyro_lpf_y += FLOW_GYRO_LPF_ALPHA * (gyro_y - s_gyro_lpf_y);
+
+    /* 按拟合公式累计当前50Hz窗口内的光流等效补偿量 */
+    s_fit_sum_x += FLOW_GYRO_FIT_K * s_gyro_lpf_x * FLOW_GYRO_DT_S;
+    s_fit_sum_y += FLOW_GYRO_FIT_K * s_gyro_lpf_y * FLOW_GYRO_DT_S;
 }
 
+/*
+ * 函数功能：在50Hz下用窗口累计补偿量对光流增量做最简去耦
+ * 输入参数：t_read_ms-光流时间戳；delta_x-X轴光流增量；delta_y-Y轴光流增量
+ * 返回值：1表示本次已完成更新
+ */
 uint8 FlowGyroDecoupler_Update50Hz(uint32 t_read_ms, int16_t delta_x, int16_t delta_y)
 {
-    uint32 t_eff;
-    float  dtheta_x, dtheta_y;
+    (void)t_read_ms;
 
-    // 如果读数时间过早（小于FLOW_TAU_MS），则无法进行有效积分，直接返回0表示未更新。
-    if (t_read_ms < FLOW_TAU_MS) { return 0U; }         // 小于12MS的读数不处理，直接丢弃，等待下次更新
-    t_eff = t_read_ms - FLOW_TAU_MS;                    // 计算有效时间点，补偿PMW3901的管线延迟（FLOW_TAU_MS），得到与陀螺数据对齐的时间戳
+    /* 光流增量直接减去本窗口累计补偿量 */
+    s_dec_x = (float)delta_x - s_fit_sum_x;
+    s_dec_y = (float)delta_y - s_fit_sum_y;
+    wifi_justfloat(
+    g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY,g_pmw3901_raw.squal,
+    g_imudata_250hz.gyrox, g_imudata_250hz.gyroy, g_imudata_250hz.gyroz,
+    delta_x,delta_y,s_fit_sum_x,s_fit_sum_y,s_dec_x, s_dec_y);
 
-    // 第一次进入 更新上一次有效时间点
-    if (s_has_prev == 0U)
-    {
-        s_prev_t_eff = t_eff;
-        s_has_prev   = 1U;
-        return 0U;
-    }
-
-    if ((t_eff <= s_prev_t_eff) ||
-        ((t_eff - s_prev_t_eff) > FLOW_MAX_WINDOW_MS))
-    {
-        s_prev_t_eff = t_eff;
-        return 0U;
-    }
-
-    if (Integrate(s_prev_t_eff, t_eff, &dtheta_x, &dtheta_y) == 0U)
-    {
-        s_prev_t_eff = t_eff;
-        return 0U;
-    }
-
-    s_prev_t_eff = t_eff;
-
-    s_dec_x = (float)delta_x - (FLOW_KX * dtheta_x + FLOW_BX);
-    s_dec_y = (float)delta_y - (FLOW_KY * dtheta_y + FLOW_BY);
+    /* 清零窗口累计，等待下一轮1000Hz重新累计 */
+    s_fit_sum_x = 0.0f;
+    s_fit_sum_y = 0.0f;
 
     return 1U;
 }
 
-float FlowGyroDecoupler_GetDecX(void) { return s_dec_x; }
-float FlowGyroDecoupler_GetDecY(void) { return s_dec_y; }
+/*
+ * 函数功能：获取X轴去耦后的光流增量
+ * 输入参数：无
+ * 返回值：X轴去耦后的光流增量
+ */
+float FlowGyroDecoupler_GetDecX(void)
+{
+    return s_dec_x;
+}
+
+/*
+ * 函数功能：获取Y轴去耦后的光流增量
+ * 输入参数：无
+ * 返回值：Y轴去耦后的光流增量
+ */
+float FlowGyroDecoupler_GetDecY(void)
+{
+    return s_dec_y;
+}

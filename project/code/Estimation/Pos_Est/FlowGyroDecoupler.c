@@ -75,10 +75,6 @@ uint8 FlowGyroDecoupler_Update50Hz(uint32 t_read_ms, int16_t delta_x, int16_t de
     /* 光流增量直接减去本窗口累计补偿量 */
     s_dec_x = (float)delta_x - s_fit_sum_x;
     s_dec_y = (float)delta_y - s_fit_sum_y;
-    wifi_justfloat(
-    g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY,g_pmw3901_raw.squal,
-    g_imudata_250hz.gyrox, g_imudata_250hz.gyroy, g_imudata_250hz.gyroz,
-    delta_x,delta_y,s_fit_sum_x,s_fit_sum_y,s_dec_x, s_dec_y);
 
     /* 清零窗口累计，等待下一轮1000Hz重新累计 */
     s_fit_sum_x = 0.0f;

@@ -172,4 +172,11 @@ void Pos_Est_Update_50HZ(void)
     Pos_Est_pos_x = Pos_Est_pos_x_last + 0.5f * (Pos_Est_vel_x_last + Pos_Est_vel_x) * dt;
     Pos_Est_pos_y = Pos_Est_pos_y_last + 0.5f * (Pos_Est_vel_y_last + Pos_Est_vel_y) * dt;
 
+    wifi_justfloat(tick_1000us_cnt,
+        g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY,g_pmw3901_raw.squal,
+    dec_x, dec_y, 
+    opflow_vel_x, opflow_vel_y,
+     acc_x_lp, acc_y_lp,
+      g_euler.roll, g_euler.pitch, g_euler.yaw);
+
 }

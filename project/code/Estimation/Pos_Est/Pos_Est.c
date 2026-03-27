@@ -5,7 +5,7 @@
 extern volatile uint32 tick_1000us_cnt;
 
 /* 50Hz 末端速度一阶低通截止频率 10Hz，对应 alpha = 1 - exp(-2πfc/fs) */
-#define POS_EST_VEL_OUT_LPF_ALPHA   (0.71539046f)
+#define POS_EST_VEL_OUT_LPF_ALPHA (0.71539046f)
 
 /* 光流解算得到的 X 轴速度，单位 cm/s，往左飞为正，往右飞为负 */
 float opflow_vel_x = 0.0f;
@@ -155,7 +155,7 @@ void Pos_Est_Update_50HZ(void)
     /* Y: 光流前正后负，acc_x 前正后负，所以预测项同号 */
     vel_y_pred = Pos_Est_vel_y_kf + acc_x_lp * dt;
 
-    Pos_Est_vel_x_last = Pos_Est_vel_x; 
+    Pos_Est_vel_x_last = Pos_Est_vel_x;
     Pos_Est_vel_y_last = Pos_Est_vel_y;
 
     /* 用光流测量对惯性预测做互补校正 */
@@ -172,11 +172,10 @@ void Pos_Est_Update_50HZ(void)
     Pos_Est_pos_x = Pos_Est_pos_x_last + 0.5f * (Pos_Est_vel_x_last + Pos_Est_vel_x) * dt;
     Pos_Est_pos_y = Pos_Est_pos_y_last + 0.5f * (Pos_Est_vel_y_last + Pos_Est_vel_y) * dt;
 
-    // wifi_justfloat(tick_1000us_cnt,
-    //     g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY,g_pmw3901_raw.squal,
-    // dec_x, dec_y, 
-    // opflow_vel_x, opflow_vel_y,
-    //  acc_x_lp, acc_y_lp,
-    //   g_euler.roll, g_euler.pitch, g_euler.yaw);
-
+    wifi_justfloat(tick_1000us_cnt,
+                   g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY, g_pmw3901_raw.squal,
+                   dec_x, dec_y,
+                   opflow_vel_x, opflow_vel_y,
+                   acc_x_lp, acc_y_lp,
+                   g_euler.roll, g_euler.pitch, g_euler.yaw);
 }

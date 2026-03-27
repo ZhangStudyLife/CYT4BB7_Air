@@ -19,19 +19,19 @@
 #define RADIANS_TO_DEGREES                    (180.0f / 3.14159265359f)   /* 弧度转角度系数 */
 
 /* ======================== INAV 对齐参数 ======================== */
-#define MAHONY_KP_DEFAULT                     0.25f    /* 室内有线悬停场景建议起始 AHRS P 增益 */
-#define MAHONY_KI_DEFAULT                     0.002f   /* 室内有线悬停场景建议起始 AHRS I 增益 */
+#define MAHONY_KP_DEFAULT                     0.20f    /* INAV 6轴默认 AHRS P 增益 */
+#define MAHONY_KI_DEFAULT                     0.0035f  /* 二轮试飞参数: 进一步抑制外力下积分积偏 */
 #define MAHONY_INPUT_ACCEL_IS_SPECIFIC_FORCE  (1U)     /* 1=输入为比力，静止时约 -1g */
 #define MAHONY_ACCEL_MIN_MAGNITUDE            0.30f    /* 加速度有效最小模长，单位 g */
 #define MAHONY_ACCEL_MAX_MAGNITUDE            3.00f    /* 加速度有效最大模长，单位 g */
-#define MAHONY_ACCEL_NEARNESS_WIDTH_G         0.15f    /* 室内有线悬停场景建议起始 bellCurve 宽度，单位 g */
-#define MAHONY_ACCEL_WEIGHT_MIN               0.001f   /* 加速度修正最小权重阈值 */
-#define MAHONY_ACCEL_IGNORE_RATE_DPS          15.0f    /* INAV 默认加速度忽略角速度中心，单位 dps */
-#define MAHONY_ACCEL_IGNORE_SLOPE_DPS         5.0f     /* INAV 默认加速度忽略斜坡半宽，单位 dps */
-#define MAHONY_SPIN_RATE_LIMIT_DPS            10.0f    /* 室内有线悬停场景建议起始积分限速阈值，单位 dps */
-#define MAHONY_ROTATION_LPF_HZ                4.0f     /* 室内有线悬停场景建议起始角速度门控低通，单位 Hz */
-#define MAHONY_FAST_GAIN_SCALE                10.0f    /* 未解锁前快速收敛增益倍率 */
-#define MAHONY_FAST_GAIN_WINDOW_S             20.0f    /* 未解锁前快速收敛持续时间，单位 s */
+#define MAHONY_ACCEL_NEARNESS_WIDTH_G         0.18f    /* 首轮试飞参数: 动态段收紧 1g 接近度窗口，单位 g */
+#define MAHONY_ACCEL_WEIGHT_MIN               0.003f   /* 二轮试飞参数: 继续抬高弱修正门限，抑制小噪声注入 */
+#define MAHONY_ACCEL_IGNORE_RATE_DPS          14.0f    /* 二轮试飞参数: 适度回放加计参与中心，单位 dps */
+#define MAHONY_ACCEL_IGNORE_SLOPE_DPS         7.0f     /* 二轮试飞参数: 扩大降权斜坡，减小门控突变 */
+#define MAHONY_SPIN_RATE_LIMIT_DPS            20.0f    /* INAV 6轴默认积分限速阈值，单位 dps */
+#define MAHONY_ROTATION_LPF_HZ                3.0f     /* INAV 6轴默认角速度门控低通，单位 Hz */
+#define MAHONY_FAST_GAIN_SCALE                3.0f     /* 二轮试飞参数: 进一步降低未解锁阶段过强纠正 */
+#define MAHONY_FAST_GAIN_WINDOW_S             6.0f     /* 二轮试飞参数: 缩短快速增益窗口，降低起飞阶段风险 */
 #define MAHONY_INTEGRAL_LIMIT_DEG             2.0f     /* INAV 风格积分限幅角度，单位 deg */
 
 /* ======================== 静止检测参数 ======================== */

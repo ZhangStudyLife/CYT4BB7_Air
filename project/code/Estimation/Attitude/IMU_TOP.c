@@ -8,7 +8,6 @@
 MahonyAhrs_t g_mahony_ahrs;       /* Mahony 姿态解算器状�?*/
 MahonyAhrs_Euler_t g_euler;       /* 当前姿态欧拉角（度�?*/
 uint8 g_imu_ready = 0U;           /* IMU 是否完成初始化与自检 */
-uint32 g_imu_update_count = 0U;   /* 1kHz ���¼��� */
 static imudata_t s_imu_raw_calib_1000hz = {0}; /* 当前 1kHz 原始 IMU 快照，供校准链读取 */
 static uint8 s_imu_initializing = 0U;
 extern uint32 tick_1000us_cnt;
@@ -131,7 +130,6 @@ void IMU_Init_All(void)
 
 	g_imu_ready = 0U;
 	s_imu_initializing = 1U;
-	g_imu_update_count = 0U;
 	s_imu_raw_calib_1000hz = (imudata_t){0};
 
 	/* 步骤1: 上电初始�?ICM42688 驱动 */
@@ -166,63 +164,6 @@ void IMU_Init_All(void)
 
 	g_imu_ready = 1U;
 	s_imu_initializing = 0U;
-}
-
-void IMU_SelectAhrsInput(float *gx, float *gy, float *gz,
-								float *ax, float *ay, float *az)
-{
-	float cal_gx = 0.0f;
-	float cal_gy = 0.0f;
-	float cal_gz = 0.0f;
-	float cal_ax = 0.0f;
-	float cal_ay = 0.0f;
-	float cal_az = 0.0f;
-	float accel_norm_g;
-
-	if ((gx == 0) || (gy == 0) || (gz == 0) ||
-		(ax == 0) || (ay == 0) || (az == 0))
-	{
-		return;
-	}
-
-	/* 默认使用500Hz滤波值，保证启动与未校准阶段正常工作 */
-	*gx = g_imudata_500hz.gyrox;
-	*gy = g_imudata_500hz.gyroy;
-	*gz = g_imudata_500hz.gyroz;
-	*ax = g_imudata_500hz.accx;
-	*ay = g_imudata_500hz.accy;
-	*az = g_imudata_500hz.accz;
-
-	/* 校准未完成、校准忙、或本帧校准数据无效时，不切换姿态输入源 */
-	if ((0U == AccelCalibration_IsCalibrated()) ||
-		(0U == AccelCalibration_IsRealtimeDataValid()) ||
-		(0U != IMUCalib_IsBusy()))
-	{
-		return;
-	}
-
-	AccelCalibration_GetBodyGyroDps(&cal_gx, &cal_gy, &cal_gz);
-	AccelCalibration_GetCorrectedSpecificForceG(&cal_ax, &cal_ay, &cal_az);
-
-	if ((0U == IMU_IsFiniteFloat(cal_gx)) || (0U == IMU_IsFiniteFloat(cal_gy)) || (0U == IMU_IsFiniteFloat(cal_gz)) ||
-		(0U == IMU_IsFiniteFloat(cal_ax)) || (0U == IMU_IsFiniteFloat(cal_ay)) || (0U == IMU_IsFiniteFloat(cal_az)))
-	{
-		return;
-	}
-
-	accel_norm_g = sqrtf(cal_ax * cal_ax + cal_ay * cal_ay + cal_az * cal_az);
-	if ((accel_norm_g < 0.30f) || (accel_norm_g > 1.70f))
-	{
-		return;
-	}
-
-	/* 姿态解算优先使用校准后机体系数据，减小长时静止漂移 */
-	*gx = cal_gx;
-	*gy = cal_gy;
-	*gz = cal_gz;
-	*ax = cal_ax;
-	*ay = cal_ay;
-	*az = cal_az;
 }
 
 /* IMU 1kHz*/
@@ -266,17 +207,49 @@ void IMU_Update_1000HZ(void)
 	IMUCalib_Update_1000HZ();
 	AccelCalibration_Update_1000HZ();
 
-	/* 5. 姿态解算 */
-	IMU_SelectAhrsInput(&ahrs_gx, &ahrs_gy, &ahrs_gz, &ahrs_ax, &ahrs_ay, &ahrs_az);
-	MahonyAhrs_Update(
-		&g_mahony_ahrs,
-		ahrs_gx, ahrs_gy, ahrs_gz,
-		ahrs_ax, ahrs_ay, ahrs_az,
-		dt_s);
+	/* 5. 姿态解算统一使用 1kHz 滤波 IMU 输出 */
+	ahrs_gx = g_imufilter_1000hz.gyrox;
+	ahrs_gy = g_imufilter_1000hz.gyroy;
+	ahrs_gz = g_imufilter_1000hz.gyroz;
+	ahrs_ax = g_imufilter_1000hz.accx;
+	ahrs_ay = g_imufilter_1000hz.accy;
+	ahrs_az = g_imufilter_1000hz.accz;
+
+	if ((0U != IMU_IsFiniteFloat(ahrs_gx)) &&
+		(0U != IMU_IsFiniteFloat(ahrs_gy)) &&
+		(0U != IMU_IsFiniteFloat(ahrs_gz)) &&
+		(0U != IMU_IsFiniteFloat(ahrs_ax)) &&
+		(0U != IMU_IsFiniteFloat(ahrs_ay)) &&
+		(0U != IMU_IsFiniteFloat(ahrs_az)))
+	{
+		MahonyAhrs_Update(
+			&g_mahony_ahrs,
+			ahrs_gx, ahrs_gy, ahrs_gz,
+			ahrs_ax, ahrs_ay, ahrs_az,
+			dt_s);
+	}
 
 	/* 步骤5: 计算欧拉角（单位: 度）并缓�?*/
 	g_euler = MahonyAhrs_GetEulerDegrees(&g_mahony_ahrs);
-	g_imu_update_count++;
+
+	wifi_justfloat(
+		g_imufilter_1000hz.gyrox,
+		g_imufilter_1000hz.gyroy,
+		g_imufilter_1000hz.gyroz,
+		g_imufilter_1000hz.accx,
+		g_imufilter_1000hz.accy,
+		g_imufilter_1000hz.accz,
+		g_mahony_ahrs.accel_magnitude,
+		g_mahony_ahrs.acc_weight_nearness,
+		g_mahony_ahrs.acc_weight_rate_ignore,
+		g_mahony_ahrs.acc_weight_final,
+		g_mahony_ahrs.gyro_bias_x,
+		g_mahony_ahrs.gyro_bias_y,
+		g_mahony_ahrs.gyro_bias_z,
+		g_euler.pitch,
+		g_euler.roll,
+		g_euler.yaw);
+
 
 }
 

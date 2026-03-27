@@ -24,7 +24,6 @@ extern "C" {
 extern MahonyAhrs_t g_mahony_ahrs;
 extern MahonyAhrs_Euler_t g_euler;
 extern uint8 g_imu_ready;
-extern uint32 g_imu_update_count;
 
 /*
  * 函数功能: 读取当前 1kHz 周期内供校准使用的原始 IMU 物理量快照。
@@ -37,16 +36,6 @@ extern uint32 g_imu_update_count;
 void IMU_GetRawSampleForCalibration(float *gx, float *gy, float *gz,
                                     float *ax, float *ay, float *az);
 
-/*
- * 函数功能: 选择姿态解算实际使用的 IMU 输入。
- * 输入参数:
- *   gx, gy, gz - 输出姿态解算使用的角速度，单位 dps
- *   ax, ay, az - 输出姿态解算使用的比力，单位 g
- * 输出参数/返回值:
- *   通过指针返回当前姿态链路选中的 IMU 输入；空指针会被忽略
- */
-void IMU_SelectAhrsInput(float *gx, float *gy, float *gz,
-								float *ax, float *ay, float *az);
 /*
  * 函数功能: 初始化 IMU 驱动、滤波器与姿态解算器。
  * 输入参数: 无

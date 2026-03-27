@@ -196,6 +196,8 @@ void AccelCalibration_GetCorrectedSpecificForceG(float *ax_g, float *ay_g, float
 void AccelCalibration_GetLevelAccelMps2(float *ax_level, float *ay_level, float *az_level);
 /* 获取水平面加速度，单位 m/s^2 */
 void AccelCalibration_GetHorizontalAccelMps2(float *ax_h, float *ay_h);
+/* 将传感器坐标系向量旋转到机体坐标系（供外部使用已滤波加速度时调用） */
+void AccelCalibration_RotateImuToBody(const float vec_sensor[3], float vec_body[3]);
 
 /* 加载一组加速度校准参数到运行态 */
 bool AccelCalibration_LoadParams(const AccelCalibrationParams_t *params);

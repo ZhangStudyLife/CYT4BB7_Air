@@ -3515,6 +3515,15 @@ void AccelCalibration_GetHorizontalAccelMps2(float *ax_h, float *ay_h)
     }
 }
 
+void AccelCalibration_RotateImuToBody(const float vec_sensor[3], float vec_body[3])
+{
+    if ((vec_sensor == NULL) || (vec_body == NULL))
+    {
+        return;
+    }
+    rotate_imu_to_body(vec_sensor, vec_body);
+}
+
 bool AccelCalibration_LoadParams(const AccelCalibrationParams_t *params)
 {
     if (params == NULL)

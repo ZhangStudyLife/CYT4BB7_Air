@@ -19,19 +19,19 @@
 #define RADIANS_TO_DEGREES                    (180.0f / 3.14159265359f)   /* 弧度转角度系数 */
 
 /* ======================== INAV 对齐参数 ======================== */
-#define MAHONY_KP_DEFAULT                     0.20f    /* INAV 6轴默认 AHRS P 增益 */
-#define MAHONY_KI_DEFAULT                     0.0035f  /* 二轮试飞参数: 进一步抑制外力下积分积偏 */
+#define MAHONY_KP_DEFAULT                     1.0f     /* 第一阶段回退参数: 提高飞行段姿态拉回力度 */
+#define MAHONY_KI_DEFAULT                     0.0f     /* 第一阶段固定关闭积分，避免错误加速度学进 bias */
 #define MAHONY_INPUT_ACCEL_IS_SPECIFIC_FORCE  (1U)     /* 1=输入为比力，静止时约 -1g */
 #define MAHONY_ACCEL_MIN_MAGNITUDE            0.30f    /* 加速度有效最小模长，单位 g */
 #define MAHONY_ACCEL_MAX_MAGNITUDE            3.00f    /* 加速度有效最大模长，单位 g */
-#define MAHONY_ACCEL_NEARNESS_WIDTH_G         0.18f    /* 首轮试飞参数: 动态段收紧 1g 接近度窗口，单位 g */
-#define MAHONY_ACCEL_WEIGHT_MIN               0.003f   /* 二轮试飞参数: 继续抬高弱修正门限，抑制小噪声注入 */
-#define MAHONY_ACCEL_IGNORE_RATE_DPS          14.0f    /* 二轮试飞参数: 适度回放加计参与中心，单位 dps */
-#define MAHONY_ACCEL_IGNORE_SLOPE_DPS         7.0f     /* 二轮试飞参数: 扩大降权斜坡，减小门控突变 */
+#define MAHONY_ACCEL_TRUST_BAND_G             0.35f    /* 第一阶段线性信任带宽: |acc|-1g 超出后逐步降权 */
+#define MAHONY_ACCEL_WEIGHT_MIN               0.0f     /* 第一阶段不再额外抬高加计参与门限 */
+#define MAHONY_ACCEL_IGNORE_RATE_DPS          0.0f     /* 第一阶段关闭角速度门控，避免飞行段修正归零 */
+#define MAHONY_ACCEL_IGNORE_SLOPE_DPS         0.0f     /* 第一阶段关闭角速度门控斜坡 */
 #define MAHONY_SPIN_RATE_LIMIT_DPS            20.0f    /* INAV 6轴默认积分限速阈值，单位 dps */
 #define MAHONY_ROTATION_LPF_HZ                3.0f     /* INAV 6轴默认角速度门控低通，单位 Hz */
-#define MAHONY_FAST_GAIN_SCALE                3.0f     /* 二轮试飞参数: 进一步降低未解锁阶段过强纠正 */
-#define MAHONY_FAST_GAIN_WINDOW_S             6.0f     /* 二轮试飞参数: 缩短快速增益窗口，降低起飞阶段风险 */
+#define MAHONY_FAST_GAIN_SCALE                1.0f     /* 第一阶段关闭未解锁快速增益，台架与飞行保持同一逻辑 */
+#define MAHONY_FAST_GAIN_WINDOW_S             0.0f     /* 第一阶段关闭未解锁快速增益窗口 */
 #define MAHONY_INTEGRAL_LIMIT_DEG             2.0f     /* INAV 风格积分限幅角度，单位 deg */
 
 /* ======================== 静止检测参数 ======================== */

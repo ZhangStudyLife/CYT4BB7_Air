@@ -1,4 +1,4 @@
-#include "MahonyAhrs.h"
+#include "mahony_temp.h"
 
 #include <math.h>
 

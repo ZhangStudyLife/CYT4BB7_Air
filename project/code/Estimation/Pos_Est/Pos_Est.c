@@ -4,8 +4,8 @@
 
 extern volatile uint32 tick_1000us_cnt;
 
-/* 50Hz 末端速度一阶低通截止频率约 12.8Hz，对应 alpha = 0.80 */
-#define POS_EST_VEL_OUT_LPF_ALPHA (0.80f)
+/* 50Hz 末端速度一阶低通截止频率约 15.1Hz，对应 alpha = 0.85 */
+#define POS_EST_VEL_OUT_LPF_ALPHA (0.85f)
 
 /* 1000Hz 水平加速度一阶低通 alpha
  * 上游 g_imufilter_1000hz 已经过 12Hz Butterworth LPF（群延迟约 19ms），

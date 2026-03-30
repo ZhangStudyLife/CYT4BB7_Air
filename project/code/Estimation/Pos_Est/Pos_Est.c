@@ -4,16 +4,16 @@
 
 extern volatile uint32 tick_1000us_cnt;
 
-/* 50Hz 末端速度一阶低通截止频率 10Hz，对应 alpha = 1 - exp(-2πfc/fs) */
-#define POS_EST_VEL_OUT_LPF_ALPHA (0.71539046f)
+/* 50Hz 末端速度一阶低通截止频率约 12.8Hz，对应 alpha = 0.80 */
+#define POS_EST_VEL_OUT_LPF_ALPHA (0.80f)
 
 /* 1000Hz 水平加速度一阶低通 alpha
  * 上游 g_imufilter_1000hz 已经过 12Hz Butterworth LPF（群延迟约 19ms），
  * 此处额外 LPF 仅用于轻微平滑，alpha 取大值以避免引入过多相位延迟。
- * alpha=0.20 → fc≈31.8Hz，群延迟≈5ms，总 acc 延迟≈24ms
- * 实飞数据实测（acc vs d(vel)/dt 互相关）表明原 alpha=0.04（总延迟44ms）
- * 导致 acc 相位滞后速度导数约 40~60ms，修改后可缩短至约 12ms。 */
-#define POS_EST_ACC_LPF_ALPHA (0.20f)
+ * alpha=0.30 → fc≈56.8Hz，群延迟≈3ms，总 acc 延迟≈22ms
+ * 当前值基于 03302334 模式2日志做保守收紧，优先缩短 acc 相位延迟，
+ * 但不在缺少原始 1000Hz 水平加速度日志的前提下做激进放开。 */
+#define POS_EST_ACC_LPF_ALPHA (0.30f)
 
 /* 光流解算得到的 X 轴速度，单位 cm/s，往左飞为正，往右飞为负 */
 float opflow_vel_x = 0.0f;

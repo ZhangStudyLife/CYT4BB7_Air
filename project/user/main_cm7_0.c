@@ -49,8 +49,8 @@ int main(void)
 
             IMU_Update_1000HZ();
             Pos_Est_Update_1000HZ();
-            wifi_justfloat(g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
-                           g_euler.roll, g_euler.pitch, g_euler.yaw);
+            // wifi_justfloat(g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
+            //                g_euler.roll, g_euler.pitch, g_euler.yaw);
 
             s_tick_div_fc_loop_500hz++;
             if (s_tick_div_fc_loop_500hz >= 2U)

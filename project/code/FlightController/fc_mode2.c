@@ -132,11 +132,11 @@ void FC_Mode2_50Hz(float dt)
     //                -Pos_Est_vel_x_kf,-Pos_Est_vel_y_kf,velx_target,vely_target,
     //                roll_angle_target, pitch_angle_target,
     //                g_euler.roll, g_euler.pitch);
-    // wifi_justfloat(
-    //     g_pmw3901_raw.deltaX, g_pmw3901_raw.squal,
-    //     opflow_vel_x,
-    //     acc_y_lp,
-    //     -Pos_Est_vel_x ,-Pos_Est_vel_x_kf, s_mode2_velx_pid.p_term, s_mode2_velx_pid.i_term, velx_target,
-    //     roll_angle_target,
-    //     g_euler.roll, g_tof_fused_height_mm / 1000.0f);
+    wifi_justfloat(
+        g_pmw3901_raw.deltaX, g_pmw3901_raw.squal,
+        opflow_vel_x,
+        acc_y_lp,
+        -Pos_Est_vel_x ,-Pos_Est_vel_x_kf, s_mode2_velx_pid.p_term, s_mode2_velx_pid.i_term, velx_target,
+        roll_angle_target,
+        g_euler.roll, g_tof_fused_height_mm / 1000.0f);
 }

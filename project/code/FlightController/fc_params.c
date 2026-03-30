@@ -12,7 +12,7 @@
 /* 飞控参数 Flash 魔数：用于识别有效参数块 */
 #define FC_PARAMS_FLASH_MAGIC   (0x46504346UL)
 /* 飞控参数 Flash 版本号：结构变化时递增 */
-#define FC_PARAMS_FLASH_VERSION (4U)
+#define FC_PARAMS_FLASH_VERSION (5U)
 
 /* 飞控参数 Flash 数据块：保存头信息和完整参数结构体 */
 typedef struct
@@ -182,7 +182,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode1_brake_exit_vel_cmps = 10.0f;
 
     /* ===== 位置估计参数 ===== */
-    params->pos_est_k_flow = 0.6f;
+    params->pos_est_k_flow = 0.3f;
 }
 
 /*

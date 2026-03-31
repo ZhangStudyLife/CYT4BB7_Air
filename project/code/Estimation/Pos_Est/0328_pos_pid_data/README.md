@@ -96,6 +96,7 @@ wifi_justfloat(
 | `03311130_velx_pid.csv` | X | `92e48c1` | 回退后的纯速度 PI | `roll_trim=0.60`，`pitch_trim=0.0`，`vel_x=0.15/0.010/4.0`，`vel_y=0.10/0.02/4.5`，`pos_est_k_flow=0.50`，`vel_out_alpha=0.85`，`acc_alpha=0.30`，`squal>=25` | 回退后重新采集的 X 轴日志 |
 | `03311215_velx_pid.csv` | X | `5e0992c` | 纯速度 PI | `roll_trim=0.46`，`pitch_trim=0.0`，`vel_x=0.145/0.010/4.0`，`vel_y=0.10/0.02/4.5`，`pos_est_k_flow=0.50`，`vel_out_alpha=0.85`，`acc_alpha=0.30`，`squal>=25` | 基于 `03311130` 微调后采集的 X 轴日志 |
 | `03311224_vely_pid.csv` | Y | `5e0992c` | 纯速度 PI | 与 `03311215_velx_pid.csv` 同一组参数：`roll_trim=0.46`，`pitch_trim=0.0`，`vel_x=0.145/0.010/4.0`，`vel_y=0.10/0.02/4.5`，`pos_est_k_flow=0.50`，`vel_out_alpha=0.85`，`acc_alpha=0.30`，`squal>=25` | 第一份 Y 轴专用日志，日志口切换到 `deltaY/opflow_vel_y/acc_x_lp/vely_target/pitch_angle_target` |
+| `03311300_vely_pid.csv` | Y | `b5d47d6` | 纯速度 PI | `roll_trim=0.46`，`pitch_trim=-1.24`，`vel_x=0.140/0.010/4.0`，`vel_y=0.10/0.02/4.5`，`pos_est_k_flow=0.50`，`vel_out_alpha=0.85`，`acc_alpha=0.30`，`squal>=25` | 在第一次 Y 轴日志基础上，先修正 `pitch` 机械中值后采集的第二份 Y 轴日志 |
 
 ## 当前两份最新日志的分析结论
 
@@ -121,6 +122,24 @@ wifi_justfloat(
 - 回中零穿越中位时间约 `1.04s`，明显慢于 X 轴约 `0.68s`
 - 零杆 `I` 项长期偏在 `-1.23 deg` 附近，说明 `pitch_mech_trim_deg` 很可能还没校到位
 - 所以当前只能说：Y 轴零杆抖动比当前 X 轴更小，但回中更慢，而且带着明显偏置。
+
+### `03311300_vely_pid.csv`
+
+- 这是把 `pitch_mech_trim_deg` 先改到 `-1.24 deg` 之后的第二份 Y 轴日志。
+- 相比 `03311224_vely_pid.csv`，它的跟杆和回中明显更利索：
+- 主动段目标误差 RMS：`41.15 -> 34.00 cm/s`
+- 零杆 `vel_kf RMS`：`17.79 -> 16.35 cm/s`
+- 回中零穿越中位时间：`1.04s -> 0.10s`
+- 回中收进 `|vel|<=8 cm/s` 的中位时间：`0.90s -> 0.08s`
+- 但这次还没完全把稳态偏置卸干净：
+- 零杆低动态段 `i_term` 均值约 `-0.29 ~ -0.33 deg`
+- 对应的稳态 `pitch_angle_target` 均值约 `-1.51 ~ -1.57 deg`
+- 所以 `pitch_mech_trim_deg=-1.24` 方向是对的，但量还不够，后续继续往负方向微调更合理。
+- 估计器侧这份日志给出的结论是：
+- `POS_EST_ACC_LPF_ALPHA=0.30` 先不动。当前日志只记录了已经滤过的 `acc_x_lp`，没有原始 1000Hz 水平加速度，无法对这一层做更科学的重整定。
+- `POS_EST_VEL_OUT_LPF_ALPHA=0.85` 先不动。当前内部 `vel_y_kf` 与 `opflow_vel_y` 在主动段的相关峰值出现在 `0` 个采样点，说明这一级末端低通没有明显额外相位滞后。
+- `pos_est_k_flow` 可以从 `0.50` 再小提到 `0.55`。按同一份日志回放，主动段 `vel_kf` 相对光流的 RMS 偏差可从约 `14.30` 降到约 `13.39 cm/s`，零杆速度 RMS 只从约 `16.35` 增到约 `16.63 cm/s`，属于可接受交换。
+- 速度环侧当前主要矛盾已经从“大偏置”变成“输出还略硬”，所以下一步更适合小降 `vel_y_kp/ki`，不需要引入新算法或外环。
 
 ## 后续使用建议
 

@@ -133,6 +133,9 @@ static const wifi_params_entry_t s_wifi_params_table[] =
     WIFI_PARAMS_FLOAT_ITEM("mode1_track_ff_deg_per_cmps", mode1_track_ff_deg_per_cmps, 0.0f, 1.0f),
     WIFI_PARAMS_FLOAT_ITEM("mode1_brake_kp", mode1_brake_kp, 0.0f, 50.0f),
     WIFI_PARAMS_FLOAT_ITEM("mode1_brake_exit_vel_cmps", mode1_brake_exit_vel_cmps, 0.0f, 300.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode2_track_ff_deg_per_cmps", mode2_track_ff_deg_per_cmps, 0.0f, 1.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode2_brake_kp", mode2_brake_kp, 0.0f, 50.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode2_brake_exit_vel_cmps", mode2_brake_exit_vel_cmps, 0.0f, 300.0f),
     WIFI_PARAMS_FLOAT_ITEM("pos_est_k_flow", pos_est_k_flow, 0.0f, 1.0f)
 };
 

@@ -12,7 +12,7 @@
 /* 飞控参数 Flash 魔数：用于识别有效参数块 */
 #define FC_PARAMS_FLASH_MAGIC   (0x46504346UL)
 /* 飞控参数 Flash 版本号：结构变化时递增 */
-#define FC_PARAMS_FLASH_VERSION (5U)
+#define FC_PARAMS_FLASH_VERSION (6U)
 
 /* 飞控参数 Flash 数据块：保存头信息和完整参数结构体 */
 typedef struct
@@ -77,7 +77,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
 
     /* ===== 油门与机械配平参数 ===== */
     params->base_throttle = 3150;         /* 悬停油门 */
-    params->roll_mech_trim_deg = 0.65f;   /* Roll 机械配平角 */
+    params->roll_mech_trim_deg = 0.42f;   /* Roll 机械配平角 */
     params->pitch_mech_trim_deg = 0.0f;   /* Pitch 机械配平角 */
 
     /* ===== Roll 轴角速度环参数 ===== */
@@ -153,19 +153,19 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pos_z_d_lpf = 2.0f;
 
     /* ===== X 轴速度环参数 ===== */
-    params->vel_x_kp = 0.15f;
-    params->vel_x_ki = 0.012f;
+    params->vel_x_kp = 0.135f;
+    params->vel_x_ki = 0.010f;
     params->vel_x_kd = 0.0f;
     params->vel_x_kff = 0.0f;
-    params->vel_x_i_limit = 4.0f;
+    params->vel_x_i_limit = 3.5f;
     params->vel_x_d_lpf = 0.0f;
 
     /* ===== Y 轴速度环参数 ===== */
-    params->vel_y_kp = 0.1f;
-    params->vel_y_ki = 0.02f;
+    params->vel_y_kp = 0.135f;
+    params->vel_y_ki = 0.010f;
     params->vel_y_kd = 0.0f;
     params->vel_y_kff = 0.0f;
-    params->vel_y_i_limit = 4.5f;
+    params->vel_y_i_limit = 3.5f;
     params->vel_y_d_lpf = 0.0f;
 
     /* ===== Z 轴速度环参数 ===== */
@@ -180,6 +180,11 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode1_track_ff_deg_per_cmps = 0.06f;
     params->mode1_brake_kp = 0.18f;
     params->mode1_brake_exit_vel_cmps = 10.0f;
+
+    /* ===== 模式 2 跟杆前馈与刹车参数 ===== */
+    params->mode2_track_ff_deg_per_cmps = 0.012f;
+    params->mode2_brake_kp = 0.145f;
+    params->mode2_brake_exit_vel_cmps = 8.0f;
 
     /* ===== 位置估计参数 ===== */
     params->pos_est_k_flow = 0.50f;

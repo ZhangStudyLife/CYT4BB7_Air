@@ -129,11 +129,6 @@ typedef struct
     float mode1_brake_kp;              /* 模式 1 刹车阶段速度环 P 增益 */
     float mode1_brake_exit_vel_cmps;   /* 模式 1 退出刹车的速度阈值，单位 cm/s */
 
-    /* ===== 模式 2 速度环轻量前馈与刹车参数 ===== */
-    float mode2_track_ff_deg_per_cmps; /* 模式 2 跟杆前馈斜率，单位 deg/(cm/s) */
-    float mode2_brake_kp;              /* 模式 2 回中刹车斜率，单位 deg/(cm/s) */
-    float mode2_brake_exit_vel_cmps;   /* 模式 2 退出刹车的速度阈值，单位 cm/s */
-
     /* ===== 位置估计参数 ===== */
     float pos_est_k_flow;              /* 光流速度融合权重，范围 0~1 */
 } fc_params_t;

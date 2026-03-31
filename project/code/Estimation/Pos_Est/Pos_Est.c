@@ -4,8 +4,8 @@
 
 extern volatile uint32 tick_1000us_cnt;
 
-/* 50Hz 末端速度一阶低通截止频率约 18.3Hz，对应 alpha = 0.90 */
-#define POS_EST_VEL_OUT_LPF_ALPHA (0.90f)
+/* 50Hz 末端速度一阶低通截止频率约 15.1Hz，对应 alpha = 0.85 */
+#define POS_EST_VEL_OUT_LPF_ALPHA (0.85f)
 
 /* 1000Hz 水平加速度一阶低通 alpha
  * 上游 g_imufilter_1000hz 已经过 12Hz Butterworth LPF（群延迟约 19ms），
@@ -196,7 +196,7 @@ void Pos_Est_Update_50HZ(void)
 
     /* squal 有效性门控：光流质量过低时不参与融合 */
     {
-        uint8_t opflow_valid = (g_pmw3901_raw.squal >= 35U) && (height >= 0.2f);
+        uint8_t opflow_valid = (g_pmw3901_raw.squal >= 25U) && (height >= 0.2f);
         float k_use = opflow_valid ? g_fc_params.pos_est_k_flow : 0.0f;
 
         /* 用光流测量对惯性预测做互补校正 */
@@ -211,7 +211,7 @@ void Pos_Est_Update_50HZ(void)
         }
     }
 
-    /* 速度末端改为一阶低通，50Hz 下截止频率约 18.3Hz */
+    /* 速度末端改为一阶低通，50Hz 下截止频率 10Hz */
     Pos_Est_vel_x_kf = LPF1_Update(&s_vel_out_lp_x, Pos_Est_vel_x);
     Pos_Est_vel_y_kf = LPF1_Update(&s_vel_out_lp_y, Pos_Est_vel_y);
 

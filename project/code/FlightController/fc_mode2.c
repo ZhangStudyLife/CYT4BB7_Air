@@ -82,9 +82,10 @@ void FC_Mode2_100Hz(void)
 
 /*
  * 函数名: FC_Mode2_50Hz
- * 功能: 模式2 50Hz 轻量速度闭环
- *   遥控 -> 速度目标（±100 cm/s，±6 cm/s 死区）-> 跟杆前馈 / 回中刹车 / 静止清零 -> 目标角度（含机械中值）
- *   X/Y 轴统一只使用末端低通速度 Pos_Est_vel_*_kf，减少模式内速度量分叉
+ * 功能: 模式2 50Hz 纯速度 PI 控制
+ *   遥控 → 速度目标（±100 cm/s，±6 cm/s 死区）→ PI → 目标角度（含机械中值）
+ *   X轴：vel_x_kf 左正右负，取反后右正，PI 输出正 → roll 右倾 → 向右飞
+ *   Y轴：vel_y_kf 前正后负，取反后后正，前推 ch1>0 → vely_target<0 → output<0 → pitch<0 → 前倾 → 向前飞
  * 输入参数:
  *   dt - 本次调用周期，单位 s
  * 返回值: 无
@@ -95,8 +96,6 @@ void FC_Mode2_50Hz(float dt)
     float ch1;
     float velx_target;
     float vely_target;
-    float velx_meas;
-    float vely_meas;
     float velx_out;
     float vely_out;
 
@@ -117,46 +116,8 @@ void FC_Mode2_50Hz(float dt)
                       -s_mode2_vel_limit_cmps, s_mode2_vel_limit_cmps),
         s_mode2_vel_deadzone_cmps);
 
-    velx_meas = -Pos_Est_vel_x_kf;
-    vely_meas = -Pos_Est_vel_y_kf;
-
-    if (velx_target != 0.0f)
-    {
-        velx_out = PID_Update(&s_mode2_velx_pid, velx_target, velx_meas, dt);
-        velx_out += g_fc_params.mode2_track_ff_deg_per_cmps * velx_target;
-    }
-    else
-    {
-        PID_Reset(&s_mode2_velx_pid);
-        if ((velx_meas >= g_fc_params.mode2_brake_exit_vel_cmps) ||
-            (velx_meas <= -g_fc_params.mode2_brake_exit_vel_cmps))
-        {
-            velx_out = -g_fc_params.mode2_brake_kp * velx_meas;
-        }
-        else
-        {
-            velx_out = 0.0f;
-        }
-    }
-
-    if (vely_target != 0.0f)
-    {
-        vely_out = PID_Update(&s_mode2_vely_pid, vely_target, vely_meas, dt);
-        vely_out += g_fc_params.mode2_track_ff_deg_per_cmps * vely_target;
-    }
-    else
-    {
-        PID_Reset(&s_mode2_vely_pid);
-        if ((vely_meas >= g_fc_params.mode2_brake_exit_vel_cmps) ||
-            (vely_meas <= -g_fc_params.mode2_brake_exit_vel_cmps))
-        {
-            vely_out = -g_fc_params.mode2_brake_kp * vely_meas;
-        }
-        else
-        {
-            vely_out = 0.0f;
-        }
-    }
+    velx_out = PID_Update(&s_mode2_velx_pid, velx_target, -Pos_Est_vel_x_kf, dt);
+    vely_out = PID_Update(&s_mode2_vely_pid, vely_target, -Pos_Est_vel_y_kf, dt);
 
     velx_out = FC_Mode_Clamp(velx_out, -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
     vely_out = FC_Mode_Clamp(vely_out, -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
@@ -175,7 +136,7 @@ void FC_Mode2_50Hz(float dt)
         g_pmw3901_raw.deltaX, g_pmw3901_raw.squal,
         opflow_vel_x,
         acc_y_lp,
-        velx_meas, velx_meas, s_mode2_velx_pid.p_term, s_mode2_velx_pid.i_term, velx_target,
+        -Pos_Est_vel_x ,-Pos_Est_vel_x_kf, s_mode2_velx_pid.p_term, s_mode2_velx_pid.i_term, velx_target,
         roll_angle_target,
         g_euler.roll, g_tof_fused_height_mm / 1000.0f);
 }

@@ -18,7 +18,7 @@
 #endif
 
 #ifndef WIFI_IMAGE_ENABLE
-#define WIFI_IMAGE_ENABLE   (1U)                 /* WiFi image mode switch: 0=normal UDP command mode, 1=image TCP mode */
+#define WIFI_IMAGE_ENABLE   (0U)                 /* WiFi image mode switch: 0=normal UDP command mode, 1=image TCP mode */
 #endif
 
 #ifndef WIFI_IMAGE_TCP_SERVER_TRANSPORT

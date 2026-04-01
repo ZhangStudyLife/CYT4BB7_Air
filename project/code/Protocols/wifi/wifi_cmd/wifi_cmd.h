@@ -17,6 +17,18 @@
 #define WIFI_PASSWORD_TEST  "zyz520520"          /* WiFi 路由器密码 */
 #endif
 
+#ifndef WIFI_IMAGE_ENABLE
+#define WIFI_IMAGE_ENABLE   (1U)                 /* WiFi image mode switch: 0=normal UDP command mode, 1=image TCP mode */
+#endif
+
+#ifndef WIFI_IMAGE_TCP_SERVER_TRANSPORT
+#define WIFI_IMAGE_TCP_SERVER_TRANSPORT  "TCP_SERVER" /* Preferred TCP transport token in image mode */
+#endif
+
+#ifndef WIFI_IMAGE_TCP_CLIENT_TRANSPORT
+#define WIFI_IMAGE_TCP_CLIENT_TRANSPORT  "TCP"   /* Fallback TCP transport token in image mode */
+#endif
+
 #ifndef UDP_REMOTE_IP
 #define UDP_REMOTE_IP       "192.168.110.183"    /* 上位机 IP 地址 */
 #endif

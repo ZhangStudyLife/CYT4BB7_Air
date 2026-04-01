@@ -15,6 +15,9 @@ extern volatile uint32 tick_1000us_cnt;                   /* 1ms系统节拍计�
 
 /* 图像发送统计信息 */
 static wifi_image_tx_stats_t s_wifi_image_stats = {0};
+static uint8_t s_wifi_image_assistant_inited = 0U;        /* 逐飞助手接口是否已初始化 */
+static uint16_t s_wifi_image_cfg_width = 0U;              /* 当前逐飞助手图像宽度配置 */
+static uint16_t s_wifi_image_cfg_height = 0U;             /* 当前逐飞助手图像高度配置 */
 
 /*
  * 函数功能：初始化图像发送模块默认配置和统计信息。
@@ -24,6 +27,9 @@ static wifi_image_tx_stats_t s_wifi_image_stats = {0};
 void wifi_image_Init(void)
 {
     memset(&s_wifi_image_stats, 0, sizeof(s_wifi_image_stats));
+    s_wifi_image_assistant_inited = 0U;
+    s_wifi_image_cfg_width = 0U;
+    s_wifi_image_cfg_height = 0U;
 }
 
 /*
@@ -39,10 +45,19 @@ uint8_t wifi_image_SendFrame(const uint8_t *image,
                              int32_t image_format,
                              int32_t image_id)
 {
+#if (0U == WIFI_IMAGE_ENABLE)
+    (void)image;
+    (void)image_size;
+    (void)width;
+    (void)height;
+    (void)image_format;
+    (void)image_id;
+    return 1U;
+#else
     uint32_t start_tick_ms;
     uint32_t end_tick_ms;
-    uint32_t pre_frame[WIFI_IMAGE_PRE_FRAME_WORD_COUNT];
-    uint8_t ok = 0U;
+    uint16_t cfg_width;
+    uint16_t cfg_height;
 
     if ((NULL == image) || (0U == image_size) || (0U == wifi_cmd_IsReady()))
     {
@@ -50,36 +65,50 @@ uint8_t wifi_image_SendFrame(const uint8_t *image,
         return 0U;
     }
 
-    pre_frame[0] = (uint32_t)image_id;
-    pre_frame[1] = image_size;
-    pre_frame[2] = (uint32_t)width;
-    pre_frame[3] = (uint32_t)height;
-    pre_frame[4] = (uint32_t)image_format;
-    pre_frame[5] = WIFI_IMAGE_PRE_FRAME_TAIL;
-    pre_frame[6] = WIFI_IMAGE_PRE_FRAME_TAIL;
-
-    start_tick_ms = tick_1000us_cnt;
-
-    /* 先发图片前导帧，再发图像本体，最后统一触发一次UDP立即发送 */
-    if ((0U != wifi_cmd_SendBufferNoFlush((const uint8_t *)pre_frame, sizeof(pre_frame))) &&
-        (0U != wifi_cmd_SendBufferNoFlush(image, image_size)) &&
-        (0U != wifi_cmd_FlushNow()))
-    {
-        ok = 1U;
-    }
-
-    end_tick_ms = tick_1000us_cnt;
-    s_wifi_image_stats.last_cost_ms = end_tick_ms - start_tick_ms;
-
-    if (0U == ok)
+    if ((width <= 0) || (height <= 0))
     {
         s_wifi_image_stats.fail_count++;
         return 0U;
     }
 
+    if ((int32_t)WIFI_IMAGE_VOFA_FORMAT_GRAYSCALE8 != image_format)
+    {
+        s_wifi_image_stats.fail_count++;
+        return 0U;
+    }
+
+    (void)image_size;
+    (void)image_id;
+    cfg_width = (uint16_t)width;
+    cfg_height = (uint16_t)height;
+
+    if ((0U == s_wifi_image_assistant_inited) ||
+        (s_wifi_image_cfg_width != cfg_width) ||
+        (s_wifi_image_cfg_height != cfg_height))
+    {
+        seekfree_assistant_interface_init(SEEKFREE_ASSISTANT_WIFI_SPI);
+        s_wifi_image_assistant_inited = 1U;
+        s_wifi_image_cfg_width = cfg_width;
+        s_wifi_image_cfg_height = cfg_height;
+    }
+
+    seekfree_assistant_camera_information_config(SEEKFREE_ASSISTANT_MT9V03X,
+                                                 (void *)image,
+                                                 cfg_width,
+                                                 cfg_height);
+
+    start_tick_ms = tick_1000us_cnt;
+
+    /* 先发图片前导帧，再发图像本体，最后统一触发一次UDP立即发送 */
+    seekfree_assistant_camera_send();
+
+    end_tick_ms = tick_1000us_cnt;
+    s_wifi_image_stats.last_cost_ms = end_tick_ms - start_tick_ms;
+
     s_wifi_image_stats.ok_count++;
     s_wifi_image_stats.last_send_tick_ms = end_tick_ms;
     return 1U;
+#endif
 }
 
 /*

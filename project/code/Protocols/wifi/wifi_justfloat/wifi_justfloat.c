@@ -167,6 +167,12 @@ uint8_t wifi_justfloat_Impl(uint8_t declared_num, uint8_t actual_num, ...)
     uint8_t frame[WIFI_JUSTFLOAT_MAX_FLOAT_NUM * 4U + 4U];
     va_list ap;
 
+#if (1U == WIFI_IMAGE_ENABLE)
+    (void)declared_num;
+    (void)actual_num;
+    return 0U;
+#endif
+
     if ((0U == actual_num) || (actual_num > WIFI_JUSTFLOAT_MAX_FLOAT_NUM))
     {
         s_wifi_justfloat_profile.fail_count++;

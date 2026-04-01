@@ -85,6 +85,7 @@ int main(void)
             {
                 Pos_Est_Update_50HZ();
                 s_tick_div_fc_start_50hz = 0U;
+                image_update();
                 FC_Loop_50Hz();
 
                 wifi_params_GetDiag(&wifi_params_diag);
@@ -101,7 +102,7 @@ int main(void)
             if (s_tick_div_fc_start_10hz >= 10U)
             {
                 s_tick_div_fc_start_10hz = 0U;
-                image_update();
+
 
                 FC_START_CRSF_Update();
 
@@ -113,6 +114,8 @@ int main(void)
             }
         }
 
+#if (0U == WIFI_IMAGE_ENABLE)
         wifi_cmd_Poll();
+#endif
     }
 }

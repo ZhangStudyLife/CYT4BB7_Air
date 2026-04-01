@@ -15,6 +15,8 @@
 #include "../wifi_cal_imu/wifi_cal_imu.h"
 #include "../wifi_params/wifi_params.h"
 
+static uint8_t s_wifi_cmd_use_udp_flush = 1U;    /* 当前链路是否使用UDP立即发送命令：1=UDP，0=TCP */
+
 /* WiFi 文本接收状态 */
 static uint8_t s_wifi_cmd_ready = 0U;            /* WiFi 链路就绪标志 */
 static char s_wifi_cmd_line[WIFI_CMD_LINE_MAX] = {0}; /* 当前接收中的文本行 */
@@ -188,17 +190,30 @@ void wifi_cmd_Init(void)
     uint8_t ret;
 
     s_wifi_cmd_ready = 0U;
+    s_wifi_cmd_use_udp_flush = 1U;
     memset(s_wifi_cmd_line, 0, sizeof(s_wifi_cmd_line));
     wifi_cmd_reset_line_state();
 
     ret = wifi_spi_init((char *)WIFI_SSID_TEST, (char *)WIFI_PASSWORD_TEST);
     if (0U == ret)
     {
+#if (0U == WIFI_IMAGE_ENABLE)
         ret = wifi_spi_socket_connect("UDP", (char *)UDP_REMOTE_IP, (char *)UDP_REMOTE_PORT, (char *)UDP_LOCAL_PORT);
+#else
+        ret = wifi_spi_socket_connect((char *)WIFI_IMAGE_TCP_CLIENT_TRANSPORT,
+                                      (char *)UDP_REMOTE_IP,
+                                      (char *)UDP_REMOTE_PORT,
+                                      (char *)UDP_LOCAL_PORT);
+#endif
     }
 
     if (0U == ret)
     {
+#if (0U == WIFI_IMAGE_ENABLE)
+        s_wifi_cmd_use_udp_flush = 1U;
+#else
+        s_wifi_cmd_use_udp_flush = 0U;
+#endif
         s_wifi_cmd_ready = 1U;
     }
     else
@@ -254,6 +269,11 @@ uint8_t wifi_cmd_FlushNow(void)
     if (0U == s_wifi_cmd_ready)
     {
         return 0U;
+    }
+
+    if (0U == s_wifi_cmd_use_udp_flush)
+    {
+        return 1U;
     }
 
     return (0U == wifi_spi_udp_send_now()) ? 1U : 0U;

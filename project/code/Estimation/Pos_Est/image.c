@@ -6,7 +6,7 @@
 #include "zf_device_mt9v03x.h"
 #include "../../Protocols/wifi/wifi_image/wifi_image.h"
 
-#define IMAGE_DEFAULT_THRESHOLD    (200U)   /* 默认高亮目标提取阈值 */
+#define IMAGE_DEFAULT_THRESHOLD    (120U)   /* 默认高亮目标提取阈值 */
 
 /* 内部完整单帧灰度图缓存，单位像素灰度值 */
 static uint8 s_image_frame[MT9V03X_H][MT9V03X_W];
@@ -14,6 +14,8 @@ static uint8 s_image_frame[MT9V03X_H][MT9V03X_W];
 static uint8 s_image_binary[MT9V03X_H][MT9V03X_W];
 /* 内部默认固定二值化阈值，单位灰度级 */
 static uint8 s_image_threshold = IMAGE_DEFAULT_THRESHOLD;
+
+
 
 /*
  * 函数功能：尝试抓取最新完整图像并锁存到内部缓存。
@@ -79,10 +81,10 @@ void image_update(void)
 
     image_binary_threshold();
 
-    (void)wifi_image_SendFrame(s_image_frame[0],
-                               MT9V03X_IMAGE_SIZE,
-                               MT9V03X_W,
-                               MT9V03X_H,
-                               WIFI_IMAGE_VOFA_FORMAT_GRAYSCALE8,
-                               0);
+    // (void)wifi_image_SendFrame(s_image_binary[0],
+    //                            MT9V03X_IMAGE_SIZE,
+    //                            MT9V03X_W,
+    //                            MT9V03X_H,
+    //                            WIFI_IMAGE_VOFA_FORMAT_GRAYSCALE8,
+    //                            0);
 }

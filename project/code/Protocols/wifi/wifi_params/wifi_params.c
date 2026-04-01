@@ -123,6 +123,20 @@ static const wifi_params_entry_t s_wifi_params_table[] =
     WIFI_PARAMS_FLOAT_ITEM("vel_y_i_limit", vel_y_i_limit, 0.0f, 5000.0f),
     WIFI_PARAMS_FLOAT_ITEM("vel_y_d_lpf", vel_y_d_lpf, 0.0f, 500.0f),
 
+    WIFI_PARAMS_FLOAT_ITEM("mode1_vel_x_kp", vel_x_kp, 0.0f, 3000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode1_vel_x_ki", vel_x_ki, 0.0f, 3000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode1_vel_x_kd", vel_x_kd, 0.0f, 3000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode1_vel_x_kff", vel_x_kff, 0.0f, 3000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode1_vel_x_i_limit", vel_x_i_limit, 0.0f, 5000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode1_vel_x_d_lpf", vel_x_d_lpf, 0.0f, 500.0f),
+
+    WIFI_PARAMS_FLOAT_ITEM("mode1_vel_y_kp", vel_y_kp, 0.0f, 3000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode1_vel_y_ki", vel_y_ki, 0.0f, 3000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode1_vel_y_kd", vel_y_kd, 0.0f, 3000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode1_vel_y_kff", vel_y_kff, 0.0f, 3000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode1_vel_y_i_limit", vel_y_i_limit, 0.0f, 5000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode1_vel_y_d_lpf", vel_y_d_lpf, 0.0f, 500.0f),
+
     WIFI_PARAMS_FLOAT_ITEM("vel_z_kp", vel_z_kp, 0.0f, 3000.0f),
     WIFI_PARAMS_FLOAT_ITEM("vel_z_ki", vel_z_ki, 0.0f, 3000.0f),
     WIFI_PARAMS_FLOAT_ITEM("vel_z_kd", vel_z_kd, 0.0f, 3000.0f),

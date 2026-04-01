@@ -913,6 +913,13 @@ void TOF_Update(void)
     /* 向后兼容：更新通道2/3使用标志 */
     g_tof2_used_in_fusion = in_fusion[1];
     g_tof3_used_in_fusion = in_fusion[2];
+
+    wifi_justfloat(g_tof1_height_mm,
+                   g_tof2_height_mm,
+                   g_tof3_height_mm,
+                   g_tof4_height_mm,
+                   g_tof_fused_height_mm);
+    
 }
 
 /*

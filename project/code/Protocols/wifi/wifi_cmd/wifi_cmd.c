@@ -226,7 +226,12 @@ uint8_t wifi_cmd_IsReady(void)
     return s_wifi_cmd_ready;
 }
 
-uint8_t wifi_cmd_SendBuffer(const uint8_t *buffer, uint32_t len)
+/*
+ * 函数功能：向 WiFi SPI 发送一段原始二进制数据，但不立即触发 UDP 发包。
+ * 输入参数：buffer-待发送数据首地址；len-待发送长度，单位字节。
+ * 返回值：1-写入成功；0-写入失败。
+ */
+uint8_t wifi_cmd_SendBufferNoFlush(const uint8_t *buffer, uint32_t len)
 {
     uint32_t remain_len;
 
@@ -236,8 +241,37 @@ uint8_t wifi_cmd_SendBuffer(const uint8_t *buffer, uint32_t len)
     }
 
     remain_len = wifi_spi_send_buffer(buffer, len);
-    (void)wifi_spi_udp_send_now();
     return (0U == remain_len) ? 1U : 0U;
+}
+
+/*
+ * 函数功能：立即触发一次 UDP 发包，将当前发送缓冲区数据整体送出。
+ * 输入参数：无。
+ * 返回值：1-触发成功；0-触发失败。
+ */
+uint8_t wifi_cmd_FlushNow(void)
+{
+    if (0U == s_wifi_cmd_ready)
+    {
+        return 0U;
+    }
+
+    return (0U == wifi_spi_udp_send_now()) ? 1U : 0U;
+}
+
+/*
+ * 函数功能：发送一段原始二进制数据，并立即触发一次 UDP 发包。
+ * 输入参数：buffer-待发送数据首地址；len-待发送长度，单位字节。
+ * 返回值：1-发送成功；0-发送失败。
+ */
+uint8_t wifi_cmd_SendBuffer(const uint8_t *buffer, uint32_t len)
+{
+    if (0U == wifi_cmd_SendBufferNoFlush(buffer, len))
+    {
+        return 0U;
+    }
+
+    return wifi_cmd_FlushNow();
 }
 
 uint8_t wifi_cmd_SendLine(const char *format, ...)

@@ -3527,6 +3527,12 @@
                 <file>
                     <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_justfloat\wifi_justfloat.h</name>
                 </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_image\wifi_image.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_image\wifi_image.h</name>
+                </file>
                 <configuration>
                     <name>Debug</name>
                     <settings>

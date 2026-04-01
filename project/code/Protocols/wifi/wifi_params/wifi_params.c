@@ -235,11 +235,6 @@ static uint8_t wifi_params_parse_int32(const char *text, int32_t *value)
         return 0U;
     }
 
-    if ((parsed < (-2147483647L - 1L)) || (parsed > 2147483647L))
-    {
-        return 0U;
-    }
-
     *value = (int32_t)parsed;
     return 1U;
 }

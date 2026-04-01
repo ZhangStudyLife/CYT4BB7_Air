@@ -52,7 +52,7 @@ int main(void)
             Pos_Est_Update_1000HZ();
             // wifi_justfloat(g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
             //                g_euler.roll, g_euler.pitch, g_euler.yaw);
-
+            
             s_tick_div_fc_loop_500hz++;
             if (s_tick_div_fc_loop_500hz >= 2U)
             {
@@ -95,11 +95,14 @@ int main(void)
             {
                 s_tick_div_fc_start_1hz = 0U;
             }
+            
 
             s_tick_div_fc_start_10hz++;
             if (s_tick_div_fc_start_10hz >= 10U)
             {
                 s_tick_div_fc_start_10hz = 0U;
+                image_update();
+
                 FC_START_CRSF_Update();
 
                 if (g_euler.roll > 35.0f || g_euler.roll < -35.0f ||

@@ -1,7 +1,7 @@
 #ifndef IMAGE_H_
 #define IMAGE_H_
 
-#include "zf_common_typedef.h"
+#include "zf_common_headfile.h"
 
 #ifdef __cplusplus
 extern "C" {

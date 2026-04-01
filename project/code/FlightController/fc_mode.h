@@ -2,7 +2,7 @@
 #define FC_MODE_H
 
 #include "fc_loop.h"
-#include "zf_common_headfile.h"
+
 #ifdef __cplusplus
 extern "C"
 {

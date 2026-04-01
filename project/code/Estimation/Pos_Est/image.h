@@ -1,9 +1,25 @@
 #ifndef IMAGE_H_
 #define IMAGE_H_
 
+#include "zf_common_typedef.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+typedef struct
+{
+    float x;        /* 相对图像中心的X坐标，右侧为正，单位像素 */
+    float y;        /* 相对图像中心的Y坐标，上方为正，单位像素 */
+    float radius;   /* 白色圆形目标半径，单位像素 */
+    uint8 valid;    /* 白色圆形目标是否有效，1=有效，0=无效 */
+} image_circle;
+
+extern image_circle g_image_circle; /* 当前帧白色圆形目标检测结果 */
+
+
+
+
 
 /*
  * 函数功能：初始化图像模块，完成摄像头、内部缓存和默认阈值初始化。

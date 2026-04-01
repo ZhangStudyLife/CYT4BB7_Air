@@ -1,5 +1,6 @@
 #include "image.h"
 
+#include <math.h>
 #include <string.h>
 
 #include "zf_common_typedef.h"
@@ -14,6 +15,9 @@ static uint8 s_image_frame[MT9V03X_H][MT9V03X_W];
 static uint8 s_image_binary[MT9V03X_H][MT9V03X_W];
 /* 内部默认固定二值化阈值，单位灰度级 */
 static uint8 s_image_threshold = IMAGE_DEFAULT_THRESHOLD;
+/* 当前帧白色圆形目标检测结果，坐标原点位于图像中心 */
+image_circle g_image_circle = {0};
+
 
 
 /*
@@ -51,6 +55,49 @@ static void image_binary_threshold(void)
 }
 
 /*
+ * 函数功能：基于二值化图像计算白色圆形目标的圆心与半径。
+ * 输入参数：无。
+ * 返回值：无。
+ */
+static void image_calc_circle(void)
+{
+    uint32 row;
+    uint32 col;
+    uint32 pixel_count = 0U;
+    uint32 sum_x = 0U;
+    uint32 sum_y = 0U;
+
+    /* 单次遍历统计全部白点数量与质心坐标 */
+    for (row = 0U; row < MT9V03X_H; row++)
+    {
+        for (col = 0U; col < MT9V03X_W; col++)
+        {
+            if (0U != s_image_binary[row][col])
+            {
+                pixel_count++;
+                sum_x += col;
+                sum_y += row;
+            }
+        }
+    }
+
+    if (0U == pixel_count)
+    {
+        g_image_circle.x = 0.0f;
+        g_image_circle.y = 0.0f;
+        g_image_circle.radius = 0.0f;
+        g_image_circle.valid = 0U;
+        return;
+    }
+
+    /* 按图像中心为原点换算目标圆心，并用面积等效圆反推半径 */
+    g_image_circle.x = ((float)sum_x / (float)pixel_count) - ((float)MT9V03X_W * 0.5f);
+    g_image_circle.y = ((float)MT9V03X_H * 0.5f) - ((float)sum_y / (float)pixel_count);
+    g_image_circle.radius = sqrtf((float)pixel_count / 3.1415926f);
+    g_image_circle.valid = 1U;
+}
+
+/*
  * 函数功能：初始化图像模块，完成摄像头、内部缓存和默认阈值初始化。
  * 输入参数：无。
  * 返回值：无。
@@ -59,6 +106,7 @@ void image_init(void)
 {
     memset(s_image_frame, 0, sizeof(s_image_frame));
     memset(s_image_binary, 0, sizeof(s_image_binary));
+    memset(&g_image_circle, 0, sizeof(g_image_circle));
 
     s_image_threshold = IMAGE_DEFAULT_THRESHOLD;
     mt9v03x_finish_flag = 0U;
@@ -80,5 +128,6 @@ void image_update(void)
     }
 
     image_binary_threshold();
+    image_calc_circle();
 
 }

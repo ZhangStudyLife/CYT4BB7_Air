@@ -18,8 +18,6 @@ static uint8 s_image_threshold = IMAGE_DEFAULT_THRESHOLD;
 /* 当前帧白色圆形目标检测结果，坐标原点位于图像中心 */
 image_circle g_image_circle = {0};
 
-
-
 /*
  * 函数功能：尝试抓取最新完整图像并锁存到内部缓存。
  * 输入参数：无。
@@ -91,8 +89,8 @@ static void image_calc_circle(void)
     }
 
     /* 按图像中心为原点换算目标圆心，并用面积等效圆反推半径 */
-    g_image_circle.x = ((float)sum_x / (float)pixel_count) - ((float)MT9V03X_W * 0.5f);
-    g_image_circle.y = ((float)MT9V03X_H * 0.5f) - ((float)sum_y / (float)pixel_count);
+    g_image_circle.x = ((float)MT9V03X_W * 0.5f) - ((float)sum_x / (float)pixel_count);
+    g_image_circle.y = ((float)sum_y / (float)pixel_count) - ((float)MT9V03X_H * 0.5f);
     g_image_circle.radius = sqrtf((float)pixel_count / 3.1415926f);
     g_image_circle.valid = 1U;
 }
@@ -129,5 +127,8 @@ void image_update(void)
 
     image_binary_threshold();
     image_calc_circle();
-
+    wifi_justfloat(g_image_circle.x,
+                   g_image_circle.y,
+                   g_image_circle.radius,
+                   (float)g_image_circle.valid);
 }

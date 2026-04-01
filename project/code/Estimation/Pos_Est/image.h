@@ -9,8 +9,8 @@ extern "C" {
 
 typedef struct
 {
-    float x;        /* 相对图像中心的X坐标，右侧为正，单位像素 */
-    float y;        /* 相对图像中心的Y坐标，上方为正，单位像素 */
+    float x;        /* 飞机在图像圆心的右侧 , X为正 */
+    float y;        /* 飞机在图像圆心的上方 , Y为正 */
     float radius;   /* 白色圆形目标半径，单位像素 */
     uint8 valid;    /* 白色圆形目标是否有效，1=有效，0=无效 */
 } image_circle;

@@ -126,6 +126,6 @@
 #include "../code/Estimation/Height_Est/TOF_data.h"
 #include "../code/Estimation/Pos_Est/FlowGyroDecoupler.h"
 #include "../code/filter.h"
-
+#include "../code/Estimation/Pos_Est/image.h"
 
 #endif

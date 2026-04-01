@@ -20,6 +20,7 @@ int main(void)
     Beep_Init();
     pit_ms_init(PIT_CH2, 10);
     wifi_cmd_Init();
+    image_init();
     TOF_Init();
     PMW3901_Init();
     IMU_Init_All();

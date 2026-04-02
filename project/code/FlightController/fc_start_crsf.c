@@ -9,7 +9,7 @@
 #define FC_START_CRSF_TAKEOFF_THR_STAGE1 (1500)
 #define FC_START_CRSF_TAKEOFF_THR_STAGE2 (2500)
 
-static FC_START_CRSF_state_e s_fc_start_state = FC_START_CRSF_STATE_INIT;
+FC_START_CRSF_state_e s_fc_start_state = FC_START_CRSF_STATE_INIT;
 static FC_START_CRSF_flight_mode_e s_fc_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
 
 static uint16_t s_unlock_timer_tick = 0U;

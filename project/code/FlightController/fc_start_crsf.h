@@ -28,6 +28,8 @@ typedef enum
 #define FC_START_CRSF_RC_RAW_LOW_THR      (-200)
 #define FC_START_CRSF_RC_RAW_HIGH_THR     (200)
 
+extern FC_START_CRSF_state_e s_fc_start_state;
+
 void FC_START_CRSF_Init(void);
 void FC_START_CRSF_Update(void);
 

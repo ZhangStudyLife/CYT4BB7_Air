@@ -225,6 +225,11 @@ void wifi_cmd_Init(void)
 
 void wifi_cmd_Poll(void)
 {
+    /* 仅在非飞行状态下轮询 */
+    if(s_fc_start_state==FC_START_CRSF_STATE_FLYING)
+    {
+        return;
+    }
     uint8_t rx_buffer[WIFI_CMD_RX_BUFFER_SIZE];
     uint32_t read_len;
     uint32_t i;

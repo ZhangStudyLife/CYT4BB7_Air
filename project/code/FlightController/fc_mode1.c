@@ -104,7 +104,7 @@ void FC_Mode1_50Hz(float dt)
     ch0 = FC_Mode_Clamp((float)CRSF_STD[0], -1000.0f, 1000.0f);
     ch1 = FC_Mode_Clamp((float)CRSF_STD[1], -1000.0f, 1000.0f);
 
-    if ((-150.0f < ch0) && (ch0 < 150.0f) && (-150.0f < ch1) && (ch1 < 150.0f) && g_image_circle.valid == 1U)
+    if ((-150.0f < ch0) && (ch0 < 150.0f) && (-150.0f < ch1) && (ch1 < 150.0f) && g_image_circles[0].valid == 1U)
     {
         // 遥控器没怎么给多大的速度指令，并且图像圆形目标有效，此时可以认为是在视觉引导下悬停，直接把速度目标设为0，让 PID 输出稳定的姿态控制指令去追踪目标
         ch0 = 0.0f;
@@ -112,10 +112,10 @@ void FC_Mode1_50Hz(float dt)
         // g_image_circle.x > 0 表示飞机在信标灯右边 需要往左飞 
         // Pos_Est_vel_x_kf 单位 cm/s，往左飞为正，往右飞为负
         float kp = 2.0f; // 视觉引导速度增益，单位 cm/s/像素
-        velx_target = -g_image_circle.x * kp;
+        velx_target = -g_image_circles[0].x * kp;
         // g_image_circle.y > 0 表示飞机在信标灯前方 需要往后飞
         // Pos_Est_vel_y_kf 单位 cm/s，往前飞为正，往后飞为负
-        vely_target = g_image_circle.y * kp;
+        vely_target = g_image_circles[0].y * kp;
     }
     else
     {

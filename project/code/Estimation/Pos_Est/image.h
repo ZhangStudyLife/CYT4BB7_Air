@@ -15,7 +15,8 @@ typedef struct
     uint8 valid;    /* 白色圆形目标是否有效，1=有效，0=无效 */
 } image_circle;
 
-extern image_circle g_image_circle; /* 当前帧白色圆形目标检测结果 */
+#define IMAGE_MAX_CIRCLE_COUNT (5U) /* 最多检测几个圆形目标 */
+extern image_circle g_image_circles[IMAGE_MAX_CIRCLE_COUNT]; /* 当前帧白色圆形目标检测结果,数组按照从大到小排序 */
 
 
 

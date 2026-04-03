@@ -16,6 +16,7 @@
 #include "../wifi_params/wifi_params.h"
 
 static uint8_t s_wifi_cmd_use_udp_flush = 1U;    /* 当前链路是否使用UDP立即发送命令：1=UDP，0=TCP */
+static uint8_t s_wifi_cmd_flush_pending = 0U;    /* 是否存在待触发的UDP立即发送请求：1-待触发，0-无请求 */
 
 /* WiFi 文本接收状态 */
 static uint8_t s_wifi_cmd_ready = 0U;            /* WiFi 链路就绪标志 */
@@ -191,6 +192,7 @@ void wifi_cmd_Init(void)
 
     s_wifi_cmd_ready = 0U;
     s_wifi_cmd_use_udp_flush = 1U;
+    s_wifi_cmd_flush_pending = 0U;
     memset(s_wifi_cmd_line, 0, sizeof(s_wifi_cmd_line));
     wifi_cmd_reset_line_state();
 
@@ -225,6 +227,18 @@ void wifi_cmd_Init(void)
 
 void wifi_cmd_Poll(void)
 {
+    /* 推进非阻塞发送状态机，确保发送在主循环中持续推进 */
+    wifi_spi_send_poll();
+
+    /* 发送完成后再触发UDP立即发送，避免与发送事务重叠 */
+    if ((0U != s_wifi_cmd_flush_pending) && (0U == wifi_spi_is_busy()))
+    {
+        if (0U != wifi_cmd_FlushNow())
+        {
+            s_wifi_cmd_flush_pending = 0U;
+        }
+    }
+
     /* 仅在非飞行状态下轮询 */
     if(s_fc_start_state==FC_START_CRSF_STATE_FLYING)
     {
@@ -285,9 +299,9 @@ uint8_t wifi_cmd_FlushNow(void)
 }
 
 /*
- * 函数功能：发送一段原始二进制数据，并立即触发一次 UDP 发包。
+ * 函数功能：提交一段原始二进制数据到非阻塞发送链路，并在后续轮询中触发 UDP 发包。
  * 输入参数：buffer-待发送数据首地址；len-待发送长度，单位字节。
- * 返回值：1-发送成功；0-发送失败。
+ * 返回值：1-提交成功；0-提交失败。
  */
 uint8_t wifi_cmd_SendBuffer(const uint8_t *buffer, uint32_t len)
 {
@@ -296,7 +310,13 @@ uint8_t wifi_cmd_SendBuffer(const uint8_t *buffer, uint32_t len)
         return 0U;
     }
 
-    return wifi_cmd_FlushNow();
+    if (0U == s_wifi_cmd_use_udp_flush)
+    {
+        return 1U;
+    }
+
+    s_wifi_cmd_flush_pending = 1U;
+    return 1U;
 }
 
 uint8_t wifi_cmd_SendLine(const char *format, ...)

@@ -143,7 +143,12 @@ uint8  wifi_spi_connect_wifi    (char *wifi_ssid, char *pass_word);
 uint8  wifi_spi_socket_connect  (char *transport_type, char *ip_addr, char *port, char *local_port);
 uint8  wifi_spi_socket_close    (void);
 uint8  wifi_spi_udp_send_now    (void);
+/* 提交待发送数据到非阻塞发送缓存，返回未提交长度 */
 uint32 wifi_spi_send_buffer     (const uint8 *buff, uint32 length);
+/* 在主循环中周期调用，推进发送状态机 */
+void   wifi_spi_send_poll       (void);
+/* 查询发送链路是否忙 */
+uint8  wifi_spi_is_busy         (void);
 uint32 wifi_spi_read_buffer     (uint8 *buffer, uint32 length);
 
 uint8  wifi_spi_init            (char *wifi_ssid, char *pass_word);

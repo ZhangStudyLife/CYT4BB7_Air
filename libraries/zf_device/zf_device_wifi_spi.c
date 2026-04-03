@@ -56,12 +56,18 @@
 #include "zf_driver_gpio.h"
 #include "zf_driver_spi.h"
 #include "zf_device_type.h"
+#include "scb/cy_scb_spi.h"
+#include "dma/cy_pdma.h"
+#include "trigmux/cy_trigmux.h"
 
 #include "zf_device_wifi_spi.h"
 
 #define WIFI_CONNECT_TIME_OUT       10000       // 单位毫秒
 #define SOCKET_CONNECT_TIME_OUT     50000       // 单位毫秒
 #define OTHER_TIME_OUT              1000        // 单位毫秒
+#define WIFI_SPI_TX_DMA_CHANNEL         (30u)   // WiFi SPI(SCB7) TX请求对应 DW1 通道号
+#define WIFI_SPI_TX_DMA_TRIGGER_1TO1    (TRIG_OUT_1TO1_2_SCB_TX_TO_PDMA17) // SCB7 TX -> DW1_TR_IN[30]
+#define WIFI_SPI_TX_DMA_USE_SW_TRIGGER  (1u)    // DMA触发方式：0-硬件触发 1-软件触发
 
 char wifi_spi_version[12];                      // 保存模块固件版本信息
 char wifi_spi_mac_addr[20];                     // 保存模块MAC地址信息
@@ -70,6 +76,216 @@ char wifi_spi_ip_addr_port[25];                 // 保存模块IP地址与端口信息
 static fifo_struct  wifi_spi_fifo;
 static uint8        wifi_spi_buffer[WIFI_SPI_RECVIVE_FIFO_SIZE];
 static volatile     wifi_spi_state_enum wifi_spi_mutex;
+/* 非阻塞发送缓存：保存待发送数据，避免上层临时缓冲区失效 */
+static uint8        wifi_spi_tx_cache[WIFI_SPI_TRANSFER_SIZE];
+/* 非阻塞发送缓存有效长度，单位字节 */
+static uint16       wifi_spi_tx_length = 0;
+/* 非阻塞发送是否已提交且待处理：1-有待发任务，0-无待发任务 */
+static uint8        wifi_spi_tx_pending = 0;
+/* WiFi SPI TX DMA 是否初始化成功 */
+static uint8        wifi_spi_tx_dma_ready = 0;
+/* WiFi SPI TX DMA 是否正在传输 */
+static uint8        wifi_spi_tx_dma_busy = 0;
+/* WiFi SPI TX DMA 描述符 */
+static cy_stc_pdma_descr_t wifi_spi_tx_dma_descr;
+
+/* 发送轮询内部步骤状态 */
+typedef enum
+{
+    WIFI_SPI_TX_STEP_IDLE = 0,
+    WIFI_SPI_TX_STEP_WAIT_SEND,
+    WIFI_SPI_TX_STEP_SEND,
+    WIFI_SPI_TX_STEP_SEND_DMA_WAIT,
+    WIFI_SPI_TX_STEP_SEND_TX_WAIT,
+    WIFI_SPI_TX_STEP_DRAIN_REPLY,
+    WIFI_SPI_TX_STEP_DONE,
+    WIFI_SPI_TX_STEP_ERROR,
+}wifi_spi_tx_step_enum;
+
+/* 当前发送轮询步骤 */
+static wifi_spi_tx_step_enum wifi_spi_tx_step = WIFI_SPI_TX_STEP_IDLE;
+/* WiFi SPI 对应 SCB 基地址（WIFI_SPI_INDEX 固定为 SPI_0，对应 SCB7） */
+static volatile stc_SCB_t * const s_wifi_spi_scb = SCB7;
+
+//-------------------------------------------------------------------------------------------------------------------
+// 函数简介     查询 WIFI SPI 发送是否完成
+// 参数说明     void
+// 返回参数     uint8           状态 1-发送完成 0-发送未完成
+// 使用示例     内部使用，用户无需关心
+// 备注信息
+//-------------------------------------------------------------------------------------------------------------------
+static uint8 wifi_spi_tx_is_complete (void)
+{
+    return (0 != Cy_SCB_IsTxComplete(s_wifi_spi_scb)) ? 1 : 0;
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+// 函数简介     清空 WIFI SPI RX FIFO
+// 参数说明     void
+// 返回参数     void
+// 使用示例     内部使用，用户无需关心
+// 备注信息
+//-------------------------------------------------------------------------------------------------------------------
+static void wifi_spi_rx_fifo_drain (void)
+{
+    while(0 != Cy_SCB_GetNumInRxFifo(s_wifi_spi_scb))
+    {
+        (void)Cy_SCB_ReadRxFifo(s_wifi_spi_scb);
+    }
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+// 函数简介     WiFi SPI TX DMA 初始化
+// 参数说明     void
+// 返回参数     uint8           状态 0-成功 1-错误
+// 使用示例     内部使用，用户无需关心
+// 备注信息
+//-------------------------------------------------------------------------------------------------------------------
+static uint8 wifi_spi_tx_dma_init (void)
+{
+    uint8 return_state = 1;
+    cy_stc_pdma_chnl_config_t tx_chnl_config;
+
+    do
+    {
+        memset(&tx_chnl_config, 0, sizeof(tx_chnl_config));
+        tx_chnl_config.PDMA_Descriptor    = &wifi_spi_tx_dma_descr;
+        tx_chnl_config.preemptable        = 0;
+        tx_chnl_config.priority           = 0;
+        tx_chnl_config.enable             = 1;
+        tx_chnl_config.priviledge         = 0;
+        tx_chnl_config.non_secure         = 0;
+        tx_chnl_config.bufferable         = 0;
+        tx_chnl_config.protection_context = 0;
+
+        if(CY_PDMA_SUCCESS != Cy_PDMA_Chnl_Init(DW1, WIFI_SPI_TX_DMA_CHANNEL, &tx_chnl_config))
+        {
+            break;
+        }
+
+#if (0u == WIFI_SPI_TX_DMA_USE_SW_TRIGGER)
+        if(CY_TRIGMUX_SUCCESS != Cy_TrigMux_Connect1To1(WIFI_SPI_TX_DMA_TRIGGER_1TO1, CY_TR_MUX_TR_INV_DISABLE, TRIGGER_TYPE_LEVEL, 0))
+        {
+            break;
+        }
+#endif
+
+        Cy_PDMA_Chnl_SetInterruptMask(DW1, WIFI_SPI_TX_DMA_CHANNEL);
+        Cy_PDMA_Enable(DW1);
+        return_state = 0;
+    }while(0);
+
+    return return_state;
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+// 函数简介     启动一次 WiFi SPI TX DMA 发送
+// 参数说明     *data           数据地址
+// 参数说明     len             数据长度
+// 返回参数     uint8           状态 0-启动成功 1-启动失败
+// 使用示例     内部使用，用户无需关心
+// 备注信息
+//-------------------------------------------------------------------------------------------------------------------
+static uint8 wifi_spi_tx_dma_start (const uint8 *data, uint16 len)
+{
+    uint8 return_state = 1;
+    cy_stc_pdma_descr_config_t tx_descr_config;
+
+    do
+    {
+        if((NULL == data) || (0 == len))
+        {
+            break;
+        }
+
+        if(0 == wifi_spi_tx_dma_ready)
+        {
+            if(0 != wifi_spi_tx_dma_init())
+            {
+                break;
+            }
+            wifi_spi_tx_dma_ready = 1;
+        }
+
+        if(0 != wifi_spi_tx_dma_busy)
+        {
+            break;
+        }
+
+        memset(&tx_descr_config, 0, sizeof(tx_descr_config));
+        tx_descr_config.deact          = CY_PDMA_TRIG_DEACT_NO_WAIT;
+        tx_descr_config.intrType       = CY_PDMA_INTR_X_LOOP_CMPLT;
+        tx_descr_config.trigoutType    = CY_PDMA_TRIGOUT_DESCR_CMPLT;
+        tx_descr_config.chStateAtCmplt = CY_PDMA_CH_DISABLED;
+        tx_descr_config.triginType     = (0u == WIFI_SPI_TX_DMA_USE_SW_TRIGGER) ? CY_PDMA_TRIGIN_1ELEMENT : CY_PDMA_TRIGIN_DESCR;
+        tx_descr_config.dataSize       = CY_PDMA_BYTE;
+        tx_descr_config.srcTxfrSize    = CY_PDMA_TXFR_SIZE_DATA_SIZE;
+        tx_descr_config.destTxfrSize   = CY_PDMA_TXFR_SIZE_WORD;
+        tx_descr_config.descrType      = CY_PDMA_1D_TRANSFER;
+        tx_descr_config.srcAddr        = (void *)data;
+        tx_descr_config.destAddr       = (void *)&(s_wifi_spi_scb->unTX_FIFO_WR.u32Register);
+        tx_descr_config.srcXincr       = 1;
+        tx_descr_config.destXincr      = 0;
+        tx_descr_config.xCount         = len;
+        tx_descr_config.srcYincr       = 0;
+        tx_descr_config.destYincr      = 0;
+        tx_descr_config.yCount         = 0;
+        tx_descr_config.descrNext      = NULL;
+
+        if(CY_PDMA_SUCCESS != Cy_PDMA_Descr_Init(&wifi_spi_tx_dma_descr, &tx_descr_config))
+        {
+            break;
+        }
+
+        Cy_PDMA_Chnl_ClearInterrupt(DW1, WIFI_SPI_TX_DMA_CHANNEL);
+        Cy_PDMA_Chnl_SetDescr(DW1, WIFI_SPI_TX_DMA_CHANNEL, &wifi_spi_tx_dma_descr);
+        Cy_PDMA_Chnl_Enable(DW1, WIFI_SPI_TX_DMA_CHANNEL);
+#if defined(CPUSS_SW_TR_PRESENT) && (CPUSS_SW_TR_PRESENT == 1)
+        if(0u != WIFI_SPI_TX_DMA_USE_SW_TRIGGER)
+        {
+            Cy_PDMA_Chnl_SetSwTrigger(DW1, WIFI_SPI_TX_DMA_CHANNEL);
+        }
+#endif
+        wifi_spi_tx_dma_busy = 1;
+        return_state = 0;
+    }while(0);
+
+    return return_state;
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+// 函数简介     查询 WiFi SPI TX DMA 是否完成
+// 参数说明     void
+// 返回参数     uint8           状态 1-完成 0-未完成
+// 使用示例     内部使用，用户无需关心
+// 备注信息
+//-------------------------------------------------------------------------------------------------------------------
+static uint8 wifi_spi_tx_dma_is_done (void)
+{
+    uint32 dma_cause;
+
+    if(0 == wifi_spi_tx_dma_busy)
+    {
+        return 1;
+    }
+
+    if(0 == Cy_PDMA_Chnl_GetInterruptStatus(DW1, WIFI_SPI_TX_DMA_CHANNEL))
+    {
+        return 0;
+    }
+
+    dma_cause = Cy_PDMA_Chnl_GetInterruptCause(DW1, WIFI_SPI_TX_DMA_CHANNEL);
+    Cy_PDMA_Chnl_ClearInterrupt(DW1, WIFI_SPI_TX_DMA_CHANNEL);
+
+    if(CY_PDMA_INTRCAUSE_COMPLETION != dma_cause)
+    {
+        wifi_spi_tx_dma_busy = 0;
+        return 1;
+    }
+
+    wifi_spi_tx_dma_busy = 0;
+    return 1;
+}
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     等待WIFI SPI就绪
 // 参数说明     wait_time       最大等待时间 单位毫秒
@@ -484,75 +700,167 @@ uint8 wifi_spi_udp_send_now (void)
     return return_state;
 }
 
+/*
+ * 函数功能：查询 WiFi SPI 当前是否仍有发送事务在执行。
+ * 输入参数：无。
+ * 返回值：1-正在忙；0-空闲。
+ */
+uint8 wifi_spi_is_busy (void)
+{
+    return (WIFI_SPI_BUSY == wifi_spi_mutex) ? 1 : 0;
+}
+
 //-------------------------------------------------------------------------------------------------------------------
-// 函数简介     WIFI SPI 数据块发送函数并同步接收数据
+// 函数简介     WIFI SPI 数据块发送函数（提交模式，需配合 wifi_spi_send_poll 推进）
 // 参数说明     *buff           需要发送的数据地址
 // 参数说明     length          发送长度
-// 返回参数     uint32          剩余未发送的长度
+// 返回参数     uint32          未提交长度
 // 使用示例     wifi_spi_send_buffer(buffer, 100);
 // 备注信息
 //-------------------------------------------------------------------------------------------------------------------
 uint32 wifi_spi_send_buffer (const uint8 *buffer, uint32 length)
 {
-    uint16 send_length;
-    wifi_spi_packets_struct temp_packets;
-    
-    // 检查WIFI SPI状态，如果在其他中断或者线程中已经发起了通讯，则本次不能发送数据
-    if(WIFI_SPI_IDLE == wifi_spi_mutex)
+    uint16 submit_length;
+    if((NULL == buffer) || (0 == length))
     {
-        // 将通讯状态设置为忙
-        wifi_spi_mutex = WIFI_SPI_BUSY;
-        
-        while(length)
+        return length;
+    }
+
+    if((WIFI_SPI_IDLE != wifi_spi_mutex) || (0 != wifi_spi_tx_pending))
+    {
+        return length;
+    }
+
+    submit_length = (length > WIFI_SPI_TRANSFER_SIZE) ? (uint16)WIFI_SPI_TRANSFER_SIZE : (uint16)length;
+    memcpy(wifi_spi_tx_cache, buffer, submit_length);
+    wifi_spi_tx_length = submit_length;
+    wifi_spi_tx_pending = 1;
+    wifi_spi_tx_step = WIFI_SPI_TX_STEP_WAIT_SEND;
+    wifi_spi_mutex = WIFI_SPI_BUSY;
+    return (uint32)(length - submit_length);
+}
+
+/*
+ * 函数功能：推进一次 WiFi SPI 非阻塞发送状态机。
+ * 输入参数：无。
+ * 返回值：无。
+ */
+void wifi_spi_send_poll (void)
+{
+    wifi_spi_packets_struct temp_packets;
+    if(WIFI_SPI_BUSY != wifi_spi_mutex)
+    {
+        return;
+    }
+
+    if(0 == wifi_spi_tx_pending)
+    {
+        wifi_spi_tx_step = WIFI_SPI_TX_STEP_IDLE;
+        wifi_spi_mutex = WIFI_SPI_IDLE;
+        return;
+    }
+
+    switch(wifi_spi_tx_step)
+    {
+        case WIFI_SPI_TX_STEP_WAIT_SEND:
         {
-            send_length = length > WIFI_SPI_TRANSFER_SIZE ? (uint16)WIFI_SPI_TRANSFER_SIZE : (uint16)length;
-            
-            if(wifi_spi_wait_idle(OTHER_TIME_OUT))
+            if(wifi_spi_wait_idle(1))
             {
+                return;
+            }
+            wifi_spi_tx_step = WIFI_SPI_TX_STEP_SEND;
+        }break;
+
+        case WIFI_SPI_TX_STEP_SEND:
+        {
+            temp_packets.head.command = WIFI_SPI_DATA;
+            temp_packets.head.length  = wifi_spi_tx_length;
+            gpio_low(WIFI_SPI_CS_PIN);
+            spi_write_8bit_array(WIFI_SPI_INDEX, &temp_packets.head.command, sizeof(wifi_spi_head_struct));
+            /* SPI 全双工下先排空头部发送产生的RX回灌，避免后续DMA过程RX FIFO顶满 */
+            wifi_spi_rx_fifo_drain();
+
+            if(0 == wifi_spi_tx_length)
+            {
+                gpio_high(WIFI_SPI_CS_PIN);
+                wifi_spi_tx_step = WIFI_SPI_TX_STEP_DRAIN_REPLY;
                 break;
             }
-            
-            wifi_spi_transfer_data(buffer, &temp_packets, send_length);
-            
-            // 检查收到的包中是否有数据
-            if((WIFI_SPI_REPLY_DATA_START == temp_packets.head.command) || (WIFI_SPI_REPLY_DATA_END == temp_packets.head.command))
+
+            if(0 == wifi_spi_tx_dma_start(wifi_spi_tx_cache, wifi_spi_tx_length))
             {
-                // 保存接收到的数据
-                if(temp_packets.head.length)
-                {
-                    fifo_write_buffer(&wifi_spi_fifo, temp_packets.buffer, temp_packets.head.length);
-                }
+                wifi_spi_tx_step = WIFI_SPI_TX_STEP_SEND_DMA_WAIT;
             }
-            
-            length -= send_length;
-            buffer += send_length;
-        }
-        
-        // 检查最后一次的接收是否将所有的数据都接收完毕
-        while(WIFI_SPI_REPLY_DATA_START == temp_packets.head.command)
+            else
+            {
+                spi_write_8bit_array(WIFI_SPI_INDEX, wifi_spi_tx_cache, wifi_spi_tx_length);
+                gpio_high(WIFI_SPI_CS_PIN);
+                wifi_spi_tx_step = WIFI_SPI_TX_STEP_DRAIN_REPLY;
+            }
+        }break;
+
+        case WIFI_SPI_TX_STEP_SEND_DMA_WAIT:
         {
-            if(wifi_spi_wait_idle(OTHER_TIME_OUT))
+            if(0 == wifi_spi_tx_dma_is_done())
             {
-                break;
+                /* DMA发送期间持续排空RX FIFO，防止全双工回灌撑满导致发送停滞 */
+                wifi_spi_rx_fifo_drain();
+                return;
             }
-            
-            // 继续读取模块剩余数据
+
+            wifi_spi_tx_step = WIFI_SPI_TX_STEP_SEND_TX_WAIT;
+        }break;
+
+        case WIFI_SPI_TX_STEP_SEND_TX_WAIT:
+        {
+            if(0 == wifi_spi_tx_is_complete())
+            {
+                return;
+            }
+
+            wifi_spi_rx_fifo_drain();
+            gpio_high(WIFI_SPI_CS_PIN);
+            wifi_spi_tx_step = WIFI_SPI_TX_STEP_DRAIN_REPLY;
+        }break;
+
+        case WIFI_SPI_TX_STEP_DRAIN_REPLY:
+        {
+            if(wifi_spi_wait_idle(1))
+            {
+                return;
+            }
             temp_packets.head.command = WIFI_SPI_DATA;
             temp_packets.head.length  = 0;
             wifi_spi_transfer_command(&temp_packets, WIFI_SPI_RECVIVE_SIZE);
-            // 检查收到的包中是否有数据
             if((WIFI_SPI_REPLY_DATA_START == temp_packets.head.command) || (WIFI_SPI_REPLY_DATA_END == temp_packets.head.command))
             {
-                // 保存接收到的数据
                 if(temp_packets.head.length)
                 {
                     fifo_write_buffer(&wifi_spi_fifo, temp_packets.buffer, temp_packets.head.length);
                 }
             }
-        }
-        wifi_spi_mutex = WIFI_SPI_IDLE;
+            if((WIFI_SPI_REPLY_DATA_END == temp_packets.head.command) || (WIFI_SPI_REPLY_OK == temp_packets.head.command))
+            {
+                wifi_spi_tx_step = WIFI_SPI_TX_STEP_DONE;
+            }
+        }break;
+
+        case WIFI_SPI_TX_STEP_DONE:
+        {
+            wifi_spi_tx_pending = 0;
+            wifi_spi_tx_length = 0;
+            wifi_spi_tx_step = WIFI_SPI_TX_STEP_IDLE;
+            wifi_spi_mutex = WIFI_SPI_IDLE;
+        }break;
+
+        default:
+        {
+            wifi_spi_tx_pending = 0;
+            wifi_spi_tx_length = 0;
+            wifi_spi_tx_step = WIFI_SPI_TX_STEP_ERROR;
+            wifi_spi_mutex = WIFI_SPI_IDLE;
+        }break;
     }
-    return length;
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -631,6 +939,11 @@ uint8 wifi_spi_init (char *wifi_ssid, char *pass_word)
     // 等待模块初始化
     system_delay_ms(100);
     wifi_spi_mutex = WIFI_SPI_IDLE;
+    wifi_spi_tx_length = 0;
+    wifi_spi_tx_pending = 0;
+    wifi_spi_tx_dma_ready = 0;
+    wifi_spi_tx_dma_busy = 0;
+    wifi_spi_tx_step = WIFI_SPI_TX_STEP_IDLE;
 
     do
     {

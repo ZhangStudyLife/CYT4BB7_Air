@@ -73,13 +73,13 @@ uint8_t wifi_cmd_IsReady(void);
 
 /*
  * 函数名: wifi_cmd_SendBuffer
- * 功能: 发送一段原始二进制数据并立即触发 UDP 发送
+ * 功能: 提交一段原始二进制数据到非阻塞发送链路，并在后续轮询中触发 UDP 发送
  * 输入参数:
  *   buffer - 待发送数据首地址
  *   len    - 待发送长度，单位字节
  * 返回值:
- *   1 - 发送成功
- *   0 - 发送失败
+ *   1 - 提交成功
+ *   0 - 提交失败
  */
 uint8_t wifi_cmd_SendBuffer(const uint8_t *buffer, uint32_t len);
 /*

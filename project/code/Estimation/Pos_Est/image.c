@@ -7,7 +7,7 @@
 #include "zf_device_mt9v03x.h"
 #include "../../Protocols/wifi/wifi_image/wifi_image.h"
 
-#define IMAGE_DEFAULT_THRESHOLD (80U) /* 默认高亮目标提取阈值 */
+#define IMAGE_DEFAULT_THRESHOLD (50U) /* 默认高亮目标提取阈值 */
 
 /* 内部完整单帧灰度图缓存，单位像素灰度值 */
 static uint8 s_image_frame[MT9V03X_H][MT9V03X_W];

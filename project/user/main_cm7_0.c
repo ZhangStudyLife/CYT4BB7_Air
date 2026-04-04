@@ -89,6 +89,9 @@ int main(void)
                 FC_Loop_50Hz();
 
                 wifi_params_GetDiag(&wifi_params_diag);
+                #if (0U == WIFI_IMAGE_ENABLE)
+                    wifi_cmd_Poll();
+                #endif
             }
 
             s_tick_div_fc_start_1hz++;
@@ -114,8 +117,6 @@ int main(void)
             }
         }
 
-#if (0U == WIFI_IMAGE_ENABLE)
-        wifi_cmd_Poll();
-#endif
+
     }
 }

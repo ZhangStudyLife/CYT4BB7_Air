@@ -53,6 +53,7 @@ static const float s_fc_deg_to_rad = 0.017453293f;
 static const float s_fc_tilt_cos_min = 0.9f;
 static const float s_fc_tilt_comp_throttle_max = 10000.0f;
 
+
 /*
  * 函数名: fc_clampf
  * 功能: 对浮点数进行上下限钳位
@@ -313,19 +314,19 @@ void FC_Loop_50Hz(void)
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_1:
-        FC_Mode1_50Hz(dt);
+        FC_Mode0_50Hz(dt);
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_2:
-        FC_Mode2_50Hz(dt);
+        FC_Mode0_50Hz(dt);
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_3:
-        FC_Mode3_50Hz(dt);
+        FC_Mode0_50Hz(dt);
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_4:
-        FC_Mode4_50Hz(dt);
+        FC_Mode1_50Hz(dt);
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_5:
@@ -333,15 +334,15 @@ void FC_Loop_50Hz(void)
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_6:
-        FC_Mode6_50Hz(dt);
+        FC_Mode0_50Hz(dt);
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_7:
-        FC_Mode7_50Hz(dt);
+        FC_Mode2_50Hz(dt);
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_8:
-        FC_Mode8_50Hz(dt);
+        FC_Mode0_50Hz(dt);
         break;
 
     default:
@@ -405,8 +406,16 @@ void FC_Loop_100Hz(void)
 
     if (fc_state == FC_START_CRSF_STATE_FLYING)
     {
-        ch2 = fc_clampf((float)CRSF_STD[2], -1000.0f, 1000.0f);
-        target_height_m = FC_Map_TargetHeightFromCh2(ch2);
+        /*定高的目标高度获取来源，模式5为固定高度模式，其他模式为CH2映射 */
+        if (s_flight_mode == FC_START_CRSF_FLIGHT_MODE_5)
+        {
+            target_height_m = FC_Mode5_Get_Fixed_Height_M();
+        }
+        else
+        {
+            ch2 = fc_clampf((float)CRSF_STD[2], -1000.0f, 1000.0f);
+            target_height_m = FC_Map_TargetHeightFromCh2(ch2);
+        }
         height_vel_out = PID_Update(&height_vel_pid, height_pos_out, s_height_vz_mps, dt);
         height_vel_out = fc_clampf(height_vel_out, s_fc_height_vel_out_min, s_fc_height_vel_out_max);
     }
@@ -426,19 +435,19 @@ void FC_Loop_100Hz(void)
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_1:
-        FC_Mode1_100Hz();
+        FC_Mode0_100Hz();
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_2:
-        FC_Mode2_100Hz();
+        FC_Mode0_100Hz();
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_3:
-        FC_Mode3_100Hz();
+        FC_Mode0_100Hz();
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_4:
-        FC_Mode4_100Hz();
+        FC_Mode1_100Hz();
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_5:
@@ -446,15 +455,15 @@ void FC_Loop_100Hz(void)
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_6:
-        FC_Mode6_100Hz();
+        FC_Mode0_100Hz();
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_7:
-        FC_Mode7_100Hz();
+        FC_Mode2_100Hz();
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_8:
-        FC_Mode8_100Hz();
+        FC_Mode0_100Hz();
         break;
 
     default:

@@ -17,6 +17,17 @@
  *
  * 当前模式号计算公式：
  * mode = CH5 * 3 + CH6
+ *
+ * 当前模式功能分配(这是实际使用的模式功能，和代码库里面的模式功能不一定对应，具体去看fc_loop.c里面50HZ，100HZ的状态机)：
+ * MODE0 - 纯手动姿态
+ * MODE1 - 纯手动姿态
+ * MODE2 - 纯手动姿态
+ * MODE3 - 纯手动姿态
+ * MODE4 - 位置保持模式，复用原模式1逻辑
+ * MODE5 - 固定高度位置保持模式，横向复用原模式1逻辑
+ * MODE6 - 纯手动姿态
+ * MODE7 - 速度环模式，复用原模式2逻辑
+ * MODE8 - 纯手动姿态
  */
 
 #include "fc_loop.h"
@@ -270,6 +281,15 @@ void FC_Mode5_100Hz(void);
  * 返回值: 无
  */
 void FC_Mode5_50Hz(float dt);
+
+/*
+ * 函数名: FC_Mode5_Get_Fixed_Height_M
+ * 功能: 获取模式5使用的固定高度目标
+ * 输入参数: 无
+ * 返回值:
+ *   模式5固定高度目标，单位m
+ */
+float FC_Mode5_Get_Fixed_Height_M(void);
 
 /*
  * 函数名: FC_Mode6_Init

@@ -125,6 +125,12 @@ static void FC_Reset_All_Mode_Control(void)
     FC_Mode0_Reset();
     FC_Mode1_Reset();
     FC_Mode2_Reset();
+    FC_Mode3_Reset();
+    FC_Mode4_Reset();
+    FC_Mode5_Reset();
+    FC_Mode6_Reset();
+    FC_Mode7_Reset();
+    FC_Mode8_Reset();
 }
 
 /*
@@ -227,6 +233,12 @@ void FC_Loop_Init(void)
     FC_Mode0_Init();
     FC_Mode1_Init();
     FC_Mode2_Init();
+    FC_Mode3_Init();
+    FC_Mode4_Init();
+    FC_Mode5_Init();
+    FC_Mode6_Init();
+    FC_Mode7_Init();
+    FC_Mode8_Init();
     FC_Reset_All_Mode_Control();
 }
 
@@ -305,8 +317,35 @@ void FC_Loop_50Hz(void)
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_2:
-    default:
         FC_Mode2_50Hz(dt);
+        break;
+
+    case FC_START_CRSF_FLIGHT_MODE_3:
+        FC_Mode3_50Hz(dt);
+        break;
+
+    case FC_START_CRSF_FLIGHT_MODE_4:
+        FC_Mode4_50Hz(dt);
+        break;
+
+    case FC_START_CRSF_FLIGHT_MODE_5:
+        FC_Mode5_50Hz(dt);
+        break;
+
+    case FC_START_CRSF_FLIGHT_MODE_6:
+        FC_Mode6_50Hz(dt);
+        break;
+
+    case FC_START_CRSF_FLIGHT_MODE_7:
+        FC_Mode7_50Hz(dt);
+        break;
+
+    case FC_START_CRSF_FLIGHT_MODE_8:
+        FC_Mode8_50Hz(dt);
+        break;
+
+    default:
+        FC_Mode0_50Hz(dt);
         break;
     }
 }
@@ -391,8 +430,35 @@ void FC_Loop_100Hz(void)
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_2:
-    default:
         FC_Mode2_100Hz();
+        break;
+
+    case FC_START_CRSF_FLIGHT_MODE_3:
+        FC_Mode3_100Hz();
+        break;
+
+    case FC_START_CRSF_FLIGHT_MODE_4:
+        FC_Mode4_100Hz();
+        break;
+
+    case FC_START_CRSF_FLIGHT_MODE_5:
+        FC_Mode5_100Hz();
+        break;
+
+    case FC_START_CRSF_FLIGHT_MODE_6:
+        FC_Mode6_100Hz();
+        break;
+
+    case FC_START_CRSF_FLIGHT_MODE_7:
+        FC_Mode7_100Hz();
+        break;
+
+    case FC_START_CRSF_FLIGHT_MODE_8:
+        FC_Mode8_100Hz();
+        break;
+
+    default:
+        FC_Mode0_100Hz();
         break;
     }
 }

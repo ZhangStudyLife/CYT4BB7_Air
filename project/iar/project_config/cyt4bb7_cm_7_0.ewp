@@ -1745,6 +1745,24 @@
                 <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode2.c</name>
             </file>
             <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode3.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode4.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode5.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode6.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode7.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode8.c</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode.h</name>
             </file>
             <file>

@@ -56,22 +56,9 @@ static uint8_t FC_START_CRSF_IsEmergencyStopRequested(void)
 }
 
 
-static void FC_START_CRSF_UpdateModeFromCH6(void)
+static void FC_START_CRSF_UpdateModeFromCH5CH6(void)
 {
-    const int16_t mode_sel = CRSF_STD[6];
-
-    if (mode_sel <= 0)
-    {
-        s_fc_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
-    }
-    else if (mode_sel == 1)
-    {
-        s_fc_flight_mode = FC_START_CRSF_FLIGHT_MODE_1;
-    }
-    else
-    {
-        s_fc_flight_mode = FC_START_CRSF_FLIGHT_MODE_2;
-    }
+    s_fc_flight_mode = (FC_START_CRSF_flight_mode_e)(CRSF_STD[5] * 3 + CRSF_STD[6]);
 }
 
 static void FC_START_CRSF_ForceStopToStandby(void)
@@ -208,7 +195,7 @@ static void FC_START_CRSF_StateMachine_Update(void)
         break;
 
     case FC_START_CRSF_STATE_FLYING:
-        FC_START_CRSF_UpdateModeFromCH6();
+        FC_START_CRSF_UpdateModeFromCH5CH6();
         if (s_landing_request != 0U)
         {
             s_fc_start_state = FC_START_CRSF_STATE_LANDING;

@@ -1,6 +1,24 @@
 #ifndef FC_MODE_H
 #define FC_MODE_H
 
+/*
+ * 模式号与遥控开关位置映射表
+ * CH5 为行选择，CH6 为列选择，两个通道均为三段开关，取值范围均为 0/1/2
+ *
+ * CH5=0, CH6=0 -> MODE0
+ * CH5=0, CH6=1 -> MODE1
+ * CH5=0, CH6=2 -> MODE2
+ * CH5=1, CH6=0 -> MODE3
+ * CH5=1, CH6=1 -> MODE4
+ * CH5=1, CH6=2 -> MODE5
+ * CH5=2, CH6=0 -> MODE6
+ * CH5=2, CH6=1 -> MODE7
+ * CH5=2, CH6=2 -> MODE8
+ *
+ * 当前模式号计算公式：
+ * mode = CH5 * 3 + CH6
+ */
+
 #include "fc_loop.h"
 
 #ifdef __cplusplus
@@ -153,6 +171,204 @@ void FC_Mode2_100Hz(void);
  * 返回值: 无
  */
 void FC_Mode2_50Hz(float dt);
+
+/*
+ * 函数名: FC_Mode3_Init
+ * 功能: 初始化模式3控制所需资源
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode3_Init(void);
+
+/*
+ * 函数名: FC_Mode3_Reset
+ * 功能: 复位模式3控制状态
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode3_Reset(void);
+
+/*
+ * 函数名: FC_Mode3_100Hz
+ * 功能: 执行模式3的100Hz控制
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode3_100Hz(void);
+
+/*
+ * 函数名: FC_Mode3_50Hz
+ * 功能: 执行模式3的50Hz控制
+ * 输入参数:
+ *   dt - 本次50Hz调用周期，单位s
+ * 返回值: 无
+ */
+void FC_Mode3_50Hz(float dt);
+
+/*
+ * 函数名: FC_Mode4_Init
+ * 功能: 初始化模式4控制所需资源
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode4_Init(void);
+
+/*
+ * 函数名: FC_Mode4_Reset
+ * 功能: 复位模式4控制状态
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode4_Reset(void);
+
+/*
+ * 函数名: FC_Mode4_100Hz
+ * 功能: 执行模式4的100Hz控制
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode4_100Hz(void);
+
+/*
+ * 函数名: FC_Mode4_50Hz
+ * 功能: 执行模式4的50Hz控制
+ * 输入参数:
+ *   dt - 本次50Hz调用周期，单位s
+ * 返回值: 无
+ */
+void FC_Mode4_50Hz(float dt);
+
+/*
+ * 函数名: FC_Mode5_Init
+ * 功能: 初始化模式5控制所需资源
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode5_Init(void);
+
+/*
+ * 函数名: FC_Mode5_Reset
+ * 功能: 复位模式5控制状态
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode5_Reset(void);
+
+/*
+ * 函数名: FC_Mode5_100Hz
+ * 功能: 执行模式5的100Hz控制
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode5_100Hz(void);
+
+/*
+ * 函数名: FC_Mode5_50Hz
+ * 功能: 执行模式5的50Hz控制
+ * 输入参数:
+ *   dt - 本次50Hz调用周期，单位s
+ * 返回值: 无
+ */
+void FC_Mode5_50Hz(float dt);
+
+/*
+ * 函数名: FC_Mode6_Init
+ * 功能: 初始化模式6控制所需资源
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode6_Init(void);
+
+/*
+ * 函数名: FC_Mode6_Reset
+ * 功能: 复位模式6控制状态
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode6_Reset(void);
+
+/*
+ * 函数名: FC_Mode6_100Hz
+ * 功能: 执行模式6的100Hz控制
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode6_100Hz(void);
+
+/*
+ * 函数名: FC_Mode6_50Hz
+ * 功能: 执行模式6的50Hz控制
+ * 输入参数:
+ *   dt - 本次50Hz调用周期，单位s
+ * 返回值: 无
+ */
+void FC_Mode6_50Hz(float dt);
+
+/*
+ * 函数名: FC_Mode7_Init
+ * 功能: 初始化模式7控制所需资源
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode7_Init(void);
+
+/*
+ * 函数名: FC_Mode7_Reset
+ * 功能: 复位模式7控制状态
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode7_Reset(void);
+
+/*
+ * 函数名: FC_Mode7_100Hz
+ * 功能: 执行模式7的100Hz控制
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode7_100Hz(void);
+
+/*
+ * 函数名: FC_Mode7_50Hz
+ * 功能: 执行模式7的50Hz控制
+ * 输入参数:
+ *   dt - 本次50Hz调用周期，单位s
+ * 返回值: 无
+ */
+void FC_Mode7_50Hz(float dt);
+
+/*
+ * 函数名: FC_Mode8_Init
+ * 功能: 初始化模式8控制所需资源
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode8_Init(void);
+
+/*
+ * 函数名: FC_Mode8_Reset
+ * 功能: 复位模式8控制状态
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode8_Reset(void);
+
+/*
+ * 函数名: FC_Mode8_100Hz
+ * 功能: 执行模式8的100Hz控制
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode8_100Hz(void);
+
+/*
+ * 函数名: FC_Mode8_50Hz
+ * 功能: 执行模式8的50Hz控制
+ * 输入参数:
+ *   dt - 本次50Hz调用周期，单位s
+ * 返回值: 无
+ */
+void FC_Mode8_50Hz(float dt);
 
 #ifdef __cplusplus
 }

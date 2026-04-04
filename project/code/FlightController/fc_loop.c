@@ -109,10 +109,11 @@ static float FC_Apply_Tilt_Throttle_Compensation(float throttle_raw)
  * 返回值:
  *   目标高度，单位 m
  * 0325 0129 : 修改映射关系,CH2 1000 对应1.2M,-1000 对应-0.2M(如果目标是0M,当前控制,会保持在0.1M,所以故意将-1000 映射到-0.2M,增加下行余量)
+ * 0404 1944 : 修改映射关系,CH2 1000 对应1.2M,-1000 对应0M(安装了10cm的脚撑)
  */
 static float FC_Map_TargetHeightFromCh2(float ch2_std)
 {
-    return (ch2_std + 1000.0f) * 0.0007f - 0.2f;
+        return (ch2_std + 1000.0f) * 0.0006f;
 }
 
 /*

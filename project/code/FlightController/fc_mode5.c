@@ -1,10 +1,21 @@
 ﻿#include "fc_mode.h"
 #include "../Estimation/Pos_Est/Pos_Est.h"
+#include "../Estimation/Height_Est/TOF_data.h"
+#include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
+
+#define FC_MODE5_DEBUG_OUTPUT_EN (1U) /* 模式5 50Hz调参遥测开关：1-开启 0-关闭 */
+#define FC_MODE5_IMG_ERR_LPF_ALPHA (0.3f) /* 视觉位置误差一阶低通系数，越小滤波越强 */
 
 /* 模式5 X 轴速度环PID */
 static pid_t s_mode5_velx_pid;
 /* 模式5 Y 轴速度环PID */
 static pid_t s_mode5_vely_pid;
+/* 模式5视觉误差X低通状态，单位像素误差 */
+static float s_mode5_img_err_x_lpf = 0.0f;
+/* 模式5视觉误差Y低通状态，单位像素误差 */
+static float s_mode5_img_err_y_lpf = 0.0f;
+/* 模式5视觉误差低通是否已初始化：1-已初始化 0-未初始化 */
+static uint8 s_mode5_img_err_lpf_inited = 0U;
 
 /* 遥控到速度映射比例，1000 单位 -> 100 cm/s */
 static const float s_mode5_rc_to_speed_scale = 0.1f;
@@ -68,6 +79,9 @@ void FC_Mode5_Reset(void)
 {
     PID_Reset(&s_mode5_velx_pid);
     PID_Reset(&s_mode5_vely_pid);
+    s_mode5_img_err_x_lpf = 0.0f;
+    s_mode5_img_err_y_lpf = 0.0f;
+    s_mode5_img_err_lpf_inited = 0U;
     roll_angle_target = FC_Mode_Get_Roll_Mech_Trim_Deg();
     pitch_angle_target = FC_Mode_Get_Pitch_Mech_Trim_Deg();
 }
@@ -93,6 +107,8 @@ void FC_Mode5_50Hz(float dt)
 {
     float ch0;
     float ch1;
+    float img_err_x;
+    float img_err_y;
     float velx_target;
     float vely_target;
     float velx_out;
@@ -108,12 +124,28 @@ void FC_Mode5_50Hz(float dt)
 
     if ((-150.0f < ch0) && (ch0 < 150.0f) && (-150.0f < ch1) && (ch1 < 150.0f) && g_image_circles[0].valid == 1U)
     {
-        float kp = 2.0f;
-        velx_target = -g_image_circles[0].x * kp;
-        vely_target = g_image_circles[0].y * kp;
+        float kp = 2.2f;
+
+        img_err_x = -g_image_circles[0].x;
+        img_err_y = g_image_circles[0].y;
+        if (0U == s_mode5_img_err_lpf_inited)
+        {
+            s_mode5_img_err_x_lpf = img_err_x;
+            s_mode5_img_err_y_lpf = img_err_y;
+            s_mode5_img_err_lpf_inited = 1U;
+        }
+
+        s_mode5_img_err_x_lpf += FC_MODE5_IMG_ERR_LPF_ALPHA * (img_err_x - s_mode5_img_err_x_lpf);
+        s_mode5_img_err_y_lpf += FC_MODE5_IMG_ERR_LPF_ALPHA * (img_err_y - s_mode5_img_err_y_lpf);
+
+        velx_target = s_mode5_img_err_x_lpf * kp;
+        vely_target = s_mode5_img_err_y_lpf * kp;
     }
     else
     {
+        s_mode5_img_err_lpf_inited = 0U;
+        s_mode5_img_err_x_lpf = 0.0f;
+        s_mode5_img_err_y_lpf = 0.0f;
         velx_target = FC_Mode5_ApplyDeadzone(
             FC_Mode_Clamp(ch0 * s_mode5_rc_to_speed_scale,
                           -s_mode5_vel_limit_cmps, s_mode5_vel_limit_cmps),
@@ -132,6 +164,36 @@ void FC_Mode5_50Hz(float dt)
 
     roll_angle_target = velx_out + FC_Mode_Get_Roll_Mech_Trim_Deg();
     pitch_angle_target = vely_out + FC_Mode_Get_Pitch_Mech_Trim_Deg();
+
+#if (1U == FC_MODE5_DEBUG_OUTPUT_EN)
+    /*
+     * 模式5调参遥测（16通道）：
+     * 1 图像原始误差X, 2 图像原始误差Y,
+     * 3 图像滤波误差X, 4 图像滤波误差Y,
+     * 5 位置环输出X(=速度目标X), 6 位置环输出Y(=速度目标Y),
+     * 7 速度环观测X, 8 速度环观测Y,
+     * 9 速度环X_P, 10 速度环X_I,
+     * 11 速度环Y_P, 12 速度环Y_I,
+     * 13 目标高度m, 14 融合高度m,
+     * 15 高度位置环输出, 16 高度速度环输出
+     */
+    (void)wifi_justfloat(-g_image_circles[0].x,
+                         g_image_circles[0].y,
+                         s_mode5_img_err_x_lpf,
+                         s_mode5_img_err_y_lpf,
+                         velx_target,
+                         vely_target,
+                         -Pos_Est_vel_x_kf,
+                         -Pos_Est_vel_y_kf,
+                         s_mode5_velx_pid.p_term,
+                         s_mode5_velx_pid.i_term,
+                         s_mode5_vely_pid.p_term,
+                         s_mode5_vely_pid.i_term,
+                         target_height_m,
+                         (float)g_tof_fused_height_mm * 0.001f,
+                         height_pos_out,
+                         height_vel_out);
+#endif
 }
 
 /*

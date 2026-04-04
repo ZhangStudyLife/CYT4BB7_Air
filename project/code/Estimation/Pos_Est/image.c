@@ -240,7 +240,8 @@ static void image_find_connected_components(void)
     /* 将连通域按像素数量降序插入，保留前 IMAGE_MAX_CIRCLE_COUNT 个 */
     for (label = 1U; label < next_label; label++)
     {
-        if (0U == s_count[label])
+        /* 过滤掉面积小于阈值的连通域 */
+        if ((0U == s_count[label]) || (s_count[label] < IMAGE_MIN_COMPONENT_AREA))
         {
             continue;
         }

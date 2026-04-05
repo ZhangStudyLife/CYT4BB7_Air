@@ -6,6 +6,10 @@
 #define FC_MODE5_DEBUG_OUTPUT_EN (1U) /* 模式5 50Hz调参遥测开关：1-开启 0-关闭 */
 #define FC_MODE5_IMG_ERR_LPF_ALPHA (0.3f) /* 视觉位置误差一阶低通系数，越小滤波越强 */
 
+/* 模式5 X 轴图像位置环PID */
+static pid_t s_mode5_imgx_pid;
+/* 模式5 Y 轴图像位置环PID */
+static pid_t s_mode5_imgy_pid;
 /* 模式5 X 轴速度环PID */
 static pid_t s_mode5_velx_pid;
 /* 模式5 Y 轴速度环PID */
@@ -19,14 +23,34 @@ static uint8 s_mode5_img_err_lpf_inited = 0U;
 
 /* 遥控到速度映射比例，1000 单位 -> 100 cm/s */
 static const float s_mode5_rc_to_speed_scale = 0.1f;
-/* 速度目标上限，单位cm/s */
+/* 模式5视觉接管摇杆阈值，单位遥控标准化量 */
+static const float s_mode5_visual_rc_gate = 150.0f;
+/* 模式5图像位置环X轴P增益，输出单位cm/s/像素 */
+static const float s_mode5_imgx_pid_kp = 2.2f;
+/* 模式5图像位置环X轴I增益 */
+static const float s_mode5_imgx_pid_ki = 0.0f;
+/* 模式5图像位置环X轴D增益 */
+static const float s_mode5_imgx_pid_kd = 0.01f;
+/* 模式5图像位置环X轴D项低通截止频率，单位Hz */
+static const float s_mode5_imgx_pid_d_lpf = 0.0f;
+/* 模式5图像位置环Y轴P增益，输出单位cm/s/像素 */
+static const float s_mode5_imgy_pid_kp = 2.2f;
+/* 模式5图像位置环Y轴I增益 */
+static const float s_mode5_imgy_pid_ki = 0.0f;
+/* 模式5图像位置环Y轴D增益 */
+static const float s_mode5_imgy_pid_kd = 0.01f;
+/* 模式5图像位置环Y轴D项低通截止频率，单位Hz */
+static const float s_mode5_imgy_pid_d_lpf = 0.0f;
+/* 模式5图像位置环输出限幅（位置环的输出限幅），单位cm/s */
+static const float s_mode5_img_pid_out_limit_cmps = 100.0f;
+/* 速度目标上限（遥控器端的），单位cm/s */
 static const float s_mode5_vel_limit_cmps = 100.0f;
 /* 速度目标死区，单位cm/s */
 static const float s_mode5_vel_deadzone_cmps = 6.0f;
 /* 姿态角输出限幅，单位度 */
 static const float s_mode5_angle_limit_deg = 20.0f;
 /* 模式5固定高度目标，单位m */
-static const float s_mode5_fixed_height_m = 1.0f;
+static const float s_mode5_fixed_height_m = 1.1f;
 
 /*
  * 函数名: FC_Mode5_ApplyDeadzone
@@ -58,6 +82,16 @@ static float FC_Mode5_ApplyDeadzone(float v, float dz)
  */
 void FC_Mode5_Init(void)
 {
+    PID_Init(&s_mode5_imgx_pid,
+             s_mode5_imgx_pid_kp, s_mode5_imgx_pid_ki, s_mode5_imgx_pid_kd,
+             0.0f, g_fc_params.vel_xy_dt,
+             0.0f, s_mode5_imgx_pid_d_lpf);
+
+    PID_Init(&s_mode5_imgy_pid,
+             s_mode5_imgy_pid_kp, s_mode5_imgy_pid_ki, s_mode5_imgy_pid_kd,
+             0.0f, g_fc_params.vel_xy_dt,
+             0.0f, s_mode5_imgy_pid_d_lpf);
+
     PID_Init(&s_mode5_velx_pid,
              g_fc_params.vel_x_kp, g_fc_params.vel_x_ki, g_fc_params.vel_x_kd,
              g_fc_params.vel_x_kff, g_fc_params.vel_xy_dt,
@@ -77,6 +111,8 @@ void FC_Mode5_Init(void)
  */
 void FC_Mode5_Reset(void)
 {
+    PID_Reset(&s_mode5_imgx_pid);
+    PID_Reset(&s_mode5_imgy_pid);
     PID_Reset(&s_mode5_velx_pid);
     PID_Reset(&s_mode5_vely_pid);
     s_mode5_img_err_x_lpf = 0.0f;
@@ -109,6 +145,7 @@ void FC_Mode5_50Hz(float dt)
     float ch1;
     float img_err_x;
     float img_err_y;
+    uint8 visual_track_enable;
     float velx_target;
     float vely_target;
     float velx_out;
@@ -121,31 +158,39 @@ void FC_Mode5_50Hz(float dt)
 
     ch0 = FC_Mode_Clamp((float)CRSF_STD[0], -1000.0f, 1000.0f);
     ch1 = FC_Mode_Clamp((float)CRSF_STD[1], -1000.0f, 1000.0f);
-
-    if ((-150.0f < ch0) && (ch0 < 150.0f) && (-150.0f < ch1) && (ch1 < 150.0f) && g_image_circles[0].valid == 1U)
+    img_err_x = -g_image_circles[0].x;
+    img_err_y = g_image_circles[0].y;
+    visual_track_enable =
+        ((-s_mode5_visual_rc_gate < ch0) && (ch0 < s_mode5_visual_rc_gate) &&
+         (-s_mode5_visual_rc_gate < ch1) && (ch1 < s_mode5_visual_rc_gate) &&
+         (g_image_circles[0].valid == 1U)) ? 1U : 0U;
+    /*没有拨动遥感的情况下 */
+    if (0U != visual_track_enable)
     {
-        float kp = 2.2f;
-
-        img_err_x = -g_image_circles[0].x;
-        img_err_y = g_image_circles[0].y;
         if (0U == s_mode5_img_err_lpf_inited)
         {
             s_mode5_img_err_x_lpf = img_err_x;
             s_mode5_img_err_y_lpf = img_err_y;
             s_mode5_img_err_lpf_inited = 1U;
+            PID_Reset(&s_mode5_imgx_pid);
+            PID_Reset(&s_mode5_imgy_pid);
         }
-
+        /* 图像位置环观测值低通滤波 */
         s_mode5_img_err_x_lpf += FC_MODE5_IMG_ERR_LPF_ALPHA * (img_err_x - s_mode5_img_err_x_lpf);
         s_mode5_img_err_y_lpf += FC_MODE5_IMG_ERR_LPF_ALPHA * (img_err_y - s_mode5_img_err_y_lpf);
 
-        velx_target = s_mode5_img_err_x_lpf * kp;
-        vely_target = s_mode5_img_err_y_lpf * kp;
+        velx_target = PID_Update(&s_mode5_imgx_pid, 0.0f, -s_mode5_img_err_x_lpf, dt);
+        vely_target = PID_Update(&s_mode5_imgy_pid, 0.0f, -s_mode5_img_err_y_lpf, dt);
+        velx_target = FC_Mode_Clamp(velx_target, -s_mode5_img_pid_out_limit_cmps, s_mode5_img_pid_out_limit_cmps);
+        vely_target = FC_Mode_Clamp(vely_target, -s_mode5_img_pid_out_limit_cmps, s_mode5_img_pid_out_limit_cmps);
     }
     else
     {
         s_mode5_img_err_lpf_inited = 0U;
         s_mode5_img_err_x_lpf = 0.0f;
         s_mode5_img_err_y_lpf = 0.0f;
+        PID_Reset(&s_mode5_imgx_pid);
+        PID_Reset(&s_mode5_imgy_pid);
         velx_target = FC_Mode5_ApplyDeadzone(
             FC_Mode_Clamp(ch0 * s_mode5_rc_to_speed_scale,
                           -s_mode5_vel_limit_cmps, s_mode5_vel_limit_cmps),
@@ -170,29 +215,28 @@ void FC_Mode5_50Hz(float dt)
      * 模式5调参遥测（16通道）：
      * 1 图像原始误差X, 2 图像原始误差Y,
      * 3 图像滤波误差X, 4 图像滤波误差Y,
-     * 5 位置环输出X(=速度目标X), 6 位置环输出Y(=速度目标Y),
-     * 7 速度环观测X, 8 速度环观测Y,
-     * 9 速度环X_P, 10 速度环X_I,
-     * 11 速度环Y_P, 12 速度环Y_I,
-     * 13 目标高度m, 14 融合高度m,
-     * 15 高度位置环输出, 16 高度速度环输出
+     * 5 图像PID_X_P, 6 图像PID_X_I, 7 图像PID_X_D,
+     * 8 图像PID_Y_P, 9 图像PID_Y_I, 10 图像PID_Y_D,
+     * 11 图像PID输出速度X, 12 图像PID输出速度Y,
+     * 13 速度环观测X, 14 速度环观测Y,
+     * 15 目标高度m, 16 融合高度m
      */
-    (void)wifi_justfloat(-g_image_circles[0].x,
-                         g_image_circles[0].y,
+    (void)wifi_justfloat(img_err_x,
+                         img_err_y,
                          s_mode5_img_err_x_lpf,
                          s_mode5_img_err_y_lpf,
+                         s_mode5_imgx_pid.p_term,
+                         s_mode5_imgx_pid.i_term,
+                         s_mode5_imgx_pid.d_term,
+                         s_mode5_imgy_pid.p_term,
+                         s_mode5_imgy_pid.i_term,
+                         s_mode5_imgy_pid.d_term,
                          velx_target,
                          vely_target,
                          -Pos_Est_vel_x_kf,
                          -Pos_Est_vel_y_kf,
-                         s_mode5_velx_pid.p_term,
-                         s_mode5_velx_pid.i_term,
-                         s_mode5_vely_pid.p_term,
-                         s_mode5_vely_pid.i_term,
                          target_height_m,
-                         (float)g_tof_fused_height_mm * 0.001f,
-                         height_pos_out,
-                         height_vel_out);
+                         (float)g_tof_fused_height_mm * 0.001f);
 #endif
 }
 

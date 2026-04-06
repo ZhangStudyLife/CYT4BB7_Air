@@ -7,7 +7,12 @@
 #include "zf_device_mt9v03x.h"
 #include "../../Protocols/wifi/wifi_image/wifi_image.h"
 
-#define IMAGE_DEFAULT_THRESHOLD (50U) /* 默认高亮目标提取阈值 */
+#define IMAGE_DEFAULT_THRESHOLD (50U) /* 默认固定阈值二值化阈值 */
+#define IMAGE_ADAPTIVE_THRESHOLD_BLOCK (9U) /* 快速局部阈值窗口边长 */
+#define IMAGE_ADAPTIVE_THRESHOLD_TOP_Y (-1) /* 上部区域覆盖截止行，-1 表示关闭 */
+#define IMAGE_ADAPTIVE_THRESHOLD_TOP_LOW (220U) /* 上部区域亮度下限 */
+#define IMAGE_ADAPTIVE_THRESHOLD_TOP_HIGH (255U) /* 上部区域亮度上限 */
+#define IMAGE_ADAPTIVE_THRESHOLD_BRIGHT (220U) /* 极亮像素直接置白阈值 */
 
 /* 内部完整单帧灰度图缓存，单位像素灰度值 */
 static uint8 s_image_frame[MT9V03X_H][MT9V03X_W];
@@ -39,11 +44,136 @@ static uint8 image_latch_frame(void)
 }
 
 /*
+ * 函数功能：使用快速滑动窗口局部阈值算法完成二值化，适用于高亮目标提取。
+ * 输入参数：无。
+ * 返回值：无。
+ */
+static void image_fast_adaptive_threshold(void)
+{
+    const uint8 *img_data = s_image_frame[0];
+    uint8 *output_data = s_image_binary[0];
+    const uint16 width = MT9V03X_W;
+    const uint16 height = MT9V03X_H;
+    const uint8 block = IMAGE_ADAPTIVE_THRESHOLD_BLOCK;
+    const int16 clip_value = (int16)s_image_threshold;
+    const uint8 clip_value2 = IMAGE_ADAPTIVE_THRESHOLD_TOP_LOW;
+    const uint8 clip_value3 = IMAGE_ADAPTIVE_THRESHOLD_TOP_HIGH;
+    const int16 upper_limit_y = IMAGE_ADAPTIVE_THRESHOLD_TOP_Y;
+    int32 half_block;
+    int32 row;
+    int32 column;
+    int32 x;
+    int32 y;
+    int32 sum;
+    int32 threshold;
+    int32 pixel_threshold;
+    uint16 temp_array[MT9V03X_W];
+    uint32 pixel_index;
+
+    if ((0 == img_data) || (0 == output_data))
+    {
+        return;
+    }
+    if ((0U == block) || (0U == (block & 1U)))
+    {
+        return;
+    }
+    if (((int32)width > MT9V03X_W) || ((int32)block > (int32)width) || ((int32)block > (int32)height))
+    {
+        return;
+    }
+    if ((clip_value < -127) || (clip_value > 127))
+    {
+        return;
+    }
+    if (clip_value2 > clip_value3)
+    {
+        return;
+    }
+
+    half_block = (int32)block / 2;
+    memset(output_data, 0, (uint32)width * (uint32)height * sizeof(output_data[0]));
+    memset(temp_array, 0, sizeof(temp_array));
+
+    /* 初始化首个局部窗口的列和 */
+    for (column = 0; column < (int32)width; column++)
+    {
+        for (row = 0; row < (int32)block; row++)
+        {
+            temp_array[column] = (uint16)(temp_array[column] + img_data[(row * (int32)width) + column]);
+        }
+    }
+
+    /* 初始化首个局部窗口的总和 */
+    sum = 0;
+    for (column = 0; column < (int32)block; column++)
+    {
+        sum += temp_array[column];
+    }
+
+    for (y = half_block; y < ((int32)height - half_block); y++)
+    {
+        if (y != half_block)
+        {
+            sum = 0;
+            for (column = 0; column < (int32)width; column++)
+            {
+                temp_array[column] = (uint16)(temp_array[column] +
+                                              img_data[((y + half_block) * (int32)width) + column] -
+                                              img_data[((y - half_block - 1) * (int32)width) + column]);
+            }
+            for (column = 0; column < (int32)block; column++)
+            {
+                sum += temp_array[column];
+            }
+        }
+
+        /* 对当前行执行横向滑窗，避免重复累加整个block窗口 */
+        for (x = half_block; x < ((int32)width - half_block); x++)
+        {
+            if (x != half_block)
+            {
+                sum += temp_array[x + half_block] - temp_array[x - half_block - 1];
+            }
+
+            threshold = sum / ((int32)block * (int32)block);
+            pixel_threshold = threshold - clip_value;
+            if (pixel_threshold < 0)
+            {
+                pixel_threshold = 0;
+            }
+            else if (pixel_threshold > 255)
+            {
+                pixel_threshold = 255;
+            }
+
+            pixel_index = (uint32)((y * (int32)width) + x);
+            if (img_data[pixel_index] >= IMAGE_ADAPTIVE_THRESHOLD_BRIGHT)
+            {
+                output_data[pixel_index] = 255U;
+            }
+            else if (threshold >= 255)
+            {
+                output_data[pixel_index] = 255U;
+            }
+            else if (threshold <= 0)
+            {
+                output_data[pixel_index] = 0U;
+            }
+            else
+            {
+                output_data[pixel_index] = (img_data[pixel_index] >= (uint8)pixel_threshold) ? 255U : 0U;
+            }
+        }
+    }
+}
+
+/*
  * 函数功能：对内部灰度图执行固定阈值二值化，生成默认二值图缓存。
  * 输入参数：无。
  * 返回值：无。
  */
-static void image_binary_threshold(void)
+static void image_binary_threshold_fixed(void)
 {
     uint32 i;
 
@@ -54,6 +184,18 @@ static void image_binary_threshold(void)
     }
 }
 
+/*
+ * 函数功能：对内部灰度图执行二值化，生成默认二值图缓存。
+ * 输入参数：无。
+ * 返回值：无。
+ */
+static void image_binary_threshold(void)
+{
+    //image_fast_adaptive_threshold();/* 快速局部阈值二值化 */
+
+    image_binary_threshold_fixed();
+
+}
 /*
  * 函数功能：基于二值化图像计算白色圆形目标的圆心与半径。
  * 输入参数：无。

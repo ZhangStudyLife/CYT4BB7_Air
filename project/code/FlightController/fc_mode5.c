@@ -26,19 +26,19 @@ static const float s_mode5_rc_to_speed_scale = 0.1f;
 /* 模式5视觉接管摇杆阈值，单位遥控标准化量 */
 static const float s_mode5_visual_rc_gate = 150.0f;
 /* 模式5图像位置环X轴P增益，输出单位cm/s/像素 */
-static const float s_mode5_imgx_pid_kp = 2.2f;
+static const float s_mode5_imgx_pid_kp = 1.7f;
 /* 模式5图像位置环X轴I增益 */
 static const float s_mode5_imgx_pid_ki = 0.0f;
 /* 模式5图像位置环X轴D增益 */
-static const float s_mode5_imgx_pid_kd = 0.01f;
+static const float s_mode5_imgx_pid_kd = 0.4f;
 /* 模式5图像位置环X轴D项低通截止频率，单位Hz */
-static const float s_mode5_imgx_pid_d_lpf = 0.0f;
+static const float s_mode5_imgx_pid_d_lpf =0.0f;
 /* 模式5图像位置环Y轴P增益，输出单位cm/s/像素 */
-static const float s_mode5_imgy_pid_kp = 2.2f;
+static const float s_mode5_imgy_pid_kp = 1.7f;
 /* 模式5图像位置环Y轴I增益 */
 static const float s_mode5_imgy_pid_ki = 0.0f;
 /* 模式5图像位置环Y轴D增益 */
-static const float s_mode5_imgy_pid_kd = 0.01f;
+static const float s_mode5_imgy_pid_kd = 0.4f;
 /* 模式5图像位置环Y轴D项低通截止频率，单位Hz */
 static const float s_mode5_imgy_pid_d_lpf = 0.0f;
 /* 模式5图像位置环输出限幅（位置环的输出限幅），单位cm/s */

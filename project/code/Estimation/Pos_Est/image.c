@@ -8,18 +8,20 @@
 #include "../../Protocols/wifi/wifi_image/wifi_image.h"
 
 #define IMAGE_DEFAULT_THRESHOLD (50U) /* 默认固定阈值二值化阈值 */
-#define IMAGE_ADAPTIVE_THRESHOLD_BLOCK (9U) /* 快速局部阈值窗口边长 */
-#define IMAGE_ADAPTIVE_THRESHOLD_TOP_Y (-1) /* 上部区域覆盖截止行，-1 表示关闭 */
-#define IMAGE_ADAPTIVE_THRESHOLD_TOP_LOW (220U) /* 上部区域亮度下限 */
-#define IMAGE_ADAPTIVE_THRESHOLD_TOP_HIGH (255U) /* 上部区域亮度上限 */
-#define IMAGE_ADAPTIVE_THRESHOLD_BRIGHT (220U) /* 极亮像素直接置白阈值 */
+#define IMAGE_ADAPTIVE_THRESHOLD_BLOCK (41U) /* 自适应阈值窗口边长（需为奇数） */
+#define IMAGE_ADAPTIVE_THRESHOLD_BRIGHT (245U) /* 极亮像素直接置白阈值 */
+#define IMAGE_ADAPTIVE_THRESHOLD_TOP_LOW (50U) /* 阈值下限（防止过暗） */
+#define IMAGE_ADAPTIVE_THRESHOLD_TOP_HIGH (200U) /* 阈值上限（防止过亮） */
+#define IMAGE_ADAPTIVE_THRESHOLD_TOP_Y (0) /* 预留参数：上部区域分界行 */
 
 /* 内部完整单帧灰度图缓存，单位像素灰度值 */
 static uint8 s_image_frame[MT9V03X_H][MT9V03X_W];
 /* 内部默认二值化图像缓存，单位像素灰度值 */
 static uint8 s_image_binary[MT9V03X_H][MT9V03X_W];
-/* 内部默认固定二值化阈值，单位灰度级 */
-static uint8 s_image_threshold = IMAGE_DEFAULT_THRESHOLD;
+/* 内部默认固定二值化阈值偏移，单位灰度级 */
+static int16 s_image_threshold = 0;
+/* 积分图缓存，用于加速自适应二值化 */
+static uint32 integral_image[MT9V03X_H + 1][MT9V03X_W + 1];
 /* 当前帧白色圆形目标检测结果数组，数组按照连通域面积从大到小排序，坐标原点位于图像中心 */
 image_circle g_image_circles[IMAGE_MAX_CIRCLE_COUNT] = {0};
 /* 当前帧有效圆形目标数量 */
@@ -55,20 +57,22 @@ static void image_fast_adaptive_threshold(void)
     const uint16 width = MT9V03X_W;
     const uint16 height = MT9V03X_H;
     const uint8 block = IMAGE_ADAPTIVE_THRESHOLD_BLOCK;
-    const int16 clip_value = (int16)s_image_threshold;
+    const int16 clip_value = s_image_threshold;
     const uint8 clip_value2 = IMAGE_ADAPTIVE_THRESHOLD_TOP_LOW;
     const uint8 clip_value3 = IMAGE_ADAPTIVE_THRESHOLD_TOP_HIGH;
     const int16 upper_limit_y = IMAGE_ADAPTIVE_THRESHOLD_TOP_Y;
     int32 half_block;
-    int32 row;
-    int32 column;
     int32 x;
     int32 y;
     int32 sum;
     int32 threshold;
     int32 pixel_threshold;
-    uint16 temp_array[MT9V03X_W];
     uint32 pixel_index;
+    int32 x1;
+    int32 y1;
+    int32 x2;
+    int32 y2;
+    int32 block_area;
 
     if ((0 == img_data) || (0 == output_data))
     {
@@ -90,61 +94,72 @@ static void image_fast_adaptive_threshold(void)
     {
         return;
     }
+    (void)upper_limit_y;
 
     half_block = (int32)block / 2;
-    memset(output_data, 0, (uint32)width * (uint32)height * sizeof(output_data[0]));
-    memset(temp_array, 0, sizeof(temp_array));
 
-    /* 初始化首个局部窗口的列和 */
-    for (column = 0; column < (int32)width; column++)
+    /* 第一步：构建积分图，便于O(1)求任意窗口和 */
+    for (y = 0; y <= (int32)height; y++)
     {
-        for (row = 0; row < (int32)block; row++)
+        integral_image[y][0] = 0U;
+    }
+    for (x = 0; x <= (int32)width; x++)
+    {
+        integral_image[0][x] = 0U;
+    }
+    for (y = 1; y <= (int32)height; y++)
+    {
+        for (x = 1; x <= (int32)width; x++)
         {
-            temp_array[column] = (uint16)(temp_array[column] + img_data[(row * (int32)width) + column]);
+            integral_image[y][x] = (uint32)img_data[((y - 1) * (int32)width) + (x - 1)] +
+                                   integral_image[y - 1][x] +
+                                   integral_image[y][x - 1] -
+                                   integral_image[y - 1][x - 1];
         }
     }
 
-    /* 初始化首个局部窗口的总和 */
-    sum = 0;
-    for (column = 0; column < (int32)block; column++)
+    /* 第二步：积分图窗口均值阈值二值化 */
+    for (y = 0; y < (int32)height; y++)
     {
-        sum += temp_array[column];
-    }
-
-    for (y = half_block; y < ((int32)height - half_block); y++)
-    {
-        if (y != half_block)
+        for (x = 0; x < (int32)width; x++)
         {
-            sum = 0;
-            for (column = 0; column < (int32)width; column++)
-            {
-                temp_array[column] = (uint16)(temp_array[column] +
-                                              img_data[((y + half_block) * (int32)width) + column] -
-                                              img_data[((y - half_block - 1) * (int32)width) + column]);
-            }
-            for (column = 0; column < (int32)block; column++)
-            {
-                sum += temp_array[column];
-            }
-        }
+            x1 = x - half_block;
+            y1 = y - half_block;
+            x2 = x + half_block;
+            y2 = y + half_block;
 
-        /* 对当前行执行横向滑窗，避免重复累加整个block窗口 */
-        for (x = half_block; x < ((int32)width - half_block); x++)
-        {
-            if (x != half_block)
+            if (x1 < 0)
             {
-                sum += temp_array[x + half_block] - temp_array[x - half_block - 1];
+                x1 = 0;
+            }
+            if (y1 < 0)
+            {
+                y1 = 0;
+            }
+            if (x2 >= (int32)width)
+            {
+                x2 = (int32)width - 1;
+            }
+            if (y2 >= (int32)height)
+            {
+                y2 = (int32)height - 1;
             }
 
-            threshold = sum / ((int32)block * (int32)block);
+            sum = (int32)integral_image[y2 + 1][x2 + 1] -
+                  (int32)integral_image[y1][x2 + 1] -
+                  (int32)integral_image[y2 + 1][x1] +
+                  (int32)integral_image[y1][x1];
+
+            block_area = ((x2 - x1) + 1) * ((y2 - y1) + 1);
+            threshold = sum / block_area;
             pixel_threshold = threshold - clip_value;
-            if (pixel_threshold < 0)
+            if (pixel_threshold < (int32)clip_value2)
             {
-                pixel_threshold = 0;
+                pixel_threshold = (int32)clip_value2;
             }
-            else if (pixel_threshold > 255)
+            else if (pixel_threshold > (int32)clip_value3)
             {
-                pixel_threshold = 255;
+                pixel_threshold = (int32)clip_value3;
             }
 
             pixel_index = (uint32)((y * (int32)width) + x);
@@ -152,17 +167,9 @@ static void image_fast_adaptive_threshold(void)
             {
                 output_data[pixel_index] = 255U;
             }
-            else if (threshold >= 255)
-            {
-                output_data[pixel_index] = 255U;
-            }
-            else if (threshold <= 0)
-            {
-                output_data[pixel_index] = 0U;
-            }
             else
             {
-                output_data[pixel_index] = (img_data[pixel_index] >= (uint8)pixel_threshold) ? 255U : 0U;
+                output_data[pixel_index] = (img_data[pixel_index] > (uint8)(pixel_threshold + 10)) ? 255U : 0U;
             }
         }
     }
@@ -191,9 +198,9 @@ static void image_binary_threshold_fixed(void)
  */
 static void image_binary_threshold(void)
 {
-    //image_fast_adaptive_threshold();/* 快速局部阈值二值化 */
+    image_fast_adaptive_threshold(); /* 积分图加速的局部自适应阈值二值化 */
 
-    image_binary_threshold_fixed();
+    //image_binary_threshold_fixed();
 
 }
 /*

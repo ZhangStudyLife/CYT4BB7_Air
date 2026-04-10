@@ -17,7 +17,7 @@
 3. 与代码对应的关键实现
 - 初始化函数：`crsf_init()`
 - 轮询更新函数：`CRSF_Update_100HZ()`
-- 姿态回传函数：`crsf_send_25hz()`
+- 姿态回传函数：`crsf_send_50hz()`
 - 原始通道缓存：`CRSF_CH[10]`
 - 标准化通道缓存：`CRSF_STD[10]`
 - 最近一次有效更新时刻：`CRSF_LAST_UPDATE_TIME`
@@ -30,7 +30,7 @@
 - 关闭库层串口接收中断业务模式：`uart_rx_interrupt(UART_4, 0)`
 - 初始化并启动 `TC_TIME2_CH0`
 - 周期任务中每 `10ms` 调用一次 `CRSF_Update_100HZ()`。
-- 周期任务中每 `40ms` 调用一次 `crsf_send_25hz()`。
+- 周期任务中每 `40ms` 调用一次 `crsf_send_50hz()`。
 
 5. 接收逻辑说明
 - `CRSF_Update_100HZ()` 每次从 `SCB2` 的 RX FIFO 中取走所有可读字节。
@@ -66,7 +66,7 @@
 - 然后重新计算 `CRSF_STD[]`
 
 8. 姿态回传说明
-- `crsf_send_25hz()` 当前回传姿态类型帧 `0x1E`。
+- `crsf_send_50hz()` 当前回传姿态类型帧 `0x1E`。
 - 姿态数据来源于 `g_euler`。
 - 角度单位换算为 `rad * 10000` 后发送。
 - 当前代码实际发送顺序以实现为准：由 `g_euler.pitch`、`g_euler.roll`、`g_euler.yaw` 取值后写入回传帧。

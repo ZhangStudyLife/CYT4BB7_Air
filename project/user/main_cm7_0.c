@@ -4,11 +4,10 @@ volatile uint32 tick_1000us_cnt = 0U;
 volatile uint16 g_tick_1000HZ = 0U;
 volatile uint8 g_tick_100HZ = 0U;
 
-static uint8 s_tick_div_pos_250hz = 0U;
-static uint8 s_tick_div_fc_loop_500hz = 0U;
-static uint8 s_tick_div_fc_start_10hz = 0U;
-static uint8 s_tick_div_fc_start_50hz = 0U;
-static uint8 s_tick_div_fc_start_1hz = 0U;
+static uint8 div500 = 0U;
+static uint8 div50 = 0U;
+static uint8 slot50 = 0U;
+static uint8 div10 = 0U;
 
 int main(void)
 {
@@ -42,9 +41,9 @@ int main(void)
 
     while (true)
     {
-        uint16 tick_1000_guard = 0U;
+        uint16 guard = 0U;
 
-        while ((g_tick_1000HZ > 0U) && (tick_1000_guard < 100U))
+        while ((g_tick_1000HZ > 0U) && (guard < 100U))
         {
             g_tick_1000HZ--;
 
@@ -53,38 +52,35 @@ int main(void)
             // wifi_justfloat(g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
             //                g_euler.roll, g_euler.pitch, g_euler.yaw);
             
-            s_tick_div_fc_loop_500hz++;
-            if (s_tick_div_fc_loop_500hz >= 2U)
+            div500++;
+            if (div500 >= 2U)
             {
-                s_tick_div_fc_loop_500hz = 0U;
+                div500 = 0U;
                 FC_Loop_500Hz();
             }
 
             FC_Loop_1000Hz();
-
-            s_tick_div_pos_250hz++;
-            if (s_tick_div_pos_250hz >= 4U)
-            {
-                s_tick_div_pos_250hz = 0U;
-            }
-
-            tick_1000_guard++;
+            guard++;
         }
 
         if (g_tick_100HZ > 0U)
         {
             g_tick_100HZ--;
 
-            crsf_send_25hz();
+            
             CRSF_Update_100HZ();
             FC_Loop_100Hz();
             wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
 
-            s_tick_div_fc_start_50hz++;
-            if (s_tick_div_fc_start_50hz >= 2U)
+            slot50 = div50;
+            if (slot50 == 0U)
             {
                 Pos_Est_Update_50HZ();
-                s_tick_div_fc_start_50hz = 0U;
+                crsf_send_50hz();
+
+            }
+            else
+            {
                 image_update();
                 FC_Loop_50Hz();
 
@@ -94,19 +90,16 @@ int main(void)
                 #endif
             }
 
-            s_tick_div_fc_start_1hz++;
-            if (s_tick_div_fc_start_1hz >= 2U)
+            div50++;
+            if (div50 >= 2U)
             {
-                s_tick_div_fc_start_1hz = 0U;
+                div50 = 0U;
             }
-            
 
-            s_tick_div_fc_start_10hz++;
-            if (s_tick_div_fc_start_10hz >= 10U)
+            div10++;
+            if (div10 >= 10U)
             {
-                s_tick_div_fc_start_10hz = 0U;
-
-
+                div10 = 0U;
                 FC_START_CRSF_Update();
 
                 if (g_euler.roll > 35.0f || g_euler.roll < -35.0f ||
@@ -116,7 +109,5 @@ int main(void)
                 }
             }
         }
-
-
     }
 }

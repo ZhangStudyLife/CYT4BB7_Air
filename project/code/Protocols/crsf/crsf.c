@@ -249,7 +249,7 @@ static void crsf_send_attitude(int16_t roll, int16_t pitch, int16_t yaw)
     uart_write_buffer(CRSF_UART_INDEX, buf, idx);
 }
 
-void crsf_send_25hz(void)
+void crsf_send_50hz(void)
 {
 
     const float k_deg_to_rad_1e4 = 174.532925f; // deg * (pi/180) * 10000

@@ -55,7 +55,7 @@ void crsf_init(void);
 
 void CRSF_Update_100HZ(void);
 
-void crsf_send_25hz(void);
+void crsf_send_50hz(void);
 
 
 

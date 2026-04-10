@@ -38,7 +38,7 @@ define symbol sram_private_for_srom             =   2K; // Private SRAM for SROM
 define symbol sram_used_by_boot                 =    6K; 
 
 define symbol cm0plus_sram_reserve              = 128K; // (SRAM0/~128KB) -> cm0plus
-define symbol cm7_0_sram_reserve                = 512K - cm0plus_sram_reserve; // (SRAM0/384KB) -> cm7_0
+define symbol cm7_0_sram_reserve                = 256K; // keep CM7_0 on a smaller SRAM budget and leave more shared SRAM for CM7_1 image buffers
 //define symbol cm7_1_sram_reserve                = 256K; // (SRAM1/~256KB) -> cm7_1
 
 if(use_psvp)

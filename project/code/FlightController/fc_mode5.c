@@ -1,4 +1,4 @@
-﻿#include "fc_mode.h"
+#include "fc_mode.h"
 #include "../Estimation/Pos_Est/Pos_Est.h"
 #include "../Estimation/Height_Est/TOF_data.h"
 #include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
@@ -158,12 +158,9 @@ void FC_Mode5_50Hz(float dt)
 
     ch0 = FC_Mode_Clamp((float)CRSF_STD[0], -1000.0f, 1000.0f);
     ch1 = FC_Mode_Clamp((float)CRSF_STD[1], -1000.0f, 1000.0f);
-    img_err_x = -g_image_circles[0].x;
-    img_err_y = g_image_circles[0].y;
-    visual_track_enable =
-        ((-s_mode5_visual_rc_gate < ch0) && (ch0 < s_mode5_visual_rc_gate) &&
-         (-s_mode5_visual_rc_gate < ch1) && (ch1 < s_mode5_visual_rc_gate) &&
-         (g_image_circles[0].valid == 1U)) ? 1U : 0U;
+    img_err_x = 0.0f;
+    img_err_y = 0.0f;
+    visual_track_enable = 0U;
     /*没有拨动遥感的情况下 */
     if (0U != visual_track_enable)
     {

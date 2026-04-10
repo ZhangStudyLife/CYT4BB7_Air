@@ -1714,12 +1714,6 @@
                     <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\FlowGyroDecoupler.h</name>
                 </file>
                 <file>
-                    <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\image.c</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\image.h</name>
-                </file>
-                <file>
                     <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\Pos_Est.c</name>
                 </file>
                 <file>
@@ -3822,12 +3816,6 @@
                     <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_cmd\wifi_cmd.h</name>
                 </file>
                 <file>
-                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_image\wifi_image.c</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_image\wifi_image.h</name>
-                </file>
-                <file>
                     <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_justfloat\wifi_justfloat.c</name>
                 </file>
                 <file>
@@ -5001,12 +4989,6 @@
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_menc15a.h</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_mt9v03x.c</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_mt9v03x.h</name>
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_oled.c</name>

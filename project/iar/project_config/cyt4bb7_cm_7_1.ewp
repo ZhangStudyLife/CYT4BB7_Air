@@ -1118,6 +1118,12 @@
         <file>
             <name>$PROJ_DIR$\..\..\code\本文件夹作用.txt</name>
         </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\image.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\image.h</name>
+        </file>
     </group>
     <group>
         <name>doc</name>
@@ -1898,15 +1904,6 @@
     </group>
     <group>
         <name>zf_components</name>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_components\seekfree_assistant.c</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_components\seekfree_assistant.h</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_components\seekfree_assistant_interface.c</name>
-        </file>
     </group>
     <group>
         <name>zf_device</name>
@@ -2014,24 +2011,6 @@
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_type.h</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_wifi_spi.c</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_wifi_spi.h</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_wifi_uart.c</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_wifi_uart.h</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_wireless_uart.c</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_wireless_uart.h</name>
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\外设文件说明.txt</name>

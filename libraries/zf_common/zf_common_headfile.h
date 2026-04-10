@@ -90,7 +90,9 @@
 #include "zf_device_key.h"
 #include "zf_device_menc15a.h"
 #include "zf_device_oled.h"
+#if defined(CY_CORE_CM7_1)
 #include "zf_device_mt9v03x.h"
+#endif
 #include "zf_device_tft180.h"
 #include "zf_device_tsl1401.h"
 #include "zf_device_type.h"
@@ -126,6 +128,8 @@
 #include "../code/Estimation/Height_Est/TOF_data.h"
 #include "../code/Estimation/Pos_Est/FlowGyroDecoupler.h"
 #include "../code/filter.h"
+#if defined(CY_CORE_CM7_1)
 #include "../code/Estimation/Pos_Est/image.h"
+#endif
 #include "../code/HW_Drivers/LC302/LC302.h"
 #endif

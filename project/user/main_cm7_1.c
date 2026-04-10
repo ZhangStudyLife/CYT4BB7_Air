@@ -48,6 +48,7 @@ int main(void)
 {
     clock_init(SYSTEM_CLOCK_250M); 	// 时钟配置及系统初始化<务必保留>
     debug_info_init();                  // 调试串口信息初始化
+    image_init();
      
     // 此处编写用户代码 例如外设初始化代码等
 
@@ -57,6 +58,7 @@ int main(void)
     // 此处编写用户代码 例如外设初始化代码等
     while(true)
     {
+        image_update();
         // 此处编写需要循环执行的代码
         
 

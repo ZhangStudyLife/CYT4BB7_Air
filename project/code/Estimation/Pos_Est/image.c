@@ -5,7 +5,6 @@
 
 #include "zf_common_typedef.h"
 #include "zf_device_mt9v03x.h"
-#include "../../Protocols/wifi/wifi_image/wifi_image.h"
 
 #define IMAGE_DEFAULT_THRESHOLD (50U) /* 默认固定阈值二值化阈值 */
 #define IMAGE_ADAPTIVE_THRESHOLD_BLOCK (41U) /* 自适应阈值窗口边长（需为奇数） */

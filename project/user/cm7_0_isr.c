@@ -165,8 +165,8 @@ void uart1_isr (void)
 {
     if(uart_isr_mask(UART_1))            // 串口1接收中断
     {
-        
-        wireless_module_uart_handler();  // 无线模块统一回调函数
+        LC302_uart_handler();            // LC302光流模块回调函数
+        // wireless_module_uart_handler();  // 无线模块统一回调函数
       
     }
     else                                // 串口1发送中断

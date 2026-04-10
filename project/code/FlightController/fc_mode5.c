@@ -210,34 +210,7 @@ void FC_Mode5_50Hz(float dt)
     roll_angle_target = velx_out + FC_Mode_Get_Roll_Mech_Trim_Deg();
     pitch_angle_target = vely_out + FC_Mode_Get_Pitch_Mech_Trim_Deg();
 
-#if (1U == FC_MODE5_DEBUG_OUTPUT_EN)
-    /*
-     * 模式5调参遥测（16通道）：
-     * 1 图像原始误差X, 2 图像原始误差Y,
-     * 3 图像滤波误差X, 4 图像滤波误差Y,
-     * 5 图像PID_X_P, 6 图像PID_X_I, 7 图像PID_X_D,
-     * 8 图像PID_Y_P, 9 图像PID_Y_I, 10 图像PID_Y_D,
-     * 11 图像PID输出速度X, 12 图像PID输出速度Y,
-     * 13 速度环观测X, 14 速度环观测Y,
-     * 15 目标高度m, 16 融合高度m
-     */
-    (void)wifi_justfloat(img_err_x,
-                         img_err_y,
-                         s_mode5_img_err_x_lpf,
-                         s_mode5_img_err_y_lpf,
-                         s_mode5_imgx_pid.p_term,
-                         s_mode5_imgx_pid.i_term,
-                         s_mode5_imgx_pid.d_term,
-                         s_mode5_imgy_pid.p_term,
-                         s_mode5_imgy_pid.i_term,
-                         s_mode5_imgy_pid.d_term,
-                         velx_target,
-                         vely_target,
-                         -Pos_Est_vel_x_kf,
-                         -Pos_Est_vel_y_kf,
-                         target_height_m,
-                         (float)g_tof_fused_height_mm * 0.001f);
-#endif
+
 }
 
 /*

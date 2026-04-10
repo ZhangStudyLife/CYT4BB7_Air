@@ -127,5 +127,5 @@
 #include "../code/Estimation/Pos_Est/FlowGyroDecoupler.h"
 #include "../code/filter.h"
 #include "../code/Estimation/Pos_Est/image.h"
-
+#include "../code/HW_Drivers/LC302/LC302.h"
 #endif

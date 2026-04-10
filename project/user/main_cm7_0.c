@@ -1,5 +1,6 @@
 #include "zf_common_headfile.h"
 
+
 volatile uint32 tick_1000us_cnt = 0U;
 volatile uint16 g_tick_1000HZ = 0U;
 volatile uint8 g_tick_100HZ = 0U;
@@ -22,6 +23,7 @@ int main(void)
     image_init();
     TOF_Init();
     PMW3901_Init();
+    LC302_Init();
     IMU_Init_All();
     crsf_init();
     AccelCalibration_Init();
@@ -38,6 +40,13 @@ int main(void)
     wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
     pit_us_init(PIT_CH0, 1000);
     pit_ms_init(PIT_CH1, 10);
+
+    printf("1");
+    for(int j = 0; j < 10000; j++){
+        LC302_Update_50HZ();
+        system_delay_ms(25);
+    }
+    printf("2");
 
     while (true)
     {
@@ -57,6 +66,8 @@ int main(void)
             {
                 div500 = 0U;
                 FC_Loop_500Hz();
+                wifi_justfloat(tick_1000us_cnt, lc302_data.flow_x_integral, lc302_data.flow_y_integral, lc302_data.integration_timespan, lc302_data.ground_distance, lc302_data.valid, lc302_data.version);
+
             }
 
             FC_Loop_1000Hz();
@@ -75,6 +86,7 @@ int main(void)
             slot50 = div50;
             if (slot50 == 0U)
             {
+                LC302_Update_50HZ();
                 Pos_Est_Update_50HZ();
                 crsf_send_50hz();
 
@@ -85,9 +97,7 @@ int main(void)
                 FC_Loop_50Hz();
 
                 wifi_params_GetDiag(&wifi_params_diag);
-                #if (0U == WIFI_IMAGE_ENABLE)
-                    wifi_cmd_Poll();
-                #endif
+
             }
 
             div50++;
@@ -109,5 +119,11 @@ int main(void)
                 }
             }
         }
+                        #if (0U == WIFI_IMAGE_ENABLE)
+                    wifi_cmd_Poll();
+                #endif
     }
+
+ 
+
 }

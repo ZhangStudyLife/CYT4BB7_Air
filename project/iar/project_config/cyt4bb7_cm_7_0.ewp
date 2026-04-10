@@ -705,7 +705,7 @@
             <data>
                 <extensions></extensions>
                 <cmdline></cmdline>
-                <hasPrio>72</hasPrio>
+                <hasPrio>1</hasPrio>
                 <buildSequence>inputOutputBased</buildSequence>
             </data>
         </settings>
@@ -1736,6 +1736,9 @@
                 <name>$PROJ_DIR$\..\..\code\FlightController\fc_loop.h</name>
             </file>
             <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode.h</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode0.c</name>
             </file>
             <file>
@@ -1761,9 +1764,6 @@
             </file>
             <file>
                 <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode8.c</name>
-            </file>
-            <file>
-                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode.h</name>
             </file>
             <file>
                 <name>$PROJ_DIR$\..\..\code\FlightController\fc_params.c</name>
@@ -2648,6 +2648,294 @@
                 </file>
             </group>
             <group>
+                <name>LC302</name>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\LC302\LC302.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\LC302\LC302.h</name>
+                </file>
+                <configuration>
+                    <name>Debug</name>
+                    <settings>
+                        <name>ICCARM</name>
+                        <data>
+                            <version>38</version>
+                            <wantNonLocal>0</wantNonLocal>
+                            <debug>1</debug>
+                            <option>
+                                <name>CCDefines</name>
+                                <state>tviibh4m</state>
+                                <state>CYT4BB7CEE</state>
+                                <state>CY_USE_PSVP=0</state>
+                                <state>CY_MCU_rev_b</state>
+                                <state>CPU_BOARD_REVB</state>
+                                <state>CY_CORE_CM7_0</state>
+                                <state>__ICACHE_PRESENT=1</state>
+                                <state>__DCACHE_PRESENT=1</state>
+                            </option>
+                            <option>
+                                <name>CCPreprocFile</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCPreprocComments</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCPreprocLine</name>
+                                <state>1</state>
+                            </option>
+                            <option>
+                                <name>CCListCFile</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCListCMnemonics</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCListCMessages</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCListAssFile</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCListAssSource</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCEnableRemarks</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCDiagSuppress</name>
+                                <state>Pa082,Pa134</state>
+                            </option>
+                            <option>
+                                <name>CCDiagRemark</name>
+                                <state></state>
+                            </option>
+                            <option>
+                                <name>CCDiagWarning</name>
+                                <state></state>
+                            </option>
+                            <option>
+                                <name>CCDiagError</name>
+                                <state></state>
+                            </option>
+                            <option>
+                                <name>CCObjPrefix</name>
+                                <state>1</state>
+                            </option>
+                            <option>
+                                <name>CCAllowList</name>
+                                <version>1</version>
+                                <state>00000000</state>
+                            </option>
+                            <option>
+                                <name>CCDebugInfo</name>
+                                <state>1</state>
+                            </option>
+                            <option>
+                                <name>IEndianMode</name>
+                                <state>1</state>
+                            </option>
+                            <option>
+                                <name>IProcessor</name>
+                                <state>1</state>
+                            </option>
+                            <option>
+                                <name>IExtraOptionsCheck</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>IExtraOptions</name>
+                                <state></state>
+                            </option>
+                            <option>
+                                <name>CCLangConformance</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCSignedPlainChar</name>
+                                <state>1</state>
+                            </option>
+                            <option>
+                                <name>CCRequirePrototypes</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCDiagWarnAreErr</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCCompilerRuntimeInfo</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>IFpuProcessor</name>
+                                <state>1</state>
+                            </option>
+                            <option>
+                                <name>OutputFile</name>
+                                <state>$FILE_BNAME$.o</state>
+                            </option>
+                            <option>
+                                <name>CCLibConfigHeader</name>
+                                <state>1</state>
+                            </option>
+                            <option>
+                                <name>PreInclude</name>
+                                <state></state>
+                            </option>
+                            <option>
+                                <name>CCIncludePath2</name>
+                                <state>$PROJ_DIR$\..\..\..\libraries\sdk\common\hdr</state>
+                                <state>$PROJ_DIR$\..\..\..\libraries\sdk\common\hdr\cmsis\include</state>
+                                <state>$PROJ_DIR$\..\..\..\libraries\sdk\common\src\drivers</state>
+                                <state>$PROJ_DIR$\..\..\..\libraries\sdk\common\src\mw</state>
+                                <state>$PROJ_DIR$\..\..\..\libraries\sdk\tviibh4m\hdr</state>
+                                <state>$PROJ_DIR$\..\..\..\libraries\sdk\tviibh4m\hdr\ip</state>
+                                <state>$PROJ_DIR$\..\..\..\libraries\sdk\tviibh4m\hdr\mcureg</state>
+                                <state>$PROJ_DIR$\..\..\..\libraries\sdk\tviibh4m\src</state>
+                                <state>$PROJ_DIR$\..\..\..\libraries\sdk\tviibh4m\src\interrupts</state>
+                                <state>$PROJ_DIR$\..\..\..\libraries\sdk\tviibh4m\src\mw</state>
+                                <state>$PROJ_DIR$\..\..\..\libraries\sdk\tviibh4m\src\drivers</state>
+                                <state>$PROJ_DIR$\..\..\..\libraries\sdk\tviibh4m\src\system</state>
+                                <state>$PROJ_DIR$\..\..\..\libraries\sdk\common\hdr\cmsis\dsp</state>
+                                <state>$PROJ_DIR$\..\..\..\libraries\zf_common</state>
+                                <state>$PROJ_DIR$\..\..\..\libraries\zf_driver</state>
+                                <state>$PROJ_DIR$\..\..\..\libraries\zf_device</state>
+                                <state>$PROJ_DIR$\..\..\..\libraries\zf_components</state>
+                                <state>$PROJ_DIR$\..\..\user</state>
+                                <state>$PROJ_DIR$\..\..\code</state>
+                                <state>$PROJ_DIR$\..\..\code\HW_Drivers\ICM42688</state>
+                                <state>$PROJ_DIR$\..\..\code\HW_Drivers\PMW3901</state>
+                                <state>$PROJ_DIR$\..\..\code\HW_Drivers\VL53L1X</state>
+                                <state>$PROJ_DIR$\..\..\code\HW_Drivers\LC302</state>
+                            </option>
+                            <option>
+                                <name>CCStdIncCheck</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCCodeSection</name>
+                                <state>.text</state>
+                            </option>
+                            <option>
+                                <name>IProcessorMode2</name>
+                                <state>1</state>
+                            </option>
+                            <option>
+                                <name>CCOptLevel</name>
+                                <state>1</state>
+                            </option>
+                            <option>
+                                <name>CCOptStrategy</name>
+                                <version>0</version>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCOptLevelSlave</name>
+                                <state>1</state>
+                            </option>
+                            <option>
+                                <name>CCPosIndRopi</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCPosIndRwpi</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCPosIndNoDynInit</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>IccLang</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>IccCDialect</name>
+                                <state>1</state>
+                            </option>
+                            <option>
+                                <name>IccAllowVLA</name>
+                                <state>1</state>
+                            </option>
+                            <option>
+                                <name>IccStaticDestr</name>
+                                <state>1</state>
+                            </option>
+                            <option>
+                                <name>IccCppInlineSemantics</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>IccCmsis</name>
+                                <state>1</state>
+                            </option>
+                            <option>
+                                <name>IccFloatSemantics</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCOptimizationNoSizeConstraints</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCNoLiteralPool</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCOptStrategySlave</name>
+                                <version>0</version>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCEncSource</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCEncOutput</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCEncOutputBom</name>
+                                <state>1</state>
+                            </option>
+                            <option>
+                                <name>CCEncInput</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>IccExceptions2</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>IccRTTI2</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCStackProtection</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCPointerAutentiction</name>
+                                <state>0</state>
+                            </option>
+                            <option>
+                                <name>CCBranchTargetIdentification</name>
+                                <state>0</state>
+                            </option>
+                        </data>
+                    </settings>
+                </configuration>
+            </group>
+            <group>
                 <name>Motor</name>
                 <file>
                     <name>$PROJ_DIR$\..\..\code\HW_Drivers\Motor\Motor_Drive.c</name>
@@ -3522,22 +3810,22 @@
             <group>
                 <name>wifi</name>
                 <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_cal_imu\wifi_cal_imu.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_cal_imu\wifi_cal_imu.h</name>
+                </file>
+                <file>
                     <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_cmd\wifi_cmd.c</name>
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_cmd\wifi_cmd.h</name>
                 </file>
                 <file>
-                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_params\wifi_params.c</name>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_image\wifi_image.c</name>
                 </file>
                 <file>
-                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_params\wifi_params.h</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_cal_imu\wifi_cal_imu.c</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_cal_imu\wifi_cal_imu.h</name>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_image\wifi_image.h</name>
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_justfloat\wifi_justfloat.c</name>
@@ -3546,10 +3834,10 @@
                     <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_justfloat\wifi_justfloat.h</name>
                 </file>
                 <file>
-                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_image\wifi_image.c</name>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_params\wifi_params.c</name>
                 </file>
                 <file>
-                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_image\wifi_image.h</name>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_params\wifi_params.h</name>
                 </file>
                 <configuration>
                     <name>Debug</name>

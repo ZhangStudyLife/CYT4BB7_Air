@@ -1481,6 +1481,12 @@
                     <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\FlowGyroDecoupler.h</name>
                 </file>
                 <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\image.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\image.h</name>
+                </file>
+                <file>
                     <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\Pos_Est.c</name>
                 </file>
                 <file>
@@ -1495,6 +1501,36 @@
             </file>
             <file>
                 <name>$PROJ_DIR$\..\..\code\FlightController\fc_loop.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode0.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode1.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode2.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode3.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode4.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode5.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode6.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode7.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode8.c</name>
             </file>
             <file>
                 <name>$PROJ_DIR$\..\..\code\FlightController\fc_params.c</name>
@@ -1554,6 +1590,18 @@
                 </file>
             </group>
             <group>
+                <name>LC302</name>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\LC302\LC302.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\LC302\LC302.h</name>
+                </file>
+                <configuration>
+                    <name>Debug</name>
+                </configuration>
+            </group>
+            <group>
                 <name>Motor</name>
                 <file>
                     <name>$PROJ_DIR$\..\..\code\HW_Drivers\Motor\Motor_Drive.c</name>
@@ -1602,12 +1650,36 @@
                 </configuration>
             </group>
             <group>
-                <name>wifi_vofa</name>
+                <name>wifi</name>
                 <file>
-                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi_vofa\wifi_vofa.c</name>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_cal_imu\wifi_cal_imu.c</name>
                 </file>
                 <file>
-                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi_vofa\wifi_vofa.h</name>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_cal_imu\wifi_cal_imu.h</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_cmd\wifi_cmd.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_cmd\wifi_cmd.h</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_image\wifi_image.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_image\wifi_image.h</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_justfloat\wifi_justfloat.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_justfloat\wifi_justfloat.h</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_params\wifi_params.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\wifi\wifi_params\wifi_params.h</name>
                 </file>
                 <configuration>
                     <name>Debug</name>

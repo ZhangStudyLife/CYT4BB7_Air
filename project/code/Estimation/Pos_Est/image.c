@@ -462,8 +462,5 @@ void image_update(void)
     image_binary_threshold();
     image_find_connected_components(); /* 利用两遍扫描法寻找4面连通域 */
 
-    // wifi_justfloat(g_image_circles[0].x,
-    //                g_image_circles[0].y,
-    //                g_image_circles[0].radius,
-    //                (float)g_image_circles[0].valid);
+
 }

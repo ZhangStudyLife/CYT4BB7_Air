@@ -124,11 +124,11 @@
                 </option>
                 <option>
                     <name>OCImagesSuppressCheck2</name>
-                    <state>0</state>
+                    <state>1</state>
                 </option>
                 <option>
                     <name>OCImagesPath2</name>
-                    <state>$PROJ_DIR$\Debug_m7_1\Exe\cyt4bb7_cm_7_1.hex</state>
+                    <state></state>
                 </option>
                 <option>
                     <name>OCImagesSuppressCheck3</name>
@@ -160,7 +160,7 @@
                 </option>
                 <option>
                     <name>OCImagesUse2</name>
-                    <state>1</state>
+                    <state>0</state>
                 </option>
                 <option>
                     <name>OCImagesUse3</name>

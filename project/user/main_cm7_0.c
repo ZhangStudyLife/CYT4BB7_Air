@@ -1,6 +1,5 @@
 #include "zf_common_headfile.h"
 
-
 volatile uint32 tick_1000us_cnt = 0U;
 volatile uint16 g_tick_1000HZ = 0U;
 volatile uint8 g_tick_100HZ = 0U;
@@ -41,16 +40,6 @@ int main(void)
     pit_us_init(PIT_CH0, 1000);
     pit_ms_init(PIT_CH1, 10);
 
-    printf("1");
-    for(int j = 0; j < 5000; j++){
-        wifi_justfloat(tick_1000us_cnt, ICM42688_RAW.gyro_x_lsb, ICM42688_RAW.gyro_y_lsb, ICM42688_RAW.gyro_z_lsb, ICM42688_RAW.acc_x_lsb, ICM42688_RAW.acc_y_lsb, ICM42688_RAW.acc_z_lsb, 
-                        g_euler.roll, g_euler.pitch, g_euler.yaw,
-                        g_tof1_height_mm, g_tof2_height_mm, g_tof3_height_mm, g_tof4_height_mm, g_tof_fused_height_mm);
-            wifi_cmd_Poll();
-        system_delay_ms(10);
-    }
-    printf("2");
-
     while (true)
     {
         uint16 guard = 0U;
@@ -63,14 +52,13 @@ int main(void)
             Pos_Est_Update_1000HZ();
             // wifi_justfloat(g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
             //                g_euler.roll, g_euler.pitch, g_euler.yaw);
-            
+
             div500++;
             if (div500 >= 2U)
             {
                 div500 = 0U;
                 FC_Loop_500Hz();
                 wifi_justfloat(tick_1000us_cnt, lc302_data.flow_x_integral, lc302_data.flow_y_integral, lc302_data.integration_timespan, lc302_data.ground_distance, lc302_data.valid, lc302_data.version);
-
             }
 
             FC_Loop_1000Hz();
@@ -81,7 +69,6 @@ int main(void)
         {
             g_tick_100HZ--;
 
-            
             CRSF_Update_100HZ();
             FC_Loop_100Hz();
             wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
@@ -92,7 +79,6 @@ int main(void)
                 LC302_Update_50HZ();
                 Pos_Est_Update_50HZ();
                 crsf_send_50hz();
-
             }
             else
             {
@@ -100,7 +86,6 @@ int main(void)
                 FC_Loop_50Hz();
 
                 wifi_params_GetDiag(&wifi_params_diag);
-
             }
 
             div50++;
@@ -122,11 +107,8 @@ int main(void)
                 }
             }
         }
-                        #if (0U == WIFI_IMAGE_ENABLE)
-                    wifi_cmd_Poll();
-                #endif
+        //         #if (0U == WIFI_IMAGE_ENABLE)
+        //     wifi_cmd_Poll();
+        // #endif
     }
-
- 
-
 }

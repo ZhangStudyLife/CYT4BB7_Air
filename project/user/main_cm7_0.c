@@ -14,8 +14,6 @@ int main(void)
     wifi_params_diag_t wifi_params_diag = {0};
 
     clock_init(SYSTEM_CLOCK_250M);
-    debug_init();
-
     Beep_Init();
     pit_ms_init(PIT_CH2, 10);
     wifi_cmd_Init();

@@ -47,25 +47,22 @@
 int main(void)
 {
     clock_init(SYSTEM_CLOCK_250M); 	// 时钟配置及系统初始化<务必保留>
-    debug_info_init();                  // 调试串口信息初始化
+    debug_init();                       // 调试串口初始化
     image_init();
      
     // 此处编写用户代码 例如外设初始化代码等
 
 
-    
+    printf("Hello CYT4BB7!\n");
 
     // 此处编写用户代码 例如外设初始化代码等
     while(true)
     {
         image_update();
-        // 此处编写需要循环执行的代码
-        
 
-      
-      
-        // 此处编写需要循环执行的代码
+        printf("%u,%.2f,%.2f\r\n", (unsigned int)g_image_circles[0].valid, g_image_circles[0].x, g_image_circles[0].y);
     }
 }
 
 // **************************** 代码区域 ****************************
+

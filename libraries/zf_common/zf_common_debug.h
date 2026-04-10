@@ -46,7 +46,7 @@
 #define DEBUG_UART_TX_PIN           (UART0_TX_P00_1 )                           // 指定 debug uart 所使用的的串口引脚
 #define DEBUG_UART_RX_PIN           (UART0_RX_P00_0)                            // 指定 debug uart 所使用的的串口引脚
 
-#define DEBUG_UART_USE_INTERRUPT    (1)                                         // 是否启用 debug uart 接收中断
+#define DEBUG_UART_USE_INTERRUPT    (0)                                         // 是否启用 debug uart 接收中断
 
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     断言
@@ -89,8 +89,9 @@ typedef struct
 #if DEBUG_UART_USE_INTERRUPT                                                            // 如果启用 debug uart 接收中断
 #define DEBUG_RING_BUFFER_LEN          (64)                                             // 定义环形缓冲区大小 默认 64byte
 void    debug_interrupr_handler        (void);
-uint32  debug_read_ring_buffer         (uint8 *buff, uint32 len);
 #endif
+
+uint32  debug_read_ring_buffer         (uint8 *buff, uint32 len);
 
 
 uint32  debug_send_buffer              (const uint8 *buff, uint32 len);                 // 调试串口缓冲区发送

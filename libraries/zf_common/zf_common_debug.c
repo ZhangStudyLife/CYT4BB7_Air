@@ -72,7 +72,11 @@ static void debug_delay (void)
 //-------------------------------------------------------------------------------------------------------------------
 static void debug_uart_str_output (const char *str)
 {
+#if CY_CORE_CM7_0
+    (void)str;
+#else
     uart_write_string(DEBUG_UART_INDEX, str);
+#endif
 }
 
 
@@ -216,7 +220,12 @@ static void debug_output (char *type, char *file, int line, char *str)
 //-------------------------------------------------------------------------------------------------------------------
 uint32 debug_send_buffer(const uint8 *buff, uint32 len)
 {
+#if CY_CORE_CM7_0
+    (void)buff;
+    (void)len;
+#else
     uart_write_buffer(DEBUG_UART_INDEX, buff, len);
+#endif
     return 0;
 }
 
@@ -253,8 +262,24 @@ void debug_interrupr_handler (void)
     }
 }
 
-#endif
+#else
 
+//-------------------------------------------------------------------------------------------------------------------
+// 函数简介     读取 debug 环形缓冲区数据
+// 参数说明     *buff       读出数据存放的数组指针
+// 参数说明     len         需要读取的长度
+// 返回参数     uint32      读出数据的实际长度
+// 使用示例
+// 备注信息     当未启用 debug 串口接收中断时固定返回 0
+//-------------------------------------------------------------------------------------------------------------------
+uint32 debug_read_ring_buffer (uint8 *buff, uint32 len)
+{
+    (void)buff;
+    (void)len;
+    return 0U;
+}
+
+#endif
 
 //-------------------------------------------------------------------------     // printf 重定向 此部分不允许用户更改
 //-------------------------------------------------------------------------------------------------------------------
@@ -265,8 +290,14 @@ void debug_interrupr_handler (void)
 //-------------------------------------------------------------------------------------------------------------------
 int __write(int handle, const unsigned char *buf, int size)
 {
+    (void)handle;
+#if CY_CORE_CM7_0
+    (void)buf;
+    return size;
+#else
     uart_write_buffer(DEBUG_UART_INDEX, buf, (char)size);
     return size;
+#endif
 }
 //-------------------------------------------------------------------------------------------------------------------
 //  函数简介      重定向scanf 到串口
@@ -454,6 +485,7 @@ void debug_init (void)
 {
     debug_info_init();                          // debug 串口信息初始化
 
+#if CY_CORE_CM7_1 || (!CY_CORE_CM7_0 && !CY_CORE_CM7_1)
     uart_init(DEBUG_UART_INDEX,                 // 在 zf_common_debug.h 中查看对应值
               DEBUG_UART_BAUDRATE,              // 在 zf_common_debug.h 中查看对应值
               DEBUG_UART_TX_PIN,                // 在 zf_common_debug.h 中查看对应值
@@ -461,6 +493,7 @@ void debug_init (void)
 #if DEBUG_UART_USE_INTERRUPT                                                    // 条件编译 只有在启用串口中断才编译
     fifo_init(&debug_uart_fifo, FIFO_DATA_8BIT, debug_uart_buffer, DEBUG_RING_BUFFER_LEN);
     uart_rx_interrupt(DEBUG_UART_INDEX, 1);                                     // 使能对应串口接收中断
+#endif
 #endif
 
 #if !CY_CORE_CM7_0 && !CY_CORE_CM7_1    

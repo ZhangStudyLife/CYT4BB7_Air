@@ -42,9 +42,12 @@ int main(void)
     pit_ms_init(PIT_CH1, 10);
 
     printf("1");
-    for(int j = 0; j < 10000; j++){
-        LC302_Update_50HZ();
-        system_delay_ms(25);
+    for(int j = 0; j < 5000; j++){
+        wifi_justfloat(tick_1000us_cnt, ICM42688_RAW.gyro_x_lsb, ICM42688_RAW.gyro_y_lsb, ICM42688_RAW.gyro_z_lsb, ICM42688_RAW.acc_x_lsb, ICM42688_RAW.acc_y_lsb, ICM42688_RAW.acc_z_lsb, 
+                        g_euler.roll, g_euler.pitch, g_euler.yaw,
+                        g_tof1_height_mm, g_tof2_height_mm, g_tof3_height_mm, g_tof4_height_mm, g_tof_fused_height_mm);
+            wifi_cmd_Poll();
+        system_delay_ms(10);
     }
     printf("2");
 

@@ -209,6 +209,59 @@ JustFloat 线协议没有变化，调用方式保持不变。
 - 最多支持 `16` 个浮点通道
 - 发送端与上位机端应保持通道顺序一致
 
+### 6.1 当前发送链路
+
+当前 WiFi 链路可以按下面理解：
+
+`wifi_cmd_Init -> wifi_spi_init -> wifi_spi_socket_connect(UDP)`  
+`wifi_justfloat -> wifi_cmd_SendBuffer -> wifi_spi_send_buffer`  
+`wifi_cmd_Poll -> wifi_spi_send_poll -> wifi_cmd_FlushNow -> wifi_spi_udp_send_now`
+
+两个函数的意义：
+
+- `wifi_justfloat`
+  - 把一组 `float` 按 JustFloat 协议打包，并提交到 WiFi 发送缓存。
+  - 它只负责“提交待发送数据”，不等待底层真正发完。
+- `wifi_cmd_Poll`
+  - 推进底层 WiFi SPI 发送状态机，并在发送完成后触发 UDP 发包。
+  - 非飞行态下也负责轮询上位机文本命令接收。
+
+频率说明：
+
+- 实际遥测发送频率，主要由 `wifi_justfloat` 的调用频率决定。
+- `wifi_cmd_Poll` 建议在主循环空闲区持续调用，它主要影响发送延迟和丢帧，不决定采样频率。
+
+DMA 说明：
+
+- 底层 `wifi_spi_send_poll` 在发送数据载荷时优先尝试 DMA。
+- 如果 DMA 启动失败，会退回普通 SPI 发送。
+- 发送头部、应答处理、接收轮询和 UDP 触发不是整段 DMA 全异步处理。
+
+效果：
+
+- 使用 DMA 后，较长载荷发送时 CPU 占用更低，主循环抖动更小。
+- 但 `wifi_cmd_Poll` 仍然需要持续运行，因为底层还有状态推进、应答读取和命令接收开销。
+- 想省 CPU，优先降低 `wifi_justfloat` 的调用频率，不要停掉 `wifi_cmd_Poll`。
+
+### 6.2 当前实测耗时
+
+按当前工程与当前测试方法，得到下面这组结果：
+
+- 单独调用 `wifi_justfloat()`：`99 / 10000 = 0.0099 ms`，约 `9.9 us/次`
+- 调用 `wifi_justfloat() + wifi_cmd_Poll()`：`433 / 5000 = 0.0866 ms`，约 `86.6 us/次`
+- 按差值估算，`wifi_cmd_Poll()` 本次额外耗时约为：`86.6 - 9.9 = 76.7 us/次`
+
+这组数据说明：
+
+- `wifi_justfloat()` 本体主要是打包和提交发送，耗时较小。
+- 主要 CPU 开销在 `wifi_cmd_Poll()`，因为它会推进底层 SPI 发送状态机、处理 UDP 触发和接收轮询。
+- `wifi_justfloat()` 的计时不等于“数据已经真正发到上位机”，真正发送过程主要在后续的 `wifi_cmd_Poll()` 中完成。
+
+使用建议：
+
+- `wifi_justfloat()` 适合放在 `50Hz` 或 `100Hz` 这类较低频率循环。
+- `wifi_cmd_Poll()` 适合放在主循环空闲区持续运行，不建议塞进高实时要求的控制闭环里当作固定频率任务。
+
 ## 7. 兼容性说明
 
 旧目录仍保留在磁盘上，但主循环与 IAR 工程入口已经切到新的 `project/code/Protocols/wifi/` 目录。

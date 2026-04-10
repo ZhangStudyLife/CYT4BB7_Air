@@ -167,6 +167,7 @@ void IMU_Init_All(void)
 }
 
 /* IMU 1kHz*/
+// 04110147 zyz实际测试执行一次IMU_Update_1000HZ花费55us
 void IMU_Update_1000HZ(void)
 {
 	/* 步骤1: �?ICM42688 读取一帧原始传感器数据 */

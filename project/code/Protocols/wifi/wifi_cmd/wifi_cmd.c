@@ -225,6 +225,7 @@ void wifi_cmd_Init(void)
     }
 }
 
+// 04110316 zyz实际测试花费88us
 void wifi_cmd_Poll(void)
 {
     /* 推进非阻塞发送状态机，确保发送在主循环中持续推进 */

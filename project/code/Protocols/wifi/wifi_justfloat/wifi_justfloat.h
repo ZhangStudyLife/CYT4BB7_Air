@@ -134,6 +134,8 @@ uint8_t wifi_justfloat_Impl(uint8_t declared_num, uint8_t actual_num, ...);
 
 #define WIFI_JUSTFLOAT_SELECT(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,_11,_12,_13,_14,_15,_16,NAME,...) NAME
 
+
+// 每次调用wifi_justfloat差不多花费10us
 #define wifi_justfloat(...) \
     WIFI_JUSTFLOAT_SELECT(__VA_ARGS__, \
                           WIFI_JUSTFLOAT_CALL_16, WIFI_JUSTFLOAT_CALL_15, WIFI_JUSTFLOAT_CALL_14, WIFI_JUSTFLOAT_CALL_13, \

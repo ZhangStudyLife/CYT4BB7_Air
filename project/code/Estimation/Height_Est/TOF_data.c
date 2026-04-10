@@ -918,6 +918,7 @@ void TOF_Update(void)
 
 /*
  * 函数功能：100Hz任务入口，更新TOF融合高度。
+ * 0411 0228 zyz实际测试执行一次 花费791.5 μs
  */
 void TOF_update_100HZ(void)
 {

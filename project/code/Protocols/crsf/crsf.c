@@ -249,6 +249,8 @@ static void crsf_send_attitude(int16_t roll, int16_t pitch, int16_t yaw)
     uart_write_buffer(CRSF_UART_INDEX, buf, idx);
 }
 
+
+// 花费0.26ms
 void crsf_send_50hz(void)
 {
 

@@ -131,6 +131,8 @@ void LC302_Init(void)
 /**
  * @brief  主循环中调用，将 ISR 影子缓冲原子拷贝到 lc302_data
  *         ISR 独占状态机，此函数仅负责发布数据
+ * 
+ * @note ZYZ亲自测试,几乎不花费任何性能,就是Copy
  */
 void LC302_Update_50HZ(void)
 {

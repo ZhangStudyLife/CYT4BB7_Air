@@ -374,6 +374,7 @@
                     <state>$PROJ_DIR$\..\..\..\libraries\zf_components</state>
                     <state>$PROJ_DIR$\..\..\user</state>
                     <state>$PROJ_DIR$\..\..\code</state>
+                    <state>$PROJ_DIR$\..\..\code\IPC</state>
                 </option>
                 <option>
                     <name>CCStdIncCheck</name>
@@ -1720,6 +1721,15 @@
                     <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\Pos_Est.h</name>
                 </file>
             </group>
+        </group>
+        <group>
+            <name>IPC</name>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\IPC\ipc_image_data.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\IPC\ipc_image_data.h</name>
+            </file>
         </group>
         <group>
             <name>FlightController</name>

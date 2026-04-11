@@ -1,0 +1,43 @@
+#ifndef IPC_IMAGE_DATA_H_
+#define IPC_IMAGE_DATA_H_
+
+#include "zf_common_headfile.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define IPC_IMAGE_MAX_CIRCLES  5
+
+typedef struct {
+    float    x;
+    float    y;
+    float    radius;
+    uint8    valid;
+    uint8    _pad[3];
+} ipc_image_circle_t;
+
+typedef struct {
+    volatile uint32        seq;
+    uint8                  count;
+    uint8                  _pad[3];
+    ipc_image_circle_t     circles[IPC_IMAGE_MAX_CIRCLES];
+} ipc_image_payload_t;
+
+/* CM7_1: 将 g_image_circles 写入共享内存并通过IPC通知CM7_0 */
+void ipc_image_send(void);
+
+/* CM7_0: IPC回调函数，传给 ipc_communicate_init */
+void ipc_image_callback(uint32 ipc_data);
+
+/* CM7_0: 是否有新数据到达（调用后自动清除标志） */
+uint8 ipc_image_is_new(void);
+
+/* CM7_0: 拷贝最新共享数据到 out */
+void ipc_image_get(ipc_image_payload_t *out);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* IPC_IMAGE_DATA_H_ */

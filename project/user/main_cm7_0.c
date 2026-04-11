@@ -14,6 +14,7 @@ int main(void)
     wifi_params_diag_t wifi_params_diag = {0};
 
     clock_init(SYSTEM_CLOCK_250M);
+    SCB_DisableDCache();
     Beep_Init();
     pit_ms_init(PIT_CH2, 10);
     wifi_cmd_Init();
@@ -32,6 +33,7 @@ int main(void)
     wifi_params_Init();
     wifi_cal_imu_Init();
     Motor_Init();
+    ipc_communicate_init(IPC_PORT_1, ipc_image_callback);
     FC_START_CRSF_Init();
     wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
     pit_us_init(PIT_CH0, 1000);
@@ -55,7 +57,7 @@ int main(void)
             {
                 div500 = 0U;
                 FC_Loop_500Hz();
-                wifi_justfloat(tick_1000us_cnt, lc302_data.flow_x_integral, lc302_data.flow_y_integral, lc302_data.integration_timespan, lc302_data.ground_distance, lc302_data.valid, lc302_data.version);
+                // wifi_justfloat(tick_1000us_cnt, lc302_data.flow_x_integral, lc302_data.flow_y_integral, lc302_data.integration_timespan, lc302_data.ground_distance, lc302_data.valid, lc302_data.version);
             }
 
             FC_Loop_1000Hz();
@@ -73,6 +75,13 @@ int main(void)
             slot50 = div50;
             if (slot50 == 0U)
             {
+                if (ipc_image_is_new())
+                {
+                    ipc_image_payload_t img;
+                    ipc_image_get(&img);
+                    wifi_justfloat(img.circles->valid, img.circles->x, img.circles->y);
+                    (void)img; // TODO: 将img数据接入位置估计
+                }
                 LC302_Update_50HZ();
                 Pos_Est_Update_50HZ();
                 crsf_send_50hz();
@@ -103,8 +112,8 @@ int main(void)
                 }
             }
         }
-        //         #if (0U == WIFI_IMAGE_ENABLE)
-        //     wifi_cmd_Poll();
-        // #endif
+                #if (0U == WIFI_IMAGE_ENABLE)
+            wifi_cmd_Poll();
+        #endif
     }
 }

@@ -206,8 +206,8 @@ void Pos_Est_Update_50HZ(void)
         /* 光流失效时对融合速度施加摩擦衰减，防止加速度偏置积分漂移 */
         if (!opflow_valid)
         {
-            Pos_Est_vel_x *= 0.98f;
-            Pos_Est_vel_y *= 0.98f;
+            Pos_Est_vel_x *= 0.96f;
+            Pos_Est_vel_y *= 0.96f;
         }
     }
 

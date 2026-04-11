@@ -57,7 +57,7 @@ int main(void)
             {
                 div500 = 0U;
                 FC_Loop_500Hz();
-                // wifi_justfloat(tick_1000us_cnt, lc302_data.flow_x_integral, lc302_data.flow_y_integral, lc302_data.integration_timespan, lc302_data.ground_distance, lc302_data.valid, lc302_data.version);
+                wifi_justfloat(tick_1000us_cnt, lc302_data.flow_x_integral, lc302_data.flow_y_integral, lc302_data.integration_timespan, g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY,g_pmw3901_raw.squal);
             }
 
             FC_Loop_1000Hz();
@@ -79,7 +79,7 @@ int main(void)
                 {
                     ipc_image_payload_t img;
                     ipc_image_get(&img);
-                    wifi_justfloat(img.circles->valid, img.circles->x, img.circles->y);
+                    // wifi_justfloat(img.circles->valid, img.circles->x, img.circles->y);
                     (void)img; // TODO: 将img数据接入位置估计
                 }
                 LC302_Update_50HZ();

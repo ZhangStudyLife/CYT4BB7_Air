@@ -15,6 +15,10 @@
 #include "../wifi_cal_imu/wifi_cal_imu.h"
 #include "../wifi_params/wifi_params.h"
 
+#define WIFI_CMD_TEXT_SEND_POLL_LIMIT   (20000U)
+
+static uint8 s_wifi_cmd_text_tx_active = 0U;
+
 static uint8 s_wifi_cmd_use_udp_flush = 1U;    /* 当前链路是否使用UDP立即发送命令：1=UDP，0=TCP */
 static uint8 s_wifi_cmd_flush_pending = 0U;    /* 是否存在待触发的UDP立即发送请求：1-待触发，0-无请求 */
 
@@ -70,6 +74,43 @@ static void wifi_cmd_reset_line_state(void)
     s_wifi_cmd_line_overflow = 0U;
     s_wifi_cmd_line_invalid = 0U;
     s_wifi_cmd_line_expect_lf = 0U;
+}
+
+static uint8 wifi_cmd_wait_tx_idle(void)
+{
+    uint32 guard = 0U;
+
+    while ((0U != wifi_spi_is_busy()) && (guard < WIFI_CMD_TEXT_SEND_POLL_LIMIT))
+    {
+        wifi_spi_send_poll();
+        guard++;
+    }
+
+    return (0U == wifi_spi_is_busy()) ? 1U : 0U;
+}
+
+static uint8 wifi_cmd_finish_pending_flush(void)
+{
+    if (0U == wifi_cmd_wait_tx_idle())
+    {
+        return 0U;
+    }
+
+    if (0U != s_wifi_cmd_flush_pending)
+    {
+        if (0U == wifi_cmd_FlushNow())
+        {
+            return 0U;
+        }
+
+        s_wifi_cmd_flush_pending = 0U;
+        if (0U == wifi_cmd_wait_tx_idle())
+        {
+            return 0U;
+        }
+    }
+
+    return 1U;
 }
 
 /*
@@ -193,6 +234,7 @@ void wifi_cmd_Init(void)
     s_wifi_cmd_ready = 0U;
     s_wifi_cmd_use_udp_flush = 1U;
     s_wifi_cmd_flush_pending = 0U;
+    s_wifi_cmd_text_tx_active = 0U;
     memset(s_wifi_cmd_line, 0, sizeof(s_wifi_cmd_line));
     wifi_cmd_reset_line_state();
 
@@ -228,6 +270,9 @@ void wifi_cmd_Init(void)
 // 04110316 zyz实际测试花费88us
 void wifi_cmd_Poll(void)
 {
+    uint8 rx_buffer[WIFI_CMD_RX_BUFFER_SIZE];
+    uint32 read_len;
+    uint32 i;
     /* 推进非阻塞发送状态机，确保发送在主循环中持续推进 */
     wifi_spi_send_poll();
 
@@ -245,10 +290,6 @@ void wifi_cmd_Poll(void)
     {
         return;
     }
-    uint8 rx_buffer[WIFI_CMD_RX_BUFFER_SIZE];
-    uint32 read_len;
-    uint32 i;
-
     read_len = wifi_spi_read_buffer(rx_buffer, (uint32)sizeof(rx_buffer));
     for (i = 0U; i < read_len; i++)
     {
@@ -259,6 +300,11 @@ void wifi_cmd_Poll(void)
 uint8 wifi_cmd_IsReady(void)
 {
     return s_wifi_cmd_ready;
+}
+
+uint8 wifi_cmd_IsTextBusy(void)
+{
+    return s_wifi_cmd_text_tx_active;
 }
 
 /*
@@ -323,6 +369,7 @@ uint8 wifi_cmd_SendBuffer(const uint8 *buffer, uint32 len)
 uint8  wifi_cmd_SendLine(const char *format, ...)
 {
     char line[WIFI_CMD_TX_LINE_MAX];
+    uint8 ret = 0U;
     int write_len;
     va_list ap;
 
@@ -349,7 +396,48 @@ uint8  wifi_cmd_SendLine(const char *format, ...)
     line[write_len + 1] = '\n';
     line[write_len + 2] = '\0';
 
-    return wifi_cmd_SendBuffer((const uint8 *)line, (uint32)(write_len + 2));
+    if (0U == s_wifi_cmd_ready)
+    {
+        return 0U;
+    }
+
+    s_wifi_cmd_text_tx_active = 1U;
+
+    if (0U == wifi_cmd_finish_pending_flush())
+    {
+        goto wifi_cmd_send_line_exit;
+    }
+
+    if (0U == wifi_cmd_SendBufferNoFlush((const uint8 *)line, (uint32)(write_len + 2)))
+    {
+        goto wifi_cmd_send_line_exit;
+    }
+
+    if (0U == wifi_cmd_wait_tx_idle())
+    {
+        goto wifi_cmd_send_line_exit;
+    }
+
+    if (0U != s_wifi_cmd_use_udp_flush)
+    {
+        s_wifi_cmd_flush_pending = 1U;
+        if (0U == wifi_cmd_FlushNow())
+        {
+            goto wifi_cmd_send_line_exit;
+        }
+
+        s_wifi_cmd_flush_pending = 0U;
+        if (0U == wifi_cmd_wait_tx_idle())
+        {
+            goto wifi_cmd_send_line_exit;
+        }
+    }
+
+    ret = 1U;
+
+wifi_cmd_send_line_exit:
+    s_wifi_cmd_text_tx_active = 0U;
+    return ret;
 }
 
 int wifi_cmd_ascii_stricmp(const char *lhs, const char *rhs)

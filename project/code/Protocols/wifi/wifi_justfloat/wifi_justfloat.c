@@ -61,6 +61,11 @@ static uint8_t wifi_justfloat_should_send(void)
         return 0U;
     }
 
+    if (0U != wifi_cmd_IsTextBusy())
+    {
+        return 0U;
+    }
+
     return 1U;
 }
 

@@ -71,6 +71,9 @@ void wifi_cmd_Poll(void);
  */
 uint8_t wifi_cmd_IsReady(void);
 
+/* Query whether text replies are queued or in flight. */
+uint8_t wifi_cmd_IsTextBusy(void);
+
 /*
  * 函数名: wifi_cmd_SendBuffer
  * 功能: 提交一段原始二进制数据到非阻塞发送链路，并在后续轮询中触发 UDP 发送

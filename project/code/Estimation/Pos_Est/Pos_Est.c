@@ -1,19 +1,15 @@
 #include "Pos_Est.h"
-#include "filter.h"
 #include "FlightController/fc_params.h"
 
 extern volatile uint32 tick_1000us_cnt;
 
-/* 50Hz 末端速度一阶低通截止频率约 15.1Hz，对应 alpha = 0.85 */
-#define POS_EST_VEL_OUT_LPF_ALPHA (0.85f)
+/* X 轴加速度一阶低通输出，单位 cm/s^2，飞机往前加速为正，往后加速为负 */
+float acc_x_lp = 0.0f;
+/* Y 轴加速度一阶低通输出，单位 cm/s^2，飞机往右加速为正，往左加速为负 */
+float acc_y_lp = 0.0f;
 
-/* 1000Hz 水平加速度一阶低通 alpha
- * 上游 g_imufilter_1000hz 已经过 12Hz Butterworth LPF（群延迟约 19ms），
- * 此处额外 LPF 仅用于轻微平滑，alpha 取大值以避免引入过多相位延迟。
- * alpha=0.30 → fc≈56.8Hz，群延迟≈3ms，总 acc 延迟≈22ms
- * 当前值基于 03302334 模式2日志做保守收紧，优先缩短 acc 相位延迟，
- * 但不在缺少原始 1000Hz 水平加速度日志的前提下做激进放开。 */
-#define POS_EST_ACC_LPF_ALPHA (0.30f)
+float vel_x_pred = 0.0f;
+float vel_y_pred = 0.0f;
 
 /* 光流解算得到的 X 轴速度，单位 cm/s，往左飞为正，往右飞为负 */
 float opflow_vel_x = 0.0f;
@@ -22,40 +18,10 @@ float opflow_vel_y = 0.0f;
 
 /* 位置估计的 X 轴速度，单位 cm/s */
 float Pos_Est_vel_x = 0.0f;
-/* 位置估计的上一拍 X 轴速度，单位 cm/s */
-float Pos_Est_vel_x_last = 0.0f;
 /* 位置估计的 Y 轴速度，单位 cm/s */
 float Pos_Est_vel_y = 0.0f;
-/* 位置估计的上一拍 Y 轴速度，单位 cm/s */
-float Pos_Est_vel_y_last = 0.0f;
 
-/* 位置估计的 X 轴位置，单位 cm，往左飞为正，往右飞为负 */
-float Pos_Est_pos_x = 0.0f;
-/* 位置估计的上一拍 X 轴位置，单位 cm */
-float Pos_Est_pos_x_last = 0.0f;
-/* 位置估计的 Y 轴位置，单位 cm，往前飞为正，往后飞为负 */
-float Pos_Est_pos_y = 0.0f;
-/* 位置估计的上一拍 Y 轴位置，单位 cm */
-float Pos_Est_pos_y_last = 0.0f;
 
-/* X 轴速度 Kalman 输出，单位 cm/s */
-float Pos_Est_vel_x_kf = 0.0f;
-/* Y 轴速度 Kalman 输出，单位 cm/s */
-float Pos_Est_vel_y_kf = 0.0f;
-
-/* X 轴加速度一阶低通状态 */
-static LPF1_t s_acc_lp_x;
-/* Y 轴加速度一阶低通状态 */
-static LPF1_t s_acc_lp_y;
-/* X 轴末端速度一阶低通状态 */
-static LPF1_t s_vel_out_lp_x;
-/* Y 轴末端速度一阶低通状态 */
-static LPF1_t s_vel_out_lp_y;
-
-/* X 轴加速度一阶低通输出，单位 cm/s^2，飞机往前加速为正，往后加速为负 */
-float acc_x_lp = 0.0f;
-/* Y 轴加速度一阶低通输出，单位 cm/s^2，飞机往右加速为正，往左加速为负 */
-float acc_y_lp = 0.0f;
 
 /*
  * 函数名: Pos_Est_Init
@@ -67,17 +33,14 @@ void Pos_Est_Init(void)
 {
     PMW3901_Init();
     FlowGyroDecoupler_Init();
-    LPF1_Init(&s_acc_lp_x, POS_EST_ACC_LPF_ALPHA);
-    LPF1_Init(&s_acc_lp_y, POS_EST_ACC_LPF_ALPHA);
-    LPF1_Init(&s_vel_out_lp_x, POS_EST_VEL_OUT_LPF_ALPHA);
-    LPF1_Init(&s_vel_out_lp_y, POS_EST_VEL_OUT_LPF_ALPHA);
-
-    Pos_Est_pos_x = 0.0f;
-    Pos_Est_pos_y = 0.0f;
-    Pos_Est_pos_x_last = 0.0f;
-    Pos_Est_pos_y_last = 0.0f;
-    Pos_Est_vel_x_kf = 0.0f;
-    Pos_Est_vel_y_kf = 0.0f;
+    acc_x_lp = 0.0f;
+    acc_y_lp = 0.0f;
+    opflow_vel_x = 0.0f;
+    opflow_vel_y = 0.0f;
+    Pos_Est_vel_x = 0.0f;
+    Pos_Est_vel_y = 0.0f;
+    vel_x_pred = 0.0f;
+    vel_y_pred = 0.0f;
 }
 
 /*
@@ -90,20 +53,18 @@ void Pos_Est_Reinit(void)
 {
     PMW3901_ReInit();
     FlowGyroDecoupler_Reinit();
-    LPF1_Reset(&s_acc_lp_x);
-    LPF1_Reset(&s_acc_lp_y);
-    LPF1_Reset(&s_vel_out_lp_x);
-    LPF1_Reset(&s_vel_out_lp_y);
 
     acc_x_lp = 0.0f;
     acc_y_lp = 0.0f;
-    Pos_Est_vel_x_kf = 0.0f;
-    Pos_Est_vel_y_kf = 0.0f;
-    Pos_Est_pos_x = 0.0f;
-    Pos_Est_pos_y = 0.0f;
-    Pos_Est_pos_x_last = 0.0f;
-    Pos_Est_pos_y_last = 0.0f;
+    opflow_vel_x = 0.0f;
+    opflow_vel_y = 0.0f;
+    Pos_Est_vel_x = 0.0f;
+    Pos_Est_vel_y = 0.0f;
+    vel_x_pred = 0.0f;
+    vel_y_pred = 0.0f;
 }
+
+
 
 /*
  * 函数名: Pos_Est_Update_1000HZ
@@ -122,8 +83,6 @@ void Pos_Est_Update_1000HZ(void)
 {
     float acc_sensor[3];
     float acc_body[3];
-    float acc_x_temp;
-    float acc_y_temp;
     float sp;
     float cp;
     float sr;
@@ -135,7 +94,11 @@ void Pos_Est_Update_1000HZ(void)
     acc_sensor[0] = g_imufilter_1000hz.accx;
     acc_sensor[1] = g_imufilter_1000hz.accy;
     acc_sensor[2] = g_imufilter_1000hz.accz;
-    AccelCalibration_RotateImuToBody(acc_sensor, acc_body);
+    // AccelCalibration_RotateImuToBody(acc_sensor, acc_body);
+    // 不用上面那个函数脱裤子放屁了，直接当传感器系就是机体系，毕竟没有安装误差
+    acc_body[0] = acc_sensor[0];
+    acc_body[1] = acc_sensor[1];
+    acc_body[2] = acc_sensor[2];
 
     sp = g_euler.sin_pitch;
     cp = g_euler.cos_pitch;
@@ -146,11 +109,14 @@ void Pos_Est_Update_1000HZ(void)
      * level_x = cp*body_x + sp*sr*body_y + sp*cr*body_z  (前进为正)
      * level_y = cr*body_y - sr*body_z                     (向右为正)
      * 单位 g → cm/s^2 */
-    acc_x_temp = (cp * acc_body[0] + sp * sr * acc_body[1] + sp * cr * acc_body[2]) * 9.80665f * 100.0f;
-    acc_y_temp = (cr * acc_body[1] - sr * acc_body[2]) * 9.80665f * 100.0f;
+    acc_x_lp = (cp * acc_body[0] + sp * sr * acc_body[1] + sp * cr * acc_body[2]) * 9.80665f * 100.0f;
+    acc_y_lp = (cr * acc_body[1] - sr * acc_body[2]) * 9.80665f * 100.0f;
 
-    acc_x_lp = LPF1_Update(&s_acc_lp_x, acc_x_temp);
-    acc_y_lp = LPF1_Update(&s_acc_lp_y, acc_y_temp);
+    // 需要注意的是acc_y_lp右正左负，acc_x_lp前正后负
+    vel_x_pred -= acc_y_lp * 0.001f;
+    vel_y_pred += acc_x_lp * 0.001f;
+
+
 }
 
 /*
@@ -165,9 +131,6 @@ void Pos_Est_Update_50HZ(void)
     float dec_y;
     float height;
     float coeff;
-    float vel_x_pred;
-    float vel_y_pred;
-    const float dt = 0.02f;
 
     PMW3901_Update_50HZ();
     FlowGyroDecoupler_Update50Hz(tick_1000us_cnt, g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY);
@@ -179,46 +142,31 @@ void Pos_Est_Update_50HZ(void)
     coeff = 0.2131946f * (height - 0.05f);
     if (height < 0.2f)
     {
-        coeff = 0.0f;
+        coeff = 0.0f;dec_x = 0.0f;dec_y = 0.0f;
     }
 
     /* 计算光流速度，此刻加入高度补偿，单位 cm/s */
     opflow_vel_x = dec_x * coeff * 50.0f;
     opflow_vel_y = dec_y * coeff * 50.0f;
 
-    /* X: 光流左正右负，acc_y 右正左负，所以预测项取负 */
-    vel_x_pred = Pos_Est_vel_x_kf - acc_y_lp * dt;
-    /* Y: 光流前正后负，acc_x 前正后负，所以预测项同号 */
-    vel_y_pred = Pos_Est_vel_y_kf + acc_x_lp * dt;
-
-    Pos_Est_vel_x_last = Pos_Est_vel_x;
-    Pos_Est_vel_y_last = Pos_Est_vel_y;
-
     /* squal 有效性门控：光流质量过低时不参与融合 */
+    uint8_t opflow_valid = (g_pmw3901_raw.squal >= 25U) && (height >= 0.2f);
+    float k_use = opflow_valid ? g_fc_params.pos_est_k_flow : 0.0f;
+
+    /* 用光流测量对惯性预测做互补校正 */
+    Pos_Est_vel_x = vel_x_pred + k_use * (opflow_vel_x - vel_x_pred);
+    Pos_Est_vel_y = vel_y_pred + k_use * (opflow_vel_y - vel_y_pred);
+
+    /* 光流失效时对融合速度施加摩擦衰减，防止加速度偏置积分漂移 */
+    if (!opflow_valid)
     {
-        uint8_t opflow_valid = (g_pmw3901_raw.squal >= 25U) && (height >= 0.2f);
-        float k_use = opflow_valid ? g_fc_params.pos_est_k_flow : 0.0f;
-
-        /* 用光流测量对惯性预测做互补校正 */
-        Pos_Est_vel_x = vel_x_pred + k_use * (opflow_vel_x - vel_x_pred);
-        Pos_Est_vel_y = vel_y_pred + k_use * (opflow_vel_y - vel_y_pred);
-
-        /* 光流失效时对融合速度施加摩擦衰减，防止加速度偏置积分漂移 */
-        if (!opflow_valid)
-        {
-            Pos_Est_vel_x *= 0.96f;
-            Pos_Est_vel_y *= 0.96f;
-        }
+        Pos_Est_vel_x *= 0.96f;
+        Pos_Est_vel_y *= 0.96f;
     }
 
-    /* 速度末端改为一阶低通，50Hz 下截止频率 10Hz */
-    Pos_Est_vel_x_kf = LPF1_Update(&s_vel_out_lp_x, Pos_Est_vel_x);
-    Pos_Est_vel_y_kf = LPF1_Update(&s_vel_out_lp_y, Pos_Est_vel_y);
+    wifi_justfloat(g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY,g_pmw3901_raw.squal,opflow_vel_x, opflow_vel_y, vel_x_pred, vel_y_pred,Pos_Est_vel_x, Pos_Est_vel_y);
+    vel_x_pred = Pos_Est_vel_x;
+    vel_y_pred = Pos_Est_vel_y;
 
-    Pos_Est_pos_x_last = Pos_Est_pos_x;
-    Pos_Est_pos_y_last = Pos_Est_pos_y;
-
-    Pos_Est_pos_x = Pos_Est_pos_x_last + 0.5f * (Pos_Est_vel_x_last + Pos_Est_vel_x) * dt;
-    Pos_Est_pos_y = Pos_Est_pos_y_last + 0.5f * (Pos_Est_vel_y_last + Pos_Est_vel_y) * dt;
-
+    
 }

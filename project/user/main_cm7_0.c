@@ -57,7 +57,7 @@ int main(void)
             {
                 div500 = 0U;
                 FC_Loop_500Hz();
-                wifi_justfloat(tick_1000us_cnt, lc302_data.flow_x_integral, lc302_data.flow_y_integral, lc302_data.integration_timespan, g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY,g_pmw3901_raw.squal);
+               // wifi_justfloat(tick_1000us_cnt, lc302_data.flow_x_integral, lc302_data.flow_y_integral, lc302_data.integration_timespan, g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY,g_pmw3901_raw.squal);
             }
 
             FC_Loop_1000Hz();

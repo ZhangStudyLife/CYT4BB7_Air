@@ -20,15 +20,7 @@ void Pos_Est_Update_50HZ(void);
 extern float opflow_vel_x;
 extern float opflow_vel_y;
 extern float Pos_Est_vel_x;
-extern float Pos_Est_vel_x_last;
 extern float Pos_Est_vel_y;
-extern float Pos_Est_vel_y_last;
-extern float Pos_Est_pos_x;
-extern float Pos_Est_pos_x_last;
-extern float Pos_Est_pos_y;
-extern float Pos_Est_pos_y_last;
-extern float Pos_Est_vel_x_kf;
-extern float Pos_Est_vel_y_kf;
 extern float acc_x_lp;
 extern float acc_y_lp;
 

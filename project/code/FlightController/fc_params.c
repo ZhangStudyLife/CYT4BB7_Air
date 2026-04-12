@@ -106,16 +106,16 @@ static void fc_params_fill_defaults(fc_params_t *params)
 
     /* ===== Roll 轴角度环参数 ===== */
     params->roll_angle_kp = 7.0f;
-    params->roll_angle_ki = 0.10f;
-    params->roll_angle_kd = 0.10f;
+    params->roll_angle_ki = 0.0f;
+    params->roll_angle_kd = 0.0f;
     params->roll_angle_kff = 0.0f;
     params->roll_angle_i_limit = 80.0f;
     params->roll_angle_d_lpf = 15.0f;
 
     /* ===== Pitch 轴角度环参数 ===== */
     params->pitch_angle_kp = 7.0f;
-    params->pitch_angle_ki = 0.10f;
-    params->pitch_angle_kd = 0.10f;
+    params->pitch_angle_ki = 0.0f;
+    params->pitch_angle_kd = 0.0f;
     params->pitch_angle_kff = 0.0f;
     params->pitch_angle_i_limit = 80.0f;
     params->pitch_angle_d_lpf = 15.0f;
@@ -182,7 +182,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode1_brake_exit_vel_cmps = 10.0f;
 
     /* ===== 位置估计参数 ===== */
-    params->pos_est_k_flow = 0.55f;
+    params->pos_est_k_flow = 0.06f;
 }
 
 /*

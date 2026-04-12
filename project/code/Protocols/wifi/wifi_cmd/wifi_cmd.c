@@ -15,16 +15,16 @@
 #include "../wifi_cal_imu/wifi_cal_imu.h"
 #include "../wifi_params/wifi_params.h"
 
-static uint8_t s_wifi_cmd_use_udp_flush = 1U;    /* 当前链路是否使用UDP立即发送命令：1=UDP，0=TCP */
-static uint8_t s_wifi_cmd_flush_pending = 0U;    /* 是否存在待触发的UDP立即发送请求：1-待触发，0-无请求 */
+static uint8 s_wifi_cmd_use_udp_flush = 1U;    /* 当前链路是否使用UDP立即发送命令：1=UDP，0=TCP */
+static uint8 s_wifi_cmd_flush_pending = 0U;    /* 是否存在待触发的UDP立即发送请求：1-待触发，0-无请求 */
 
 /* WiFi 文本接收状态 */
-static uint8_t s_wifi_cmd_ready = 0U;            /* WiFi 链路就绪标志 */
+static uint8 s_wifi_cmd_ready = 0U;            /* WiFi 链路就绪标志 */
 static char s_wifi_cmd_line[WIFI_CMD_LINE_MAX] = {0}; /* 当前接收中的文本行 */
-static uint16_t s_wifi_cmd_line_len = 0U;        /* 当前文本行长度 */
-static uint8_t s_wifi_cmd_line_overflow = 0U;    /* 当前文本行是否溢出 */
-static uint8_t s_wifi_cmd_line_invalid = 0U;     /* 当前文本行是否包含非法字符 */
-static uint8_t s_wifi_cmd_line_expect_lf = 0U;   /* 当前是否已收到 CR，等待 LF */
+static uint16 s_wifi_cmd_line_len = 0U;        /* 当前文本行长度 */
+static uint8 s_wifi_cmd_line_overflow = 0U;    /* 当前文本行是否溢出 */
+static uint8 s_wifi_cmd_line_invalid = 0U;     /* 当前文本行是否包含非法字符 */
+static uint8 s_wifi_cmd_line_expect_lf = 0U;   /* 当前是否已收到 CR，等待 LF */
 
 /*
  * 函数名: wifi_cmd_is_space_char
@@ -35,7 +35,7 @@ static uint8_t s_wifi_cmd_line_expect_lf = 0U;   /* 当前是否已收到 CR，�
  *   1 - 空白字符
  *   0 - 非空白字符
  */
-static uint8_t wifi_cmd_is_space_char(char ch)
+static uint8 wifi_cmd_is_space_char(char ch)
 {
     return ((' ' == ch) || ('\t' == ch)) ? 1U : 0U;
 }
@@ -188,7 +188,7 @@ static void wifi_cmd_feed_byte(char ch)
 
 void wifi_cmd_Init(void)
 {
-    uint8_t ret;
+    uint8 ret;
 
     s_wifi_cmd_ready = 0U;
     s_wifi_cmd_use_udp_flush = 1U;
@@ -245,18 +245,18 @@ void wifi_cmd_Poll(void)
     {
         return;
     }
-    uint8_t rx_buffer[WIFI_CMD_RX_BUFFER_SIZE];
-    uint32_t read_len;
-    uint32_t i;
+    uint8 rx_buffer[WIFI_CMD_RX_BUFFER_SIZE];
+    uint32 read_len;
+    uint32 i;
 
-    read_len = wifi_spi_read_buffer(rx_buffer, (uint32_t)sizeof(rx_buffer));
+    read_len = wifi_spi_read_buffer(rx_buffer, (uint32)sizeof(rx_buffer));
     for (i = 0U; i < read_len; i++)
     {
         wifi_cmd_feed_byte((char)rx_buffer[i]);
     }
 }
 
-uint8_t wifi_cmd_IsReady(void)
+uint8 wifi_cmd_IsReady(void)
 {
     return s_wifi_cmd_ready;
 }
@@ -266,9 +266,9 @@ uint8_t wifi_cmd_IsReady(void)
  * 输入参数：buffer-待发送数据首地址；len-待发送长度，单位字节。
  * 返回值：1-写入成功；0-写入失败。
  */
-uint8_t wifi_cmd_SendBufferNoFlush(const uint8_t *buffer, uint32_t len)
+uint8 wifi_cmd_SendBufferNoFlush(const uint8 *buffer, uint32 len)
 {
-    uint32_t remain_len;
+    uint32 remain_len;
 
     if ((NULL == buffer) || (0U == len) || (0U == s_wifi_cmd_ready))
     {
@@ -284,7 +284,7 @@ uint8_t wifi_cmd_SendBufferNoFlush(const uint8_t *buffer, uint32_t len)
  * 输入参数：无。
  * 返回值：1-触发成功；0-触发失败。
  */
-uint8_t wifi_cmd_FlushNow(void)
+uint8 wifi_cmd_FlushNow(void)
 {
     if (0U == s_wifi_cmd_ready)
     {
@@ -304,7 +304,7 @@ uint8_t wifi_cmd_FlushNow(void)
  * 输入参数：buffer-待发送数据首地址；len-待发送长度，单位字节。
  * 返回值：1-提交成功；0-提交失败。
  */
-uint8_t wifi_cmd_SendBuffer(const uint8_t *buffer, uint32_t len)
+uint8 wifi_cmd_SendBuffer(const uint8 *buffer, uint32 len)
 {
     if (0U == wifi_cmd_SendBufferNoFlush(buffer, len))
     {
@@ -320,7 +320,7 @@ uint8_t wifi_cmd_SendBuffer(const uint8_t *buffer, uint32_t len)
     return 1U;
 }
 
-uint8_t wifi_cmd_SendLine(const char *format, ...)
+uint8  wifi_cmd_SendLine(const char *format, ...)
 {
     char line[WIFI_CMD_TX_LINE_MAX];
     int write_len;
@@ -340,7 +340,7 @@ uint8_t wifi_cmd_SendLine(const char *format, ...)
         return 0U;
     }
 
-    if ((uint32_t)write_len > (sizeof(line) - 3U))
+    if ((uint32)write_len > (sizeof(line) - 3U))
     {
         write_len = (int)(sizeof(line) - 3U);
     }
@@ -349,7 +349,7 @@ uint8_t wifi_cmd_SendLine(const char *format, ...)
     line[write_len + 1] = '\n';
     line[write_len + 2] = '\0';
 
-    return wifi_cmd_SendBuffer((const uint8_t *)line, (uint32_t)(write_len + 2));
+    return wifi_cmd_SendBuffer((const uint8 *)line, (uint32)(write_len + 2));
 }
 
 int wifi_cmd_ascii_stricmp(const char *lhs, const char *rhs)
@@ -464,7 +464,7 @@ char *wifi_cmd_next_token(char **cursor)
     return token;
 }
 
-uint8_t wifi_cmd_is_help_flag(const char *text)
+uint8 wifi_cmd_is_help_flag(const char *text)
 {
     if (NULL == text)
     {

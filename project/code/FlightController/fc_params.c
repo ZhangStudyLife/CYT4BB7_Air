@@ -17,10 +17,10 @@
 /* 飞控参数 Flash 数据块：保存头信息和完整参数结构体 */
 typedef struct
 {
-    uint32_t magic;      /* 魔数 */
-    uint16_t version;    /* 参数版本 */
-    uint16_t size;       /* 参数结构体大小 */
-    uint32_t checksum;   /* 参数校验值 */
+    uint32 magic;      /* 魔数 */
+    uint16 version;    /* 参数版本 */
+    uint16 size;       /* 参数结构体大小 */
+    uint32 checksum;   /* 参数校验值 */
     fc_params_t params;  /* 参数内容 */
 } fc_params_flash_blob_t;
 
@@ -36,15 +36,15 @@ fc_params_t g_fc_params;
  * 返回值:
  *   32 位校验值
  */
-static uint32_t fc_params_checksum_calc(const void *data, uint32_t size)
+static uint32 fc_params_checksum_calc(const void *data, uint32 size)
 {
-    const uint8_t *bytes = (const uint8_t *)data;
-    uint32_t hash = 2166136261UL;
-    uint32_t i;
+    const uint8 *bytes = (const uint8 *)data;
+    uint32 hash = 2166136261UL;
+    uint32 i;
 
     for (i = 0U; i < size; i++)
     {
-        hash ^= (uint32_t)bytes[i];
+        hash ^= (uint32)bytes[i];
         hash *= 16777619UL;
     }
 
@@ -77,7 +77,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
 
     /* ===== 油门与机械配平参数 ===== */
     params->base_throttle = 3150;         /* 悬停油门 */
-    params->roll_mech_trim_deg = 2.0f;   /* Roll 机械配平角 */
+    params->roll_mech_trim_deg = 1.0f;   /* Roll 机械配平角 */
     params->pitch_mech_trim_deg = -1.52f; /* Pitch 机械配平角 */
 
     /* ===== Roll 轴角速度环参数 ===== */
@@ -193,9 +193,9 @@ static void fc_params_fill_defaults(fc_params_t *params)
  * 返回值:
  *   1=合法，0=非法
  */
-static uint8_t fc_params_blob_is_valid(const fc_params_flash_blob_t *blob)
+static uint8 fc_params_blob_is_valid(const fc_params_flash_blob_t *blob)
 {
-    uint32_t checksum;
+    uint32 checksum;
 
     if (NULL == blob)
     {
@@ -212,12 +212,12 @@ static uint8_t fc_params_blob_is_valid(const fc_params_flash_blob_t *blob)
         return 0U;
     }
 
-    if (blob->size != (uint16_t)sizeof(fc_params_t))
+    if (blob->size != (uint16)sizeof(fc_params_t))
     {
         return 0U;
     }
 
-    checksum = fc_params_checksum_calc(&blob->params, (uint32_t)sizeof(blob->params));
+    checksum = fc_params_checksum_calc(&blob->params, (uint32)sizeof(blob->params));
     return (checksum == blob->checksum) ? 1U : 0U;
 }
 
@@ -238,15 +238,15 @@ void FC_Params_Init(void)
  * 输入参数: 无
  * 返回值: 1=加载成功，0=加载失败
  */
-uint8_t FC_Params_LoadFromFlash(void)
+uint8 FC_Params_LoadFromFlash(void)
 {
     fc_params_flash_blob_t blob;
-    uint32_t words;
+    uint32 words;
 
     flash_init();
 
-    words = (uint32_t)((sizeof(blob) + sizeof(uint32_t) - 1U) / sizeof(uint32_t));
-    flash_read_page(0U, FC_PARAMS_FLASH_PAGE, (uint32_t *)&blob, words);
+    words = (uint32)((sizeof(blob) + sizeof(uint32) - 1U) / sizeof(uint32));
+    flash_read_page(0U, FC_PARAMS_FLASH_PAGE, (uint32 *)&blob, words);
     if (0U == fc_params_blob_is_valid(&blob))
     {
         return 0U;
@@ -262,22 +262,22 @@ uint8_t FC_Params_LoadFromFlash(void)
  * 输入参数: 无
  * 返回值: 1=保存成功，0=保存失败
  */
-uint8_t FC_Params_SaveToFlash(void)
+uint8 FC_Params_SaveToFlash(void)
 {
     fc_params_flash_blob_t blob;
-    uint32_t words;
+    uint32 words;
 
     flash_init();
 
     memset(&blob, 0, sizeof(blob));
     blob.magic = FC_PARAMS_FLASH_MAGIC;
     blob.version = FC_PARAMS_FLASH_VERSION;
-    blob.size = (uint16_t)sizeof(fc_params_t);
+    blob.size = (uint16)sizeof(fc_params_t);
     memcpy(&blob.params, &g_fc_params, sizeof(blob.params));
-    blob.checksum = fc_params_checksum_calc(&blob.params, (uint32_t)sizeof(blob.params));
+    blob.checksum = fc_params_checksum_calc(&blob.params, (uint32)sizeof(blob.params));
 
-    words = (uint32_t)((sizeof(blob) + sizeof(uint32_t) - 1U) / sizeof(uint32_t));
-    flash_write_page(0U, FC_PARAMS_FLASH_PAGE, (const uint32_t *)&blob, words);
+    words = (uint32)((sizeof(blob) + sizeof(uint32) - 1U) / sizeof(uint32));
+    flash_write_page(0U, FC_PARAMS_FLASH_PAGE, (const uint32 *)&blob, words);
 
     return FC_Params_LoadFromFlash();
 }
@@ -288,7 +288,7 @@ uint8_t FC_Params_SaveToFlash(void)
  * 输入参数: 无
  * 返回值: 1=擦除成功，0=擦除失败
  */
-uint8_t FC_Params_ClearFlash(void)
+uint8 FC_Params_ClearFlash(void)
 {
     flash_init();
     flash_erase_page(0U, FC_PARAMS_FLASH_PAGE);

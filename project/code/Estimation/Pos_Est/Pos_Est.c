@@ -150,7 +150,7 @@ void Pos_Est_Update_50HZ(void)
     opflow_vel_y = dec_y * coeff * 50.0f;
 
     /* squal 有效性门控：光流质量过低时不参与融合 */
-    uint8_t opflow_valid = (g_pmw3901_raw.squal >= 25U) && (height >= 0.2f);
+    uint8 opflow_valid = (g_pmw3901_raw.squal >= 25U) && (height >= 0.2f);
     float k_use = opflow_valid ? g_fc_params.pos_est_k_flow : 0.0f;
 
     /* 用光流测量对惯性预测做互补校正 */
@@ -164,9 +164,9 @@ void Pos_Est_Update_50HZ(void)
         Pos_Est_vel_y *= 0.96f;
     }
 
-    wifi_justfloat(g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY,g_pmw3901_raw.squal,opflow_vel_x, opflow_vel_y, vel_x_pred, vel_y_pred,Pos_Est_vel_x, Pos_Est_vel_y);
+    wifi_justfloat(g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY,g_pmw3901_raw.squal,opflow_vel_x, opflow_vel_y, vel_x_pred, vel_y_pred,Pos_Est_vel_x, Pos_Est_vel_y,acc_x_lp, acc_y_lp);
     vel_x_pred = Pos_Est_vel_x;
     vel_y_pred = Pos_Est_vel_y;
 
     
-}
+}                  

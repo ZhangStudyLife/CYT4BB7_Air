@@ -6,6 +6,11 @@
 #include "../../HW_Drivers/VL53L1X/VL53L1X.h"
 #include "zf_common_headfile.h"
 
+#define TOF_MEASURE_CLASS_NONE          (0U)
+#define TOF_MEASURE_CLASS_2CH           (2U)
+#define TOF_MEASURE_CLASS_3CH           (3U)
+#define TOF_MEASURE_CLASS_4CH           (4U)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -38,6 +43,10 @@ extern uint8 g_tof3_used_in_fusion;
 extern uint8 g_tof_fused_source;
 /* 校准通过标志：1=通道间偏差在允许范围内，0=校准失败或偏差过大 */
 extern uint8 g_tof_calibration_ok;
+extern float g_tof_fused_vz_mps;
+extern uint16 g_tof_measure_height_mm;
+extern uint8 g_tof_measure_class;
+extern uint8 g_tof_measure_mask;
 extern uint16 g_tof_shadow_height_mm;
 extern float g_tof_shadow_vz_mps;
 extern uint8 g_tof_shadow_valid;

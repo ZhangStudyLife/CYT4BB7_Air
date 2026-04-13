@@ -71,6 +71,19 @@
 #define TOF_SHADOW_P0_H_MM2              (400.0f)
 #define TOF_SHADOW_P0_V_MM2PS2           (40000.0f)
 #define TOF_SHADOW_Q_ACC_MM2PS4          (360000.0f)
+#define TOF_FUSED_TIMEOUT_FRAMES         (20U)
+#define TOF_FUSED_R_4CH_MM2              (144.0f)
+#define TOF_FUSED_R_3CH_MM2              (400.0f)
+#define TOF_FUSED_R_2CH_MM2              (1296.0f)
+#define TOF_FUSED_P0_H_MM2               (400.0f)
+#define TOF_FUSED_P0_V_MM2PS2            (40000.0f)
+#define TOF_FUSED_Q_ACC_MM2PS4           (800000.0f)
+#define TOF_FUSED_4CH_SPREAD_MM          (35U)
+#define TOF_FUSED_3CH_SPREAD_MM          (30U)
+#define TOF_FUSED_2CH_SPREAD_MM          (25U)
+#define TOF_FUSED_STICK_FRAMES           (6U)
+#define TOF_FUSED_STICK_SPREAD_MM        (8U)
+#define TOF_FUSED_STICK_PRED_MM          (15.0f)
 
 /* ==================== 融合来源标识宏 ==================== */
 
@@ -136,6 +149,28 @@ typedef struct
     float p11;
 } TOFShadowState_t;
 
+typedef struct
+{
+    uint8 valid;
+    uint8 mask;
+    uint8 count;
+    uint16 measure_mm;
+    uint16 spread_mm;
+    float pred_err_mm;
+    float measure_var_mm2;
+} TOFFusedCandidate_t;
+
+typedef struct
+{
+    uint8 seeded;
+    float height_mm;
+    float vz_mmps;
+    float p00;
+    float p01;
+    float p10;
+    float p11;
+} TOFFusedState_t;
+
 /* ==================== 机臂几何参数（Mark5 Pro，Quad-X布局） ==================== */
 /*
  * 各TOF在机体坐标系中的位置（x=前方向正，y=右方向正），单位：mm。
@@ -187,6 +222,10 @@ uint8 g_tof3_used_in_fusion = 0U;
 uint8 g_tof_fused_source = TOF_SRC_NONE;
 /* 校准通过标志：1=各通道偏差在允许范围内，0=校准失败 */
 uint8 g_tof_calibration_ok = 0U;
+float g_tof_fused_vz_mps = 0.0f;
+uint16 g_tof_measure_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
+uint8 g_tof_measure_class = TOF_MEASURE_CLASS_NONE;
+uint8 g_tof_measure_mask = 0U;
 uint16 g_tof_shadow_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
 float g_tof_shadow_vz_mps = 0.0f;
 uint8 g_tof_shadow_valid = 0U;
@@ -203,6 +242,11 @@ static TOFChannelState_t s_tof_state[VL53L1X_CHANNEL_COUNT] = {{0}};
 static float s_attitude_pitch_bias_deg = 0.0f;
 static float s_attitude_roll_bias_deg  = 0.0f;
 /* 融合失效保持计数（最多保持TOF_FUSED_HOLD_FRAMES帧后输出无效） */
+static TOFFusedState_t s_tof_fused_state = {0};
+static uint8 s_tof_fused_miss_count = 0U;
+static uint8 s_tof_fused_last_measure_mask = 0U;
+static uint8 s_tof_fused_pending_mask = 0U;
+static uint8 s_tof_fused_pending_count = 0U;
 static uint8 s_fused_invalid_hold_count = 0U;
 static Kalman1D_t s_tof_fused_kf = {0};
 static int16 s_tof_shadow_offset_mm[VL53L1X_CHANNEL_COUNT] = {0};
@@ -315,7 +359,22 @@ static void TOF_ResetFusionState(void)
     g_tof2_used_in_fusion = 0U;
     g_tof3_used_in_fusion = 0U;
     g_tof_fused_source = TOF_SRC_NONE;
+    g_tof_fused_vz_mps = 0.0f;
+    g_tof_measure_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
+    g_tof_measure_class = TOF_MEASURE_CLASS_NONE;
+    g_tof_measure_mask = 0U;
 
+    s_tof_fused_state.seeded = 0U;
+    s_tof_fused_state.height_mm = 0.0f;
+    s_tof_fused_state.vz_mmps = 0.0f;
+    s_tof_fused_state.p00 = TOF_FUSED_P0_H_MM2;
+    s_tof_fused_state.p01 = 0.0f;
+    s_tof_fused_state.p10 = 0.0f;
+    s_tof_fused_state.p11 = TOF_FUSED_P0_V_MM2PS2;
+    s_tof_fused_miss_count = 0U;
+    s_tof_fused_last_measure_mask = 0U;
+    s_tof_fused_pending_mask = 0U;
+    s_tof_fused_pending_count = 0U;
     s_fused_invalid_hold_count = 0U;
     Kalman1D_Init(&s_tof_fused_kf,
                   TOF_FUSED_KF_Q_MM2,
@@ -331,6 +390,339 @@ static void TOF_ResetFusionState(void)
  *   TOFAttitudeTerms_t，包含 cos_term、sin_pitch、sin_roll 和有效标志。
  */
 static void TOF_Sort4(uint16 *vals, uint8 n);
+static float TOF_ClampF(float value, float min_value, float max_value);
+
+static uint8 TOF_IsDiagonalMask(uint8 mask)
+{
+    if ((0x09U == mask) || (0x06U == mask))
+    {
+        return 1U;
+    }
+    return 0U;
+}
+
+static float TOF_FusedBaseVariance(uint8 count)
+{
+    if (TOF_MEASURE_CLASS_4CH == count)
+    {
+        return TOF_FUSED_R_4CH_MM2;
+    }
+    if (TOF_MEASURE_CLASS_3CH == count)
+    {
+        return TOF_FUSED_R_3CH_MM2;
+    }
+    return TOF_FUSED_R_2CH_MM2;
+}
+
+static void TOF_FusedSeed(float height_mm)
+{
+    s_tof_fused_state.seeded = 1U;
+    s_tof_fused_state.height_mm = height_mm;
+    s_tof_fused_state.vz_mmps = 0.0f;
+    s_tof_fused_state.p00 = TOF_FUSED_P0_H_MM2;
+    s_tof_fused_state.p01 = 0.0f;
+    s_tof_fused_state.p10 = 0.0f;
+    s_tof_fused_state.p11 = TOF_FUSED_P0_V_MM2PS2;
+    s_tof_fused_miss_count = 0U;
+}
+
+static void TOF_FusedPredict(float dt_s)
+{
+    float dt2;
+    float dt3;
+    float dt4;
+    float p00;
+    float p01;
+    float p10;
+    float p11;
+
+    if (0U == s_tof_fused_state.seeded)
+    {
+        return;
+    }
+
+    dt_s = TOF_ClampF(dt_s, 0.001f, 0.05f);
+    dt2 = dt_s * dt_s;
+    dt3 = dt2 * dt_s;
+    dt4 = dt2 * dt2;
+
+    s_tof_fused_state.height_mm += s_tof_fused_state.vz_mmps * dt_s;
+
+    p00 = s_tof_fused_state.p00;
+    p01 = s_tof_fused_state.p01;
+    p10 = s_tof_fused_state.p10;
+    p11 = s_tof_fused_state.p11;
+
+    s_tof_fused_state.p00 = p00 + dt_s * (p10 + p01) + dt2 * p11 + 0.25f * dt4 * TOF_FUSED_Q_ACC_MM2PS4;
+    s_tof_fused_state.p01 = p01 + dt_s * p11 + 0.5f * dt3 * TOF_FUSED_Q_ACC_MM2PS4;
+    s_tof_fused_state.p10 = p10 + dt_s * p11 + 0.5f * dt3 * TOF_FUSED_Q_ACC_MM2PS4;
+    s_tof_fused_state.p11 = p11 + dt2 * TOF_FUSED_Q_ACC_MM2PS4;
+}
+
+static void TOF_FusedCorrect(float measure_mm, float measure_var_mm2)
+{
+    float innov;
+    float s;
+    float k0;
+    float k1;
+    float p00;
+    float p01;
+    float p10;
+    float p11;
+
+    if (0U == s_tof_fused_state.seeded)
+    {
+        return;
+    }
+
+    measure_var_mm2 = TOF_ClampF(measure_var_mm2, 1.0f, 40000.0f);
+
+    p00 = s_tof_fused_state.p00;
+    p01 = s_tof_fused_state.p01;
+    p10 = s_tof_fused_state.p10;
+    p11 = s_tof_fused_state.p11;
+
+    innov = measure_mm - s_tof_fused_state.height_mm;
+    s = p00 + measure_var_mm2;
+    if (s < 1.0f)
+    {
+        s = 1.0f;
+    }
+
+    k0 = p00 / s;
+    k1 = p10 / s;
+
+    s_tof_fused_state.height_mm += k0 * innov;
+    s_tof_fused_state.vz_mmps += k1 * innov;
+    s_tof_fused_state.p00 = (1.0f - k0) * p00;
+    s_tof_fused_state.p01 = (1.0f - k0) * p01;
+    s_tof_fused_state.p10 = p10 - k1 * p00;
+    s_tof_fused_state.p11 = p11 - k1 * p01;
+}
+
+static uint8 TOF_FusedBuildCandidate(const uint8 *ch_valid,
+                                     const uint16 *ch_center_mm,
+                                     uint8 mask,
+                                     TOFFusedCandidate_t *candidate)
+{
+    uint8 ch;
+    uint8 count;
+    uint16 sorted[VL53L1X_CHANNEL_COUNT];
+    uint32 sum_mm;
+    uint16 spread_limit_mm;
+
+    if ((0 == ch_valid) || (0 == ch_center_mm) || (0 == candidate))
+    {
+        return 0U;
+    }
+
+    candidate->valid = 0U;
+    candidate->mask = mask;
+    candidate->count = 0U;
+    candidate->measure_mm = 0U;
+    candidate->spread_mm = 0U;
+    candidate->pred_err_mm = 0.0f;
+    candidate->measure_var_mm2 = 0.0f;
+
+    count = 0U;
+    sum_mm = 0U;
+    for (ch = 0U; ch < VL53L1X_CHANNEL_COUNT; ch++)
+    {
+        if (0U == (mask & (uint8)(1U << ch)))
+        {
+            continue;
+        }
+
+        if (0U == ch_valid[ch])
+        {
+            return 0U;
+        }
+
+        sorted[count] = ch_center_mm[ch];
+        sum_mm += (uint32)ch_center_mm[ch];
+        count++;
+    }
+
+    if (TOF_MEASURE_CLASS_4CH == count)
+    {
+        spread_limit_mm = TOF_FUSED_4CH_SPREAD_MM;
+    }
+    else if (TOF_MEASURE_CLASS_3CH == count)
+    {
+        spread_limit_mm = TOF_FUSED_3CH_SPREAD_MM;
+    }
+    else if ((TOF_MEASURE_CLASS_2CH == count) && (0U != TOF_IsDiagonalMask(mask)))
+    {
+        spread_limit_mm = TOF_FUSED_2CH_SPREAD_MM;
+    }
+    else
+    {
+        return 0U;
+    }
+
+    TOF_Sort4(sorted, count);
+    candidate->spread_mm = (uint16)(sorted[count - 1U] - sorted[0]);
+    if (candidate->spread_mm > spread_limit_mm)
+    {
+        return 0U;
+    }
+
+    candidate->valid = 1U;
+    candidate->count = count;
+    candidate->measure_mm = (uint16)(sum_mm / (uint32)count);
+    if (0U != s_tof_fused_state.seeded)
+    {
+        candidate->pred_err_mm = fabsf((float)candidate->measure_mm - s_tof_fused_state.height_mm);
+    }
+    candidate->measure_var_mm2 = TOF_FusedBaseVariance(count) + 0.25f * (float)candidate->spread_mm * (float)candidate->spread_mm;
+    return 1U;
+}
+
+static uint8 TOF_FusedCandidateBetter(const TOFFusedCandidate_t *lhs,
+                                      const TOFFusedCandidate_t *rhs)
+{
+    if ((0 == lhs) || (0 == rhs))
+    {
+        return 0U;
+    }
+
+    if (0U == rhs->valid)
+    {
+        return lhs->valid;
+    }
+    if (0U == lhs->valid)
+    {
+        return 0U;
+    }
+    if (lhs->count != rhs->count)
+    {
+        return (lhs->count > rhs->count);
+    }
+    if (lhs->spread_mm != rhs->spread_mm)
+    {
+        return (lhs->spread_mm < rhs->spread_mm);
+    }
+    if (fabsf(lhs->pred_err_mm - rhs->pred_err_mm) > 0.5f)
+    {
+        return (lhs->pred_err_mm < rhs->pred_err_mm);
+    }
+    return (lhs->mask < rhs->mask);
+}
+
+static uint8 TOF_FusedCandidatesClose(const TOFFusedCandidate_t *best,
+                                      const TOFFusedCandidate_t *prev)
+{
+    if ((0 == best) || (0 == prev))
+    {
+        return 0U;
+    }
+    if ((0U == best->valid) || (0U == prev->valid))
+    {
+        return 0U;
+    }
+    if (best->count != prev->count)
+    {
+        return 0U;
+    }
+    if (TOF_AbsDiffU16(best->spread_mm, prev->spread_mm) > TOF_FUSED_STICK_SPREAD_MM)
+    {
+        return 0U;
+    }
+    if (fabsf(best->pred_err_mm - prev->pred_err_mm) > TOF_FUSED_STICK_PRED_MM)
+    {
+        return 0U;
+    }
+    return 1U;
+}
+
+static uint8 TOF_FusedSelectCandidate(const uint8 *ch_valid,
+                                      const uint16 *ch_center_mm,
+                                      TOFFusedCandidate_t *selected)
+{
+    static const uint8 s_candidate_masks[] = {0x0FU, 0x0EU, 0x0DU, 0x0BU, 0x07U, 0x09U, 0x06U};
+    TOFFusedCandidate_t candidates[7];
+    uint8 valid_count;
+    uint8 i;
+    int16 best_idx;
+    int16 prev_idx;
+    int16 chosen_idx;
+
+    if ((0 == ch_valid) || (0 == ch_center_mm) || (0 == selected))
+    {
+        return 0U;
+    }
+
+    valid_count = 0U;
+    for (i = 0U; i < (uint8)(sizeof(s_candidate_masks) / sizeof(s_candidate_masks[0])); i++)
+    {
+        if (0U != TOF_FusedBuildCandidate(ch_valid, ch_center_mm, s_candidate_masks[i], &candidates[valid_count]))
+        {
+            valid_count++;
+        }
+    }
+
+    if (0U == valid_count)
+    {
+        return 0U;
+    }
+
+    best_idx = 0;
+    for (i = 1U; i < valid_count; i++)
+    {
+        if (0U != TOF_FusedCandidateBetter(&candidates[i], &candidates[best_idx]))
+        {
+            best_idx = (int16)i;
+        }
+    }
+
+    prev_idx = -1;
+    for (i = 0U; i < valid_count; i++)
+    {
+        if (candidates[i].mask == s_tof_fused_last_measure_mask)
+        {
+            prev_idx = (int16)i;
+            break;
+        }
+    }
+
+    chosen_idx = best_idx;
+    if ((prev_idx >= 0) &&
+        (candidates[best_idx].mask != candidates[prev_idx].mask) &&
+        (0U != TOF_FusedCandidatesClose(&candidates[best_idx], &candidates[prev_idx])))
+    {
+        if (s_tof_fused_pending_mask == candidates[best_idx].mask)
+        {
+            if (s_tof_fused_pending_count < 255U)
+            {
+                s_tof_fused_pending_count++;
+            }
+        }
+        else
+        {
+            s_tof_fused_pending_mask = candidates[best_idx].mask;
+            s_tof_fused_pending_count = 1U;
+        }
+
+        if (s_tof_fused_pending_count < TOF_FUSED_STICK_FRAMES)
+        {
+            chosen_idx = prev_idx;
+        }
+        else
+        {
+            s_tof_fused_pending_mask = 0U;
+            s_tof_fused_pending_count = 0U;
+        }
+    }
+    else
+    {
+        s_tof_fused_pending_mask = 0U;
+        s_tof_fused_pending_count = 0U;
+    }
+
+    *selected = candidates[chosen_idx];
+    s_tof_fused_last_measure_mask = selected->mask;
+    return 1U;
+}
 
 static void TOF_SeedFusionKalman(uint16 seed_mm)
 {
@@ -339,8 +731,6 @@ static void TOF_SeedFusionKalman(uint16 seed_mm)
                   TOF_FUSED_KF_R_MM2,
                   TOF_FUSED_KF_P0_MM2,
                   (float)seed_mm);
-    g_tof_fused_height_mm = seed_mm;
-    g_tof_fused_valid = 1U;
 }
 
 static uint8 TOF_BuildFusionMeasurement(const uint8 *ch_fusion_valid,
@@ -348,55 +738,17 @@ static uint8 TOF_BuildFusionMeasurement(const uint8 *ch_fusion_valid,
                                         uint16 *measure_mm,
                                         uint8 *source)
 {
-    uint8 ch;
-    uint8 count = 0U;
-    uint8 first_ch = 0U;
-    uint16 sorted[VL53L1X_CHANNEL_COUNT];
-
-    for (ch = 0U; ch < VL53L1X_CHANNEL_COUNT; ch++)
-    {
-        if (0U != ch_fusion_valid[ch])
-        {
-            if (0U == count)
-            {
-                first_ch = ch;
-            }
-            sorted[count] = ch_center_mm[ch];
-            count++;
-        }
-    }
-
-    if (0U == count)
+    (void)ch_fusion_valid;
+    (void)ch_center_mm;
+    if (0 != measure_mm)
     {
         *measure_mm = 0U;
+    }
+    if (0 != source)
+    {
         *source = TOF_SRC_NONE;
-        return 0U;
     }
-
-    if (1U == count)
-    {
-        *measure_mm = sorted[0];
-        *source = (uint8)(TOF_SRC_CH1 + first_ch);
-        return count;
-    }
-
-    TOF_Sort4(sorted, count);
-    *source = TOF_SRC_MULTI;
-
-    if (2U == count)
-    {
-        *measure_mm = (uint16)(((uint32)sorted[0] + (uint32)sorted[1]) / 2U);
-    }
-    else if (3U == count)
-    {
-        *measure_mm = sorted[1];
-    }
-    else
-    {
-        *measure_mm = (uint16)(((uint32)sorted[1] + (uint32)sorted[2]) / 2U);
-    }
-
-    return count;
+    return 0U;
 }
 
 static TOFAttitudeTerms_t TOF_ComputeAttitudeTerms(void)
@@ -880,6 +1232,201 @@ static uint8 TOF_ShadowBuildMeasurement(const uint8 *ch_valid,
     return 0U;
 }
 
+static void TOF_Update_Robust(void)
+{
+    uint8 ch;
+    uint8 raw_valid;
+    uint8 ch_raw_valid[VL53L1X_CHANNEL_COUNT];
+    uint16 ch_center_mm[VL53L1X_CHANNEL_COUNT];
+    uint8 ch_fusion_valid[VL53L1X_CHANNEL_COUNT];
+    uint16 display_mm[VL53L1X_CHANNEL_COUNT];
+    TOFFusedCandidate_t selected;
+    const float dt_s = 0.01f;
+    TOFAttitudeTerms_t att;
+    VL53L1X_data_struct data;
+
+    if (0U == s_tof_inited)
+    {
+        g_tof1_valid = 0U;
+        g_tof2_valid = 0U;
+        g_tof3_valid = 0U;
+        g_tof4_valid = 0U;
+        g_tof_fused_valid = 0U;
+        g_tof_fused_vz_mps = 0.0f;
+        g_tof_fused_source = TOF_SRC_NONE;
+        g_tof_measure_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
+        g_tof_measure_class = TOF_MEASURE_CLASS_NONE;
+        g_tof_measure_mask = 0U;
+        return;
+    }
+
+    att = TOF_ComputeAttitudeTerms();
+    (void)VL53L1X_read_data(&data);
+
+    for (ch = 0U; ch < VL53L1X_CHANNEL_COUNT; ch++)
+    {
+        raw_valid = TOF_IsRawMeasurementValid(data.distance_mm[ch],
+                                              data.range_status[ch],
+                                              g_vl53l1x_diag[ch].ready,
+                                              g_vl53l1x_diag[ch].is_fresh);
+        ch_raw_valid[ch] = raw_valid;
+        ch_fusion_valid[ch] = 0U;
+        ch_center_mm[ch] = VL53L1X_INVALID_DISTANCE_MM;
+        display_mm[ch] = VL53L1X_INVALID_DISTANCE_MM;
+
+        if ((0U != raw_valid) && (0U != att.valid))
+        {
+            uint16 center_mm;
+            uint16 corrected_mm;
+            uint16 delta;
+
+            center_mm = TOF_EstimateCenterHeight(data.distance_mm[ch], &att, ch);
+            corrected_mm = TOF_ApplyOffsetClamp(center_mm, s_tof_offset_mm[ch]);
+
+            ch_center_mm[ch] = corrected_mm;
+            display_mm[ch] = corrected_mm;
+
+            if ((0U != s_tof_state[ch].has_last_mm) &&
+                (corrected_mm == s_tof_state[ch].last_mm))
+            {
+                if (s_tof_state[ch].same_value_streak < 65535U)
+                {
+                    s_tof_state[ch].same_value_streak++;
+                }
+            }
+            else
+            {
+                s_tof_state[ch].same_value_streak = 0U;
+            }
+
+            if (0U != s_tof_state[ch].has_last_mm)
+            {
+                delta = TOF_AbsDiffU16(corrected_mm, s_tof_state[ch].last_mm);
+                if (delta > TOF_SPIKE_GATE_MM)
+                {
+                    s_tof_state[ch].last_mm = corrected_mm;
+                    s_tof_state[ch].fresh_now = g_vl53l1x_diag[ch].is_fresh;
+                    s_tof_state[ch].invalid_streak = 0U;
+
+                    if (s_tof_state[ch].spike_count < TOF_SPIKE_PERSIST_FRAMES)
+                    {
+                        s_tof_state[ch].spike_count++;
+                        continue;
+                    }
+
+                    s_tof_state[ch].spike_count = 0U;
+                    s_tof_state[ch].has_last_mm = 1U;
+                    ch_fusion_valid[ch] = 1U;
+                    continue;
+                }
+
+                s_tof_state[ch].spike_count = 0U;
+            }
+            else
+            {
+                s_tof_state[ch].spike_count = 0U;
+            }
+
+            s_tof_state[ch].last_mm = corrected_mm;
+            s_tof_state[ch].has_last_mm = 1U;
+            s_tof_state[ch].fresh_now = g_vl53l1x_diag[ch].is_fresh;
+            s_tof_state[ch].invalid_streak = 0U;
+            ch_fusion_valid[ch] = 1U;
+        }
+        else
+        {
+            if (s_tof_state[ch].invalid_streak < 65535U)
+            {
+                s_tof_state[ch].invalid_streak++;
+            }
+            s_tof_state[ch].fresh_now = 0U;
+            s_tof_state[ch].same_value_streak = 0U;
+            s_tof_state[ch].spike_count = 0U;
+
+            if (0U != s_tof_state[ch].has_last_mm)
+            {
+                display_mm[ch] = s_tof_state[ch].last_mm;
+            }
+        }
+    }
+
+    g_tof1_height_mm = display_mm[0];
+    g_tof2_height_mm = display_mm[1];
+    g_tof3_height_mm = display_mm[2];
+    g_tof4_height_mm = display_mm[3];
+    g_tof1_valid = ch_raw_valid[0];
+    g_tof2_valid = ch_raw_valid[1];
+    g_tof3_valid = ch_raw_valid[2];
+    g_tof4_valid = ch_raw_valid[3];
+
+    TOF_FusedPredict(dt_s);
+
+    g_tof_measure_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
+    g_tof_measure_class = TOF_MEASURE_CLASS_NONE;
+    g_tof_measure_mask = 0U;
+    g_tof_fused_source = TOF_SRC_NONE;
+    g_tof2_used_in_fusion = 0U;
+    g_tof3_used_in_fusion = 0U;
+
+    if ((0U != att.valid) &&
+        (0U != TOF_FusedSelectCandidate(ch_fusion_valid, ch_center_mm, &selected)))
+    {
+        g_tof_measure_height_mm = selected.measure_mm;
+        g_tof_measure_class = selected.count;
+        g_tof_measure_mask = selected.mask;
+        g_tof2_used_in_fusion = (0U != (selected.mask & (1U << 1))) ? 1U : 0U;
+        g_tof3_used_in_fusion = (0U != (selected.mask & (1U << 2))) ? 1U : 0U;
+
+        if (0U == s_tof_fused_state.seeded)
+        {
+            TOF_FusedSeed((float)selected.measure_mm);
+        }
+        else
+        {
+            TOF_FusedCorrect((float)selected.measure_mm, selected.measure_var_mm2);
+        }
+
+        s_tof_fused_miss_count = 0U;
+        g_tof_fused_valid = 1U;
+        g_tof_fused_source = TOF_SRC_MULTI;
+    }
+    else if (0U != s_tof_fused_state.seeded)
+    {
+        if (s_tof_fused_miss_count < 255U)
+        {
+            s_tof_fused_miss_count++;
+        }
+
+        if (s_tof_fused_miss_count > TOF_FUSED_TIMEOUT_FRAMES)
+        {
+            s_tof_fused_state.seeded = 0U;
+            s_tof_fused_state.vz_mmps = 0.0f;
+            g_tof_fused_valid = 0U;
+            g_tof_fused_vz_mps = 0.0f;
+            s_tof_fused_last_measure_mask = 0U;
+            s_tof_fused_pending_mask = 0U;
+            s_tof_fused_pending_count = 0U;
+        }
+        else
+        {
+            g_tof_fused_valid = 1U;
+        }
+    }
+    else
+    {
+        g_tof_fused_valid = 0U;
+        g_tof_fused_vz_mps = 0.0f;
+    }
+
+    if (0U != s_tof_fused_state.seeded)
+    {
+        s_tof_fused_state.height_mm = TOF_ClampF(s_tof_fused_state.height_mm, 0.0f, 65535.0f);
+        s_tof_fused_state.vz_mmps = TOF_ClampF(s_tof_fused_state.vz_mmps, -3000.0f, 3000.0f);
+        g_tof_fused_height_mm = (uint16)(s_tof_fused_state.height_mm + 0.5f);
+        g_tof_fused_vz_mps = 0.001f * s_tof_fused_state.vz_mmps;
+    }
+}
+
 void TOF_Init(void)
 {
     uint8 ch;
@@ -1065,23 +1612,14 @@ void TOF_Calibrate(void)
  */
 void TOF_Update(void)
 {
-    uint8 ch;
-    uint8 raw_valid;
-    uint8 ch_raw_valid[VL53L1X_CHANNEL_COUNT];
+#if 0
     uint16 ch_center_mm[VL53L1X_CHANNEL_COUNT];   /* 几何修正+零偏后的中心高度估计 */
     uint8  ch_fusion_valid[VL53L1X_CHANNEL_COUNT]; /* 通过突变检测后可参与融合的标志 */
     uint8  in_fusion[VL53L1X_CHANNEL_COUNT];       /* 通过异常值剔除后的最终融合标志 */
     uint16 display_mm[VL53L1X_CHANNEL_COUNT];      /* 各通道显示值（保持或实测） */
-    uint16 sorted[VL53L1X_CHANNEL_COUNT];
-    uint8  candidate_count;
-    uint8  sorted_count;
-    uint16 median_val;
-    uint32 sum_fused;
-    uint8  final_count;
-    uint8  source;
-    uint16 source_mm;
-    TOFAttitudeTerms_t att;
-    VL53L1X_data_struct data;
+#endif
+    TOF_Update_Robust();
+#if 0
 
     if (0U == s_tof_inited)
     {
@@ -1090,7 +1628,11 @@ void TOF_Update(void)
         g_tof3_valid = 0U;
         g_tof4_valid = 0U;
         g_tof_fused_valid = 0U;
+        g_tof_fused_vz_mps = 0.0f;
         g_tof_fused_source = TOF_SRC_NONE;
+        g_tof_measure_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
+        g_tof_measure_class = TOF_MEASURE_CLASS_NONE;
+        g_tof_measure_mask = 0U;
         return;
     }
 
@@ -1214,10 +1756,10 @@ void TOF_Update(void)
     g_tof4_valid = ch_raw_valid[3];
 
     /* ---- 步骤2.5：大倾角保护 ---- */
-    if (0U == att.valid)
+    TOF_FusedPredict(dt_s);
     {
         /* 飞机倾角过大，TOF数据不可信，短时保持融合值 */
-        if (s_fused_invalid_hold_count < TOF_FUSED_HOLD_FRAMES)
+        if (0U != att.valid)
         {
             s_fused_invalid_hold_count++;
         }
@@ -1390,6 +1932,7 @@ void TOF_Update(void)
     /* 向后兼容：更新通道2/3使用标志 */
     g_tof2_used_in_fusion = (candidate_count > 0U) ? ch_fusion_valid[1] : 0U;
     g_tof3_used_in_fusion = (candidate_count > 0U) ? ch_fusion_valid[2] : 0U;
+#endif
 
 }
 

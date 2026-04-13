@@ -297,7 +297,7 @@ void FC_Loop_50Hz(void)
         dt = 0.02f;
     }
 
-    if (fc_state == FC_START_CRSF_STATE_FLYING)
+    if ((fc_state == FC_START_CRSF_STATE_FLYING) && (0U != g_tof_fused_valid))
     {
         height_m = (float)g_tof_fused_height_mm * 0.001f;
         height_pos_out = PID_Update(&height_pos_pid, target_height_m, height_m, dt);
@@ -364,13 +364,11 @@ void FC_Loop_100Hz(void)
     static uint8 s_vl53_recover_div = 0U;
     static uint8 s_tof_hist_inited = 0U;
     static float s_height_prev_m = 0.0f;
-    static float s_height_vz_lpf_mps = 0.0f;
     static uint32 tick_1000us_cnt_last = 0;
     FC_START_CRSF_state_e fc_state;
     float ch2;
     float height_m;
     float height_vz_raw_mps;
-    const float vz_lpf_alpha = 0.08f;
     uint32 tick_now = tick_1000us_cnt;
     uint32 diff = tick_now - tick_1000us_cnt_last;
     float dt = diff * 0.001f;
@@ -389,30 +387,25 @@ void FC_Loop_100Hz(void)
         dt = 0.01f;
     }
 
-    TOF_Shadow_Update(dt);
-
     height_m = (float)g_tof_fused_height_mm * 0.001f;
     if (0U == s_tof_hist_inited)
     {
         s_height_prev_m = height_m;
-        s_height_vz_lpf_mps = 0.0f;
         s_tof_hist_inited = 1U;
     }
 
     height_vz_raw_mps = (height_m - s_height_prev_m) / dt;
     s_height_prev_m = height_m;
-    s_height_vz_lpf_mps += vz_lpf_alpha * (height_vz_raw_mps - s_height_vz_lpf_mps);
-
-    s_height_vz_mps = s_height_vz_lpf_mps;
+    s_height_vz_mps = g_tof_fused_vz_mps;
     fc_state = FC_START_CRSF_Get_State();
     s_flight_mode = FC_START_CRSF_Get_Flight_Mode(); /* 检测遥控器的模式 */
     FC_Handle_Mode_Transition_100Hz(s_flight_mode, fc_state);
     wifi_justfloat(tick_1000us_cnt,
-        g_tof_shadow_height_mm,g_tof1_height_mm,
+        g_tof_measure_height_mm,g_tof1_height_mm,
         VL53L1X_data.distance_mm[1],g_tof2_height_mm,
          VL53L1X_data.distance_mm[2],g_tof3_height_mm,
-          g_tof_shadow_vz_mps,g_tof4_height_mm,
-           g_tof_fused_height_mm,target_height_m*1000.0f,height_vz_raw_mps,s_height_vz_mps,g_euler.roll,g_euler.pitch);
+          g_tof_measure_mask,g_tof4_height_mm,
+           g_tof_fused_height_mm,target_height_m*1000.0f,height_vz_raw_mps,g_tof_fused_vz_mps,g_euler.roll,g_euler.pitch);
 
     if (fc_state == FC_START_CRSF_STATE_FLYING)
     {
@@ -426,13 +419,21 @@ void FC_Loop_100Hz(void)
             ch2 = fc_clampf((float)CRSF_STD[2], -1000.0f, 1000.0f);
             target_height_m = FC_Map_TargetHeightFromCh2(ch2);
         }
-        height_vel_out = PID_Update(&height_vel_pid, height_pos_out, s_height_vz_mps, dt);
-        height_vel_out = fc_clampf(height_vel_out, s_fc_height_vel_out_min, s_fc_height_vel_out_max);
+        if (0U != g_tof_fused_valid)
+        {
+            height_vel_out = PID_Update(&height_vel_pid, height_pos_out, s_height_vz_mps, dt);
+            height_vel_out = fc_clampf(height_vel_out, s_fc_height_vel_out_min, s_fc_height_vel_out_max);
+        }
+        else
+        {
+            s_height_vz_mps = 0.0f;
+            height_pos_out = 0.0f;
+            height_vel_out = 0.0f;
+        }
     }
     else
     {
         s_tof_hist_inited = 0U;
-        s_height_vz_lpf_mps = 0.0f;
         s_height_vz_mps = 0.0f;
         height_pos_out = 0.0f;
         height_vel_out = 0.0f;

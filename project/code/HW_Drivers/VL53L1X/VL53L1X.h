@@ -21,6 +21,13 @@
 /* TOF通道总数：1号至4号共四路。 */
 #define VL53L1X_CHANNEL_COUNT           (4U)
 
+/* VL53L1X硬件引脚版本选择：1=硬件版本1，2=硬件版本2。 */
+#ifndef VL53L1X_HARDWARE_VERSION
+#define VL53L1X_HARDWARE_VERSION        (1U)
+#endif
+
+#if (VL53L1X_HARDWARE_VERSION == 1U)
+
 /* TOF1（1号机臂，右下电机）软IIC SCL引脚。 */
 #define VL53L1X1_SCL_PIN    P06_4
 /* TOF1（1号机臂，右下电机）软IIC SDA引脚。 */
@@ -41,7 +48,33 @@
 /* TOF4（4号机臂，左上电机）软IIC SDA引脚。 */
 #define VL53L1X4_SDA_PIN    P17_4
 
-/* 注意：TOF3 当前占用的 P13_2/P13_3 与 BMP388 默认软SPI的 SCK/MISO 引脚冲突，如需同时启用必须重分配其中一方引脚。 */
+#elif (VL53L1X_HARDWARE_VERSION == 2U)
+
+/* TOF1（1号机臂，右下电机）软IIC SCL引脚。 */
+#define VL53L1X1_SCL_PIN    P17_3
+/* TOF1（1号机臂，右下电机）软IIC SDA引脚。 */
+#define VL53L1X1_SDA_PIN    P17_4
+
+/* TOF2（2号机臂，右上电机）软IIC SCL引脚。 */
+#define VL53L1X2_SCL_PIN    P13_2
+/* TOF2（2号机臂，右上电机）软IIC SDA引脚。 */
+#define VL53L1X2_SDA_PIN    P13_3
+
+/* TOF3（3号机臂，左下电机）软IIC SCL引脚。 */
+#define VL53L1X3_SCL_PIN    P23_4
+/* TOF3（3号机臂，左下电机）软IIC SDA引脚。 */
+#define VL53L1X3_SDA_PIN    P23_7
+
+/* TOF4（4号机臂，左上电机）软IIC SCL引脚。 */
+#define VL53L1X4_SCL_PIN    P06_4
+/* TOF4（4号机臂，左上电机）软IIC SDA引脚。 */
+#define VL53L1X4_SDA_PIN    P06_3
+
+#else
+#error "VL53L1X_HARDWARE_VERSION must be 1 or 2."
+#endif
+
+/* 注意：P13_2/P13_3 与 BMP388 默认软SPI的 SCK/MISO 引脚冲突，如需同时启用必须重分配其中一方引脚。 */
 
 /**
  * @brief 四路TOF测距输出数据结构体。

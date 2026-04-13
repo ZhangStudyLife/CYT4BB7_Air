@@ -164,7 +164,6 @@ void Pos_Est_Update_50HZ(void)
         Pos_Est_vel_y *= 0.96f;
     }
 
-    wifi_justfloat(g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY,g_pmw3901_raw.squal,opflow_vel_x, opflow_vel_y, vel_x_pred, vel_y_pred,Pos_Est_vel_x, Pos_Est_vel_y,acc_x_lp, acc_y_lp);
     vel_x_pred = Pos_Est_vel_x;
     vel_y_pred = Pos_Est_vel_y;
 

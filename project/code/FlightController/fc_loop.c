@@ -299,7 +299,7 @@ void FC_Loop_50Hz(void)
 
     if ((fc_state == FC_START_CRSF_STATE_FLYING) && (0U != g_tof_fused_valid))
     {
-        height_m = (float)g_tof_fused_height_mm * 0.001f;
+        height_m = g_tof_fused_height_mm * 0.001f;
         height_pos_out = PID_Update(&height_pos_pid, target_height_m, height_m, dt);
         height_pos_out = fc_clampf(height_pos_out, -0.25f, 0.25f);
     }
@@ -387,7 +387,7 @@ void FC_Loop_100Hz(void)
         dt = 0.01f;
     }
 
-    height_m = (float)g_tof_fused_height_mm * 0.001f;
+    height_m = g_tof_fused_height_mm * 0.001f;
     if (0U == s_tof_hist_inited)
     {
         s_height_prev_m = height_m;

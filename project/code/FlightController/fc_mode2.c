@@ -138,7 +138,7 @@ void FC_Mode2_50Hz(float dt)
         acc_y_lp,
         -Pos_Est_vel_x , s_mode2_velx_pid.p_term, s_mode2_velx_pid.i_term, velx_target,
         roll_angle_target,
-        g_euler.roll, g_tof_fused_height_mm / 1000.0f);
+        g_euler.roll, g_tof_fused_height_mm * 0.001f);
     // wifi_justfloat(
     //     g_pmw3901_raw.deltaY, g_pmw3901_raw.squal,
     //     opflow_vel_y,

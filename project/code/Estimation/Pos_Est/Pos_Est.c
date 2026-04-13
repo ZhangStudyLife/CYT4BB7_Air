@@ -136,7 +136,7 @@ void Pos_Est_Update_50HZ(void)
     FlowGyroDecoupler_Update50Hz(tick_1000us_cnt, g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY);
     dec_x = FlowGyroDecoupler_GetDecX();
     dec_y = FlowGyroDecoupler_GetDecY();
-    height = g_tof_fused_height_mm / 1000.0f;
+    height = g_tof_fused_height_mm * 0.001f;
 
     /* 1m 高度下 1 像素约对应 0.2131946 cm 位移，同时对过低高度做保护 */
     coeff = 0.2131946f * (height - 0.05f);

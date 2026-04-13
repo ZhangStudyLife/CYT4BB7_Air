@@ -89,7 +89,14 @@
 #define TOF_FUSED_STICK_PRED_MM          (15.0f)
 #define TOF_FUSED_MISS_VZ_DAMP           (0.70f)
 #define TOF_FUSED_MISS_VZ_STOP_MMPS      (30.0f)
-#define TOF_FUSED_VZ_HIST_LEN            (4U)
+/* 速度观测差分窗口长度；适当拉长可抑制量测切换帧带来的速度尖峰 */
+#define TOF_FUSED_VZ_HIST_LEN            (5U)
+/* 相邻两帧速度观测允许逼近当前速度状态的最大变化量，单位：mm/s */
+#define TOF_FUSED_VZ_DV_LIMIT_MMPS       (450.0f)
+/* 量测来源掩码切换时，速度残差更新缩放系数 */
+#define TOF_FUSED_VZ_SWITCH_BETA_SCALE   (0.45f)
+/* 量测来源掩码切换时，速度差分更新缩放系数 */
+#define TOF_FUSED_VZ_SWITCH_GAMMA_SCALE  (0.35f)
 
 /* ==================== 融合来源标识宏 ==================== */
 
@@ -115,7 +122,7 @@ typedef struct
 {
     uint8  has_last_mm;        /* 是否有历史有效值，1=有，0=无 */
     uint8  fresh_now;          /* 当前数据是否新鲜 */
-    uint16 last_mm;            /* 上一帧有效的中心高度估计，单位：mm */
+    float  last_mm;            /* 上一帧有效的中心高度估计，单位：mm */
     uint16 invalid_streak;     /* 连续无效帧计数 */
     uint16 same_value_streak;  /* 连续相同值帧计数（冻结检测用） */
     uint8  spike_count;        /* 连续突变帧计数（电缆干扰抑制用） */
@@ -160,8 +167,8 @@ typedef struct
     uint8 valid;
     uint8 mask;
     uint8 count;
-    uint16 measure_mm;
-    uint16 spread_mm;
+    float measure_mm;
+    float spread_mm;
     float pred_err_mm;
     float measure_var_mm2;
 } TOFFusedCandidate_t;
@@ -208,12 +215,12 @@ static const int16 s_tof_arm_y_mm[VL53L1X_CHANNEL_COUNT] = {
 /* ==================== 全局变量定义 ==================== */
 
 /* 融合后TOF高度，单位：mm，无效时为VL53L1X_VALID_RANGE_MAX */
-uint16 g_tof_fused_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
+float g_tof_fused_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
 /* 各通道中心高度估计（几何修正+零偏后），无效时为VL53L1X_INVALID_DISTANCE_MM */
-uint16 g_tof1_height_mm = VL53L1X_INVALID_DISTANCE_MM;
-uint16 g_tof2_height_mm = VL53L1X_INVALID_DISTANCE_MM;
-uint16 g_tof3_height_mm = VL53L1X_INVALID_DISTANCE_MM;
-uint16 g_tof4_height_mm = VL53L1X_INVALID_DISTANCE_MM;
+float g_tof1_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
+float g_tof2_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
+float g_tof3_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
+float g_tof4_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
 /* 融合高度有效标志，1=有效，0=无效 */
 uint8 g_tof_fused_valid = 0U;
 /* 各通道原始有效标志（通过范围与状态码检查），1=有效，0=无效 */
@@ -229,10 +236,10 @@ uint8 g_tof_fused_source = TOF_SRC_NONE;
 /* 校准通过标志：1=各通道偏差在允许范围内，0=校准失败 */
 uint8 g_tof_calibration_ok = 0U;
 float g_tof_fused_vz_mps = 0.0f;
-uint16 g_tof_measure_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
+float g_tof_measure_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
 uint8 g_tof_measure_class = TOF_MEASURE_CLASS_NONE;
 uint8 g_tof_measure_mask = 0U;
-uint16 g_tof_shadow_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
+float g_tof_shadow_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
 float g_tof_shadow_vz_mps = 0.0f;
 uint8 g_tof_shadow_valid = 0U;
 
@@ -250,7 +257,7 @@ static float s_attitude_roll_bias_deg  = 0.0f;
 /* 融合失效保持计数（最多保持TOF_FUSED_HOLD_FRAMES帧后输出无效） */
 static TOFFusedState_t s_tof_fused_state = {0};
 static uint8 s_tof_fused_miss_count = 0U;
-static uint16 s_tof_fused_meas_hist_mm[TOF_FUSED_VZ_HIST_LEN] = {0};
+static float s_tof_fused_meas_hist_mm[TOF_FUSED_VZ_HIST_LEN] = {0};
 static uint8 s_tof_fused_meas_hist_count = 0U;
 static uint8 s_tof_fused_last_measure_mask = 0U;
 static uint8 s_tof_fused_pending_mask = 0U;
@@ -288,20 +295,20 @@ static uint16 TOF_AbsDiffU16(uint16 a, uint16 b)
  * 返回值：
  *   补偿并钳位后的高度值，单位：mm。
  */
-static uint16 TOF_ApplyOffsetClamp(uint16 raw_mm, int16 offset_mm)
+static float TOF_ApplyOffsetClamp(float raw_mm, int16 offset_mm)
 {
-    int32 corrected = (int32)raw_mm + (int32)offset_mm;
+    float corrected = raw_mm + (float)offset_mm;
 
-    if (corrected < 0)
+    if (corrected < 0.0f)
     {
-        corrected = 0;
+        corrected = 0.0f;
     }
-    else if (corrected > 65535)
+    else if (corrected > 65535.0f)
     {
-        corrected = 65535;
+        corrected = 65535.0f;
     }
 
-    return (uint16)corrected;
+    return corrected;
 }
 
 /*
@@ -341,7 +348,7 @@ static void TOF_ResetChannelState(TOFChannelState_t *state)
 
     state->has_last_mm = 0U;
     state->fresh_now = 0U;
-    state->last_mm = 0U;
+    state->last_mm = 0.0f;
     state->invalid_streak = 0U;
     state->same_value_streak = 0U;
     state->spike_count = 0U;
@@ -354,11 +361,11 @@ static void TOF_ShadowResetState(void);
  */
 static void TOF_ResetFusionState(void)
 {
-    g_tof1_height_mm = VL53L1X_INVALID_DISTANCE_MM;
-    g_tof2_height_mm = VL53L1X_INVALID_DISTANCE_MM;
-    g_tof3_height_mm = VL53L1X_INVALID_DISTANCE_MM;
-    g_tof4_height_mm = VL53L1X_INVALID_DISTANCE_MM;
-    g_tof_fused_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
+    g_tof1_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
+    g_tof2_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
+    g_tof3_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
+    g_tof4_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
+    g_tof_fused_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
     g_tof1_valid = 0U;
     g_tof2_valid = 0U;
     g_tof3_valid = 0U;
@@ -368,7 +375,7 @@ static void TOF_ResetFusionState(void)
     g_tof3_used_in_fusion = 0U;
     g_tof_fused_source = TOF_SRC_NONE;
     g_tof_fused_vz_mps = 0.0f;
-    g_tof_measure_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
+    g_tof_measure_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
     g_tof_measure_class = TOF_MEASURE_CLASS_NONE;
     g_tof_measure_mask = 0U;
 
@@ -437,7 +444,7 @@ static void TOF_FusedSeed(float height_mm)
     s_tof_fused_state.p10 = 0.0f;
     s_tof_fused_state.p11 = TOF_FUSED_P0_V_MM2PS2;
     s_tof_fused_miss_count = 0U;
-    s_tof_fused_meas_hist_mm[0] = (uint16)(height_mm + 0.5f);
+    s_tof_fused_meas_hist_mm[0] = height_mm;
     s_tof_fused_meas_hist_count = 1U;
 }
 
@@ -482,9 +489,10 @@ static void TOF_FusedCorrect(float measure_mm, float measure_var_mm2)
     float gamma;
     float innov;
     float vz_meas_mmps;
+    float vz_delta_mmps;
     uint8 i;
     uint8 hist_span;
-    uint16 measure_mm_u16;
+    uint8 mask_changed;
 
     if (0U == s_tof_fused_state.seeded)
     {
@@ -494,32 +502,32 @@ static void TOF_FusedCorrect(float measure_mm, float measure_var_mm2)
     measure_var_mm2 = TOF_ClampF(measure_var_mm2, 1.0f, 40000.0f);
     dt_s = 0.01f;
     alpha = 0.75f;
-    beta = 0.12f;
-    gamma = 0.30f;
+    beta = 0.08f;
+    gamma = 0.18f;
 
     if (TOF_MEASURE_CLASS_4CH == g_tof_measure_class)
     {
         alpha = 0.90f;
-        beta = 0.20f;
-        gamma = 0.50f;
+        beta = 0.14f;
+        gamma = 0.22f;
     }
     else if (TOF_MEASURE_CLASS_3CH == g_tof_measure_class)
     {
         alpha = 0.84f;
-        beta = 0.16f;
-        gamma = 0.42f;
+        beta = 0.09f;
+        gamma = 0.16f;
     }
     else if (TOF_MEASURE_CLASS_2CH == g_tof_measure_class)
     {
         alpha = 0.72f;
-        beta = 0.10f;
-        gamma = 0.26f;
+        beta = 0.06f;
+        gamma = 0.10f;
     }
     else if (TOF_MEASURE_CLASS_1CH == g_tof_measure_class)
     {
         alpha = 0.55f;
-        beta = 0.06f;
-        gamma = 0.15f;
+        beta = 0.03f;
+        gamma = 0.06f;
     }
 
     if (measure_var_mm2 > 6000.0f)
@@ -535,6 +543,15 @@ static void TOF_FusedCorrect(float measure_mm, float measure_var_mm2)
         gamma = TOF_ClampF(gamma * 1.05f, 0.0f, 0.70f);
     }
 
+    mask_changed = ((0U != s_tof_fused_last_measure_mask) &&
+                    (g_tof_measure_mask != s_tof_fused_last_measure_mask)) ? 1U : 0U;
+    if (0U != mask_changed)
+    {
+        s_tof_fused_meas_hist_count = 0U;
+        beta *= TOF_FUSED_VZ_SWITCH_BETA_SCALE;
+        gamma *= TOF_FUSED_VZ_SWITCH_GAMMA_SCALE;
+    }
+
     innov = measure_mm - s_tof_fused_state.height_mm;
     s_tof_fused_state.height_mm += alpha * innov;
     s_tof_fused_state.vz_mmps += (beta * innov) / dt_s;
@@ -544,10 +561,9 @@ static void TOF_FusedCorrect(float measure_mm, float measure_var_mm2)
         s_tof_fused_meas_hist_count = 0U;
     }
 
-    measure_mm_u16 = (uint16)(TOF_ClampF(measure_mm, 0.0f, 65535.0f) + 0.5f);
     if (s_tof_fused_meas_hist_count < TOF_FUSED_VZ_HIST_LEN)
     {
-        s_tof_fused_meas_hist_mm[s_tof_fused_meas_hist_count] = measure_mm_u16;
+        s_tof_fused_meas_hist_mm[s_tof_fused_meas_hist_count] = measure_mm;
         s_tof_fused_meas_hist_count++;
     }
     else
@@ -556,20 +572,19 @@ static void TOF_FusedCorrect(float measure_mm, float measure_var_mm2)
         {
             s_tof_fused_meas_hist_mm[i - 1U] = s_tof_fused_meas_hist_mm[i];
         }
-        s_tof_fused_meas_hist_mm[TOF_FUSED_VZ_HIST_LEN - 1U] = measure_mm_u16;
+        s_tof_fused_meas_hist_mm[TOF_FUSED_VZ_HIST_LEN - 1U] = measure_mm;
     }
 
     if (s_tof_fused_meas_hist_count >= 2U)
     {
         hist_span = (uint8)(s_tof_fused_meas_hist_count - 1U);
-        vz_meas_mmps = ((float)s_tof_fused_meas_hist_mm[s_tof_fused_meas_hist_count - 1U]
-                      - (float)s_tof_fused_meas_hist_mm[0]) / ((float)hist_span * dt_s);
+        vz_meas_mmps = (s_tof_fused_meas_hist_mm[s_tof_fused_meas_hist_count - 1U]
+                      - s_tof_fused_meas_hist_mm[0]) / ((float)hist_span * dt_s);
         vz_meas_mmps = TOF_ClampF(vz_meas_mmps, -3000.0f, 3000.0f);
-
-        if ((s_tof_fused_state.vz_mmps * vz_meas_mmps) < 0.0f)
-        {
-            gamma = TOF_ClampF(gamma + 0.20f, 0.0f, 0.85f);
-        }
+        vz_delta_mmps = TOF_ClampF(vz_meas_mmps - s_tof_fused_state.vz_mmps,
+                                   -TOF_FUSED_VZ_DV_LIMIT_MMPS,
+                                   TOF_FUSED_VZ_DV_LIMIT_MMPS);
+        vz_meas_mmps = s_tof_fused_state.vz_mmps + vz_delta_mmps;
 
         s_tof_fused_state.vz_mmps =
             ((1.0f - gamma) * s_tof_fused_state.vz_mmps) + (gamma * vz_meas_mmps);
@@ -577,7 +592,7 @@ static void TOF_FusedCorrect(float measure_mm, float measure_var_mm2)
 }
 
 static uint8 TOF_FusedBuildCandidate(const uint8 *ch_valid,
-                                     const uint16 *ch_center_mm,
+                                     const float *ch_center_mm,
                                      uint8 mask,
                                      TOFFusedCandidate_t *candidate)
 {
@@ -587,11 +602,11 @@ static uint8 TOF_FusedBuildCandidate(const uint8 *ch_valid,
     uint8 j;
     uint8 key_mask;
     uint8 order_mask[VL53L1X_CHANNEL_COUNT];
-    uint16 key;
-    uint16 sorted[VL53L1X_CHANNEL_COUNT];
-    uint16 diff_lo;
-    uint16 diff_hi;
-    uint16 spread_mm;
+    float key;
+    float sorted[VL53L1X_CHANNEL_COUNT];
+    float diff_lo;
+    float diff_hi;
+    float spread_mm;
     float measure_var_mm2;
     float err0_mm;
     float err1_mm;
@@ -605,8 +620,8 @@ static uint8 TOF_FusedBuildCandidate(const uint8 *ch_valid,
     candidate->valid = 0U;
     candidate->mask = mask;
     candidate->count = 0U;
-    candidate->measure_mm = 0U;
-    candidate->spread_mm = 0U;
+    candidate->measure_mm = 0.0f;
+    candidate->spread_mm = 0.0f;
     candidate->pred_err_mm = 0.0f;
     candidate->measure_var_mm2 = 0.0f;
 
@@ -648,50 +663,50 @@ static uint8 TOF_FusedBuildCandidate(const uint8 *ch_valid,
         order_mask[j] = key_mask;
     }
 
-    spread_mm = 0U;
+    spread_mm = 0.0f;
     measure_var_mm2 = 0.0f;
 
     if (TOF_MEASURE_CLASS_4CH == count)
     {
-        candidate->measure_mm = (uint16)(((uint32)sorted[1] + (uint32)sorted[2]) / 2U);
-        spread_mm = (uint16)(sorted[2] - sorted[1]);
-        measure_var_mm2 = TOF_FusedBaseVariance(count) + 0.25f * (float)spread_mm * (float)spread_mm;
+        candidate->measure_mm = 0.5f * (sorted[1] + sorted[2]);
+        spread_mm = sorted[2] - sorted[1];
+        measure_var_mm2 = TOF_FusedBaseVariance(count) + 0.25f * spread_mm * spread_mm;
     }
     else if (TOF_MEASURE_CLASS_3CH == count)
     {
         candidate->measure_mm = sorted[1];
-        diff_lo = (uint16)(sorted[1] - sorted[0]);
-        diff_hi = (uint16)(sorted[2] - sorted[1]);
+        diff_lo = sorted[1] - sorted[0];
+        diff_hi = sorted[2] - sorted[1];
         spread_mm = (diff_lo < diff_hi) ? diff_lo : diff_hi;
-        measure_var_mm2 = TOF_FusedBaseVariance(count) + 0.25f * (float)spread_mm * (float)spread_mm;
+        measure_var_mm2 = TOF_FusedBaseVariance(count) + 0.25f * spread_mm * spread_mm;
     }
     else if (TOF_MEASURE_CLASS_2CH == count)
     {
-        spread_mm = (uint16)(sorted[1] - sorted[0]);
+        spread_mm = sorted[1] - sorted[0];
 
-        if ((spread_mm > TOF_FUSED_2CH_SPLIT_MM) && (0U != s_tof_fused_state.seeded))
+        if ((spread_mm > (float)TOF_FUSED_2CH_SPLIT_MM) && (0U != s_tof_fused_state.seeded))
         {
-            err0_mm = fabsf((float)sorted[0] - s_tof_fused_state.height_mm);
-            err1_mm = fabsf((float)sorted[1] - s_tof_fused_state.height_mm);
+            err0_mm = fabsf(sorted[0] - s_tof_fused_state.height_mm);
+            err1_mm = fabsf(sorted[1] - s_tof_fused_state.height_mm);
             use_idx = (err0_mm <= err1_mm) ? 0U : 1U;
             candidate->measure_mm = sorted[use_idx];
             candidate->mask = order_mask[use_idx];
             candidate->count = TOF_MEASURE_CLASS_1CH;
-            candidate->spread_mm = 0U;
+            candidate->spread_mm = 0.0f;
             candidate->pred_err_mm = (use_idx == 0U) ? err0_mm : err1_mm;
-            candidate->measure_var_mm2 = TOF_FUSED_R_1CH_MM2 + 0.0625f * (float)spread_mm * (float)spread_mm;
+            candidate->measure_var_mm2 = TOF_FUSED_R_1CH_MM2 + 0.0625f * spread_mm * spread_mm;
             candidate->valid = 1U;
             return 1U;
         }
 
-        candidate->measure_mm = (uint16)(((uint32)sorted[0] + (uint32)sorted[1]) / 2U);
+        candidate->measure_mm = 0.5f * (sorted[0] + sorted[1]);
         if (0U != TOF_IsDiagonalMask(mask))
         {
-            measure_var_mm2 = TOF_FUSED_R_2CH_MM2 + 0.25f * (float)spread_mm * (float)spread_mm;
+            measure_var_mm2 = TOF_FUSED_R_2CH_MM2 + 0.25f * spread_mm * spread_mm;
         }
         else
         {
-            measure_var_mm2 = TOF_FUSED_R_2CH_EDGE_MM2 + 0.25f * (float)spread_mm * (float)spread_mm;
+            measure_var_mm2 = TOF_FUSED_R_2CH_EDGE_MM2 + 0.25f * spread_mm * spread_mm;
         }
     }
     else
@@ -705,14 +720,14 @@ static uint8 TOF_FusedBuildCandidate(const uint8 *ch_valid,
     candidate->spread_mm = spread_mm;
     if (0U != s_tof_fused_state.seeded)
     {
-        candidate->pred_err_mm = fabsf((float)candidate->measure_mm - s_tof_fused_state.height_mm);
+        candidate->pred_err_mm = fabsf(candidate->measure_mm - s_tof_fused_state.height_mm);
     }
     candidate->measure_var_mm2 = measure_var_mm2;
     return 1U;
 }
 
 static uint8 TOF_FusedSelectCandidate(const uint8 *ch_valid,
-                                      const uint16 *ch_center_mm,
+                                      const float *ch_center_mm,
                                       TOFFusedCandidate_t *selected)
 {
     uint8 ch;
@@ -748,7 +763,6 @@ static uint8 TOF_FusedSelectCandidate(const uint8 *ch_valid,
         return 0U;
     }
 
-    s_tof_fused_last_measure_mask = selected->mask;
     s_tof_fused_pending_mask = 0U;
     s_tof_fused_pending_count = 0U;
     return 1U;
@@ -838,7 +852,7 @@ static TOFAttitudeTerms_t TOF_ComputeAttitudeTerms(void)
  * 返回值：
  *   飞机中心高度估计，单位：mm，已钳位到[0, 65535]。
  */
-static uint16 TOF_EstimateCenterHeight(uint16 slant_mm, const TOFAttitudeTerms_t *att, uint8 ch)
+static float TOF_EstimateCenterHeight(uint16 slant_mm, const TOFAttitudeTerms_t *att, uint8 ch)
 {
     float h;
 
@@ -855,7 +869,7 @@ static uint16 TOF_EstimateCenterHeight(uint16 slant_mm, const TOFAttitudeTerms_t
         h = 65535.0f;
     }
 
-    return (uint16)(h + 0.5f);
+    return h;
 }
 
 /*
@@ -914,7 +928,7 @@ static void TOF_ShadowResetState(void)
     s_tof_shadow_slope_y = 0.0f;
     s_tof_shadow_slope_valid = 0U;
     s_tof_shadow_miss_count = 0U;
-    g_tof_shadow_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
+    g_tof_shadow_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
     g_tof_shadow_vz_mps = 0.0f;
     g_tof_shadow_valid = 0U;
 }
@@ -1267,9 +1281,9 @@ static void TOF_Update_Robust(void)
     uint8 ch;
     uint8 raw_valid;
     uint8 ch_raw_valid[VL53L1X_CHANNEL_COUNT];
-    uint16 ch_center_mm[VL53L1X_CHANNEL_COUNT];
+    float ch_center_mm[VL53L1X_CHANNEL_COUNT];
     uint8 ch_fusion_valid[VL53L1X_CHANNEL_COUNT];
-    uint16 display_mm[VL53L1X_CHANNEL_COUNT];
+    float display_mm[VL53L1X_CHANNEL_COUNT];
     TOFFusedCandidate_t selected;
     const float dt_s = 0.01f;
     TOFAttitudeTerms_t att;
@@ -1284,7 +1298,7 @@ static void TOF_Update_Robust(void)
         g_tof_fused_valid = 0U;
         g_tof_fused_vz_mps = 0.0f;
         g_tof_fused_source = TOF_SRC_NONE;
-        g_tof_measure_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
+        g_tof_measure_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
         g_tof_measure_class = TOF_MEASURE_CLASS_NONE;
         g_tof_measure_mask = 0U;
         return;
@@ -1301,14 +1315,14 @@ static void TOF_Update_Robust(void)
                                               g_vl53l1x_diag[ch].is_fresh);
         ch_raw_valid[ch] = raw_valid;
         ch_fusion_valid[ch] = 0U;
-        ch_center_mm[ch] = VL53L1X_INVALID_DISTANCE_MM;
-        display_mm[ch] = VL53L1X_INVALID_DISTANCE_MM;
+        ch_center_mm[ch] = (float)VL53L1X_INVALID_DISTANCE_MM;
+        display_mm[ch] = (float)VL53L1X_INVALID_DISTANCE_MM;
 
         if ((0U != raw_valid) && (0U != att.valid))
         {
-            uint16 center_mm;
-            uint16 corrected_mm;
-            uint16 delta;
+            float center_mm;
+            float corrected_mm;
+            float delta;
 
             center_mm = TOF_EstimateCenterHeight(data.distance_mm[ch], &att, ch);
             corrected_mm = TOF_ApplyOffsetClamp(center_mm, s_tof_offset_mm[ch]);
@@ -1317,7 +1331,7 @@ static void TOF_Update_Robust(void)
             display_mm[ch] = corrected_mm;
 
             if ((0U != s_tof_state[ch].has_last_mm) &&
-                (corrected_mm == s_tof_state[ch].last_mm))
+                (fabsf(corrected_mm - s_tof_state[ch].last_mm) < 0.5f))
             {
                 if (s_tof_state[ch].same_value_streak < 65535U)
                 {
@@ -1331,8 +1345,8 @@ static void TOF_Update_Robust(void)
 
             if (0U != s_tof_state[ch].has_last_mm)
             {
-                delta = TOF_AbsDiffU16(corrected_mm, s_tof_state[ch].last_mm);
-                if (delta > TOF_SPIKE_GATE_MM)
+                delta = fabsf(corrected_mm - s_tof_state[ch].last_mm);
+                if (delta > (float)TOF_SPIKE_GATE_MM)
                 {
                     s_tof_state[ch].last_mm = corrected_mm;
                     s_tof_state[ch].fresh_now = g_vl53l1x_diag[ch].is_fresh;
@@ -1391,7 +1405,7 @@ static void TOF_Update_Robust(void)
 
     TOF_FusedPredict(dt_s);
 
-    g_tof_measure_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
+    g_tof_measure_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
     g_tof_measure_class = TOF_MEASURE_CLASS_NONE;
     g_tof_measure_mask = 0U;
     g_tof_fused_source = TOF_SRC_NONE;
@@ -1409,12 +1423,13 @@ static void TOF_Update_Robust(void)
 
         if (0U == s_tof_fused_state.seeded)
         {
-            TOF_FusedSeed((float)selected.measure_mm);
+            TOF_FusedSeed(selected.measure_mm);
         }
         else
         {
-            TOF_FusedCorrect((float)selected.measure_mm, selected.measure_var_mm2);
+            TOF_FusedCorrect(selected.measure_mm, selected.measure_var_mm2);
         }
+        s_tof_fused_last_measure_mask = selected.mask;
 
         s_tof_fused_miss_count = 0U;
         g_tof_fused_valid = 1U;
@@ -1480,7 +1495,7 @@ static void TOF_Update_Robust(void)
     {
         s_tof_fused_state.height_mm = TOF_ClampF(s_tof_fused_state.height_mm, 0.0f, 65535.0f);
         s_tof_fused_state.vz_mmps = TOF_ClampF(s_tof_fused_state.vz_mmps, -3000.0f, 3000.0f);
-        g_tof_fused_height_mm = (uint16)(s_tof_fused_state.height_mm + 0.5f);
+        g_tof_fused_height_mm = s_tof_fused_state.height_mm;
         g_tof_fused_vz_mps = 0.001f * s_tof_fused_state.vz_mmps;
     }
 }
@@ -2073,7 +2088,7 @@ void TOF_Shadow_Update(float dt_s)
     else
     {
         g_tof_shadow_valid = 0U;
-        g_tof_shadow_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
+        g_tof_shadow_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
         g_tof_shadow_vz_mps = 0.0f;
         return;
     }
@@ -2081,7 +2096,7 @@ void TOF_Shadow_Update(float dt_s)
     s_tof_shadow_state.height_mm = TOF_ClampF(s_tof_shadow_state.height_mm, 0.0f, 65535.0f);
     s_tof_shadow_state.vz_mmps = TOF_ClampF(s_tof_shadow_state.vz_mmps, -3000.0f, 3000.0f);
 
-    g_tof_shadow_height_mm = (uint16)(s_tof_shadow_state.height_mm + 0.5f);
+    g_tof_shadow_height_mm = s_tof_shadow_state.height_mm;
     g_tof_shadow_vz_mps = 0.001f * s_tof_shadow_state.vz_mmps;
 }
 

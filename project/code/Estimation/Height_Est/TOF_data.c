@@ -61,6 +61,16 @@
 #define TOF_CALIBRATION_DT_MS            (10U)
 /* 校准通过的最大通道间偏差，单位：mm（用户要求：10cm） */
 #define TOF_CALIB_DEVIATION_MAX_MM       (100U)
+#define TOF_SHADOW_TIMEOUT_FRAMES        (20U)
+#define TOF_SHADOW_DROP_RESIDUAL_MM      (20.0f)
+#define TOF_SHADOW_R_4CH_MM2             (400.0f)
+#define TOF_SHADOW_R_3CH_MM2             (900.0f)
+#define TOF_SHADOW_R_2CH_DIAG_MM2        (1600.0f)
+#define TOF_SHADOW_R_2CH_EDGE_MM2        (4900.0f)
+#define TOF_SHADOW_R_1CH_MM2             (10000.0f)
+#define TOF_SHADOW_P0_H_MM2              (400.0f)
+#define TOF_SHADOW_P0_V_MM2PS2           (40000.0f)
+#define TOF_SHADOW_Q_ACC_MM2PS4          (360000.0f)
 
 /* ==================== 融合来源标识宏 ==================== */
 
@@ -102,6 +112,29 @@ typedef struct
     float sin_roll;  /* sin(roll_comp)，roll_comp = roll - roll_bias（度转弧度后） */
     uint8 valid;     /* 1=倾角在允许范围内；0=倾角过大，全部通道数据不可信 */
 } TOFAttitudeTerms_t;
+
+typedef struct
+{
+    float height_mm;
+    float slope_x;
+    float slope_y;
+    float rms_mm;
+    float max_abs_residual_mm;
+    uint8 count;
+    uint8 worst_ch;
+    uint8 solved;
+} TOFShadowPlaneFit_t;
+
+typedef struct
+{
+    uint8 seeded;
+    float height_mm;
+    float vz_mmps;
+    float p00;
+    float p01;
+    float p10;
+    float p11;
+} TOFShadowState_t;
 
 /* ==================== 机臂几何参数（Mark5 Pro，Quad-X布局） ==================== */
 /*
@@ -154,6 +187,9 @@ uint8 g_tof3_used_in_fusion = 0U;
 uint8 g_tof_fused_source = TOF_SRC_NONE;
 /* 校准通过标志：1=各通道偏差在允许范围内，0=校准失败 */
 uint8 g_tof_calibration_ok = 0U;
+uint16 g_tof_shadow_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
+float g_tof_shadow_vz_mps = 0.0f;
+uint8 g_tof_shadow_valid = 0U;
 
 /* ==================== 静态变量 ==================== */
 
@@ -169,6 +205,12 @@ static float s_attitude_roll_bias_deg  = 0.0f;
 /* 融合失效保持计数（最多保持TOF_FUSED_HOLD_FRAMES帧后输出无效） */
 static uint8 s_fused_invalid_hold_count = 0U;
 static Kalman1D_t s_tof_fused_kf = {0};
+static int16 s_tof_shadow_offset_mm[VL53L1X_CHANNEL_COUNT] = {0};
+static TOFShadowState_t s_tof_shadow_state = {0};
+static float s_tof_shadow_slope_x = 0.0f;
+static float s_tof_shadow_slope_y = 0.0f;
+static uint8 s_tof_shadow_slope_valid = 0U;
+static uint8 s_tof_shadow_miss_count = 0U;
 /* 步进限幅内部参考值（浮点，与滤波输出解耦，防止滤波滞后影响步进判断） */
 /* 最终输出IIR滤波状态（浮点，避免整数累积误差） */
 
@@ -253,6 +295,8 @@ static void TOF_ResetChannelState(TOFChannelState_t *state)
     state->spike_count = 0U;
 }
 
+static void TOF_ShadowResetState(void);
+
 /*
  * 函数功能：重置TOF融合输出与全局状态。
  */
@@ -278,6 +322,7 @@ static void TOF_ResetFusionState(void)
                   TOF_FUSED_KF_R_MM2,
                   TOF_FUSED_KF_P0_MM2,
                   0.0f);
+    TOF_ShadowResetState();
 }
 
 /*
@@ -461,6 +506,380 @@ static void TOF_Sort4(uint16 *vals, uint8 n)
 /*
  * 函数功能：初始化四路TOF模块并执行零偏标定。
  */
+static float TOF_ClampF(float value, float min_value, float max_value)
+{
+    if (value < min_value)
+    {
+        return min_value;
+    }
+    if (value > max_value)
+    {
+        return max_value;
+    }
+    return value;
+}
+
+static void TOF_ShadowResetState(void)
+{
+    s_tof_shadow_state.seeded = 0U;
+    s_tof_shadow_state.height_mm = 0.0f;
+    s_tof_shadow_state.vz_mmps = 0.0f;
+    s_tof_shadow_state.p00 = TOF_SHADOW_P0_H_MM2;
+    s_tof_shadow_state.p01 = 0.0f;
+    s_tof_shadow_state.p10 = 0.0f;
+    s_tof_shadow_state.p11 = TOF_SHADOW_P0_V_MM2PS2;
+    s_tof_shadow_slope_x = 0.0f;
+    s_tof_shadow_slope_y = 0.0f;
+    s_tof_shadow_slope_valid = 0U;
+    s_tof_shadow_miss_count = 0U;
+    g_tof_shadow_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
+    g_tof_shadow_vz_mps = 0.0f;
+    g_tof_shadow_valid = 0U;
+}
+
+static void TOF_ShadowSeed(float height_mm)
+{
+    s_tof_shadow_state.seeded = 1U;
+    s_tof_shadow_state.height_mm = height_mm;
+    s_tof_shadow_state.vz_mmps = 0.0f;
+    s_tof_shadow_state.p00 = TOF_SHADOW_P0_H_MM2;
+    s_tof_shadow_state.p01 = 0.0f;
+    s_tof_shadow_state.p10 = 0.0f;
+    s_tof_shadow_state.p11 = TOF_SHADOW_P0_V_MM2PS2;
+    s_tof_shadow_miss_count = 0U;
+}
+
+static void TOF_ShadowPredict(float dt_s)
+{
+    float dt2;
+    float dt3;
+    float dt4;
+    float p00;
+    float p01;
+    float p10;
+    float p11;
+
+    if (0U == s_tof_shadow_state.seeded)
+    {
+        return;
+    }
+
+    dt_s = TOF_ClampF(dt_s, 0.001f, 0.05f);
+    dt2 = dt_s * dt_s;
+    dt3 = dt2 * dt_s;
+    dt4 = dt2 * dt2;
+
+    s_tof_shadow_state.height_mm += s_tof_shadow_state.vz_mmps * dt_s;
+
+    p00 = s_tof_shadow_state.p00;
+    p01 = s_tof_shadow_state.p01;
+    p10 = s_tof_shadow_state.p10;
+    p11 = s_tof_shadow_state.p11;
+
+    s_tof_shadow_state.p00 = p00 + dt_s * (p10 + p01) + dt2 * p11 + 0.25f * dt4 * TOF_SHADOW_Q_ACC_MM2PS4;
+    s_tof_shadow_state.p01 = p01 + dt_s * p11 + 0.5f * dt3 * TOF_SHADOW_Q_ACC_MM2PS4;
+    s_tof_shadow_state.p10 = p10 + dt_s * p11 + 0.5f * dt3 * TOF_SHADOW_Q_ACC_MM2PS4;
+    s_tof_shadow_state.p11 = p11 + dt2 * TOF_SHADOW_Q_ACC_MM2PS4;
+}
+
+static void TOF_ShadowCorrect(float measure_mm, float measure_var_mm2)
+{
+    float innov;
+    float s;
+    float k0;
+    float k1;
+    float p00;
+    float p01;
+    float p10;
+    float p11;
+
+    if (0U == s_tof_shadow_state.seeded)
+    {
+        return;
+    }
+
+    measure_var_mm2 = TOF_ClampF(measure_var_mm2, 1.0f, 40000.0f);
+
+    p00 = s_tof_shadow_state.p00;
+    p01 = s_tof_shadow_state.p01;
+    p10 = s_tof_shadow_state.p10;
+    p11 = s_tof_shadow_state.p11;
+
+    innov = measure_mm - s_tof_shadow_state.height_mm;
+    s = p00 + measure_var_mm2;
+    if (s < 1.0f)
+    {
+        s = 1.0f;
+    }
+
+    k0 = p00 / s;
+    k1 = p10 / s;
+
+    s_tof_shadow_state.height_mm += k0 * innov;
+    s_tof_shadow_state.vz_mmps += k1 * innov;
+    s_tof_shadow_state.p00 = (1.0f - k0) * p00;
+    s_tof_shadow_state.p01 = (1.0f - k0) * p01;
+    s_tof_shadow_state.p10 = p10 - k1 * p00;
+    s_tof_shadow_state.p11 = p11 - k1 * p01;
+}
+
+static float TOF_ShadowProjectDistanceMm(uint16 distance_mm, const TOFAttitudeTerms_t *att, uint8 ch)
+{
+    float projected_mm;
+
+    projected_mm = ((float)distance_mm * att->cos_term) + (float)s_tof_shadow_offset_mm[ch];
+    return TOF_ClampF(projected_mm, 0.0f, 65535.0f);
+}
+
+static uint8 TOF_ShadowIsDiagonalPair(uint8 ch_a, uint8 ch_b)
+{
+    if (((0U == ch_a) && (3U == ch_b)) ||
+        ((3U == ch_a) && (0U == ch_b)) ||
+        ((1U == ch_a) && (2U == ch_b)) ||
+        ((2U == ch_a) && (1U == ch_b)))
+    {
+        return 1U;
+    }
+    return 0U;
+}
+
+static uint8 TOF_ShadowSolvePlane(const uint8 *ch_use,
+                                  const float *meas_mm,
+                                  TOFShadowPlaneFit_t *fit)
+{
+    uint8 ch;
+    uint8 count;
+    float a00;
+    float a01;
+    float a02;
+    float a11;
+    float a12;
+    float a22;
+    float b0;
+    float b1;
+    float b2;
+    float det;
+    float inv00;
+    float inv01;
+    float inv02;
+    float inv10;
+    float inv11;
+    float inv12;
+    float inv20;
+    float inv21;
+    float inv22;
+    float pred;
+    float residual;
+    float residual_sq_sum;
+    float max_abs_residual;
+    uint8 worst_ch;
+
+    if ((0 == ch_use) || (0 == meas_mm) || (0 == fit))
+    {
+        return 0U;
+    }
+
+    fit->height_mm = 0.0f;
+    fit->slope_x = 0.0f;
+    fit->slope_y = 0.0f;
+    fit->rms_mm = 0.0f;
+    fit->max_abs_residual_mm = 0.0f;
+    fit->count = 0U;
+    fit->worst_ch = 0U;
+    fit->solved = 0U;
+
+    count = 0U;
+    a00 = 0.0f;
+    a01 = 0.0f;
+    a02 = 0.0f;
+    a11 = 0.0f;
+    a12 = 0.0f;
+    a22 = 0.0f;
+    b0 = 0.0f;
+    b1 = 0.0f;
+    b2 = 0.0f;
+
+    for (ch = 0U; ch < VL53L1X_CHANNEL_COUNT; ch++)
+    {
+        float x_mm;
+        float y_mm;
+        float z_mm;
+
+        if (0U == ch_use[ch])
+        {
+            continue;
+        }
+
+        x_mm = (float)s_tof_arm_x_mm[ch];
+        y_mm = (float)s_tof_arm_y_mm[ch];
+        z_mm = meas_mm[ch];
+
+        count++;
+        a00 += 1.0f;
+        a01 += x_mm;
+        a02 += y_mm;
+        a11 += x_mm * x_mm;
+        a12 += x_mm * y_mm;
+        a22 += y_mm * y_mm;
+        b0 += z_mm;
+        b1 += x_mm * z_mm;
+        b2 += y_mm * z_mm;
+    }
+
+    if (count < 3U)
+    {
+        return 0U;
+    }
+
+    det = a00 * (a11 * a22 - a12 * a12)
+        - a01 * (a01 * a22 - a12 * a02)
+        + a02 * (a01 * a12 - a11 * a02);
+    if (fabsf(det) < 1.0e-3f)
+    {
+        return 0U;
+    }
+
+    inv00 = (a11 * a22 - a12 * a12) / det;
+    inv01 = (a02 * a12 - a01 * a22) / det;
+    inv02 = (a01 * a12 - a02 * a11) / det;
+    inv10 = (a12 * a02 - a01 * a22) / det;
+    inv11 = (a00 * a22 - a02 * a02) / det;
+    inv12 = (a01 * a02 - a00 * a12) / det;
+    inv20 = (a01 * a12 - a11 * a02) / det;
+    inv21 = (a01 * a02 - a00 * a12) / det;
+    inv22 = (a00 * a11 - a01 * a01) / det;
+
+    fit->height_mm = inv00 * b0 + inv01 * b1 + inv02 * b2;
+    fit->slope_x   = inv10 * b0 + inv11 * b1 + inv12 * b2;
+    fit->slope_y   = inv20 * b0 + inv21 * b1 + inv22 * b2;
+
+    residual_sq_sum = 0.0f;
+    max_abs_residual = 0.0f;
+    worst_ch = 0U;
+
+    for (ch = 0U; ch < VL53L1X_CHANNEL_COUNT; ch++)
+    {
+        if (0U == ch_use[ch])
+        {
+            continue;
+        }
+
+        pred = fit->height_mm
+             + fit->slope_x * (float)s_tof_arm_x_mm[ch]
+             + fit->slope_y * (float)s_tof_arm_y_mm[ch];
+        residual = meas_mm[ch] - pred;
+        residual_sq_sum += residual * residual;
+        if (fabsf(residual) > max_abs_residual)
+        {
+            max_abs_residual = fabsf(residual);
+            worst_ch = ch;
+        }
+    }
+
+    fit->rms_mm = sqrtf(residual_sq_sum / (float)count);
+    fit->max_abs_residual_mm = max_abs_residual;
+    fit->count = count;
+    fit->worst_ch = worst_ch;
+    fit->solved = 1U;
+    return 1U;
+}
+
+static uint8 TOF_ShadowBuildMeasurement(const uint8 *ch_valid,
+                                        const float *meas_mm,
+                                        float *measure_mm,
+                                        float *measure_var_mm2)
+{
+    uint8 ch;
+    uint8 count;
+    uint8 ch_list[VL53L1X_CHANNEL_COUNT];
+    uint8 use_all[VL53L1X_CHANNEL_COUNT];
+    uint8 use_drop[VL53L1X_CHANNEL_COUNT];
+    TOFShadowPlaneFit_t fit;
+    TOFShadowPlaneFit_t fit_drop;
+
+    if ((0 == ch_valid) || (0 == meas_mm) || (0 == measure_mm) || (0 == measure_var_mm2))
+    {
+        return 0U;
+    }
+
+    count = 0U;
+    for (ch = 0U; ch < VL53L1X_CHANNEL_COUNT; ch++)
+    {
+        use_all[ch] = ch_valid[ch];
+        use_drop[ch] = ch_valid[ch];
+        if (0U != ch_valid[ch])
+        {
+            ch_list[count] = ch;
+            count++;
+        }
+    }
+
+    if (count >= 3U)
+    {
+        if (0U != TOF_ShadowSolvePlane(use_all, meas_mm, &fit))
+        {
+            if ((4U == count) && (fit.max_abs_residual_mm > TOF_SHADOW_DROP_RESIDUAL_MM))
+            {
+                use_drop[fit.worst_ch] = 0U;
+                if (0U != TOF_ShadowSolvePlane(use_drop, meas_mm, &fit_drop))
+                {
+                    fit = fit_drop;
+                }
+            }
+
+            *measure_mm = fit.height_mm;
+            if (fit.count >= 4U)
+            {
+                *measure_var_mm2 = TOF_SHADOW_R_4CH_MM2 + fit.rms_mm * fit.rms_mm;
+            }
+            else
+            {
+                *measure_var_mm2 = TOF_SHADOW_R_3CH_MM2 + fit.rms_mm * fit.rms_mm;
+            }
+
+            s_tof_shadow_slope_x = fit.slope_x;
+            s_tof_shadow_slope_y = fit.slope_y;
+            s_tof_shadow_slope_valid = 1U;
+            return 1U;
+        }
+    }
+
+    if (2U == count)
+    {
+        if (0U != TOF_ShadowIsDiagonalPair(ch_list[0], ch_list[1]))
+        {
+            *measure_mm = 0.5f * (meas_mm[ch_list[0]] + meas_mm[ch_list[1]]);
+            *measure_var_mm2 = TOF_SHADOW_R_2CH_DIAG_MM2;
+            return 1U;
+        }
+
+        if (0U != s_tof_shadow_slope_valid)
+        {
+            *measure_mm = 0.5f * ((meas_mm[ch_list[0]]
+                                 - s_tof_shadow_slope_x * (float)s_tof_arm_x_mm[ch_list[0]]
+                                 - s_tof_shadow_slope_y * (float)s_tof_arm_y_mm[ch_list[0]])
+                                + (meas_mm[ch_list[1]]
+                                 - s_tof_shadow_slope_x * (float)s_tof_arm_x_mm[ch_list[1]]
+                                 - s_tof_shadow_slope_y * (float)s_tof_arm_y_mm[ch_list[1]]));
+            *measure_var_mm2 = TOF_SHADOW_R_2CH_EDGE_MM2;
+            return 1U;
+        }
+
+        return 0U;
+    }
+
+    if ((1U == count) && (0U != s_tof_shadow_slope_valid))
+    {
+        *measure_mm = meas_mm[ch_list[0]]
+                    - s_tof_shadow_slope_x * (float)s_tof_arm_x_mm[ch_list[0]]
+                    - s_tof_shadow_slope_y * (float)s_tof_arm_y_mm[ch_list[0]];
+        *measure_var_mm2 = TOF_SHADOW_R_1CH_MM2;
+        return 1U;
+    }
+
+    return 0U;
+}
+
 void TOF_Init(void)
 {
     uint8 ch;
@@ -469,6 +888,7 @@ void TOF_Init(void)
     for (ch = 0U; ch < VL53L1X_CHANNEL_COUNT; ch++)
     {
         s_tof_offset_mm[ch] = 0;
+        s_tof_shadow_offset_mm[ch] = 0;
         TOF_ResetChannelState(&s_tof_state[ch]);
     }
     s_attitude_pitch_bias_deg = 0.0f;
@@ -500,10 +920,13 @@ void TOF_Calibrate(void)
     float  sum_pitch;
     float  sum_roll;
     uint32 sum_mm[VL53L1X_CHANNEL_COUNT];
+    float  sum_shadow_mm[VL53L1X_CHANNEL_COUNT];
     uint32 cnt[VL53L1X_CHANNEL_COUNT];
     int32  mean_mm[VL53L1X_CHANNEL_COUNT];
+    int32  mean_shadow_mm[VL53L1X_CHANNEL_COUNT];
     int32  valid_ch_count;
     int32  common_center;
+    int32  common_shadow;
     int32  max_mean;
     int32  min_mean;
     uint8  raw_valid;
@@ -524,10 +947,13 @@ void TOF_Calibrate(void)
     for (ch = 0U; ch < VL53L1X_CHANNEL_COUNT; ch++)
     {
         s_tof_offset_mm[ch] = 0;
+        s_tof_shadow_offset_mm[ch] = 0;
         TOF_ResetChannelState(&s_tof_state[ch]);
         sum_mm[ch]   = 0U;
+        sum_shadow_mm[ch] = 0.0f;
         cnt[ch]      = 0U;
         mean_mm[ch]  = -1;
+        mean_shadow_mm[ch] = -1;
     }
     TOF_ResetFusionState();
 
@@ -561,6 +987,7 @@ void TOF_Calibrate(void)
             {
                 center_mm = TOF_EstimateCenterHeight(data.distance_mm[ch], &att, ch);
                 sum_mm[ch] += (uint32)center_mm;
+                sum_shadow_mm[ch] += TOF_ShadowProjectDistanceMm(data.distance_mm[ch], &att, ch);
                 cnt[ch]++;
             }
         }
@@ -570,6 +997,7 @@ void TOF_Calibrate(void)
     /* ---- 阶段3：计算各通道均值、公共中心、零偏和偏差检查 ---- */
     valid_ch_count = 0;
     common_center  = 0;
+    common_shadow  = 0;
     max_mean = 0;
     min_mean = 65535;
 
@@ -578,7 +1006,9 @@ void TOF_Calibrate(void)
         if (cnt[ch] > 0U)
         {
             mean_mm[ch] = (int32)(sum_mm[ch] / cnt[ch]);
+            mean_shadow_mm[ch] = (int32)(sum_shadow_mm[ch] / (float)cnt[ch]);
             common_center += mean_mm[ch];
+            common_shadow += mean_shadow_mm[ch];
             valid_ch_count++;
             if (mean_mm[ch] > max_mean)
             {
@@ -597,11 +1027,13 @@ void TOF_Calibrate(void)
     {
         /* 对齐各通道到公共中心 */
         common_center /= valid_ch_count;
+        common_shadow /= valid_ch_count;
         for (ch = 0U; ch < VL53L1X_CHANNEL_COUNT; ch++)
         {
             if (mean_mm[ch] >= 0)
             {
                 s_tof_offset_mm[ch] = (int16)(common_center - mean_mm[ch]);
+                s_tof_shadow_offset_mm[ch] = (int16)(common_shadow - mean_shadow_mm[ch]);
             }
         }
 
@@ -965,6 +1397,93 @@ void TOF_Update(void)
  * 函数功能：100Hz任务入口，更新TOF融合高度。
  * 0411 0228 zyz实际测试执行一次 花费791.5 μs
  */
+void TOF_Shadow_Update(float dt_s)
+{
+    uint8 ch;
+    uint8 raw_valid;
+    uint8 ch_valid[VL53L1X_CHANNEL_COUNT];
+    float ch_meas_mm[VL53L1X_CHANNEL_COUNT];
+    float measure_mm;
+    float measure_var_mm2;
+    TOFAttitudeTerms_t att;
+
+    if (0U == s_tof_inited)
+    {
+        TOF_ShadowResetState();
+        return;
+    }
+
+    att = TOF_ComputeAttitudeTerms();
+
+    for (ch = 0U; ch < VL53L1X_CHANNEL_COUNT; ch++)
+    {
+        raw_valid = TOF_IsRawMeasurementValid(VL53L1X_data.distance_mm[ch],
+                                              VL53L1X_data.range_status[ch],
+                                              g_vl53l1x_diag[ch].ready,
+                                              g_vl53l1x_diag[ch].is_fresh);
+        ch_valid[ch] = 0U;
+        ch_meas_mm[ch] = 0.0f;
+
+        if ((0U != raw_valid) && (0U != att.valid))
+        {
+            ch_valid[ch] = 1U;
+            ch_meas_mm[ch] = TOF_ShadowProjectDistanceMm(VL53L1X_data.distance_mm[ch], &att, ch);
+        }
+    }
+
+    TOF_ShadowPredict(dt_s);
+
+    if ((0U != att.valid) &&
+        (0U != TOF_ShadowBuildMeasurement(ch_valid, ch_meas_mm, &measure_mm, &measure_var_mm2)))
+    {
+        measure_mm = TOF_ClampF(measure_mm, 0.0f, 65535.0f);
+
+        if (0U == s_tof_shadow_state.seeded)
+        {
+            TOF_ShadowSeed(measure_mm);
+        }
+        else
+        {
+            TOF_ShadowCorrect(measure_mm, measure_var_mm2);
+        }
+
+        s_tof_shadow_miss_count = 0U;
+        g_tof_shadow_valid = 1U;
+    }
+    else if (0U != s_tof_shadow_state.seeded)
+    {
+        if (s_tof_shadow_miss_count < 255U)
+        {
+            s_tof_shadow_miss_count++;
+        }
+
+        if (s_tof_shadow_miss_count > TOF_SHADOW_TIMEOUT_FRAMES)
+        {
+            s_tof_shadow_state.seeded = 0U;
+            s_tof_shadow_state.vz_mmps = 0.0f;
+            s_tof_shadow_slope_valid = 0U;
+            g_tof_shadow_valid = 0U;
+        }
+        else
+        {
+            g_tof_shadow_valid = 1U;
+        }
+    }
+    else
+    {
+        g_tof_shadow_valid = 0U;
+        g_tof_shadow_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
+        g_tof_shadow_vz_mps = 0.0f;
+        return;
+    }
+
+    s_tof_shadow_state.height_mm = TOF_ClampF(s_tof_shadow_state.height_mm, 0.0f, 65535.0f);
+    s_tof_shadow_state.vz_mmps = TOF_ClampF(s_tof_shadow_state.vz_mmps, -3000.0f, 3000.0f);
+
+    g_tof_shadow_height_mm = (uint16)(s_tof_shadow_state.height_mm + 0.5f);
+    g_tof_shadow_vz_mps = 0.001f * s_tof_shadow_state.vz_mmps;
+}
+
 void TOF_update_100HZ(void)
 {
     TOF_Update();

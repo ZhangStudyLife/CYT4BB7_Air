@@ -38,6 +38,9 @@ extern uint8 g_tof3_used_in_fusion;
 extern uint8 g_tof_fused_source;
 /* 校准通过标志：1=通道间偏差在允许范围内，0=校准失败或偏差过大 */
 extern uint8 g_tof_calibration_ok;
+extern uint16 g_tof_shadow_height_mm;
+extern float g_tof_shadow_vz_mps;
+extern uint8 g_tof_shadow_valid;
 
 /*
  * 函数功能：初始化四路TOF模块并执行零偏标定。
@@ -63,6 +66,7 @@ void TOF_Update(void);
  *   无。
  */
 void TOF_update_100HZ(void);
+void TOF_Shadow_Update(float dt_s);
 /*
  * 函数功能：执行TOF静态标定。
  *   阶段1：采样IMU 500ms，记录静态姿态偏差（消除陀螺仪固有倾斜）。

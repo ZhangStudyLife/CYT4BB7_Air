@@ -1,5 +1,6 @@
 #include "TOF_data.h"
 #include "../../HW_Drivers/Motor/Motor_Drive.h"
+#include "../../filter.h"
 #include "zf_common_headfile.h"
 #include <math.h>
 
@@ -23,6 +24,9 @@
 #define TOF_AGREE_GATE_MM                (22U)
 /* 融合失效后保持上一融合值的最大帧数 */
 #define TOF_FUSED_HOLD_FRAMES            (8U)
+#define TOF_FUSED_KF_Q_MM2               (16.0f)
+#define TOF_FUSED_KF_R_MM2               (100.0f)
+#define TOF_FUSED_KF_P0_MM2              (400.0f)
 /* 一致区间（所有融合通道差距<22mm）下的融合输出单步最大变化，单位：mm
  * 对应最大跟踪速度：12mm × 100Hz = 1.2m/s，满足正常飞行需求 */
 #define TOF_STEP_FAST_MM                 (12U)
@@ -164,10 +168,9 @@ static float s_attitude_pitch_bias_deg = 0.0f;
 static float s_attitude_roll_bias_deg  = 0.0f;
 /* 融合失效保持计数（最多保持TOF_FUSED_HOLD_FRAMES帧后输出无效） */
 static uint8 s_fused_invalid_hold_count = 0U;
+static Kalman1D_t s_tof_fused_kf = {0};
 /* 步进限幅内部参考值（浮点，与滤波输出解耦，防止滤波滞后影响步进判断） */
-static float s_fused_step_ref_mm = 0.0f;
 /* 最终输出IIR滤波状态（浮点，避免整数累积误差） */
-static float s_fused_lpf_mm = 0.0f;
 
 /* ==================== 内部工具函数 ==================== */
 
@@ -270,8 +273,11 @@ static void TOF_ResetFusionState(void)
     g_tof_fused_source = TOF_SRC_NONE;
 
     s_fused_invalid_hold_count = 0U;
-    s_fused_step_ref_mm = 0.0f;
-    s_fused_lpf_mm = 0.0f;
+    Kalman1D_Init(&s_tof_fused_kf,
+                  TOF_FUSED_KF_Q_MM2,
+                  TOF_FUSED_KF_R_MM2,
+                  TOF_FUSED_KF_P0_MM2,
+                  0.0f);
 }
 
 /*
@@ -279,6 +285,75 @@ static void TOF_ResetFusionState(void)
  * 返回值：
  *   TOFAttitudeTerms_t，包含 cos_term、sin_pitch、sin_roll 和有效标志。
  */
+static void TOF_Sort4(uint16 *vals, uint8 n);
+
+static void TOF_SeedFusionKalman(uint16 seed_mm)
+{
+    Kalman1D_Init(&s_tof_fused_kf,
+                  TOF_FUSED_KF_Q_MM2,
+                  TOF_FUSED_KF_R_MM2,
+                  TOF_FUSED_KF_P0_MM2,
+                  (float)seed_mm);
+    g_tof_fused_height_mm = seed_mm;
+    g_tof_fused_valid = 1U;
+}
+
+static uint8 TOF_BuildFusionMeasurement(const uint8 *ch_fusion_valid,
+                                        const uint16 *ch_center_mm,
+                                        uint16 *measure_mm,
+                                        uint8 *source)
+{
+    uint8 ch;
+    uint8 count = 0U;
+    uint8 first_ch = 0U;
+    uint16 sorted[VL53L1X_CHANNEL_COUNT];
+
+    for (ch = 0U; ch < VL53L1X_CHANNEL_COUNT; ch++)
+    {
+        if (0U != ch_fusion_valid[ch])
+        {
+            if (0U == count)
+            {
+                first_ch = ch;
+            }
+            sorted[count] = ch_center_mm[ch];
+            count++;
+        }
+    }
+
+    if (0U == count)
+    {
+        *measure_mm = 0U;
+        *source = TOF_SRC_NONE;
+        return 0U;
+    }
+
+    if (1U == count)
+    {
+        *measure_mm = sorted[0];
+        *source = (uint8)(TOF_SRC_CH1 + first_ch);
+        return count;
+    }
+
+    TOF_Sort4(sorted, count);
+    *source = TOF_SRC_MULTI;
+
+    if (2U == count)
+    {
+        *measure_mm = (uint16)(((uint32)sorted[0] + (uint32)sorted[1]) / 2U);
+    }
+    else if (3U == count)
+    {
+        *measure_mm = sorted[1];
+    }
+    else
+    {
+        *measure_mm = (uint16)(((uint32)sorted[1] + (uint32)sorted[2]) / 2U);
+    }
+
+    return count;
+}
+
 static TOFAttitudeTerms_t TOF_ComputeAttitudeTerms(void)
 {
     TOFAttitudeTerms_t att;
@@ -573,7 +648,6 @@ void TOF_Update(void)
     uint8  final_count;
     uint8  source;
     uint16 source_mm;
-    uint16 step_limit;
     TOFAttitudeTerms_t att;
     VL53L1X_data_struct data;
 
@@ -718,7 +792,6 @@ void TOF_Update(void)
         else
         {
             g_tof_fused_valid = 0U;
-            g_tof_fused_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
             g_tof_fused_source = TOF_SRC_NONE;
         }
         g_tof2_used_in_fusion = 0U;
@@ -738,6 +811,10 @@ void TOF_Update(void)
     }
 
     /* ---- 步骤4：异常值剔除（>=2路时做中值过滤，单路直接使用） ---- */
+    candidate_count = TOF_BuildFusionMeasurement(ch_fusion_valid,
+                                                 ch_center_mm,
+                                                 &source_mm,
+                                                 &source);
     if (candidate_count >= 2U)
     {
         /* 将候选值排序，计算中值 */
@@ -807,6 +884,13 @@ void TOF_Update(void)
         }
     }
 
+    if ((0U == final_count) && (candidate_count >= 2U))
+    {
+        sum_fused = (uint32)median_val;
+        final_count = 1U;
+        source = TOF_SRC_MULTI;
+    }
+
     if (final_count == 0U)
     {
         /* 无有效来源：短时保持，超时后输出无效 */
@@ -817,7 +901,6 @@ void TOF_Update(void)
         else
         {
             g_tof_fused_valid = 0U;
-            g_tof_fused_height_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
             g_tof_fused_source = TOF_SRC_NONE;
         }
         g_tof2_used_in_fusion = 0U;
@@ -846,73 +929,35 @@ void TOF_Update(void)
      */
 
     /* 确定步进限幅量：多通道高度一致时允许更大步进以提高响应速度 */
-    if (final_count >= 2U)
-    {
-        uint16 fused_max = 0U;
-        uint16 fused_min = 65535U;
-        uint16 range_mm;
-
-        for (ch = 0U; ch < VL53L1X_CHANNEL_COUNT; ch++)
-        {
-            if (0U != in_fusion[ch])
-            {
-                if (ch_center_mm[ch] > fused_max) { fused_max = ch_center_mm[ch]; }
-                if (ch_center_mm[ch] < fused_min) { fused_min = ch_center_mm[ch]; }
-            }
-        }
-        range_mm = TOF_AbsDiffU16(fused_max, fused_min);
-        step_limit = (range_mm <= TOF_AGREE_GATE_MM) ? TOF_STEP_FAST_MM : TOF_STEP_SAFE_MM;
-    }
-    else
-    {
-        step_limit = TOF_STEP_SAFE_MM;
-    }
-
     if (0U == g_tof_fused_valid)
     {
         /* 首次获得有效融合值：直接建立内部状态，不做步进限幅 */
-        s_fused_step_ref_mm = (float)source_mm;
-        s_fused_lpf_mm      = (float)source_mm;
-        g_tof_fused_height_mm = source_mm;
-        g_tof_fused_valid = 1U;
+        TOF_SeedFusionKalman(source_mm);
     }
     else
     {
-        float step_ref_delta;
-        float stepped_mm;
+        float fused_mm = Kalman1D_Update(&s_tof_fused_kf, (float)source_mm);
 
         /* 步进限幅：相对于内部参考值（s_fused_step_ref_mm）计算，防止滤波滞后影响 */
-        step_ref_delta = (float)source_mm - s_fused_step_ref_mm;
-        if (step_ref_delta > (float)step_limit)
-        {
-            step_ref_delta = (float)step_limit;
-        }
-        else if (step_ref_delta < -(float)step_limit)
-        {
-            step_ref_delta = -(float)step_limit;
-        }
-        s_fused_step_ref_mm += step_ref_delta;
-        stepped_mm = s_fused_step_ref_mm;
 
         /* IIR低通滤波：平滑步进后的值，抑制剩余传感器噪声 */
-        s_fused_lpf_mm += TOF_FUSED_LPF_ALPHA * (stepped_mm - s_fused_lpf_mm);
-        if (s_fused_lpf_mm < 0.0f)
+        if (fused_mm < 0.0f)
         {
-            s_fused_lpf_mm = 0.0f;
+            fused_mm = 0.0f;
         }
-        else if (s_fused_lpf_mm > 65535.0f)
+        else if (fused_mm > 65535.0f)
         {
-            s_fused_lpf_mm = 65535.0f;
+            fused_mm = 65535.0f;
         }
 
-        g_tof_fused_height_mm = (uint16)(s_fused_lpf_mm + 0.5f);
+        g_tof_fused_height_mm = (uint16)(fused_mm + 0.5f);
         g_tof_fused_valid = 1U;
     }
 
     g_tof_fused_source = source;
     /* 向后兼容：更新通道2/3使用标志 */
-    g_tof2_used_in_fusion = in_fusion[1];
-    g_tof3_used_in_fusion = in_fusion[2];
+    g_tof2_used_in_fusion = (candidate_count > 0U) ? ch_fusion_valid[1] : 0U;
+    g_tof3_used_in_fusion = (candidate_count > 0U) ? ch_fusion_valid[2] : 0U;
 
 }
 

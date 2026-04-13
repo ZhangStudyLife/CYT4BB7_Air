@@ -405,7 +405,12 @@ void FC_Loop_100Hz(void)
     fc_state = FC_START_CRSF_Get_State();
     s_flight_mode = FC_START_CRSF_Get_Flight_Mode(); /* 检测遥控器的模式 */
     FC_Handle_Mode_Transition_100Hz(s_flight_mode, fc_state);
-    wifi_justfloat(tick_1000us_cnt,g_tof1_height_mm, g_tof2_height_mm, g_tof3_height_mm, g_tof4_height_mm, g_tof_fused_height_mm,target_height_m,s_height_vz_mps);
+    wifi_justfloat(tick_1000us_cnt,
+        VL53L1X_data.distance_mm[0],g_tof1_height_mm, 
+        VL53L1X_data.distance_mm[1],g_tof2_height_mm,
+         VL53L1X_data.distance_mm[2],g_tof3_height_mm,
+          VL53L1X_data.distance_mm[3],g_tof4_height_mm,
+           g_tof_fused_height_mm,target_height_m*1000.0f,height_vz_raw_mps,s_height_vz_mps,g_euler.roll,g_euler.pitch);
 
     if (fc_state == FC_START_CRSF_STATE_FLYING)
     {

@@ -71,19 +71,24 @@
 #define TOF_SHADOW_P0_H_MM2              (400.0f)
 #define TOF_SHADOW_P0_V_MM2PS2           (40000.0f)
 #define TOF_SHADOW_Q_ACC_MM2PS4          (360000.0f)
-#define TOF_FUSED_TIMEOUT_FRAMES         (20U)
+#define TOF_FUSED_TIMEOUT_FRAMES         (12U)
 #define TOF_FUSED_R_4CH_MM2              (144.0f)
 #define TOF_FUSED_R_3CH_MM2              (400.0f)
 #define TOF_FUSED_R_2CH_MM2              (1296.0f)
+#define TOF_FUSED_R_2CH_EDGE_MM2         (4900.0f)
+#define TOF_FUSED_R_1CH_MM2              (10000.0f)
 #define TOF_FUSED_P0_H_MM2               (400.0f)
 #define TOF_FUSED_P0_V_MM2PS2            (40000.0f)
 #define TOF_FUSED_Q_ACC_MM2PS4           (800000.0f)
 #define TOF_FUSED_4CH_SPREAD_MM          (35U)
 #define TOF_FUSED_3CH_SPREAD_MM          (30U)
 #define TOF_FUSED_2CH_SPREAD_MM          (25U)
+#define TOF_FUSED_2CH_SPLIT_MM           (120U)
 #define TOF_FUSED_STICK_FRAMES           (6U)
 #define TOF_FUSED_STICK_SPREAD_MM        (8U)
 #define TOF_FUSED_STICK_PRED_MM          (15.0f)
+#define TOF_FUSED_MISS_VZ_DAMP           (0.70f)
+#define TOF_FUSED_MISS_VZ_STOP_MMPS      (30.0f)
 
 /* ==================== 融合来源标识宏 ==================== */
 
@@ -411,6 +416,10 @@ static float TOF_FusedBaseVariance(uint8 count)
     {
         return TOF_FUSED_R_3CH_MM2;
     }
+    if (TOF_MEASURE_CLASS_1CH == count)
+    {
+        return TOF_FUSED_R_1CH_MM2;
+    }
     return TOF_FUSED_R_2CH_MM2;
 }
 
@@ -507,9 +516,19 @@ static uint8 TOF_FusedBuildCandidate(const uint8 *ch_valid,
 {
     uint8 ch;
     uint8 count;
+    uint8 i;
+    uint8 j;
+    uint8 key_mask;
+    uint8 order_mask[VL53L1X_CHANNEL_COUNT];
+    uint16 key;
     uint16 sorted[VL53L1X_CHANNEL_COUNT];
-    uint32 sum_mm;
-    uint16 spread_limit_mm;
+    uint16 diff_lo;
+    uint16 diff_hi;
+    uint16 spread_mm;
+    float measure_var_mm2;
+    float err0_mm;
+    float err1_mm;
+    uint8 use_idx;
 
     if ((0 == ch_valid) || (0 == ch_center_mm) || (0 == candidate))
     {
@@ -525,7 +544,6 @@ static uint8 TOF_FusedBuildCandidate(const uint8 *ch_valid,
     candidate->measure_var_mm2 = 0.0f;
 
     count = 0U;
-    sum_mm = 0U;
     for (ch = 0U; ch < VL53L1X_CHANNEL_COUNT; ch++)
     {
         if (0U == (mask & (uint8)(1U << ch)))
@@ -539,99 +557,90 @@ static uint8 TOF_FusedBuildCandidate(const uint8 *ch_valid,
         }
 
         sorted[count] = ch_center_mm[ch];
-        sum_mm += (uint32)ch_center_mm[ch];
+        order_mask[count] = (uint8)(1U << ch);
         count++;
     }
 
-    if (TOF_MEASURE_CLASS_4CH == count)
-    {
-        spread_limit_mm = TOF_FUSED_4CH_SPREAD_MM;
-    }
-    else if (TOF_MEASURE_CLASS_3CH == count)
-    {
-        spread_limit_mm = TOF_FUSED_3CH_SPREAD_MM;
-    }
-    else if ((TOF_MEASURE_CLASS_2CH == count) && (0U != TOF_IsDiagonalMask(mask)))
-    {
-        spread_limit_mm = TOF_FUSED_2CH_SPREAD_MM;
-    }
-    else
+    if (0U == count)
     {
         return 0U;
     }
 
-    TOF_Sort4(sorted, count);
-    candidate->spread_mm = (uint16)(sorted[count - 1U] - sorted[0]);
-    if (candidate->spread_mm > spread_limit_mm)
+    for (i = 1U; i < count; i++)
     {
-        return 0U;
+        key = sorted[i];
+        key_mask = order_mask[i];
+        j = i;
+        while ((j > 0U) && (sorted[j - 1U] > key))
+        {
+            sorted[j] = sorted[j - 1U];
+            order_mask[j] = order_mask[j - 1U];
+            j--;
+        }
+        sorted[j] = key;
+        order_mask[j] = key_mask;
+    }
+
+    spread_mm = 0U;
+    measure_var_mm2 = 0.0f;
+
+    if (TOF_MEASURE_CLASS_4CH == count)
+    {
+        candidate->measure_mm = (uint16)(((uint32)sorted[1] + (uint32)sorted[2]) / 2U);
+        spread_mm = (uint16)(sorted[2] - sorted[1]);
+        measure_var_mm2 = TOF_FusedBaseVariance(count) + 0.25f * (float)spread_mm * (float)spread_mm;
+    }
+    else if (TOF_MEASURE_CLASS_3CH == count)
+    {
+        candidate->measure_mm = sorted[1];
+        diff_lo = (uint16)(sorted[1] - sorted[0]);
+        diff_hi = (uint16)(sorted[2] - sorted[1]);
+        spread_mm = (diff_lo < diff_hi) ? diff_lo : diff_hi;
+        measure_var_mm2 = TOF_FusedBaseVariance(count) + 0.25f * (float)spread_mm * (float)spread_mm;
+    }
+    else if (TOF_MEASURE_CLASS_2CH == count)
+    {
+        spread_mm = (uint16)(sorted[1] - sorted[0]);
+
+        if ((spread_mm > TOF_FUSED_2CH_SPLIT_MM) && (0U != s_tof_fused_state.seeded))
+        {
+            err0_mm = fabsf((float)sorted[0] - s_tof_fused_state.height_mm);
+            err1_mm = fabsf((float)sorted[1] - s_tof_fused_state.height_mm);
+            use_idx = (err0_mm <= err1_mm) ? 0U : 1U;
+            candidate->measure_mm = sorted[use_idx];
+            candidate->mask = order_mask[use_idx];
+            candidate->count = TOF_MEASURE_CLASS_1CH;
+            candidate->spread_mm = 0U;
+            candidate->pred_err_mm = (use_idx == 0U) ? err0_mm : err1_mm;
+            candidate->measure_var_mm2 = TOF_FUSED_R_1CH_MM2 + 0.0625f * (float)spread_mm * (float)spread_mm;
+            candidate->valid = 1U;
+            return 1U;
+        }
+
+        candidate->measure_mm = (uint16)(((uint32)sorted[0] + (uint32)sorted[1]) / 2U);
+        if (0U != TOF_IsDiagonalMask(mask))
+        {
+            measure_var_mm2 = TOF_FUSED_R_2CH_MM2 + 0.25f * (float)spread_mm * (float)spread_mm;
+        }
+        else
+        {
+            measure_var_mm2 = TOF_FUSED_R_2CH_EDGE_MM2 + 0.25f * (float)spread_mm * (float)spread_mm;
+        }
+    }
+    else
+    {
+        candidate->measure_mm = sorted[0];
+        measure_var_mm2 = TOF_FusedBaseVariance(TOF_MEASURE_CLASS_1CH);
     }
 
     candidate->valid = 1U;
     candidate->count = count;
-    candidate->measure_mm = (uint16)(sum_mm / (uint32)count);
+    candidate->spread_mm = spread_mm;
     if (0U != s_tof_fused_state.seeded)
     {
         candidate->pred_err_mm = fabsf((float)candidate->measure_mm - s_tof_fused_state.height_mm);
     }
-    candidate->measure_var_mm2 = TOF_FusedBaseVariance(count) + 0.25f * (float)candidate->spread_mm * (float)candidate->spread_mm;
-    return 1U;
-}
-
-static uint8 TOF_FusedCandidateBetter(const TOFFusedCandidate_t *lhs,
-                                      const TOFFusedCandidate_t *rhs)
-{
-    if ((0 == lhs) || (0 == rhs))
-    {
-        return 0U;
-    }
-
-    if (0U == rhs->valid)
-    {
-        return lhs->valid;
-    }
-    if (0U == lhs->valid)
-    {
-        return 0U;
-    }
-    if (lhs->count != rhs->count)
-    {
-        return (lhs->count > rhs->count);
-    }
-    if (lhs->spread_mm != rhs->spread_mm)
-    {
-        return (lhs->spread_mm < rhs->spread_mm);
-    }
-    if (fabsf(lhs->pred_err_mm - rhs->pred_err_mm) > 0.5f)
-    {
-        return (lhs->pred_err_mm < rhs->pred_err_mm);
-    }
-    return (lhs->mask < rhs->mask);
-}
-
-static uint8 TOF_FusedCandidatesClose(const TOFFusedCandidate_t *best,
-                                      const TOFFusedCandidate_t *prev)
-{
-    if ((0 == best) || (0 == prev))
-    {
-        return 0U;
-    }
-    if ((0U == best->valid) || (0U == prev->valid))
-    {
-        return 0U;
-    }
-    if (best->count != prev->count)
-    {
-        return 0U;
-    }
-    if (TOF_AbsDiffU16(best->spread_mm, prev->spread_mm) > TOF_FUSED_STICK_SPREAD_MM)
-    {
-        return 0U;
-    }
-    if (fabsf(best->pred_err_mm - prev->pred_err_mm) > TOF_FUSED_STICK_PRED_MM)
-    {
-        return 0U;
-    }
+    candidate->measure_var_mm2 = measure_var_mm2;
     return 1U;
 }
 
@@ -639,88 +648,42 @@ static uint8 TOF_FusedSelectCandidate(const uint8 *ch_valid,
                                       const uint16 *ch_center_mm,
                                       TOFFusedCandidate_t *selected)
 {
-    static const uint8 s_candidate_masks[] = {0x0FU, 0x0EU, 0x0DU, 0x0BU, 0x07U, 0x09U, 0x06U};
-    TOFFusedCandidate_t candidates[7];
-    uint8 valid_count;
-    uint8 i;
-    int16 best_idx;
-    int16 prev_idx;
-    int16 chosen_idx;
+    uint8 ch;
+    uint8 valid_mask;
 
     if ((0 == ch_valid) || (0 == ch_center_mm) || (0 == selected))
     {
         return 0U;
     }
 
-    valid_count = 0U;
-    for (i = 0U; i < (uint8)(sizeof(s_candidate_masks) / sizeof(s_candidate_masks[0])); i++)
+    valid_mask = 0U;
+    for (ch = 0U; ch < VL53L1X_CHANNEL_COUNT; ch++)
     {
-        if (0U != TOF_FusedBuildCandidate(ch_valid, ch_center_mm, s_candidate_masks[i], &candidates[valid_count]))
+        if (0U != ch_valid[ch])
         {
-            valid_count++;
+            valid_mask |= (uint8)(1U << ch);
         }
     }
 
-    if (0U == valid_count)
+    if (0U == valid_mask)
     {
+        s_tof_fused_last_measure_mask = 0U;
+        s_tof_fused_pending_mask = 0U;
+        s_tof_fused_pending_count = 0U;
         return 0U;
     }
 
-    best_idx = 0;
-    for (i = 1U; i < valid_count; i++)
+    if (0U == TOF_FusedBuildCandidate(ch_valid, ch_center_mm, valid_mask, selected))
     {
-        if (0U != TOF_FusedCandidateBetter(&candidates[i], &candidates[best_idx]))
-        {
-            best_idx = (int16)i;
-        }
-    }
-
-    prev_idx = -1;
-    for (i = 0U; i < valid_count; i++)
-    {
-        if (candidates[i].mask == s_tof_fused_last_measure_mask)
-        {
-            prev_idx = (int16)i;
-            break;
-        }
-    }
-
-    chosen_idx = best_idx;
-    if ((prev_idx >= 0) &&
-        (candidates[best_idx].mask != candidates[prev_idx].mask) &&
-        (0U != TOF_FusedCandidatesClose(&candidates[best_idx], &candidates[prev_idx])))
-    {
-        if (s_tof_fused_pending_mask == candidates[best_idx].mask)
-        {
-            if (s_tof_fused_pending_count < 255U)
-            {
-                s_tof_fused_pending_count++;
-            }
-        }
-        else
-        {
-            s_tof_fused_pending_mask = candidates[best_idx].mask;
-            s_tof_fused_pending_count = 1U;
-        }
-
-        if (s_tof_fused_pending_count < TOF_FUSED_STICK_FRAMES)
-        {
-            chosen_idx = prev_idx;
-        }
-        else
-        {
-            s_tof_fused_pending_mask = 0U;
-            s_tof_fused_pending_count = 0U;
-        }
-    }
-    else
-    {
+        s_tof_fused_last_measure_mask = 0U;
         s_tof_fused_pending_mask = 0U;
         s_tof_fused_pending_count = 0U;
+        return 0U;
     }
 
-    *selected = candidates[chosen_idx];
     s_tof_fused_last_measure_mask = selected->mask;
+    s_tof_fused_pending_mask = 0U;
+    s_tof_fused_pending_count = 0U;
     return 1U;
 }
 
@@ -1388,13 +1351,39 @@ static void TOF_Update_Robust(void)
 
         s_tof_fused_miss_count = 0U;
         g_tof_fused_valid = 1U;
-        g_tof_fused_source = TOF_SRC_MULTI;
+        if (selected.count >= TOF_MEASURE_CLASS_2CH)
+        {
+            g_tof_fused_source = TOF_SRC_MULTI;
+        }
+        else if (0U != (selected.mask & 0x01U))
+        {
+            g_tof_fused_source = TOF_SRC_CH1;
+        }
+        else if (0U != (selected.mask & 0x02U))
+        {
+            g_tof_fused_source = TOF_SRC_CH2;
+        }
+        else if (0U != (selected.mask & 0x04U))
+        {
+            g_tof_fused_source = TOF_SRC_CH3;
+        }
+        else if (0U != (selected.mask & 0x08U))
+        {
+            g_tof_fused_source = TOF_SRC_CH4;
+        }
     }
     else if (0U != s_tof_fused_state.seeded)
     {
         if (s_tof_fused_miss_count < 255U)
         {
             s_tof_fused_miss_count++;
+        }
+
+        s_tof_fused_state.vz_mmps *= TOF_FUSED_MISS_VZ_DAMP;
+        if ((s_tof_fused_state.vz_mmps < TOF_FUSED_MISS_VZ_STOP_MMPS) &&
+            (s_tof_fused_state.vz_mmps > -TOF_FUSED_MISS_VZ_STOP_MMPS))
+        {
+            s_tof_fused_state.vz_mmps = 0.0f;
         }
 
         if (s_tof_fused_miss_count > TOF_FUSED_TIMEOUT_FRAMES)

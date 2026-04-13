@@ -7,6 +7,7 @@
 #include "zf_common_headfile.h"
 
 #define TOF_MEASURE_CLASS_NONE          (0U)
+#define TOF_MEASURE_CLASS_1CH           (1U)
 #define TOF_MEASURE_CLASS_2CH           (2U)
 #define TOF_MEASURE_CLASS_3CH           (3U)
 #define TOF_MEASURE_CLASS_4CH           (4U)

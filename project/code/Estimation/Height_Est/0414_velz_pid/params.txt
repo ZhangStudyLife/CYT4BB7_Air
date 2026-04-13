@@ -1,0 +1,94 @@
+wifi_justfloat(tick_1000us_cnt,
+                target_height_m * 1000.0f,
+                g_tof_fused_height_mm,
+                height_err_mm,
+                height_pos_out,
+                s_height_vz_mps,
+                height_vz_raw_mps,
+                height_vel_pid.error,
+                height_vel_pid.p_term,
+                height_vel_pid.i_term,
+                height_vel_pid.d_term,
+                height_vel_out,
+                throttle_z_cmd,
+                g_tof_measure_height_mm,
+                g_tof_fused_valid,
+                g_tof_measure_mask);
+
+                以上是04140420开始的飞行日志记录 用于调节velz的参数
+
+project\code\Estimation\Height_Est\0414_velz_pid\04140419_velz_data.csv
+以上这个飞行日志基于    
+/* ===== Z 轴位置环参数 ===== */
+params->pos_z_kp = 0.8f;
+params->pos_z_ki = 0.0f;
+params->pos_z_kd = 0.06f;
+params->pos_z_kff = 0.0f;
+params->pos_z_i_limit = 0.0f;
+params->pos_z_d_lpf = 2.0f;
+/* ===== Z 轴速度环参数 ===== */
+params->vel_z_kp = 900.0f;
+params->vel_z_ki = 95.0f;
+params->vel_z_kd = 38.0f;
+params->vel_z_kff = 0.0f;
+params->vel_z_i_limit = 450.0f;
+params->vel_z_d_lpf = 1.3f;
+
+
+
+=========================================================================
+project\code\Estimation\Height_Est\0414_velz_pid\04140435_velz_data.csv
+/* ===== Z 轴位置环参数 ===== */
+params->pos_z_kp = 0.8f;
+params->pos_z_ki = 0.0f;
+params->pos_z_kd = 0.06f;
+params->pos_z_kff = 0.0f;
+params->pos_z_i_limit = 0.0f;
+params->pos_z_d_lpf = 2.0f;
+/* ===== Z 轴速度环参数 ===== */
+params->vel_z_kp = 400.0f;
+params->vel_z_ki = 120.0f;
+params->vel_z_kd = 0.0f;
+params->vel_z_kff = 0.0f;
+params->vel_z_i_limit = 450.0f;
+params->vel_z_d_lpf = 1.3f;
+
+
+
+project\code\Estimation\Height_Est\0414_velz_pid\04140442_velz_data.csv
+/* ===== Z 轴位置环参数 ===== */
+params->pos_z_kp = 0.8f;
+params->pos_z_ki = 0.0f;
+params->pos_z_kd = 0.06f;
+params->pos_z_kff = 0.0f;
+params->pos_z_i_limit = 0.0f;
+params->pos_z_d_lpf = 2.0f;
+/* ===== Z 轴速度环参数 ===== */
+params->vel_z_kp = 300.0f;
+params->vel_z_ki = 140.0f;
+params->vel_z_kd = 0.0f;
+params->vel_z_kff = 0.0f;
+params->vel_z_i_limit = 450.0f;
+params->vel_z_d_lpf = 1.3f;
+
+
+
+
+
+
+project\code\Estimation\Height_Est\0414_velz_pid\04140447_velz_data.csv
+/* ===== Z 轴位置环参数 ===== */
+params->pos_z_kp = 0.8f;
+params->pos_z_ki = 0.0f;
+params->pos_z_kd = 0.06f;
+params->pos_z_kff = 0.0f;
+params->pos_z_i_limit = 0.0f;
+params->pos_z_d_lpf = 2.0f;
+/* ===== Z 轴速度环参数 ===== */
+params->vel_z_kp = 300.0f;
+params->vel_z_ki = 40.0f;
+params->vel_z_kd = 0.0f;
+params->vel_z_kff = 0.0f;
+params->vel_z_i_limit = 450.0f;
+params->vel_z_d_lpf = 1.3f;
+

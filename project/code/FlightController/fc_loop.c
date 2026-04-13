@@ -53,7 +53,6 @@ static const float s_fc_deg_to_rad = 0.017453293f;
 static const float s_fc_tilt_cos_min = 0.9f;
 static const float s_fc_tilt_comp_throttle_max = 10000.0f;
 
-
 /*
  * 函数名: fc_clampf
  * 功能: 对浮点数进行上下限钳位
@@ -113,7 +112,7 @@ static float FC_Apply_Tilt_Throttle_Compensation(float throttle_raw)
  */
 static float FC_Map_TargetHeightFromCh2(float ch2_std)
 {
-        return (ch2_std + 1000.0f) * 0.0006f;
+    return (ch2_std + 1000.0f) * 0.0006f;
 }
 
 /*
@@ -368,7 +367,9 @@ void FC_Loop_100Hz(void)
     FC_START_CRSF_state_e fc_state;
     float ch2;
     float height_m;
+    float height_err_mm;
     float height_vz_raw_mps;
+    float throttle_z_cmd;
     uint32 tick_now = tick_1000us_cnt;
     uint32 diff = tick_now - tick_1000us_cnt_last;
     float dt = diff * 0.001f;
@@ -400,12 +401,6 @@ void FC_Loop_100Hz(void)
     fc_state = FC_START_CRSF_Get_State();
     s_flight_mode = FC_START_CRSF_Get_Flight_Mode(); /* 检测遥控器的模式 */
     FC_Handle_Mode_Transition_100Hz(s_flight_mode, fc_state);
-    wifi_justfloat(tick_1000us_cnt,
-        g_tof_measure_height_mm,g_tof1_height_mm,
-        VL53L1X_data.distance_mm[1],g_tof2_height_mm,
-         VL53L1X_data.distance_mm[2],g_tof3_height_mm,
-          g_tof_measure_mask,g_tof4_height_mm,
-           g_tof_fused_height_mm,target_height_m*1000.0f,height_vz_raw_mps,g_tof_fused_vz_mps,g_euler.roll,g_euler.pitch);
 
     if (fc_state == FC_START_CRSF_STATE_FLYING)
     {
@@ -437,6 +432,28 @@ void FC_Loop_100Hz(void)
         s_height_vz_mps = 0.0f;
         height_pos_out = 0.0f;
         height_vel_out = 0.0f;
+    }
+
+    height_err_mm = target_height_m * 1000.0f - g_tof_fused_height_mm;
+    throttle_z_cmd = g_fc_params.base_throttle + height_vel_out;
+    if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
+    {
+        wifi_justfloat(tick_1000us_cnt,
+                       target_height_m * 1000.0f,
+                       g_tof_fused_height_mm,
+                       height_err_mm,
+                       height_pos_out,
+                       s_height_vz_mps,
+                       height_vz_raw_mps,
+                       height_vel_pid.error,
+                       height_vel_pid.p_term,
+                       height_vel_pid.i_term,
+                       height_vel_pid.d_term,
+                       height_vel_out,
+                       throttle_z_cmd,
+                       g_tof_measure_height_mm,
+                       g_tof_fused_valid,
+                       g_tof_measure_mask);
     }
 
     switch (s_flight_mode)

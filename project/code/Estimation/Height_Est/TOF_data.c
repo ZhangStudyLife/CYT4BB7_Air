@@ -89,6 +89,7 @@
 #define TOF_FUSED_STICK_PRED_MM          (15.0f)
 #define TOF_FUSED_MISS_VZ_DAMP           (0.70f)
 #define TOF_FUSED_MISS_VZ_STOP_MMPS      (30.0f)
+#define TOF_FUSED_VZ_HIST_LEN            (4U)
 
 /* ==================== 融合来源标识宏 ==================== */
 
@@ -249,6 +250,8 @@ static float s_attitude_roll_bias_deg  = 0.0f;
 /* 融合失效保持计数（最多保持TOF_FUSED_HOLD_FRAMES帧后输出无效） */
 static TOFFusedState_t s_tof_fused_state = {0};
 static uint8 s_tof_fused_miss_count = 0U;
+static uint16 s_tof_fused_meas_hist_mm[TOF_FUSED_VZ_HIST_LEN] = {0};
+static uint8 s_tof_fused_meas_hist_count = 0U;
 static uint8 s_tof_fused_last_measure_mask = 0U;
 static uint8 s_tof_fused_pending_mask = 0U;
 static uint8 s_tof_fused_pending_count = 0U;
@@ -377,6 +380,7 @@ static void TOF_ResetFusionState(void)
     s_tof_fused_state.p10 = 0.0f;
     s_tof_fused_state.p11 = TOF_FUSED_P0_V_MM2PS2;
     s_tof_fused_miss_count = 0U;
+    s_tof_fused_meas_hist_count = 0U;
     s_tof_fused_last_measure_mask = 0U;
     s_tof_fused_pending_mask = 0U;
     s_tof_fused_pending_count = 0U;
@@ -433,6 +437,8 @@ static void TOF_FusedSeed(float height_mm)
     s_tof_fused_state.p10 = 0.0f;
     s_tof_fused_state.p11 = TOF_FUSED_P0_V_MM2PS2;
     s_tof_fused_miss_count = 0U;
+    s_tof_fused_meas_hist_mm[0] = (uint16)(height_mm + 0.5f);
+    s_tof_fused_meas_hist_count = 1U;
 }
 
 static void TOF_FusedPredict(float dt_s)
@@ -470,14 +476,15 @@ static void TOF_FusedPredict(float dt_s)
 
 static void TOF_FusedCorrect(float measure_mm, float measure_var_mm2)
 {
+    float dt_s;
+    float alpha;
+    float beta;
+    float gamma;
     float innov;
-    float s;
-    float k0;
-    float k1;
-    float p00;
-    float p01;
-    float p10;
-    float p11;
+    float vz_meas_mmps;
+    uint8 i;
+    uint8 hist_span;
+    uint16 measure_mm_u16;
 
     if (0U == s_tof_fused_state.seeded)
     {
@@ -485,28 +492,88 @@ static void TOF_FusedCorrect(float measure_mm, float measure_var_mm2)
     }
 
     measure_var_mm2 = TOF_ClampF(measure_var_mm2, 1.0f, 40000.0f);
+    dt_s = 0.01f;
+    alpha = 0.75f;
+    beta = 0.12f;
+    gamma = 0.30f;
 
-    p00 = s_tof_fused_state.p00;
-    p01 = s_tof_fused_state.p01;
-    p10 = s_tof_fused_state.p10;
-    p11 = s_tof_fused_state.p11;
-
-    innov = measure_mm - s_tof_fused_state.height_mm;
-    s = p00 + measure_var_mm2;
-    if (s < 1.0f)
+    if (TOF_MEASURE_CLASS_4CH == g_tof_measure_class)
     {
-        s = 1.0f;
+        alpha = 0.90f;
+        beta = 0.20f;
+        gamma = 0.50f;
+    }
+    else if (TOF_MEASURE_CLASS_3CH == g_tof_measure_class)
+    {
+        alpha = 0.84f;
+        beta = 0.16f;
+        gamma = 0.42f;
+    }
+    else if (TOF_MEASURE_CLASS_2CH == g_tof_measure_class)
+    {
+        alpha = 0.72f;
+        beta = 0.10f;
+        gamma = 0.26f;
+    }
+    else if (TOF_MEASURE_CLASS_1CH == g_tof_measure_class)
+    {
+        alpha = 0.55f;
+        beta = 0.06f;
+        gamma = 0.15f;
     }
 
-    k0 = p00 / s;
-    k1 = p10 / s;
+    if (measure_var_mm2 > 6000.0f)
+    {
+        alpha *= 0.85f;
+        beta *= 0.80f;
+        gamma *= 0.80f;
+    }
+    else if (measure_var_mm2 < 400.0f)
+    {
+        alpha = TOF_ClampF(alpha * 1.05f, 0.0f, 0.95f);
+        beta = TOF_ClampF(beta * 1.10f, 0.0f, 0.30f);
+        gamma = TOF_ClampF(gamma * 1.05f, 0.0f, 0.70f);
+    }
 
-    s_tof_fused_state.height_mm += k0 * innov;
-    s_tof_fused_state.vz_mmps += k1 * innov;
-    s_tof_fused_state.p00 = (1.0f - k0) * p00;
-    s_tof_fused_state.p01 = (1.0f - k0) * p01;
-    s_tof_fused_state.p10 = p10 - k1 * p00;
-    s_tof_fused_state.p11 = p11 - k1 * p01;
+    innov = measure_mm - s_tof_fused_state.height_mm;
+    s_tof_fused_state.height_mm += alpha * innov;
+    s_tof_fused_state.vz_mmps += (beta * innov) / dt_s;
+
+    if (0U != s_tof_fused_miss_count)
+    {
+        s_tof_fused_meas_hist_count = 0U;
+    }
+
+    measure_mm_u16 = (uint16)(TOF_ClampF(measure_mm, 0.0f, 65535.0f) + 0.5f);
+    if (s_tof_fused_meas_hist_count < TOF_FUSED_VZ_HIST_LEN)
+    {
+        s_tof_fused_meas_hist_mm[s_tof_fused_meas_hist_count] = measure_mm_u16;
+        s_tof_fused_meas_hist_count++;
+    }
+    else
+    {
+        for (i = 1U; i < TOF_FUSED_VZ_HIST_LEN; i++)
+        {
+            s_tof_fused_meas_hist_mm[i - 1U] = s_tof_fused_meas_hist_mm[i];
+        }
+        s_tof_fused_meas_hist_mm[TOF_FUSED_VZ_HIST_LEN - 1U] = measure_mm_u16;
+    }
+
+    if (s_tof_fused_meas_hist_count >= 2U)
+    {
+        hist_span = (uint8)(s_tof_fused_meas_hist_count - 1U);
+        vz_meas_mmps = ((float)s_tof_fused_meas_hist_mm[s_tof_fused_meas_hist_count - 1U]
+                      - (float)s_tof_fused_meas_hist_mm[0]) / ((float)hist_span * dt_s);
+        vz_meas_mmps = TOF_ClampF(vz_meas_mmps, -3000.0f, 3000.0f);
+
+        if ((s_tof_fused_state.vz_mmps * vz_meas_mmps) < 0.0f)
+        {
+            gamma = TOF_ClampF(gamma + 0.20f, 0.0f, 0.85f);
+        }
+
+        s_tof_fused_state.vz_mmps =
+            ((1.0f - gamma) * s_tof_fused_state.vz_mmps) + (gamma * vz_meas_mmps);
+    }
 }
 
 static uint8 TOF_FusedBuildCandidate(const uint8 *ch_valid,
@@ -1390,6 +1457,7 @@ static void TOF_Update_Robust(void)
         {
             s_tof_fused_state.seeded = 0U;
             s_tof_fused_state.vz_mmps = 0.0f;
+            s_tof_fused_meas_hist_count = 0U;
             g_tof_fused_valid = 0U;
             g_tof_fused_vz_mps = 0.0f;
             s_tof_fused_last_measure_mask = 0U;
@@ -1405,6 +1473,7 @@ static void TOF_Update_Robust(void)
     {
         g_tof_fused_valid = 0U;
         g_tof_fused_vz_mps = 0.0f;
+        s_tof_fused_meas_hist_count = 0U;
     }
 
     if (0U != s_tof_fused_state.seeded)

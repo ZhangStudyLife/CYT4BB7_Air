@@ -89,8 +89,15 @@
 #define TOF_FUSED_STICK_PRED_MM          (15.0f)
 #define TOF_FUSED_MISS_VZ_DAMP           (0.70f)
 #define TOF_FUSED_MISS_VZ_STOP_MMPS      (30.0f)
-/* 速度观测差分窗口长度；适当拉长可抑制量测切换帧带来的速度尖峰 */
-#define TOF_FUSED_VZ_HIST_LEN            (5U)
+/* 速度观测差分窗口长度；适当拉长可抑制量测切换帧带来的速度尖峰
+ * 7帧 × 10ms = 60ms差分基线，相比5帧(40ms)可降低高空速度噪声约30% */
+#define TOF_FUSED_VZ_HIST_LEN            (7U)
+/* 高度自适应增益衰减起始高度，单位：mm */
+#define TOF_VZ_ADAPT_H_LOW_MM            (600.0f)
+/* 高度自适应增益衰减终止高度，单位：mm */
+#define TOF_VZ_ADAPT_H_HIGH_MM           (1200.0f)
+/* 高空时beta/gamma的最小缩放系数(0~1)；越小滤波越强、延迟越大 */
+#define TOF_VZ_ADAPT_GAIN_MIN            (0.55f)
 /* 相邻两帧速度观测允许逼近当前速度状态的最大变化量，单位：mm/s */
 #define TOF_FUSED_VZ_DV_LIMIT_MMPS       (450.0f)
 /* 量测来源掩码切换时，速度残差更新缩放系数 */
@@ -489,6 +496,7 @@ static void TOF_FusedCorrect(float measure_mm, float measure_var_mm2)
     float gamma;
     float innov;
     float vz_meas_mmps;
+    float adapt_scale;
     float vz_delta_mmps;
     uint8 i;
     uint8 hist_span;
@@ -550,6 +558,19 @@ static void TOF_FusedCorrect(float measure_mm, float measure_var_mm2)
         s_tof_fused_meas_hist_count = 0U;
         beta *= TOF_FUSED_VZ_SWITCH_BETA_SCALE;
         gamma *= TOF_FUSED_VZ_SWITCH_GAMMA_SCALE;
+    }
+
+    if (s_tof_fused_state.height_mm > TOF_VZ_ADAPT_H_LOW_MM)
+    {
+        adapt_scale = 1.0f - (1.0f - TOF_VZ_ADAPT_GAIN_MIN)
+                    * (s_tof_fused_state.height_mm - TOF_VZ_ADAPT_H_LOW_MM)
+                    / (TOF_VZ_ADAPT_H_HIGH_MM - TOF_VZ_ADAPT_H_LOW_MM);
+        if (adapt_scale < TOF_VZ_ADAPT_GAIN_MIN)
+        {
+            adapt_scale = TOF_VZ_ADAPT_GAIN_MIN;
+        }
+        beta *= adapt_scale;
+        gamma *= adapt_scale;
     }
 
     innov = measure_mm - s_tof_fused_state.height_mm;

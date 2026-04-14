@@ -267,3 +267,55 @@ params->vel_z_d_lpf   = 1.5f; // 保持
 | kd: 15→20 | D项当前仅占7.6%偏低，提到20可更好抑制0.3-0.7Hz的低频摇摆 |
 
 **飞行建议**: 起飞后先保持**30秒完全不打杆**，专门采集安静悬停数据观察I项收敛情况，然后再做机动测试。
+
+
+
+
+
+
+project\code\Estimation\Height_Est\0414_velz_pid\04141658_velz_data.csv
+/* 速度观测差分窗口长度；适当拉长可抑制量测切换帧带来的速度尖峰
+ * 7帧 × 10ms = 60ms差分基线，相比5帧(40ms)可降低高空速度噪声约30% */
+#define TOF_FUSED_VZ_HIST_LEN            (7U)
+/* 高度自适应增益衰减起始高度，单位：mm */
+#define TOF_VZ_ADAPT_H_LOW_MM            (600.0f)
+/* 高度自适应增益衰减终止高度，单位：mm */
+#define TOF_VZ_ADAPT_H_HIGH_MM           (1200.0f)
+/* 高空时beta/gamma的最小缩放系数(0~1)；越小滤波越强、延迟越大 */
+#define TOF_VZ_ADAPT_GAIN_MIN            (0.55f)
+/* ===== Z 轴位置环参数 ===== */
+params->pos_z_kp = 0.8f;
+params->pos_z_ki = 0.0f;
+params->pos_z_kd = 0.06f;
+params->pos_z_kff = 0.0f;
+params->pos_z_i_limit = 0.0f;
+params->pos_z_d_lpf = 2.0f;
+/* ===== Z 轴速度环参数 ===== */
+params->vel_z_kp = 400.0f;
+params->vel_z_ki = 70.0f;
+params->vel_z_kd = 20.0f;
+params->vel_z_kff = 0.0f;
+params->vel_z_i_limit = 450.0f;
+params->vel_z_d_lpf = 1.3f;
+以上飞行遇到的问题就是,一开始起飞的时候,目标高度是375mm左右,然后飞机会跳到656mm左右,然后慢慢就降低
+这个可能跟高度环输出限幅或者速度环输出限幅有关,也可能跟参数有关系
+
+
+
+project\code\Estimation\Height_Est\0414_velz_pid\04141738_velz_data.csv
+/* ===== Z 轴位置环参数 ===== */
+params->pos_z_kp = 0.8f;
+params->pos_z_ki = 0.0f;
+params->pos_z_kd = 0.06f;
+params->pos_z_kff = 0.0f;
+params->pos_z_i_limit = 0.0f;
+params->pos_z_d_lpf = 2.0f;
+/* ===== Z 轴速度环参数 ===== */
+params->vel_z_kp = 200.0f;
+params->vel_z_ki = 70.0f;
+params->vel_z_kd = 20.0f;
+params->vel_z_kff = 0.0f;
+params->vel_z_i_limit = 450.0f;
+params->vel_z_d_lpf = 1.3f;
+这个在具体飞行的时候也是差不多的问题
+一开始起飞的时候,目标高度是292mm左右,然后飞机会跳到580mm左右,然后慢慢就降低, 后面也有一段时间目标稳定在1110,然后飞机飞到1282,过于高了!

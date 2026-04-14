@@ -33,6 +33,13 @@ extern volatile uint32 tick_1000us_cnt;
 
 /* 当前高度速度估计，仅供本文件高度速度环使用，单位 m/s */
 static float s_height_vz_mps = 0.0f;
+/* 目标高度斜坡限速器状态 */
+static float s_target_height_slew_m = 0.0f;
+static uint8_t s_height_slew_inited = 0U;
+/* 目标高度上升斜坡限速，单位 m/s */
+#define FC_TARGET_H_RAMP_UP_MPS   0.35f
+/* 目标高度下降斜坡限速，单位 m/s */
+#define FC_TARGET_H_RAMP_DOWN_MPS 0.30f
 /* 100Hz 锁存的飞行模式，50Hz 控制只消费该锁存值 */
 static FC_START_CRSF_flight_mode_e s_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
 /* 上一次锁存的飞行模式，用于检测模式切换边沿 */
@@ -273,6 +280,8 @@ void FC_Loop_Reset(void)
     s_prev_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
     s_prev_fc_state = FC_START_CRSF_STATE_INIT;
     target_height_m = 1.0f;
+    s_height_slew_inited = 0U;
+    s_target_height_slew_m = 0.0f;
 }
 
 /*
@@ -414,6 +423,21 @@ void FC_Loop_100Hz(void)
             ch2 = fc_clampf((float)CRSF_STD[2], -1000.0f, 1000.0f);
             target_height_m = FC_Map_TargetHeightFromCh2(ch2);
         }
+        /* 目标高度斜坡限速：首次进入FLYING时从当前实测高度开始 */
+        if (0U == s_height_slew_inited)
+        {
+            s_target_height_slew_m = height_m;
+            s_height_slew_inited = 1U;
+        }
+        {
+            float delta = target_height_m - s_target_height_slew_m;
+            float max_up   =  FC_TARGET_H_RAMP_UP_MPS * dt;
+            float max_down = -FC_TARGET_H_RAMP_DOWN_MPS * dt;
+            if (delta > max_up)   { delta = max_up; }
+            if (delta < max_down) { delta = max_down; }
+            s_target_height_slew_m += delta;
+            target_height_m = s_target_height_slew_m;
+        }
         if (0U != g_tof_fused_valid)
         {
             height_vel_out = PID_Update(&height_vel_pid, height_pos_out, s_height_vz_mps, dt);
@@ -432,6 +456,7 @@ void FC_Loop_100Hz(void)
         s_height_vz_mps = 0.0f;
         height_pos_out = 0.0f;
         height_vel_out = 0.0f;
+        s_height_slew_inited = 0U;
     }
 
     height_err_mm = target_height_m * 1000.0f - g_tof_fused_height_mm;

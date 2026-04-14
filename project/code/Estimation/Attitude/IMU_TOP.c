@@ -229,12 +229,7 @@ void IMU_Update_1000HZ(void)
 
 	/* 步骤5: 计算欧拉角（单位: 度）并缓�?*/
 	g_euler = MahonyAhrs_GetEulerDegrees(&g_mahony_ahrs);
-	wifi_justfloat(tick_1000us_cnt,
-	               ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,
-	               ICM42688.acc_x, ICM42688.acc_y, ICM42688.acc_z,
-				g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
-				g_imufilter_1000hz.accx, g_imufilter_1000hz.accy, g_imufilter_1000hz.accz,
-			g_euler.roll, g_euler.pitch, g_euler.yaw);
+
 
 }
 

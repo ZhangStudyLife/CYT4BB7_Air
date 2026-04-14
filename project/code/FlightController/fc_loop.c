@@ -37,7 +37,7 @@ static float s_height_vz_mps = 0.0f;
 static float s_target_height_slew_m = 0.0f;
 static uint8_t s_height_slew_inited = 0U;
 /* 目标高度上升斜坡限速，单位 m/s */
-#define FC_TARGET_H_RAMP_UP_MPS   0.15f
+#define FC_TARGET_H_RAMP_UP_MPS 0.15f
 /* 目标高度下降斜坡限速，单位 m/s */
 #define FC_TARGET_H_RAMP_DOWN_MPS 0.15f
 /* 100Hz 锁存的飞行模式，50Hz 控制只消费该锁存值 */
@@ -48,11 +48,11 @@ static FC_START_CRSF_flight_mode_e s_prev_flight_mode = FC_START_CRSF_FLIGHT_MOD
 static FC_START_CRSF_state_e s_prev_fc_state = FC_START_CRSF_STATE_INIT;
 /* 悬停油门在线学习（借鉴 ArduPilot MOT_THST_HOVER） */
 static float s_hover_throttle = 3150.0f;
-#define FC_HOVER_THR_TC        3.0f    /* 学习时间常数，秒 */
-#define FC_HOVER_THR_MIN       2800.0f
-#define FC_HOVER_THR_MAX       3500.0f
-#define FC_HOVER_LEARN_VZ_MAX  0.3f    /* |vz|<此值时才学习，m/s */
-#define FC_HOVER_LEARN_POS_MAX 0.05f   /* |pos_out|<此值时才学习，m/s */
+#define FC_HOVER_THR_TC 3.0f /* 学习时间常数，秒 */
+#define FC_HOVER_THR_MIN 2800.0f
+#define FC_HOVER_THR_MAX 3500.0f
+#define FC_HOVER_LEARN_VZ_MAX 0.3f   /* |vz|<此值时才学习，m/s */
+#define FC_HOVER_LEARN_POS_MAX 0.05f /* |pos_out|<此值时才学习，m/s */
 /* 高度速度环输出最小限幅 */
 static const float s_fc_height_vel_out_min = -1500.0f;
 /* 高度速度环输出最大限幅 */
@@ -439,10 +439,16 @@ void FC_Loop_100Hz(void)
         }
         {
             float delta = target_height_m - s_target_height_slew_m;
-            float max_up   =  FC_TARGET_H_RAMP_UP_MPS * dt;
+            float max_up = FC_TARGET_H_RAMP_UP_MPS * dt;
             float max_down = -FC_TARGET_H_RAMP_DOWN_MPS * dt;
-            if (delta > max_up)   { delta = max_up; }
-            if (delta < max_down) { delta = max_down; }
+            if (delta > max_up)
+            {
+                delta = max_up;
+            }
+            if (delta < max_down)
+            {
+                delta = max_down;
+            }
             s_target_height_slew_m += delta;
             target_height_m = s_target_height_slew_m;
         }
@@ -617,10 +623,15 @@ void FC_Loop_1000Hz(void)
 
         Motor_Mixer(&g_motor_cmd);
     }
-    float dec_x;
-    float dec_y;
-    dec_x = FlowGyroDecoupler_GetDecX();
-    dec_y = FlowGyroDecoupler_GetDecY();
+    wifi_justfloat(tick_1000us_cnt,
+                   g_imufilter_1000hz.gyrox, roll_gyro_target, roll_gyro_pid.p_term, roll_gyro_pid.i_term, roll_gyro_pid.d_term,
+                   g_imufilter_1000hz.gyroy, pitch_gyro_target, pitch_gyro_pid.p_term, pitch_gyro_pid.i_term, pitch_gyro_pid.d_term,
+                   g_euler.roll, g_euler.pitch, g_euler.yaw);
+
+    // float dec_x;
+    // float dec_y;
+    // dec_x = FlowGyroDecoupler_GetDecX();
+    // dec_y = FlowGyroDecoupler_GetDecY();
     // wifi_justfloat(tick_1000us_cnt,
     //     g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY,g_pmw3901_raw.squal,
     //     g_imudata_250hz.gyrox, g_imudata_250hz.gyroy, g_imudata_250hz.gyroz,

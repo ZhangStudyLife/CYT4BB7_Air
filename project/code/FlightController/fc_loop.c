@@ -37,9 +37,9 @@ static float s_height_vz_mps = 0.0f;
 static float s_target_height_slew_m = 0.0f;
 static uint8_t s_height_slew_inited = 0U;
 /* 目标高度上升斜坡限速，单位 m/s */
-#define FC_TARGET_H_RAMP_UP_MPS   0.35f
+#define FC_TARGET_H_RAMP_UP_MPS   0.15f
 /* 目标高度下降斜坡限速，单位 m/s */
-#define FC_TARGET_H_RAMP_DOWN_MPS 0.30f
+#define FC_TARGET_H_RAMP_DOWN_MPS 0.15f
 /* 100Hz 锁存的飞行模式，50Hz 控制只消费该锁存值 */
 static FC_START_CRSF_flight_mode_e s_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
 /* 上一次锁存的飞行模式，用于检测模式切换边沿 */
@@ -309,7 +309,7 @@ void FC_Loop_50Hz(void)
     {
         height_m = g_tof_fused_height_mm * 0.001f;
         height_pos_out = PID_Update(&height_pos_pid, target_height_m, height_m, dt);
-        height_pos_out = fc_clampf(height_pos_out, -0.25f, 0.25f);
+        height_pos_out = fc_clampf(height_pos_out, -0.40f, 0.25f);
     }
     else
     {

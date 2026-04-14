@@ -147,10 +147,10 @@ static void fc_params_fill_defaults(fc_params_t *params)
     /* ===== Z 轴位置环参数 ===== */
     params->pos_z_kp = 0.8f;
     params->pos_z_ki = 0.0f;
-    params->pos_z_kd = 0.06f;
+    params->pos_z_kd = 0.15f;
     params->pos_z_kff = 0.0f;
     params->pos_z_i_limit = 0.0f;
-    params->pos_z_d_lpf = 2.0f;
+    params->pos_z_d_lpf = 3.0f;
 
     /* ===== X 轴速度环参数 ===== */
     params->vel_x_kp = 0.14f;

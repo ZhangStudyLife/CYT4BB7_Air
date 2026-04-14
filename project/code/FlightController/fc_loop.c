@@ -46,6 +46,13 @@ static FC_START_CRSF_flight_mode_e s_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
 static FC_START_CRSF_flight_mode_e s_prev_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
 /* 上一次飞控状态，用于检测飞行态切换边沿 */
 static FC_START_CRSF_state_e s_prev_fc_state = FC_START_CRSF_STATE_INIT;
+/* 悬停油门在线学习（借鉴 ArduPilot MOT_THST_HOVER） */
+static float s_hover_throttle = 3150.0f;
+#define FC_HOVER_THR_TC        10.0f   /* 学习时间常数，秒 */
+#define FC_HOVER_THR_MIN       2800.0f
+#define FC_HOVER_THR_MAX       3500.0f
+#define FC_HOVER_LEARN_VZ_MAX  0.3f    /* |vz|<此值时才学习，m/s */
+#define FC_HOVER_LEARN_POS_MAX 0.05f   /* |pos_out|<此值时才学习，m/s */
 /* 高度速度环输出最小限幅 */
 static const float s_fc_height_vel_out_min = -1500.0f;
 /* 高度速度环输出最大限幅 */
@@ -282,6 +289,7 @@ void FC_Loop_Reset(void)
     target_height_m = 1.0f;
     s_height_slew_inited = 0U;
     s_target_height_slew_m = 0.0f;
+    s_hover_throttle = (float)g_fc_params.base_throttle;
 }
 
 /*
@@ -460,7 +468,16 @@ void FC_Loop_100Hz(void)
     }
 
     height_err_mm = target_height_m * 1000.0f - g_tof_fused_height_mm;
-    throttle_z_cmd = g_fc_params.base_throttle + height_vel_out;
+    throttle_z_cmd = s_hover_throttle + height_vel_out;
+    /* 悬停油门在线学习：仅在接近稳态悬停时更新 */
+    if ((fc_state == FC_START_CRSF_STATE_FLYING) &&
+        (s_height_vz_mps > -FC_HOVER_LEARN_VZ_MAX) && (s_height_vz_mps < FC_HOVER_LEARN_VZ_MAX) &&
+        (height_pos_out > -FC_HOVER_LEARN_POS_MAX) && (height_pos_out < FC_HOVER_LEARN_POS_MAX))
+    {
+        float alpha = dt / (dt + FC_HOVER_THR_TC);
+        s_hover_throttle += alpha * (throttle_z_cmd - s_hover_throttle);
+        s_hover_throttle = fc_clampf(s_hover_throttle, FC_HOVER_THR_MIN, FC_HOVER_THR_MAX);
+    }
     if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
     {
         wifi_justfloat(tick_1000us_cnt,

@@ -76,7 +76,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->vel_z_dt = 0.01f;   /* 100Hz */
 
     /* ===== 油门与机械配平参数 ===== */
-    params->base_throttle = 3150;         /* 悬停油门 */
+    params->base_throttle = 2950;         /* 悬停油门 */
     params->roll_mech_trim_deg = 2.95f;   /* Roll 机械配平角 */
     params->pitch_mech_trim_deg = 1.75f; /* Pitch 机械配平角 */
 
@@ -169,9 +169,9 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->vel_y_d_lpf = 0.0f;
 
     /* ===== Z 轴速度环参数 ===== */
-    params->vel_z_kp = 350.0f;
-    params->vel_z_ki = 70.0f;
-    params->vel_z_kd = 35.0f;
+    params->vel_z_kp = 400.0f;
+    params->vel_z_ki = 90.0f;
+    params->vel_z_kd = 0.0f;
     params->vel_z_kff = 0.0f;
     params->vel_z_i_limit = 450.0f;
     params->vel_z_d_lpf = 5.0f;

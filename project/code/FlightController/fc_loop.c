@@ -48,7 +48,7 @@ static FC_START_CRSF_flight_mode_e s_prev_flight_mode = FC_START_CRSF_FLIGHT_MOD
 static FC_START_CRSF_state_e s_prev_fc_state = FC_START_CRSF_STATE_INIT;
 /* 悬停油门在线学习（借鉴 ArduPilot MOT_THST_HOVER） */
 static float s_hover_throttle = 3150.0f;
-#define FC_HOVER_THR_TC        10.0f   /* 学习时间常数，秒 */
+#define FC_HOVER_THR_TC        3.0f    /* 学习时间常数，秒 */
 #define FC_HOVER_THR_MIN       2800.0f
 #define FC_HOVER_THR_MAX       3500.0f
 #define FC_HOVER_LEARN_VZ_MAX  0.3f    /* |vz|<此值时才学习，m/s */

@@ -116,15 +116,19 @@ void IMUFilter_Init(void)
 
     for (axis = 0U; axis < IMU_AXIS_NUM; axis++)
     {
-        /* 陀螺仪链路：AntiAliasLPF -> Notch0 -> Notch1 -> LPF */
+        /* 陀螺仪链路：AntiAliasLPF -> Notch0 -> OptionalNotch1 -> LPF */
         IMUBiquad_InitLPF(&s_filt.gyro_anti_alias_lpf[axis], IMU_SAMPLE_RATE_HZ, IMU_GYRO_ANTI_ALIAS_LPF_HZ);
         IMUBiquad_InitNotch(&s_filt.gyro_notch0[axis], IMU_SAMPLE_RATE_HZ, IMU_NOTCH0_HZ, IMU_NOTCH0_Q);
+#if (IMU_NOTCH1_ENABLE != 0U)
         IMUBiquad_InitNotch(&s_filt.gyro_notch1[axis], IMU_SAMPLE_RATE_HZ, IMU_NOTCH1_HZ, IMU_NOTCH1_Q);
+#endif
         IMUBiquad_InitLPF(&s_filt.gyro_lpf[axis], IMU_SAMPLE_RATE_HZ, IMU_GYRO_LPF_HZ);
 
-        /* 加速度计链路：Notch0 -> Notch1 -> LPF */
-        IMUBiquad_InitNotch(&s_filt.accel_notch0[axis], IMU_SAMPLE_RATE_HZ, IMU_NOTCH0_HZ, IMU_NOTCH0_Q);
+        /* 加速度计链路：Notch0 -> OptionalNotch1 -> LPF */
+        IMUBiquad_InitNotch(&s_filt.accel_notch0[axis], IMU_SAMPLE_RATE_HZ, IMU_NOTCH0_HZ, IMU_ACCEL_NOTCH0_Q);
+#if (IMU_NOTCH1_ENABLE != 0U)
         IMUBiquad_InitNotch(&s_filt.accel_notch1[axis], IMU_SAMPLE_RATE_HZ, IMU_NOTCH1_HZ, IMU_NOTCH1_Q);
+#endif
         IMUBiquad_InitLPF(&s_filt.accel_lpf[axis], IMU_SAMPLE_RATE_HZ, IMU_ACCEL_LPF_HZ);
     }
 
@@ -175,15 +179,23 @@ void IMUFilter_Update(float gx, float gy, float gz,
         float accel_stage0;
         float accel_stage1;
 
-        /* 统一陀螺仪链路：先抗混叠，再双陷波，最后 60Hz 低通 */
+        /* 统一陀螺仪链路：先抗混叠，主陷波后按需经过第二陷波，最后 80Hz 低通 */
         gyro_stage_aa = IMUBiquad_Apply(&s_filt.gyro_anti_alias_lpf[axis], gyro_in[axis]);
         gyro_stage0 = IMUBiquad_Apply(&s_filt.gyro_notch0[axis], gyro_stage_aa);
+#if (IMU_NOTCH1_ENABLE != 0U)
         gyro_stage1 = IMUBiquad_Apply(&s_filt.gyro_notch1[axis], gyro_stage0);
+#else
+        gyro_stage1 = gyro_stage0;
+#endif
         gyro_out[axis] = IMUBiquad_Apply(&s_filt.gyro_lpf[axis], gyro_stage1);
 
-        /* 统一加速度计链路：双陷波后进入 15Hz 低通 */
+        /* 统一加速度计链路：主陷波后按需经过第二陷波，再进入 15Hz 低通 */
         accel_stage0 = IMUBiquad_Apply(&s_filt.accel_notch0[axis], accel_in[axis]);
+#if (IMU_NOTCH1_ENABLE != 0U)
         accel_stage1 = IMUBiquad_Apply(&s_filt.accel_notch1[axis], accel_stage0);
+#else
+        accel_stage1 = accel_stage0;
+#endif
         accel_out[axis] = IMUBiquad_Apply(&s_filt.accel_lpf[axis], accel_stage1);
     }
 

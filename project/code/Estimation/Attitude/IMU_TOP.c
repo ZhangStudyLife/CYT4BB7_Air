@@ -139,9 +139,6 @@ void IMU_Init_All(void)
 	if (0U == IMU_Startup_SelfCheck())
 	{
 		printf("IMU startup self-check failed.\r\n");
-		while (1)
-		{
-		}
 	}
 
 	/* 步骤3: 初始化上层滤波与姿态解算器 */

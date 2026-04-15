@@ -105,17 +105,17 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->yaw_gyro_d_lpf = 30.0f;
 
     /* ===== Roll 轴角度环参数 ===== */
-    params->roll_angle_kp = 5.0f;
+    params->roll_angle_kp = 6.4f;
     params->roll_angle_ki = 0.0f;
-    params->roll_angle_kd = 0.1f;
+    params->roll_angle_kd = 0.0f;
     params->roll_angle_kff = 0.0f;
     params->roll_angle_i_limit = 80.0f;
     params->roll_angle_d_lpf = 15.0f;
 
     /* ===== Pitch 轴角度环参数 ===== */
-    params->pitch_angle_kp = 5.0f;
+    params->pitch_angle_kp = 6.0f;
     params->pitch_angle_ki = 0.0f;
-    params->pitch_angle_kd = 0.1f;
+    params->pitch_angle_kd = 0.0f;
     params->pitch_angle_kff = 0.0f;
     params->pitch_angle_i_limit = 80.0f;
     params->pitch_angle_d_lpf = 15.0f;

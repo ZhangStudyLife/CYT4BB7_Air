@@ -572,11 +572,7 @@ void FC_Loop_500Hz(void)
         pitch_gyro_target = pitch_ctrl;
         yaw_gyro_target = 0; // 不闭环航向角，保持当前值
 
-        wifi_justfloat(tick_1000us_cnt,
-                       roll_angle_target, roll_angle_meas, roll_angle_pid.p_term, roll_angle_pid.i_term, roll_angle_pid.d_term,
-                       roll_gyro_target, g_imufilter_1000hz.gyrox,
-                       pitch_angle_target, pitch_angle_meas, pitch_angle_pid.p_term, pitch_angle_pid.i_term, pitch_angle_pid.d_term,
-                       pitch_gyro_target, g_imufilter_1000hz.gyroy);
+
     }
 }
 

@@ -167,5 +167,11 @@ void Pos_Est_Update_50HZ(void)
     vel_x_pred = Pos_Est_vel_x;
     vel_y_pred = Pos_Est_vel_y;
 
+    wifi_justfloat(tick_1000us_cnt,
+                        acc_x_lp, acc_y_lp,
+                        opflow_vel_x, opflow_vel_y,
+                        Pos_Est_vel_x, Pos_Est_vel_y,
+                        g_pmw3901_raw.squal, height, lc302_data.flow_x_integral, lc302_data.flow_y_integral);
+
     
 }                  

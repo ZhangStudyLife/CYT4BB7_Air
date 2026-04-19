@@ -406,6 +406,10 @@ void FC_Loop_100Hz(void)
     }
 
     height_vz_raw_mps = (height_m - s_height_prev_m) / dt;
+
+    wifi_justfloat(tick_1000us_cnt,g_tof1_height_mm,g_tof4_height_mm,g_tof_fused_height_mm,height_vz_raw_mps,dt,
+    g_imufilter_1000hz.accx,g_imufilter_1000hz.accy,g_imufilter_1000hz.accz,g_euler.pitch,g_euler.roll,g_euler.yaw);
+
     s_height_prev_m = height_m;
     s_height_vz_mps = g_tof_fused_vz_mps;
     fc_state = FC_START_CRSF_Get_State();
@@ -564,8 +568,6 @@ void FC_Loop_500Hz(void)
         roll_gyro_target = roll_ctrl;
         pitch_gyro_target = pitch_ctrl;
         yaw_gyro_target = 0; // 不闭环航向角，保持当前值
-
-
     }
 }
 
@@ -609,13 +611,16 @@ void FC_Loop_1000Hz(void)
             g_motor_cmd.throttle = CRSF_STD[2] * 2.6f + 2600; /* 1000 对应 2600，-1000 对应 2600，线性映射 */
             g_motor_cmd.throttle = (int32_t)fc_clampf((float)(int32_t)g_motor_cmd.throttle, 2600.0f, 5200.0f);
         }
-        g_motor_cmd.roll =(int32)(roll_ctrl * 1.3f);
-        g_motor_cmd.pitch = -(int32)(pitch_ctrl * 1.3f);
-        g_motor_cmd.yaw = (int32)(yaw_ctrl * 1.3f);
+        // g_motor_cmd.roll =(int32)(roll_ctrl * 1.3f);
+        // g_motor_cmd.pitch = -(int32)(pitch_ctrl * 1.3f);
+        // g_motor_cmd.yaw = (int32)(yaw_ctrl * 1.3f);
+        g_motor_cmd.roll = 0;
+        g_motor_cmd.pitch = 0;
+        g_motor_cmd.yaw = 0;
         // CRSF_STD[2] -1000~1000 映射到油门的 2600 ~ 5200
         g_motor_cmd.throttle = (int32_t)(CRSF_STD[2] * 1.3f + 3900.0f);
 
-        wifi_justfloat(g_motor_cmd.pitch, g_motor_cmd.roll, g_motor_cmd.yaw, g_motor_cmd.throttle);
+
 
         Motor_Mixer(&g_motor_cmd);
     }

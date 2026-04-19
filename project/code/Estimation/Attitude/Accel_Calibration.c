@@ -19,13 +19,10 @@
 
 #define DEG_TO_RAD                               (0.017453292519943295f)
 
-#define ACC_DOWN_LPF_ALPHA_EKF                   (0.3f)
-#define ACC_DOWN_LPF_ALPHA_OUTPUT                (0.1f)
 
 #define IMU_ACCEL_G_MAX_ABS                      (20.0f)
 #define IMU_GYRO_DPS_MAX_ABS                     (6000.0f)
 #define CALIB_MAX_TRY_SAMPLES                    (3000U) /* ���ٶȾ�ֹ�궨�������ܴ��� */
-#define ACCEL_DOWN_SIGN_FOR_EKF                  (+1.0f)
 
 /* AP ��񣺷ִ��ڲɼ����ж� */
 #define ACCEL_CALIBRATION_WINDOW_SAMPLES         (200U)  /* ��ֹ����������������1kHzԼ0.2�� */
@@ -700,7 +697,7 @@ static void get_gravity_body_g(float *gx, float *gy, float *gz)
         return;
     }
 
-    /* ��λ����ʸ��(g)�ڻ���ϵ�ķ��� */
+
     *gx = -g_euler.sin_pitch;
     *gy = g_euler.sin_roll * g_euler.cos_pitch;
     *gz = g_euler.cos_roll * g_euler.cos_pitch;
@@ -708,10 +705,7 @@ static void get_gravity_body_g(float *gx, float *gy, float *gz)
 
 static float calc_accel_down_from_body(const float accel_body_mps2[3])
 {
-    /* 输入为机体系FRD线性加速度，输出为水平系Down方向加速度。
-     * 忽略yaw，仅去除roll/pitch对坐标轴的倾斜影响。
-     */
-    /* ʹ����̬�ǽ�У�������ϵ���ٶ�ͶӰ�� NED �� Down �� */
+
     const float sin_pitch = g_euler.sin_pitch;
     const float cos_pitch = g_euler.cos_pitch;
     const float sin_roll = g_euler.sin_roll;
@@ -768,7 +762,6 @@ static void rotate_body_linear_to_level(const float accel_body_mps2[3], float ac
     r32 = sin_roll * cos_pitch;
     r33 = cos_roll * cos_pitch;
 #else
-    /* yaw=0: ���� roll/pitch ��ת�����Ե�ǰ����ƫб���򻯼��� */
     r11 = cos_pitch;
     r12 = sin_roll * sin_pitch;
     r13 = cos_roll * sin_pitch;
@@ -789,7 +782,6 @@ static void rotate_body_linear_to_level(const float accel_body_mps2[3], float ac
 
 static void sanitize_scale(void)
 {
-    /* ��ֹ scale �쳣��NaN/Inf/��С����ǯλ����ȫ��Χ */
     uint8_t i;
     for (i = 0U; i < 3U; i++)
     {
@@ -865,7 +857,6 @@ static bool imu_sample_valid(float ax, float ay, float az, float gx, float gy, f
 
 static void rotate_imu_to_body(const float vec_in[3], float vec_out[3])
 {
-    /* ����������ϵͳһ��ת������ϵ���궨������ʱ��ʹ�ã� */
     if (g_accel_calibration.imu_to_body_identity)
     {
         vec_out[0] = vec_in[0];
@@ -937,7 +928,6 @@ static bool static_calibration_sample_valid(const float accel_body_g[3],
                                             float *acc_norm_g,
                                             float *gyro_norm_dps)
 {
-    /* ��ֹ�궨����У�飺ȷ�Ͻ��ƾ�ֹ��|a|��1g �ҽ��ٶȺ�С */
     float accel_norm;
     float gyro_norm;
 
@@ -1070,7 +1060,6 @@ static void update_bias_online(const float accel_body_g[3],
                                float gravity_y_g,
                                float gravity_z_g)
 {
-    /* ����ƫ�� bias ΢�������ھ�ֹ����Ч�����¸��� */
     float target_bias[3];
     float accel_norm;
     float gyro_norm;
@@ -1114,7 +1103,6 @@ static void update_bias_online(const float accel_body_g[3],
 
 static void update_scale_online(const float accel_body_g[3], const float gyro_body_dps[3])
 {
-    /* ���� scale ΢����ʹȥƫ�� |a| �𲽱ƽ� 1g */
     float accel_unbiased_g[3];
     float accel_norm_g;
     float gyro_norm_dps;
@@ -1165,7 +1153,6 @@ static void update_scale_online(const float accel_body_g[3], const float gyro_bo
 
 static void update_runtime_quality(const float accel_corrected_body_g[3], const float gyro_body_dps[3])
 {
-    /* ����ָ��ƽ��ͳ�� |a| �ľ�ֵ�ͱ�׼�����У׼�����۲� */
     float accel_norm_g;
     float gyro_norm_dps;
     float mean;
@@ -3277,7 +3264,7 @@ void AccelCalibration_ApplySensorCorrection(float *ax, float *ay, float *az)
 void AccelCalibration_Update_1000HZ(void)
 {
     float accel_sensor_g[3];
-    float accel_corrected_sensor_g[3];
+    float accel_raw_sensor_g[3];
     float gyro_sensor_dps[3];
     float gravity_x_g;
     float gravity_y_g;
@@ -3292,61 +3279,57 @@ void AccelCalibration_Update_1000HZ(void)
     /* ===================== ����Ϊʵʱ1kHz���� ===================== */
     sanitize_scale();
 
-    imu_calib_get_raw_sensor_sample(accel_sensor_g, gyro_sensor_dps);
+    accel_sensor_g[0] = g_imufilter_1000hz.accx;
+    accel_sensor_g[1] = g_imufilter_1000hz.accy;
+    accel_sensor_g[2] = g_imufilter_1000hz.accz;
+    gyro_sensor_dps[0] = g_imufilter_1000hz.gyrox;
+    gyro_sensor_dps[1] = g_imufilter_1000hz.gyroy;
+    gyro_sensor_dps[2] = g_imufilter_1000hz.gyroz;
 
     if (!imu_sample_valid(accel_sensor_g[0], accel_sensor_g[1], accel_sensor_g[2], gyro_sensor_dps[0], gyro_sensor_dps[1], gyro_sensor_dps[2]))
     {
         /* ��Ч�����������������ƽ��˥������ֹͻ�� */
         g_accel_calibration.invalid_sample_count++;
         g_accel_calibration.realtime_sample_valid = 0U;
-
-        g_accel_calibration.accel_down_for_ekf_mps2 *= 0.98f;
-        g_accel_calibration.accel_down_for_output_mps2 *= 0.99f;
-        g_accel_calibration.accel_level_mps2[0] *= 0.98f;
-        g_accel_calibration.accel_level_mps2[1] *= 0.98f;
-        g_accel_calibration.accel_level_mps2[2] *= 0.98f;
-
-        g_accel_calibration.vel_up_mps += (-g_accel_calibration.accel_down_for_ekf_mps2) * ACCEL_CALIBRATION_DT_S;
-        g_accel_calibration.pos_up_m += g_accel_calibration.vel_up_mps * ACCEL_CALIBRATION_DT_S;
         return;
     }
 
-    rotate_imu_to_body(accel_sensor_g, g_accel_calibration.accel_raw_body_g);
-    rotate_imu_to_body(gyro_sensor_dps, g_accel_calibration.gyro_raw_body_dps);
+    IMU_GetRawSampleForCalibration(NULL,
+                                   NULL,
+                                   NULL,
+                                   &accel_raw_sensor_g[0],
+                                   &accel_raw_sensor_g[1],
+                                   &accel_raw_sensor_g[2]);
+    rotate_imu_to_body(accel_raw_sensor_g, g_accel_calibration.accel_raw_body_g);
+    rotate_imu_to_body(accel_sensor_g, g_accel_calibration.accel_corrected_body_g);
+    rotate_imu_to_body(gyro_sensor_dps, g_accel_calibration.gyro_body_dps);
 
     /* ����΢�����£�����ֹ����ʱ��Ч�� */
     get_gravity_body_g(&gravity_x_g, &gravity_y_g, &gravity_z_g);
 #if ACCEL_CALIBRATION_ENABLE_ONLINE_TRIM
     update_bias_online(
-        g_accel_calibration.accel_raw_body_g,
-        g_accel_calibration.gyro_raw_body_dps,
+        g_accel_calibration.accel_corrected_body_g,
+        g_accel_calibration.gyro_body_dps,
         gravity_x_g,
         gravity_y_g,
         gravity_z_g);
     update_scale_online(
-        g_accel_calibration.accel_raw_body_g,
-        g_accel_calibration.gyro_raw_body_dps);
+        g_accel_calibration.accel_corrected_body_g,
+        g_accel_calibration.gyro_body_dps);
 #endif
 
     /* 校准已在 ApplySensorCorrection 前置完成,
        g_imufilter_1000hz 中的 acc 已经是校准后的值,
        rotate_imu_to_body 后的 accel_raw_body_g 即为校准后机体系值 */
     /* 原始传感器值先做零偏/矩阵校准，再旋转到机体系，得到实时校准输出 */
-    accel_corrected_sensor_g[0] = accel_sensor_g[0];
-    accel_corrected_sensor_g[1] = accel_sensor_g[1];
-    accel_corrected_sensor_g[2] = accel_sensor_g[2];
-    AccelCalibration_ApplySensorCorrection(&accel_corrected_sensor_g[0],
-                                           &accel_corrected_sensor_g[1],
-                                           &accel_corrected_sensor_g[2]);
-    rotate_imu_to_body(accel_corrected_sensor_g, g_accel_calibration.accel_corrected_body_g);
     update_runtime_quality(
         g_accel_calibration.accel_corrected_body_g,
-        g_accel_calibration.gyro_raw_body_dps);
+        g_accel_calibration.gyro_body_dps);
 
 #if ACCEL_CALIBRATION_STATIC_RELOCK_ENABLE
     static_relock_update_trim(
         g_accel_calibration.accel_corrected_body_g,
-        g_accel_calibration.gyro_raw_body_dps,
+        g_accel_calibration.gyro_body_dps,
         gravity_x_g,
         gravity_y_g,
         gravity_z_g);
@@ -3376,20 +3359,11 @@ void AccelCalibration_Update_1000HZ(void)
     g_accel_calibration.accel_level_mps2[1] = accel_level_mps2[1];
     g_accel_calibration.accel_level_mps2[2] = accel_level_mps2[2];
 
-    /* ͶӰ�� Down �Ტͳһ���ţ��� EKF �ã� */
-    accel_down_mps2 = ACCEL_DOWN_SIGN_FOR_EKF * calc_accel_down_from_body(accel_body_real_mps2);
+    accel_down_mps2 = ACCEL_CALIBRATION_OUTPUT_DOWN_SIGN * calc_accel_down_from_body(accel_body_real_mps2);
 
-    /* ˫·��ͨ��EKF ͨ�������ͨ�� */
-    g_accel_calibration.accel_down_for_ekf_mps2 =
-        ACC_DOWN_LPF_ALPHA_EKF * accel_down_mps2 +
-        (1.0f - ACC_DOWN_LPF_ALPHA_EKF) * g_accel_calibration.accel_down_for_ekf_mps2;
+    g_accel_calibration.accel_down_output_mps2 = accel_down_mps2;
 
-    g_accel_calibration.accel_down_for_output_mps2 =
-        ACC_DOWN_LPF_ALPHA_OUTPUT * accel_down_mps2 +
-        (1.0f - ACC_DOWN_LPF_ALPHA_OUTPUT) * g_accel_calibration.accel_down_for_output_mps2;
-
-    /* �������ٶȺ�λ�� */
-    g_accel_calibration.vel_up_mps += (-g_accel_calibration.accel_down_for_ekf_mps2) * ACCEL_CALIBRATION_DT_S;
+    g_accel_calibration.vel_up_mps += (-g_accel_calibration.accel_down_output_mps2) * ACCEL_CALIBRATION_DT_S;
     g_accel_calibration.pos_up_m += g_accel_calibration.vel_up_mps * ACCEL_CALIBRATION_DT_S;
     g_accel_calibration.realtime_sample_valid = 1U;
 }
@@ -3411,7 +3385,7 @@ float AccelCalibration_GetGravityMps2(void)
 
 float AccelCalibration_GetVerticalAccelUpMps2(void)
 {
-    return -g_accel_calibration.accel_down_for_output_mps2;
+    return -g_accel_calibration.accel_down_output_mps2;
 }
 
 float AccelCalibration_GetVerticalVelocityUpMps(void)
@@ -3424,19 +3398,9 @@ float AccelCalibration_GetVerticalPositionUpM(void)
     return g_accel_calibration.pos_up_m;
 }
 
-float AccelCalibration_GetAccelDownMps2(void)
-{
-    return g_accel_calibration.accel_down_for_ekf_mps2;
-}
-
-float AccelCalibration_GetAccelDownForEkfMps2(void)
-{
-    return g_accel_calibration.accel_down_for_ekf_mps2;
-}
-
 float AccelCalibration_GetAccelDownForOutputMps2(void)
 {
-    return g_accel_calibration.accel_down_for_output_mps2;
+    return g_accel_calibration.accel_down_output_mps2;
 }
 
 void AccelCalibration_GetBodyAccelMps2(float *ax, float *ay, float *az)
@@ -3459,15 +3423,15 @@ void AccelCalibration_GetBodyGyroDps(float *gx, float *gy, float *gz)
 {
     if (gx != NULL)
     {
-        *gx = g_accel_calibration.gyro_raw_body_dps[0];
+        *gx = g_accel_calibration.gyro_body_dps[0];
     }
     if (gy != NULL)
     {
-        *gy = g_accel_calibration.gyro_raw_body_dps[1];
+        *gy = g_accel_calibration.gyro_body_dps[1];
     }
     if (gz != NULL)
     {
-        *gz = g_accel_calibration.gyro_raw_body_dps[2];
+        *gz = g_accel_calibration.gyro_body_dps[2];
     }
 }
 
@@ -3484,22 +3448,6 @@ void AccelCalibration_GetCorrectedSpecificForceG(float *ax_g, float *ay_g, float
     if (az_g != NULL)
     {
         *az_g = g_accel_calibration.accel_corrected_body_g[2];
-    }
-}
-
-void AccelCalibration_GetLevelAccelMps2(float *ax_level, float *ay_level, float *az_level)
-{
-    if (ax_level != NULL)
-    {
-        *ax_level = g_accel_calibration.accel_level_mps2[0];
-    }
-    if (ay_level != NULL)
-    {
-        *ay_level = g_accel_calibration.accel_level_mps2[1];
-    }
-    if (az_level != NULL)
-    {
-        *az_level = g_accel_calibration.accel_level_mps2[2];
     }
 }
 

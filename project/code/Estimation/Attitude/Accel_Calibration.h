@@ -34,7 +34,6 @@ extern "C" {
 #define ACCEL_CALIBRATION_BODY_AXIS_Y_RIGHT      (+1.0f)    /* 机体系 +Y 向右 */
 #define ACCEL_CALIBRATION_BODY_AXIS_Z_DOWN       (+1.0f)    /* 机体系 +Z 向下 */
 #define ACCEL_CALIBRATION_OUTPUT_DOWN_SIGN       (+1.0f)    /* Down 输出方向符号 */
-#define ACCEL_CALIBRATION_OUTPUT_UP_SIGN         (-1.0f)    /* Up 输出方向符号 */
 
 typedef struct
 {
@@ -50,7 +49,7 @@ typedef struct
     /* 机体系原始值与校正值 */
     float accel_raw_body_g[3];
     float accel_corrected_body_g[3];
-    float gyro_raw_body_dps[3];
+    float gyro_body_dps[3];
 
     /* 机体系线性加速度，单位 m/s^2 */
     float accel_real_body_mps2[3];
@@ -59,8 +58,7 @@ typedef struct
     float accel_level_mps2[3];
 
     /* 向下加速度输出 */
-    float accel_down_for_ekf_mps2;
-    float accel_down_for_output_mps2;
+    float accel_down_output_mps2;
 
     /* 垂直积分状态，Up 为正 */
     float vel_up_mps;
@@ -178,10 +176,6 @@ float AccelCalibration_GetVerticalVelocityUpMps(void);
 /* 获取垂直方向 Up 位置 */
 float AccelCalibration_GetVerticalPositionUpM(void);
 
-/* 获取 Down 方向加速度 */
-float AccelCalibration_GetAccelDownMps2(void);
-/* 获取供 EKF 使用的 Down 加速度 */
-float AccelCalibration_GetAccelDownForEkfMps2(void);
 /* 获取供输出使用的 Down 加速度 */
 float AccelCalibration_GetAccelDownForOutputMps2(void);
 
@@ -192,8 +186,6 @@ void AccelCalibration_GetBodyGyroDps(float *gx, float *gy, float *gz);
 /* 获取校正后的机体系比力，单位 g */
 void AccelCalibration_GetCorrectedSpecificForceG(float *ax_g, float *ay_g, float *az_g);
 
-/* 获取水平系线性加速度，单位 m/s^2 */
-void AccelCalibration_GetLevelAccelMps2(float *ax_level, float *ay_level, float *az_level);
 /* 获取水平面加速度，单位 m/s^2 */
 void AccelCalibration_GetHorizontalAccelMps2(float *ax_h, float *ay_h);
 /* 将传感器坐标系向量旋转到机体坐标系（供外部使用已滤波加速度时调用） */

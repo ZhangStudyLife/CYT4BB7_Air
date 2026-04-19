@@ -62,6 +62,7 @@ int main(void)
             g_tick_1000HZ--;
 
             IMU_Update_1000HZ();
+            Height_Est_update_1000HZ();
             Pos_Est_Update_1000HZ();
 
             div500++;
@@ -79,7 +80,7 @@ int main(void)
         if (g_tick_100HZ > 0U)
         {
             g_tick_100HZ--;
-
+            Height_Est_update_100HZ();
             CRSF_Update_100HZ();
             FC_Loop_100Hz();
             wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));

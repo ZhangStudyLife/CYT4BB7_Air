@@ -52,6 +52,12 @@ void TOF_update_100HZ(void)
     const VL53L1X_data_struct *tof_data = 0;
     uint8 tof1_valid = 0U;
     uint8 tof4_valid = 0U;
+    static float s_prev_fused_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
+    static uint8 s_prev_fused_valid = 0U;
+    static uint8 s_both_invalid_hold_cnt = 0U;
+    float acc_down_g = 0.0f;
+    float candidate_height_mm = 0.0f;
+    float diff_14_mm = 0.0f;
 
     VL53L1X_Update();
     tof_data = VL53L1X_GetData();
@@ -76,19 +82,91 @@ void TOF_update_100HZ(void)
         g_tof4_height_mm = (float)tof_data->distance_mm[1U] * g_euler.cos_pitch * g_euler.cos_roll;
     }
 
+    acc_down_g = -g_euler.sin_pitch * g_imufilter_1000hz.accx +
+                 g_euler.sin_roll * g_euler.cos_pitch * g_imufilter_1000hz.accy +
+                 g_euler.cos_roll * g_euler.cos_pitch * g_imufilter_1000hz.accz +
+                 1.0f;
+
     if ((0U != tof1_valid) && (0U != tof4_valid))
     {
-        g_tof_fused_height_mm = 0.5f * (g_tof1_height_mm + g_tof4_height_mm);
+        diff_14_mm = fabsf(g_tof1_height_mm - g_tof4_height_mm);
+        if (diff_14_mm <= 100.0f)
+        {
+            candidate_height_mm = 0.5f * (g_tof1_height_mm + g_tof4_height_mm);
+        }
+        else if ((g_tof1_height_mm < 300.0f) && (g_tof4_height_mm > g_tof1_height_mm))
+        {
+            candidate_height_mm = g_tof4_height_mm;
+        }
+        else if ((g_tof4_height_mm < 300.0f) && (g_tof1_height_mm > g_tof4_height_mm))
+        {
+            candidate_height_mm = g_tof1_height_mm;
+        }
+        else if (0U != s_prev_fused_valid)
+        {
+            if (fabsf(g_tof1_height_mm - s_prev_fused_height_mm) <= fabsf(g_tof4_height_mm - s_prev_fused_height_mm))
+            {
+                candidate_height_mm = g_tof1_height_mm;
+            }
+            else
+            {
+                candidate_height_mm = g_tof4_height_mm;
+            }
+        }
+        else
+        {
+            candidate_height_mm = 0.5f * (g_tof1_height_mm + g_tof4_height_mm);
+        }
+
+        if ((0U != s_prev_fused_valid) &&
+            (fabsf(candidate_height_mm - s_prev_fused_height_mm) > 100.0f) &&
+            (fabsf(acc_down_g) < 0.08f))
+        {
+            candidate_height_mm = s_prev_fused_height_mm;
+        }
+
+        g_tof_fused_height_mm = candidate_height_mm;
         g_tof_fused_valid = 1U;
+        s_both_invalid_hold_cnt = 0U;
     }
     else if (0U != tof1_valid)
     {
-        g_tof_fused_height_mm = g_tof1_height_mm;
+        candidate_height_mm = g_tof1_height_mm;
+        if ((0U != s_prev_fused_valid) &&
+            (fabsf(candidate_height_mm - s_prev_fused_height_mm) > 100.0f) &&
+            (fabsf(acc_down_g) < 0.08f))
+        {
+            candidate_height_mm = s_prev_fused_height_mm;
+        }
+
+        g_tof_fused_height_mm = candidate_height_mm;
         g_tof_fused_valid = 1U;
+        s_both_invalid_hold_cnt = 0U;
     }
     else if (0U != tof4_valid)
     {
-        g_tof_fused_height_mm = g_tof4_height_mm;
+        candidate_height_mm = g_tof4_height_mm;
+        if ((0U != s_prev_fused_valid) &&
+            (fabsf(candidate_height_mm - s_prev_fused_height_mm) > 100.0f) &&
+            (fabsf(acc_down_g) < 0.08f))
+        {
+            candidate_height_mm = s_prev_fused_height_mm;
+        }
+
+        g_tof_fused_height_mm = candidate_height_mm;
         g_tof_fused_valid = 1U;
+        s_both_invalid_hold_cnt = 0U;
+    }
+    else if ((0U != s_prev_fused_valid) && (s_both_invalid_hold_cnt < 3U))
+    {
+        g_tof_fused_height_mm = s_prev_fused_height_mm;
+        g_tof_fused_valid = 1U;
+        s_both_invalid_hold_cnt++;
+    }
+
+    if (0U != g_tof_fused_valid)
+    {
+        s_prev_fused_height_mm = g_tof_fused_height_mm;
+        s_prev_fused_valid = 1U;
     }
 }

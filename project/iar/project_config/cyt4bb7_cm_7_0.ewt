@@ -1463,10 +1463,10 @@
             <group>
                 <name>Height_Est</name>
                 <file>
-                    <name>$PROJ_DIR$\..\..\code\Estimation\Height_Est\TOF_data.c</name>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Height_Est\Height_Est.c</name>
                 </file>
                 <file>
-                    <name>$PROJ_DIR$\..\..\code\Estimation\Height_Est\TOF_data.h</name>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Height_Est\Height_Est.h</name>
                 </file>
                 <configuration>
                     <name>Debug</name>

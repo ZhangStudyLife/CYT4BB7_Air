@@ -1,5 +1,5 @@
-#ifndef TOF_DATA_H_
-#define TOF_DATA_H_
+#ifndef HEIGHT_EST_H_
+#define HEIGHT_EST_H_
 
 #include "../../HW_Drivers/VL53L1X/VL53L1X.h"
 #include "zf_common_headfile.h"

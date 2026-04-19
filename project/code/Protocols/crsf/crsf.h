@@ -47,7 +47,7 @@ static const CRSF_ChannelConfig CRSF_CHANNEL_CONFIG[CRSF_CH_COUNT] =
 };
 
 extern volatile uint16_t CRSF_CH[CRSF_CH_COUNT];            // 接收的通道数据 0-2047 对应 11 位有效数�?
-extern volatile int16_t CRSF_STD[CRSF_CH_COUNT];             // 标准化通道数据
+extern volatile int16_t CRSF_STD[CRSF_CH_COUNT];             // 
 extern volatile uint32_t CRSF_LAST_UPDATE_TIME;             // 上次更新通道数据的时�?用于判断接收超时
 extern volatile uint8_t CRSF_LINK_UP;                       // 接收链接状�?0表示链接断开 1表示链接正常
 

@@ -37,6 +37,7 @@
 ********************************************************************************************************************/
 
 #include "zf_common_headfile.h"
+#include "../code/HW_Drivers/Motor/small_driver_uart_control.h"
 
 extern volatile uint32 tick_1000us_cnt;
 extern volatile uint16 g_tick_1000HZ;
@@ -181,9 +182,11 @@ void uart2_isr (void)
 {
     if(uart_isr_mask(UART_2))            // 串口2接收中断
     {
-        
+#if (MOTOR_DRIVER_BACKEND == MOTOR_DRIVER_BACKEND_UART)
+        uart_control_callback();         // 串口四合一电调回调函数
+#else
         gnss_uart_callback();            // GPS模块回调函数      
-        
+#endif
     }
     else                                // 串口2发送中断
     {

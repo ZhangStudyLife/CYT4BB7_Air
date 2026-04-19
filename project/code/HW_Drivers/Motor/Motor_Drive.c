@@ -7,6 +7,18 @@
 
 #include "Motor_Drive.h"
 #include "zf_common_headfile.h"
+#include "small_driver_uart_control.h"
+
+#if (MOTOR_DRIVER_BACKEND == MOTOR_DRIVER_BACKEND_PWM)
+#define MOTOR_OUTPUT_STOP_VALUE    (MOTOR_DUTY_MIN)
+#else
+#define MOTOR_OUTPUT_STOP_VALUE    (0U)
+#endif
+
+#if (MOTOR_DRIVER_BACKEND == MOTOR_DRIVER_BACKEND_UART)
+#define MOTOR_UART_SEND_RATE_HZ    (500U)    /* 串口电机控制帧平均发送频率，单位Hz */
+extern volatile uint32 tick_1000us_cnt;
+#endif
 
 /* ======================== 引脚映射配置 ======================== */
 /*
@@ -22,6 +34,11 @@ static const pwm_channel_enum MOTOR_PWM_CH[MOTOR_NUM] = {
     TCPWM_CH24_P09_0,   /* M3: 左后 */
     TCPWM_CH25_P09_1    /* M4: 左前 */
 };
+
+#if (MOTOR_DRIVER_BACKEND == MOTOR_DRIVER_BACKEND_UART)
+static const uint8 MOTOR_UART_CMD_SLOT_BY_REAL[MOTOR_NUM] = {2U, 0U, 3U, 1U};
+static uint32 g_motor_uart_last_tick = 0U;     /* 串口电机周期发送上次节拍，单位ms */
+#endif
 
 /* ======================== 混控矩阵定义（整数版本） ======================== */
 /*
@@ -80,22 +97,22 @@ static inline int32 clamp_i(int32 value, int32 min_val, int32 max_val)
  *          - 输入5000  → duty=6000 (1500us脉宽，安全上限)
  *          - 输入10000 → 先限幅到5000 → duty=6000 (1500us脉宽)
  */
-static inline uint32 throttle_to_duty(int32 throttle)
+static inline uint32 throttle_to_driver_value(int32 throttle)
 {
-    /* 限幅到安全范围：0 ~ MOTOR_THROTTLE_LIMIT_MAX(5000) */
     throttle = clamp_i(throttle, 0, MOTOR_THROTTLE_LIMIT_MAX);
 
-    /* 线性映射：0~10000 → MOTOR_DUTY_MIN(4000)~MOTOR_DUTY_MAX(8000) */
-    /* 公式：duty = DUTY_MIN + throttle × (DUTY_MAX - DUTY_MIN) / 10000 */
+#if (MOTOR_DRIVER_BACKEND == MOTOR_DRIVER_BACKEND_PWM)
     uint32 duty = MOTOR_DUTY_MIN + (uint32)throttle * (MOTOR_DUTY_MAX - MOTOR_DUTY_MIN) / MOTOR_INPUT_MAX;
 
-    /* 二次限幅确保不超过安全限制 */
     if (duty > MOTOR_DUTY_LIMIT)
     {
         duty = MOTOR_DUTY_LIMIT;
     }
 
     return duty;
+#else
+    return (uint32)throttle;
+#endif
 }
 
 /**
@@ -103,15 +120,67 @@ static inline uint32 throttle_to_duty(int32 throttle)
  * @param   motor   电机编号
  * @param   duty    PWM duty值
  */
-static void motor_set_pwm(motor_index_e motor, uint32 duty)
+static void motor_set_backend_value(motor_index_e motor, uint32 value)
 {
     if (motor >= MOTOR_NUM) return;
 
-    g_motor_state.duty[motor] = duty;
-    pwm_set_duty(MOTOR_PWM_CH[motor], duty);
+    g_motor_state.duty[motor] = value;
+
+#if (MOTOR_DRIVER_BACKEND == MOTOR_DRIVER_BACKEND_PWM)
+    pwm_set_duty(MOTOR_PWM_CH[motor], value);
+#endif
+}
+
+static void motor_backend_sync_all(void)
+{
+#if (MOTOR_DRIVER_BACKEND == MOTOR_DRIVER_BACKEND_UART)
+    int16 uart_cmd[MOTOR_NUM] = {0};
+
+    for (uint8 i = 0; i < MOTOR_NUM; i++)
+    {
+        uart_cmd[MOTOR_UART_CMD_SLOT_BY_REAL[i]] = (int16)g_motor_state.duty[i];
+    }
+
+    small_driver_set_duty(uart_cmd[0], uart_cmd[1], uart_cmd[2], uart_cmd[3]);
+#endif
 }
 
 /* ======================== 公开接口实现 ======================== */
+
+/**
+ * @brief   立即同步当前四个电机输出到后端
+ * @param   void
+ * @return  void
+ */
+static void motor_backend_sync_immediate(void)
+{
+    motor_backend_sync_all();
+
+#if (MOTOR_DRIVER_BACKEND == MOTOR_DRIVER_BACKEND_UART)
+    g_motor_uart_last_tick = tick_1000us_cnt;
+#endif
+}
+
+/**
+ * @brief   按时间节流同步串口电机输出
+ * @param   void
+ * @return  void
+ */
+static void motor_backend_sync_periodic(void)
+{
+#if (MOTOR_DRIVER_BACKEND == MOTOR_DRIVER_BACKEND_UART)
+    uint32 tick_now = tick_1000us_cnt;
+
+    if ((tick_now - g_motor_uart_last_tick) < (1000U / MOTOR_UART_SEND_RATE_HZ))
+    {
+        return;
+    }
+
+    g_motor_uart_last_tick = tick_now;
+#endif
+
+    motor_backend_sync_all();
+}
 
 void Motor_Init(void)
 {
@@ -119,11 +188,12 @@ void Motor_Init(void)
     g_motor_state.is_armed = 0;
     for (uint8 i = 0; i < MOTOR_NUM; i++)
     {
-        g_motor_state.duty[i] = MOTOR_DUTY_MIN;
+        g_motor_state.duty[i] = MOTOR_OUTPUT_STOP_VALUE;
         g_motor_state.output[i] = 0;
     }
 
     /* 初始化4路PWM，频率400Hz，初始duty为最小油门 */
+#if (MOTOR_DRIVER_BACKEND == MOTOR_DRIVER_BACKEND_PWM)
     for (uint8 i = 0; i < MOTOR_NUM; i++)
     {
         pwm_init(MOTOR_PWM_CH[i], MOTOR_PWM_FREQ, MOTOR_DUTY_MIN);
@@ -136,6 +206,10 @@ void Motor_Init(void)
 
     // 电调上电要给低油门信号一段时间
     system_delay_ms(3000);
+#else
+    small_driver_uart_init();
+    motor_backend_sync_immediate();
+#endif
 }
 
 void Motor_SetThrottle(motor_index_e motor, int32 throttle)
@@ -145,8 +219,9 @@ void Motor_SetThrottle(motor_index_e motor, int32 throttle)
     /* 未解锁时只输出最小油门 */
     if (!g_motor_state.is_armed)
     {
-        motor_set_pwm(motor, MOTOR_DUTY_MIN);
+        motor_set_backend_value(motor, MOTOR_OUTPUT_STOP_VALUE);
         g_motor_state.output[motor] = 0;
+        motor_backend_sync_immediate();
         return;
     }
 
@@ -155,16 +230,29 @@ void Motor_SetThrottle(motor_index_e motor, int32 throttle)
     g_motor_state.output[motor] = throttle;
 
     /* 转换为duty并输出 */
-    uint32 duty = throttle_to_duty(throttle);
-    motor_set_pwm(motor, duty);
+    uint32 duty = throttle_to_driver_value(throttle);
+    motor_set_backend_value(motor, duty);
+    motor_backend_sync_immediate();
 }
 
 void Motor_SetThrottleAll(const int32 throttle[MOTOR_NUM])
 {
+    if (throttle == NULL) return;
+
+    if (!g_motor_state.is_armed)
+    {
+        Motor_EmergencyStop();
+        return;
+    }
+
     for (uint8 i = 0; i < MOTOR_NUM; i++)
     {
-        Motor_SetThrottle((motor_index_e)i, throttle[i]);
+        int32 motor_throttle = clamp_i(throttle[i], 0, MOTOR_INPUT_MAX);
+        g_motor_state.output[i] = motor_throttle;
+        motor_set_backend_value((motor_index_e)i, throttle_to_driver_value(motor_throttle));
     }
+
+    motor_backend_sync_immediate();
 }
 
 void Motor_EmergencyStop(void)
@@ -175,8 +263,10 @@ void Motor_EmergencyStop(void)
     for (uint8 i = 0; i < MOTOR_NUM; i++)
     {
         g_motor_state.output[i] = 0;
-        motor_set_pwm((motor_index_e)i, MOTOR_DUTY_MIN);
+        motor_set_backend_value((motor_index_e)i, MOTOR_OUTPUT_STOP_VALUE);
     }
+
+    motor_backend_sync_immediate();
 }
 
 void Motor_Mixer(const motor_mixer_input_t *input)
@@ -256,9 +346,11 @@ void Motor_Mixer(const motor_mixer_input_t *input)
         g_motor_state.output[i] = motor_out[i];
 
         /* 转换为duty并输出 */
-        uint32 duty = throttle_to_duty(motor_out[i]);
-        motor_set_pwm((motor_index_e)i, duty);
+        uint32 duty = throttle_to_driver_value(motor_out[i]);
+        motor_set_backend_value((motor_index_e)i, duty);
     }
+
+    motor_backend_sync_periodic();
 }
 
 void Motor_Enable(void)

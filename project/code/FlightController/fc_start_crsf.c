@@ -175,16 +175,16 @@ static void FC_START_CRSF_StateMachine_Update(void)
          * 校准完成后检查四路TOF偏差：超过10cm则回STANDBY拒绝起飞。 */
         if (0U == s_takeoff_calib_done)
         {
-            TOF_Calibrate();
+            // TOF_Calibrate();
             s_takeoff_calib_done = 1U;
-            if (0U == g_tof_calibration_ok)
-            {
-                /* 四路TOF偏差过大（>100mm），拒绝起飞，回到待机状态 */
-                Beep_Play(50,2,3); /* 50%占空比，2s周期，3次循环的报警提示 */
-                FC_START_CRSF_ForceStopToStandby();
-                break;
-            }
-            break;
+            // if (0U == g_tof_calibration_ok)
+            // {
+            //     /* 四路TOF偏差过大（>100mm），拒绝起飞，回到待机状态 */
+            //     Beep_Play(50,2,3); /* 50%占空比，2s周期，3次循环的报警提示 */
+            //     FC_START_CRSF_ForceStopToStandby();
+            //     break;
+            // }
+            // break;
         }
         /* 阶段2：正常起飞序列（电机渐进加速） */
         if (FC_START_CRSF_TakeoffState_Update() != 0U)

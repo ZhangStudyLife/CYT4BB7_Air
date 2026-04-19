@@ -26,7 +26,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
+#include "zf_common_headfile.h"
 #include "ICM42688.h"
 
 /*
@@ -111,9 +111,7 @@ static void Find_ICM42688(void)
     if (ID != ICM42688_ID)
     {
         printf("ICM42688 not recognized,Read:%d\n", ID);
-        while (1)
-        {
-        }
+        Beep_Play(60,0.5,6);
     }
 }
 
@@ -207,9 +205,7 @@ static void ICM42688_SET_GYRO(GYRO_FSR gyro_fsr, GYRO_ODR gyro_odr)
     if (GYRO_CONFIG_Verify != GYRO_CONFIG0)
     {
         printf("Gyroscope set failed!\n");
-        while (1)
-        {
-        }
+        Beep_Play(60,0.5,6);
     }
 }
 
@@ -287,9 +283,7 @@ static void ICM42688_SET_ACC(ACC_FSR acc_fsr, ACC_ODR acc_odr)
     if (ACCEL_CONFIG_Verify != ACCEL_CONFIG0)
     {
         printf("Accelerometer set failed!\n");
-        while (1)
-        {
-        }
+        Beep_Play(60,0.5,6);
     }
 }
 

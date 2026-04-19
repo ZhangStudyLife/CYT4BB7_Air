@@ -11,6 +11,10 @@
 
 #include "zf_common_typedef.h"
 
+#define MOTOR_DRIVER_BACKEND_PWM      (0U)
+#define MOTOR_DRIVER_BACKEND_UART     (1U)
+#define MOTOR_DRIVER_BACKEND          (MOTOR_DRIVER_BACKEND_UART)
+
 #ifdef __cplusplus
 extern "C" {
 #endif

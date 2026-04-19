@@ -20,7 +20,7 @@ int main(void)
     wifi_cmd_Init();
     TOF_Init();
     PMW3901_Init();
-    LC302_Init();
+    // LC302_Init();
     IMU_Init_All();
     crsf_init();
     AccelCalibration_Init();
@@ -38,6 +38,20 @@ int main(void)
     wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
     pit_us_init(PIT_CH0, 1000);
     pit_ms_init(PIT_CH1, 10);
+    
+    Motor_Enable();
+    Motor_SetThrottleAll((int32[]){0, 0, 0, 0});
+    system_delay_ms(2000);
+    Motor_SetThrottleAll((int32[]){2000, 0, 0, 0});
+    system_delay_ms(2000);
+    Motor_SetThrottleAll((int32[]){0, 2000, 0, 0});
+    system_delay_ms(2000);
+    Motor_SetThrottleAll((int32[]){0, 0, 2000, 0});
+    system_delay_ms(2000);
+    Motor_SetThrottleAll((int32[]){0, 0, 0, 2000});
+    system_delay_ms(2000);
+    Motor_SetThrottleAll((int32[]){0, 0, 0, 0});
+    system_delay_ms(2000);
 
     while (true)
     {
@@ -49,15 +63,13 @@ int main(void)
 
             IMU_Update_1000HZ();
             Pos_Est_Update_1000HZ();
-            // wifi_justfloat(g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
-            //                g_euler.roll, g_euler.pitch, g_euler.yaw);
 
             div500++;
             if (div500 >= 2U)
             {
                 div500 = 0U;
                 FC_Loop_500Hz();
-               // wifi_justfloat(tick_1000us_cnt, lc302_data.flow_x_integral, lc302_data.flow_y_integral, lc302_data.integration_timespan, g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY,g_pmw3901_raw.squal);
+                // wifi_justfloat(tick_1000us_cnt, lc302_data.flow_x_integral, lc302_data.flow_y_integral, lc302_data.integration_timespan, g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY,g_pmw3901_raw.squal);
             }
 
             FC_Loop_1000Hz();
@@ -80,9 +92,7 @@ int main(void)
                     ipc_image_payload_t img;
                     ipc_image_get(&img);
                     // wifi_justfloat(img.circles->valid, img.circles->x, img.circles->y);
-                    (void)img; // TODO: 将img数据接入位置估计
                 }
-                LC302_Update_50HZ();
                 Pos_Est_Update_50HZ();
                 crsf_send_50hz();
             }
@@ -98,7 +108,6 @@ int main(void)
             {
                 div50 = 0U;
             }
-
             div10++;
             if (div10 >= 10U)
             {
@@ -112,8 +121,8 @@ int main(void)
                 }
             }
         }
-                #if (0U == WIFI_IMAGE_ENABLE)
-            wifi_cmd_Poll();
-        #endif
+#if (0U == WIFI_IMAGE_ENABLE)
+        wifi_cmd_Poll();
+#endif
     }
 }

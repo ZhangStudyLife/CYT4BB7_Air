@@ -206,12 +206,17 @@ void IMU_Update_1000HZ(void)
 	AccelCalibration_Update_1000HZ();
 
 	/* 5. 姿态解算统一使用 1kHz 滤波 IMU 输出 */
+	if (g_imufilter_1000hz.gyrox > -0.1f && g_imufilter_1000hz.gyrox < 0.1f){g_imufilter_1000hz.gyrox = 0.0f;}
+	if (g_imufilter_1000hz.gyroy > -0.1f && g_imufilter_1000hz.gyroy < 0.1f){g_imufilter_1000hz.gyroy = 0.0f;}
+	if (g_imufilter_1000hz.gyroz > -0.1f && g_imufilter_1000hz.gyroz < 0.1f){g_imufilter_1000hz.gyroz = 0.0f;}
+
 	ahrs_gx = g_imufilter_1000hz.gyrox;
 	ahrs_gy = g_imufilter_1000hz.gyroy;
 	ahrs_gz = g_imufilter_1000hz.gyroz;
 	ahrs_ax = g_imufilter_1000hz.accx;
 	ahrs_ay = g_imufilter_1000hz.accy;
 	ahrs_az = g_imufilter_1000hz.accz;
+
 
 	if ((0U != IMU_IsFiniteFloat(ahrs_gx)) &&
 		(0U != IMU_IsFiniteFloat(ahrs_gy)) &&
@@ -229,7 +234,6 @@ void IMU_Update_1000HZ(void)
 
 	/* 步骤5: 计算欧拉角（单位: 度）并缓�?*/
 	g_euler = MahonyAhrs_GetEulerDegrees(&g_mahony_ahrs);
-
 
 }
 

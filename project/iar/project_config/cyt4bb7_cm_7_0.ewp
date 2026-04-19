@@ -1715,6 +1715,12 @@
                     <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\FlowGyroDecoupler.h</name>
                 </file>
                 <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\FlowGyroDecoupler_LC302.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\FlowGyroDecoupler_LC302.h</name>
+                </file>
+                <file>
                     <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\Pos_Est.c</name>
                 </file>
                 <file>
@@ -2946,6 +2952,12 @@
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\..\code\HW_Drivers\Motor\Motor_Drive.h</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\Motor\small_driver_uart_control.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\Motor\small_driver_uart_control.h</name>
                 </file>
                 <configuration>
                     <name>Debug</name>

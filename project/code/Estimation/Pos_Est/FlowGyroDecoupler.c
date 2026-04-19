@@ -1,27 +1,31 @@
 #include "FlowGyroDecoupler.h"
 
-/* 1000Hz采样下15Hz一阶低通系数 */
-#define FLOW_GYRO_LPF_ALPHA   (0.05f)
-/* 光流拟合系数 */
-#define FLOW_GYRO_FIT_K       (10.0f)
-/* 1000Hz积分步长，单位s */
-#define FLOW_GYRO_DT_S        (0.001f)
+/* PMW3901 X 轴一阶低通 alpha，对应 fc=10Hz */
+#define FLOW_GYRO_PMW3901_LPF_ALPHA_X   (0.059117f)
+/* PMW3901 Y 轴一阶低通 alpha，对应 fc=7Hz */
+#define FLOW_GYRO_PMW3901_LPF_ALPHA_Y   (0.042129f)
+/* PMW3901 X 轴姿态补偿倍率 */
+#define FLOW_GYRO_PMW3901_GAIN_X        (8.009662f)
+/* PMW3901 Y 轴姿态补偿倍率 */
+#define FLOW_GYRO_PMW3901_GAIN_Y        (9.120377f)
+/* 1000Hz 积分步长，单位 s */
+#define FLOW_GYRO_PMW3901_DT_S          (0.001f)
 
-/* X轴陀螺低通状态 */
+/* PMW3901 X 轴陀螺低通状态 */
 static float s_gyro_lpf_x = 0.0f;
-/* Y轴陀螺低通状态 */
+/* PMW3901 Y 轴陀螺低通状态 */
 static float s_gyro_lpf_y = 0.0f;
-/* X轴窗口累计补偿量 */
-static float s_fit_sum_x = 0.0f;
-/* Y轴窗口累计补偿量 */
-static float s_fit_sum_y = 0.0f;
-/* X轴去耦后的光流增量 */
+/* PMW3901 X 轴当前 50Hz 窗口积分补偿量 */
+static float s_window_sum_x = 0.0f;
+/* PMW3901 Y 轴当前 50Hz 窗口积分补偿量 */
+static float s_window_sum_y = 0.0f;
+/* PMW3901 X 轴解耦后的光流增量 */
 static float s_dec_x = 0.0f;
-/* Y轴去耦后的光流增量 */
+/* PMW3901 Y 轴解耦后的光流增量 */
 static float s_dec_y = 0.0f;
 
 /*
- * 函数功能：初始化光流去陀螺补偿状态
+ * 函数功能：初始化 PMW3901 专用光流解耦模块
  * 输入参数：无
  * 返回值：无
  */
@@ -29,14 +33,14 @@ void FlowGyroDecoupler_Init(void)
 {
     s_gyro_lpf_x = 0.0f;
     s_gyro_lpf_y = 0.0f;
-    s_fit_sum_x  = 0.0f;
-    s_fit_sum_y  = 0.0f;
-    s_dec_x      = 0.0f;
-    s_dec_y      = 0.0f;
+    s_window_sum_x = 0.0f;
+    s_window_sum_y = 0.0f;
+    s_dec_x = 0.0f;
+    s_dec_y = 0.0f;
 }
 
 /*
- * 函数功能：重新初始化光流去陀螺补偿状态
+ * 函数功能：重置 PMW3901 专用光流解耦模块内部状态
  * 输入参数：无
  * 返回值：无
  */
@@ -46,47 +50,47 @@ void FlowGyroDecoupler_Reinit(void)
 }
 
 /*
- * 函数功能：在1000Hz下对陀螺数据低通并累计窗口补偿量
- * 输入参数：t_ms-时间戳；gyro_x-X轴角速度；gyro_y-Y轴角速度
+ * 函数功能：在 1000Hz 下推入陀螺数据，并累计本个 50Hz 窗口内的姿态补偿量
+ * 输入参数：t_ms-当前毫秒时间戳；gyro_x-X 轴角速度；gyro_y-Y 轴角速度
  * 返回值：无
  */
 void FlowGyroDecoupler_Push1000Hz(uint32 t_ms, float gyro_x, float gyro_y)
 {
     (void)t_ms;
 
-    /* 对输入角速度做15Hz一阶低通 */
-    s_gyro_lpf_x += FLOW_GYRO_LPF_ALPHA * (gyro_x - s_gyro_lpf_x);
-    s_gyro_lpf_y += FLOW_GYRO_LPF_ALPHA * (gyro_y - s_gyro_lpf_y);
+    /* 按拟合结论分别对 X/Y 轴角速度执行一阶低通 */
+    s_gyro_lpf_x += FLOW_GYRO_PMW3901_LPF_ALPHA_X * (gyro_x - s_gyro_lpf_x);
+    s_gyro_lpf_y += FLOW_GYRO_PMW3901_LPF_ALPHA_Y * (gyro_y - s_gyro_lpf_y);
 
-    /* 按拟合公式累计当前50Hz窗口内的光流等效补偿量 */
-    s_fit_sum_x += FLOW_GYRO_FIT_K * s_gyro_lpf_x * FLOW_GYRO_DT_S;
-    s_fit_sum_y += FLOW_GYRO_FIT_K * s_gyro_lpf_y * FLOW_GYRO_DT_S;
+    /* 在当前 50Hz 窗口内累计角速度积分补偿量 */
+    s_window_sum_x += FLOW_GYRO_PMW3901_GAIN_X * s_gyro_lpf_x * FLOW_GYRO_PMW3901_DT_S;
+    s_window_sum_y += FLOW_GYRO_PMW3901_GAIN_Y * s_gyro_lpf_y * FLOW_GYRO_PMW3901_DT_S;
 }
 
 /*
- * 函数功能：在50Hz下用窗口累计补偿量对光流增量做最简去耦
- * 输入参数：t_read_ms-光流时间戳；delta_x-X轴光流增量；delta_y-Y轴光流增量
- * 返回值：1表示本次已完成更新
+ * 函数功能：在 50Hz 下根据当前窗口的积分补偿量更新 PMW3901 解耦结果
+ * 输入参数：t_read_ms-当前光流读取时刻；delta_x-X 轴原始光流增量；delta_y-Y 轴原始光流增量
+ * 返回值：1 表示本次已完成更新
  */
 uint8 FlowGyroDecoupler_Update50Hz(uint32 t_read_ms, int16_t delta_x, int16_t delta_y)
 {
     (void)t_read_ms;
 
-    /* 光流增量直接减去本窗口累计补偿量 */
-    s_dec_x = (float)delta_x - s_fit_sum_x;
-    s_dec_y = (float)delta_y - s_fit_sum_y;
+    /* 当前新帧直接减去上一窗口累计的姿态补偿量 */
+    s_dec_x = (float)delta_x - s_window_sum_x;
+    s_dec_y = (float)delta_y - s_window_sum_y;
 
-    /* 清零窗口累计，等待下一轮1000Hz重新累计 */
-    s_fit_sum_x = 0.0f;
-    s_fit_sum_y = 0.0f;
+    /* 清零窗口累计量，等待下一轮 1000Hz 重新积分 */
+    s_window_sum_x = 0.0f;
+    s_window_sum_y = 0.0f;
 
     return 1U;
 }
 
 /*
- * 函数功能：获取X轴去耦后的光流增量
+ * 函数功能：获取 PMW3901 X 轴解耦后的光流增量
  * 输入参数：无
- * 返回值：X轴去耦后的光流增量
+ * 返回值：X 轴解耦后的光流增量
  */
 float FlowGyroDecoupler_GetDecX(void)
 {
@@ -94,9 +98,9 @@ float FlowGyroDecoupler_GetDecX(void)
 }
 
 /*
- * 函数功能：获取Y轴去耦后的光流增量
+ * 函数功能：获取 PMW3901 Y 轴解耦后的光流增量
  * 输入参数：无
- * 返回值：Y轴去耦后的光流增量
+ * 返回值：Y 轴解耦后的光流增量
  */
 float FlowGyroDecoupler_GetDecY(void)
 {

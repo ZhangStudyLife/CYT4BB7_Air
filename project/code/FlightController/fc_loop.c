@@ -377,7 +377,6 @@ void FC_Loop_50Hz(void)
  */
 void FC_Loop_100Hz(void)
 {
-    static uint8 s_vl53_recover_div = 0U;
     static uint8 s_tof_hist_inited = 0U;
     static float s_height_prev_m = 0.0f;
     static uint32 tick_1000us_cnt_last = 0;
@@ -392,12 +391,6 @@ void FC_Loop_100Hz(void)
     float dt = diff * 0.001f;
 
     TOF_update_100HZ();
-    s_vl53_recover_div++;
-    if (s_vl53_recover_div >= 10U)
-    {
-        s_vl53_recover_div = 0U;
-        VL53L1X_recover_update_10HZ();
-    }
 
     tick_1000us_cnt_last = tick_now;
     if (dt < 0.0001f)
@@ -611,11 +604,18 @@ void FC_Loop_1000Hz(void)
         {
             float throttle_cmd_raw = g_fc_params.base_throttle + height_vel_out;
             float throttle_cmd_comp = FC_Apply_Tilt_Throttle_Compensation(throttle_cmd_raw);
-            g_motor_cmd.throttle = (int32_t)fc_clampf((float)(int32_t)throttle_cmd_comp, 2600.0f, 4200.0f);
+            g_motor_cmd.throttle = (int32_t)fc_clampf((float)(int32_t)throttle_cmd_comp, 2600.0f, 4500.0f);
+            // CRSF_STD[2] 0~1000 映射到油门的 2600 ~ 5200
+            g_motor_cmd.throttle = CRSF_STD[2] * 2.6f + 2600; /* 1000 对应 2600，-1000 对应 2600，线性映射 */
+            g_motor_cmd.throttle = (int32_t)fc_clampf((float)(int32_t)g_motor_cmd.throttle, 2600.0f, 5200.0f);
         }
-        g_motor_cmd.roll = roll_ctrl;
-        g_motor_cmd.pitch = -pitch_ctrl;
-        g_motor_cmd.yaw = yaw_ctrl;
+        g_motor_cmd.roll =(int32)(roll_ctrl * 1.3f);
+        g_motor_cmd.pitch = -(int32)(pitch_ctrl * 1.3f);
+        g_motor_cmd.yaw = (int32)(yaw_ctrl * 1.3f);
+        // CRSF_STD[2] -1000~1000 映射到油门的 2600 ~ 5200
+        g_motor_cmd.throttle = (int32_t)(CRSF_STD[2] * 1.3f + 3900.0f);
+
+        wifi_justfloat(g_motor_cmd.pitch, g_motor_cmd.roll, g_motor_cmd.yaw, g_motor_cmd.throttle);
 
         Motor_Mixer(&g_motor_cmd);
     }

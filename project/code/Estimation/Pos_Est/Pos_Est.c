@@ -171,6 +171,9 @@
 // }
 
 #include "Pos_Est.h"
+#include "FlowGyroDecoupler_LC302.h"
+#include "HW_Drivers/PMW3901/PMW3901.h"
+#include "HW_Drivers/LC302/LC302.h"
 #include "filter.h"
 #include "FlightController/fc_params.h"
 
@@ -238,7 +241,9 @@ float acc_y_lp = 0.0f;
 void Pos_Est_Init(void)
 {
     PMW3901_Init();
+    LC302_Init();
     FlowGyroDecoupler_Init();
+    FlowGyroDecoupler_LC302_Init();
     LPF1_Init(&s_acc_lp_x, POS_EST_ACC_LPF_ALPHA);
     LPF1_Init(&s_acc_lp_y, POS_EST_ACC_LPF_ALPHA);
     LPF1_Init(&s_vel_out_lp_x, POS_EST_VEL_OUT_LPF_ALPHA);
@@ -260,8 +265,8 @@ void Pos_Est_Init(void)
  */
 void Pos_Est_Reinit(void)
 {
-    PMW3901_ReInit();
     FlowGyroDecoupler_Reinit();
+    FlowGyroDecoupler_LC302_Reinit();
     LPF1_Reset(&s_acc_lp_x);
     LPF1_Reset(&s_acc_lp_y);
     LPF1_Reset(&s_vel_out_lp_x);
@@ -301,7 +306,8 @@ void Pos_Est_Update_1000HZ(void)
     float sr;
     float cr;
 
-    FlowGyroDecoupler_Push1000Hz(tick_1000us_cnt, g_imudata_250hz.gyrox, g_imudata_250hz.gyroy);
+    FlowGyroDecoupler_Push1000Hz(tick_1000us_cnt, g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy);
+    FlowGyroDecoupler_LC302_Push1000Hz(tick_1000us_cnt, g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy);
 
     /* 取陷波+低通滤波后的传感器系加速度（单位 g，已校准零偏/尺度） */
     acc_sensor[0] = g_imufilter_1000hz.accx;
@@ -324,11 +330,12 @@ void Pos_Est_Update_1000HZ(void)
     acc_x_lp = LPF1_Update(&s_acc_lp_x, acc_x_temp);
     acc_y_lp = LPF1_Update(&s_acc_lp_y, acc_y_temp);
 
-    wifi_justfloat(tick_1000us_cnt, g_tof_fused_height_mm,
-                   g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
-                   g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY, g_pmw3901_raw.squal,
-                   lc302_data.flow_x_integral, lc302_data.flow_y_integral,
-                   acc_x_lp, acc_y_lp);
+    float dec_x_pmw3901 = FlowGyroDecoupler_GetDecX();
+    float dec_y_pmw3901 = FlowGyroDecoupler_GetDecY();
+    float dec_x_lc302 = FlowGyroDecoupler_LC302_GetDecX();
+    float dec_y_lc302 = FlowGyroDecoupler_LC302_GetDecY();
+    FC_START_CRSF_state_e FC_START_CRSF_state = FC_START_CRSF_Get_State();
+
 }
 
 /*
@@ -348,7 +355,9 @@ void Pos_Est_Update_50HZ(void)
     const float dt = 0.02f;
 
     PMW3901_Update_50HZ();
+    LC302_Update_50HZ();
     FlowGyroDecoupler_Update50Hz(tick_1000us_cnt, g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY);
+    FlowGyroDecoupler_LC302_Update50Hz(tick_1000us_cnt, lc302_data.flow_x_integral, lc302_data.flow_y_integral);
     dec_x = FlowGyroDecoupler_GetDecX();
     dec_y = FlowGyroDecoupler_GetDecY();
     height = g_tof_fused_height_mm / 1000.0f;
@@ -398,4 +407,5 @@ void Pos_Est_Update_50HZ(void)
 
     Pos_Est_pos_x = Pos_Est_pos_x_last + 0.5f * (Pos_Est_vel_x_last + Pos_Est_vel_x) * dt;
     Pos_Est_pos_y = Pos_Est_pos_y_last + 0.5f * (Pos_Est_vel_y_last + Pos_Est_vel_y) * dt;
+
 }

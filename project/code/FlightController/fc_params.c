@@ -169,8 +169,8 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->vel_y_d_lpf = 0.0f;
 
     /* ===== Z 轴速度环参数 ===== */
-    params->vel_z_kp = 300.0f;
-    params->vel_z_ki = 200.0f;
+    params->vel_z_kp = 400.0f;
+    params->vel_z_ki = 300.0f;
     params->vel_z_kd = 0.0f;
     params->vel_z_kff = 0.0f;
     params->vel_z_i_limit = 1500.0f;

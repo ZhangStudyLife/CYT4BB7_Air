@@ -377,8 +377,6 @@ void FC_Loop_50Hz(void)
  */
 void FC_Loop_100Hz(void)
 {
-    static uint8 s_tof_hist_inited = 0U;
-    static float s_height_prev_m = 0.0f;
     static uint32 tick_1000us_cnt_last = 0;
     FC_START_CRSF_state_e fc_state;
     float ch2;
@@ -397,18 +395,11 @@ void FC_Loop_100Hz(void)
     }
 
     height_m = g_tof_fused_height_mm * 0.001f;
-    if (0U == s_tof_hist_inited)
-    {
-        s_height_prev_m = height_m;
-        s_tof_hist_inited = 1U;
-    }
-
-    height_vz_raw_mps = (height_m - s_height_prev_m) / dt;
+    height_vz_raw_mps = g_tof_fused_vz_mps;
 
     // wifi_justfloat(tick_1000us_cnt,g_tof1_height_mm,g_tof4_height_mm,g_tof_fused_height_mm,height_vz_raw_mps,dt,
     // g_imufilter_1000hz.accx,g_imufilter_1000hz.accy,g_imufilter_1000hz.accz,g_euler.pitch,g_euler.roll,g_euler.yaw);
 
-    s_height_prev_m = height_m;
     s_height_vz_mps = g_height_fused_vz_mps;
     fc_state = FC_START_CRSF_Get_State();
     s_flight_mode = FC_START_CRSF_Get_Flight_Mode(); /* 检测遥控器的模式 */
@@ -461,7 +452,6 @@ void FC_Loop_100Hz(void)
     }
     else
     {
-        s_tof_hist_inited = 0U;
         s_height_vz_mps = 0.0f;
         height_pos_out = 0.0f;
         height_vel_out = 0.0f;

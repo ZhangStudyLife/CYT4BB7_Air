@@ -8,18 +8,39 @@
 extern "C" {
 #endif
 
-extern float g_tof_fused_height_mm;
-extern float g_tof1_height_mm;
-extern float g_tof4_height_mm;
-extern uint8 g_tof_fused_valid;
-extern float g_tof_fused_vz_mps;
-extern float g_height_fused_vz_mps;
-extern float g_acc_sum_vz_mps2;
+extern float g_tof_fused_height_mm;  /* TOF 融合高度，单位 mm */
+extern float g_tof1_height_mm;       /* 1 号电机下方 TOF 高度，单位 mm */
+extern float g_tof4_height_mm;       /* 4 号电机下方 TOF 高度，单位 mm */
+extern uint8 g_tof_fused_valid;      /* TOF 融合高度有效标志：1=有效，0=无效 */
+extern float g_tof_fused_vz_mps;     /* TOF 单次差分速度，单位 m/s，上升为正 */
+extern float g_height_fused_vz_mps;  /* TOF 差分速度 3Hz 低通结果，单位 m/s，上升为正 */
 
+/*
+ * 函数功能：初始化 TOF 相关状态与驱动。
+ * 输入参数：
+ *   无
+ * 返回值：
+ *   无
+ */
 void TOF_Init(void);
+
+/*
+ * 函数功能：100Hz 更新 TOF 原始测距并生成融合高度。
+ * 输入参数：
+ *   无
+ * 返回值：
+ *   无
+ */
 void TOF_update_100HZ(void);
+
+/*
+ * 函数功能：100Hz 更新高度速度估计，输出 raw 速度与低通速度。
+ * 输入参数：
+ *   无
+ * 返回值：
+ *   无
+ */
 void Height_Est_update_100HZ(void);
-void Height_Est_update_1000HZ(void);
 
 #ifdef __cplusplus
 }

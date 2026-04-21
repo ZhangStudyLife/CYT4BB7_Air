@@ -62,7 +62,6 @@ int main(void)
             g_tick_1000HZ--;
 
             IMU_Update_1000HZ();
-            Height_Est_update_1000HZ();
             Pos_Est_Update_1000HZ();
 
             div500++;

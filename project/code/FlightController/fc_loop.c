@@ -390,8 +390,6 @@ void FC_Loop_100Hz(void)
     uint32 diff = tick_now - tick_1000us_cnt_last;
     float dt = diff * 0.001f;
 
-
-
     tick_1000us_cnt_last = tick_now;
     if (dt < 0.0001f)
     {
@@ -543,6 +541,15 @@ void FC_Loop_100Hz(void)
         FC_Mode0_100Hz();
         break;
     }
+
+    wifi_justfloat(g_tof1_height_mm,             // 0: TOF1 原始高度，单位 mm
+                   g_tof4_height_mm,             // 1: TOF4 原始高度，单位 mm
+                   g_tof_fused_height_mm,        // 2: TOF 融合高度，单位 mm
+                   target_height_m * 1000.0f,    // 3: 目标高度，单位 mm
+                   height_vz_raw_mps,            // 4: 原始高度差分速度，单位 m/s（上升为正）
+                   s_height_vz_mps,              // 5: 速度环使用的融合速度，单位 m/s（上升为正）
+                   height_pos_out,               // 6: 高度位置环输出（速度目标），单位 m/s
+                   (float)g_motor_cmd.throttle); // 7: 当前总油门指令值
 }
 
 void FC_Loop_500Hz(void)
@@ -606,21 +613,13 @@ void FC_Loop_1000Hz(void)
         {
             float throttle_cmd_raw = g_fc_params.base_throttle + height_vel_out;
             float throttle_cmd_comp = FC_Apply_Tilt_Throttle_Compensation(throttle_cmd_raw);
-            g_motor_cmd.throttle = (int32_t)fc_clampf((float)(int32_t)throttle_cmd_comp, 2600.0f, 4500.0f);
-            // CRSF_STD[2] 0~1000 映射到油门的 2600 ~ 5200
-            g_motor_cmd.throttle = CRSF_STD[2] * 2.6f + 2600; /* 1000 对应 2600，-1000 对应 2600，线性映射 */
-            g_motor_cmd.throttle = (int32_t)fc_clampf((float)(int32_t)g_motor_cmd.throttle, 2600.0f, 5200.0f);
+            g_motor_cmd.throttle = (int32_t)fc_clampf((float)(int32_t)throttle_cmd_comp, 3000.0f, 6000.0f);
         }
-        // g_motor_cmd.roll =(int32)(roll_ctrl * 1.3f);
-        // g_motor_cmd.pitch = -(int32)(pitch_ctrl * 1.3f);
-        // g_motor_cmd.yaw = (int32)(yaw_ctrl * 1.3f);
-        g_motor_cmd.roll = 0;
-        g_motor_cmd.pitch = 0;
-        g_motor_cmd.yaw = 0;
+        g_motor_cmd.roll = roll_ctrl;
+        g_motor_cmd.pitch = -pitch_ctrl;
+        g_motor_cmd.yaw = yaw_ctrl;
         // CRSF_STD[2] -1000~1000 映射到油门的 2600 ~ 5200
-        g_motor_cmd.throttle = (int32_t)(CRSF_STD[2] * 1.3f + 3900.0f);
-
-
+        // g_motor_cmd.throttle = (int32_t)(CRSF_STD[2] * 1.3f + 3900.0f);
 
         Motor_Mixer(&g_motor_cmd);
     }

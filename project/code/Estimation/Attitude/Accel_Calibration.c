@@ -3606,7 +3606,7 @@ uint8_t IMUCalib_IsBusy(void)
  *   sink - 文本输出回调，传入 NULL 表示关闭外部回调
  * 返回值: 无
  */
-void IMUCalib_SetTextSink(IMUCalibTextSink_t sink)
+void  IMUCalib_SetTextSink(IMUCalibTextSink_t sink)
 {
     s_imu_calib_text_sink = sink;
 }

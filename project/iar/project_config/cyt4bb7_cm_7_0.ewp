@@ -2658,6 +2658,15 @@
                 </file>
             </group>
             <group>
+                <name>ICM42688_Aux</name>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\ICM42688_Aux\ICM42688_Aux.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\ICM42688_Aux\ICM42688_Aux.h</name>
+                </file>
+            </group>
+            <group>
                 <name>LC302</name>
                 <file>
                     <name>$PROJ_DIR$\..\..\code\HW_Drivers\LC302\LC302.c</name>

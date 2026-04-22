@@ -2,7 +2,7 @@
 #include "zf_common_headfile.h"
 #include <stdio.h>
 #include <math.h>
-
+#include "../code/HW_Drivers/ICM42688_Aux/ICM42688_Aux.h"
 /* ======================== IMU 全局状�?======================== */
 /* IMU滤波数据通过 g_imufilter_1000hz (IMU_Filtter.h) 访问 */
 MahonyAhrs_t g_mahony_ahrs;       /* Mahony 姿态解算器状�?*/
@@ -233,7 +233,7 @@ void IMU_Update_1000HZ(void)
 
 	wifi_justfloat(tick_1000us_cnt,
 				ICM42688.gyro_x,ICM42688.gyro_y,ICM42688.gyro_z,ICM42688.acc_x,ICM42688.acc_y,ICM42688.acc_z,
-				g_imufilter_1000hz.gyrox,g_imufilter_1000hz.gyroy,g_imufilter_1000hz.gyroz,g_imufilter_1000hz.accx,g_imufilter_1000hz.accy,g_imufilter_1000hz.accz,
+				g_icm42688_aux.gyro_x, g_icm42688_aux.gyro_y, g_icm42688_aux.gyro_z, g_icm42688_aux.acc_x, g_icm42688_aux.acc_y, g_icm42688_aux.acc_z,
 				g_euler.roll, g_euler.pitch, g_euler.yaw
 			);
 

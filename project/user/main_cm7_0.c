@@ -1,4 +1,5 @@
 #include "zf_common_headfile.h"
+#include "../code/HW_Drivers/ICM42688_Aux/ICM42688_Aux.h"
 
 volatile uint32 tick_1000us_cnt = 0U;
 volatile uint16 g_tick_1000HZ = 0U;
@@ -17,11 +18,13 @@ int main(void)
     SCB_DisableDCache();
     Beep_Init();
     pit_ms_init(PIT_CH2, 10);
+    /* 副 IMU 初始化日志走 WiFi 文本链路，所以 wifi_cmd_Init 必须早于 ICM42688_Aux_Init。 */
     wifi_cmd_Init();
     TOF_Init();
     PMW3901_Init();
     // LC302_Init();
     IMU_Init_All();
+    (void)ICM42688_Aux_Init();
     crsf_init();
     AccelCalibration_Init();
     IMUCalib_Init();
@@ -40,16 +43,14 @@ int main(void)
     pit_ms_init(PIT_CH1, 10);
     
     Motor_Enable();
-    Motor_SetThrottleAll((int32[]){0, 0, 0, 0});
-    system_delay_ms(300);
     Motor_SetThrottleAll((int32[]){2000, 0, 0, 0});
-    system_delay_ms(300);
+    system_delay_ms(500);
     Motor_SetThrottleAll((int32[]){0, 2000, 0, 0});
-    system_delay_ms(300);
+    system_delay_ms(500);
     Motor_SetThrottleAll((int32[]){0, 0, 2000, 0});
-    system_delay_ms(300);
+    system_delay_ms(500);
     Motor_SetThrottleAll((int32[]){0, 0, 0, 2000});
-    system_delay_ms(300);
+    system_delay_ms(500);
     Motor_SetThrottleAll((int32[]){0, 0, 0, 0});
 
 
@@ -62,6 +63,7 @@ int main(void)
             g_tick_1000HZ--;
 
             IMU_Update_1000HZ();
+            ICM42688_Aux_Update_1000Hz(tick_1000us_cnt);
             Pos_Est_Update_1000HZ();
 
             div500++;

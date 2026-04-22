@@ -41,17 +41,17 @@ int main(void)
     
     Motor_Enable();
     Motor_SetThrottleAll((int32[]){0, 0, 0, 0});
-    system_delay_ms(2000);
+    system_delay_ms(300);
     Motor_SetThrottleAll((int32[]){2000, 0, 0, 0});
-    system_delay_ms(2000);
+    system_delay_ms(300);
     Motor_SetThrottleAll((int32[]){0, 2000, 0, 0});
-    system_delay_ms(2000);
+    system_delay_ms(300);
     Motor_SetThrottleAll((int32[]){0, 0, 2000, 0});
-    system_delay_ms(2000);
+    system_delay_ms(300);
     Motor_SetThrottleAll((int32[]){0, 0, 0, 2000});
-    system_delay_ms(2000);
+    system_delay_ms(300);
     Motor_SetThrottleAll((int32[]){0, 0, 0, 0});
-    system_delay_ms(2000);
+
 
     while (true)
     {

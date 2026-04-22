@@ -532,14 +532,14 @@ void FC_Loop_100Hz(void)
         break;
     }
 
-    wifi_justfloat(g_tof1_height_mm,             // 0: TOF1 原始高度，单位 mm
-                   g_tof4_height_mm,             // 1: TOF4 原始高度，单位 mm
-                   g_tof_fused_height_mm,        // 2: TOF 融合高度，单位 mm
-                   target_height_m * 1000.0f,    // 3: 目标高度，单位 mm
-                   height_vz_raw_mps,            // 4: 原始高度差分速度，单位 m/s（上升为正）
-                   s_height_vz_mps,              // 5: 速度环使用的融合速度，单位 m/s（上升为正）
-                   height_pos_out,               // 6: 高度位置环输出（速度目标），单位 m/s
-                   (float)g_motor_cmd.throttle); // 7: 当前总油门指令值
+    // wifi_justfloat(g_tof1_height_mm,             // 0: TOF1 原始高度，单位 mm
+    //                g_tof4_height_mm,             // 1: TOF4 原始高度，单位 mm
+    //                g_tof_fused_height_mm,        // 2: TOF 融合高度，单位 mm
+    //                target_height_m * 1000.0f,    // 3: 目标高度，单位 mm
+    //                height_vz_raw_mps,            // 4: 原始高度差分速度，单位 m/s（上升为正）
+    //                s_height_vz_mps,              // 5: 速度环使用的融合速度，单位 m/s（上升为正）
+    //                height_pos_out,               // 6: 高度位置环输出（速度目标），单位 m/s
+    //                (float)g_motor_cmd.throttle); // 7: 当前总油门指令值
 }
 
 void FC_Loop_500Hz(void)

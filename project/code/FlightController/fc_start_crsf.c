@@ -43,7 +43,7 @@ static uint8_t FC_START_CRSF_IsEmergencyStopRequested(void)
 
     if (CRSF_STD[7] == 0)
     {
-        if (zero_streak < 3U)
+        if (zero_streak < 8u)
         {
             zero_streak++;
         }
@@ -133,11 +133,8 @@ static void FC_START_CRSF_PrepareTakeoff(void)
 
 static void FC_START_CRSF_StateMachine_Update(void)
 {
-    if ((CRSF_LINK_UP == 0U) || (FC_START_CRSF_IsEmergencyStopRequested() != 0U))
-    {
-        FC_START_CRSF_ForceStopToStandby();
-        return;
-    }
+    if (CRSF_LINK_UP == 0U) { FC_START_CRSF_ForceStopToStandby(); return; }
+    if (FC_START_CRSF_IsEmergencyStopRequested() != 0U) { if (s_fc_start_state >= FC_START_CRSF_STATE_TAKEOFF) { Beep_Play(50, 2, 3); } FC_START_CRSF_ForceStopToStandby(); return; }
 
     switch (s_fc_start_state)
     {

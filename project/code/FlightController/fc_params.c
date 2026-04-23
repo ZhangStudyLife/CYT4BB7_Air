@@ -145,7 +145,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pos_y_d_lpf = 0.0f;
 
     /* ===== Z 轴位置环参数 ===== */
-    params->pos_z_kp = 0.8f;
+    params->pos_z_kp = 1.4f;
     params->pos_z_ki = 0.0f;
     params->pos_z_kd = 0.1f;
     params->pos_z_kff = 0.0f;

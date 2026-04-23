@@ -132,6 +132,10 @@ void TOF_update_100HZ(void)
     float weighted_sum = 0.0f;
     float weight_sum = 0.0f;
     float z_meas_mm = (float)VL53L1X_VALID_RANGE_MAX;
+    float log_tof1_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
+    float log_tof2_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
+    float log_tof3_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
+    float log_tof4_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
 
     VL53L1X_Update();
     tof_data = VL53L1X_GetData();
@@ -310,9 +314,20 @@ void TOF_update_100HZ(void)
     g_tof_fused_height_mm = s_height_est_mm;
     g_tof_fused_vz_mps = s_height_est_vz_mps;
     g_height_fused_vz_mps = s_height_est_vz_mps;
-    wifi_justfloat(tick_1000us_cnt,tof_data->distance_mm[0],tof_data->distance_mm[1],tof_data->distance_mm[2],tof_data->distance_mm[3],
-        g_euler.roll, g_euler.pitch, g_euler.yaw,acc_z_mps2,g_tof1_height_mm,g_tof2_height_mm,g_tof3_height_mm,g_tof4_height_mm
-                   );
+    log_tof1_height_mm = HeightEst_ClampHeightMm(g_tof1_height_mm);
+    log_tof2_height_mm = HeightEst_ClampHeightMm(g_tof2_height_mm);
+    log_tof3_height_mm = HeightEst_ClampHeightMm(g_tof3_height_mm);
+    log_tof4_height_mm = HeightEst_ClampHeightMm(g_tof4_height_mm);
+    /* 仅发送四路姿态解耦后的高度，1300 mm 视为无效，离线再重算融合参数 */
+    FC_START_CRSF_state_e fc_state = FC_START_CRSF_Get_State();
+    if (fc_state == FC_START_CRSF_STATE_FLYING)
+    {
+        wifi_justfloat(
+            tick_1000us_cnt,
+            log_tof1_height_mm, log_tof2_height_mm, log_tof3_height_mm, log_tof4_height_mm,
+            g_euler.roll, g_euler.pitch, acc_z_mps2, g_tof_fused_vz_mps,g_tof_fused_height_mm
+        );
+    }
 }
 
 void Height_Est_update_100HZ(void)

@@ -10,6 +10,8 @@ extern "C" {
 
 extern float g_tof_fused_height_mm;  /* TOF 融合高度，单位 mm */
 extern float g_tof1_height_mm;       /* 1 号电机下方 TOF 高度，单位 mm */
+extern float g_tof2_height_mm;       /* 2 号电机下方 TOF 高度，单位 mm */
+extern float g_tof3_height_mm;       /* 3 号电机下方 TOF 高度，单位 mm */
 extern float g_tof4_height_mm;       /* 4 号电机下方 TOF 高度，单位 mm */
 extern uint8 g_tof_fused_valid;      /* TOF 融合高度有效标志：1=有效，0=无效 */
 extern float g_tof_fused_vz_mps;     /* TOF 单次差分速度，单位 m/s，上升为正 */

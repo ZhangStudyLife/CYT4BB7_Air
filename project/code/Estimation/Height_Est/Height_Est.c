@@ -5,6 +5,8 @@
 
 float g_tof_fused_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
 float g_tof1_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
+float g_tof2_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
+float g_tof3_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
 float g_tof4_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
 uint8 g_tof_fused_valid = 0U;
 float g_tof_fused_vz_mps = 0.0f;
@@ -12,6 +14,8 @@ float g_height_fused_vz_mps = 0.0f;
 extern volatile uint32 tick_1000us_cnt;
 
 #define HEIGHT_EST_TOF1_INDEX           0U
+#define HEIGHT_EST_TOF2_INDEX           1U
+#define HEIGHT_EST_TOF3_INDEX           2U
 #define HEIGHT_EST_TOF4_INDEX           3U
 #define HEIGHT_EST_DT_S                 0.01f
 #define HEIGHT_EST_MEDIAN_WIN           3U
@@ -22,12 +26,8 @@ extern volatile uint32 tick_1000us_cnt;
 #define HEIGHT_EST_PREDICT_HOLD_CNT     15U
 #define HEIGHT_EST_VEL_DECAY            0.95f
 #define HEIGHT_EST_WEIGHT_EPS           0.001f
-#define HEIGHT_EST_TOF1_X_MM            0.0f
-#define HEIGHT_EST_TOF1_Y_MM            0.0f
-#define HEIGHT_EST_TOF1_BIAS_MM         0.0f
-#define HEIGHT_EST_TOF4_X_MM            0.0f
-#define HEIGHT_EST_TOF4_Y_MM            0.0f
-#define HEIGHT_EST_TOF4_BIAS_MM         0.0f
+#define HEIGHT_EST_TOF_PITCH_ARM_MM     65.40f
+#define HEIGHT_EST_TOF_ROLL_ARM_MM      84.81f
 
 static Median_t s_tof_median[VL53L1X_SENSOR_COUNT];
 static StepLim_t s_tof_step[VL53L1X_SENSOR_COUNT];
@@ -35,6 +35,8 @@ static float s_height_est_mm = (float)VL53L1X_VALID_RANGE_MAX;
 static float s_height_est_vz_mps = 0.0f;
 static uint8 s_height_est_ready = 0U;
 static uint8 s_predict_hold_cnt = 0U;
+static const float s_tof_pitch_sign[VL53L1X_SENSOR_COUNT] = {1.0f, -1.0f, 1.0f, -1.0f};
+static const float s_tof_roll_sign[VL53L1X_SENSOR_COUNT] = {1.0f, 1.0f, -1.0f, -1.0f};
 
 static float HeightEst_ClampHeightMm(float height_mm)
 {
@@ -71,6 +73,8 @@ static void HeightEst_ResetAll(void)
     s_predict_hold_cnt = 0U;
 
     g_tof1_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
+    g_tof2_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
+    g_tof3_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
     g_tof4_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
     g_tof_fused_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
     g_tof_fused_valid = 0U;
@@ -82,18 +86,8 @@ static float HeightEst_ProcessChannel(uint8 index, uint16 distance_mm)
 {
     float height_mm = (float)distance_mm * g_euler.cos_pitch * g_euler.cos_roll;
 
-    if (index == HEIGHT_EST_TOF1_INDEX)
-    {
-        height_mm += HEIGHT_EST_TOF1_X_MM * g_euler.sin_pitch;
-        height_mm -= HEIGHT_EST_TOF1_Y_MM * g_euler.sin_roll;
-        height_mm += HEIGHT_EST_TOF1_BIAS_MM;
-    }
-    else
-    {
-        height_mm += HEIGHT_EST_TOF4_X_MM * g_euler.sin_pitch;
-        height_mm -= HEIGHT_EST_TOF4_Y_MM * g_euler.sin_roll;
-        height_mm += HEIGHT_EST_TOF4_BIAS_MM;
-    }
+    height_mm += s_tof_pitch_sign[index] * HEIGHT_EST_TOF_PITCH_ARM_MM * g_euler.sin_pitch;
+    height_mm += s_tof_roll_sign[index] * HEIGHT_EST_TOF_ROLL_ARM_MM * g_euler.sin_roll * g_euler.cos_pitch;
 
     height_mm = HeightEst_ClampHeightMm(height_mm);
     height_mm = Median_Update(&s_tof_median[index], height_mm);
@@ -143,6 +137,8 @@ void TOF_update_100HZ(void)
     tof_data = VL53L1X_GetData();
 
     g_tof1_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
+    g_tof2_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
+    g_tof3_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
     g_tof4_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
     g_tof_fused_valid = 0U;
 
@@ -164,6 +160,24 @@ void TOF_update_100HZ(void)
             HeightEst_ResetChannel(HEIGHT_EST_TOF1_INDEX);
         }
 
+        if (0U != tof_data->valid[HEIGHT_EST_TOF2_INDEX])
+        {
+            g_tof2_height_mm = HeightEst_ProcessChannel(HEIGHT_EST_TOF2_INDEX, tof_data->distance_mm[HEIGHT_EST_TOF2_INDEX]);
+        }
+        else
+        {
+            HeightEst_ResetChannel(HEIGHT_EST_TOF2_INDEX);
+        }
+
+        if (0U != tof_data->valid[HEIGHT_EST_TOF3_INDEX])
+        {
+            g_tof3_height_mm = HeightEst_ProcessChannel(HEIGHT_EST_TOF3_INDEX, tof_data->distance_mm[HEIGHT_EST_TOF3_INDEX]);
+        }
+        else
+        {
+            HeightEst_ResetChannel(HEIGHT_EST_TOF3_INDEX);
+        }
+
         if (0U != tof_data->valid[HEIGHT_EST_TOF4_INDEX])
         {
             g_tof4_height_mm = HeightEst_ProcessChannel(HEIGHT_EST_TOF4_INDEX, tof_data->distance_mm[HEIGHT_EST_TOF4_INDEX]);
@@ -177,6 +191,8 @@ void TOF_update_100HZ(void)
     else
     {
         HeightEst_ResetChannel(HEIGHT_EST_TOF1_INDEX);
+        HeightEst_ResetChannel(HEIGHT_EST_TOF2_INDEX);
+        HeightEst_ResetChannel(HEIGHT_EST_TOF3_INDEX);
         HeightEst_ResetChannel(HEIGHT_EST_TOF4_INDEX);
     }
 
@@ -295,7 +311,7 @@ void TOF_update_100HZ(void)
     g_tof_fused_vz_mps = s_height_est_vz_mps;
     g_height_fused_vz_mps = s_height_est_vz_mps;
     wifi_justfloat(tick_1000us_cnt,tof_data->distance_mm[0],tof_data->distance_mm[1],tof_data->distance_mm[2],tof_data->distance_mm[3],
-        g_euler.roll, g_euler.pitch, g_euler.yaw,acc_z_mps2
+        g_euler.roll, g_euler.pitch, g_euler.yaw,acc_z_mps2,g_tof1_height_mm,g_tof2_height_mm,g_tof3_height_mm,g_tof4_height_mm
                    );
 }
 

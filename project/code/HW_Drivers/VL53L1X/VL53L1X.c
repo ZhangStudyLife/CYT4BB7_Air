@@ -16,29 +16,39 @@
 #define VL53L1X_REG_RANGE_STATUS         (0x0089U)   /* 测距状态寄存器 */
 #define VL53L1X_REG_DISTANCE_MM          (0x0096U)   /* 距离结果寄存器 */
 #define VL53L1X_REG_FW_STATUS            (0x00E5U)   /* 固件状态寄存器 */
+#define VL53L1X_ACK_ALL_MASK             ((uint8)((1UL << VL53L1X_SENSOR_COUNT) - 1UL)) /* 四路 ACK 掩码 */
 
-/* 两路 TOF 的软 IIC 句柄 */
+/* 四路 TOF 的软 IIC 句柄 */
 static soft_iic_info_struct s_vl53l1x_iic[VL53L1X_SENSOR_COUNT];
-/* 两路 TOF 的初始化成功标志 */
-static uint8 s_vl53l1x_init_ok[VL53L1X_SENSOR_COUNT] = {0U, 0U};
-/* 两路 TOF 的最新缓存数据 */
+/* 四路 TOF 的初始化成功标志 */
+static uint8 s_vl53l1x_init_ok[VL53L1X_SENSOR_COUNT] = {0U, 0U, 0U, 0U};
+/* 四路 TOF 的最新缓存数据 */
 static VL53L1X_data_struct s_vl53l1x_data =
 {
-    {VL53L1X_INVALID_DISTANCE_MM, VL53L1X_INVALID_DISTANCE_MM},
-    {0U, 0U}
+    {
+        VL53L1X_INVALID_DISTANCE_MM,
+        VL53L1X_INVALID_DISTANCE_MM,
+        VL53L1X_INVALID_DISTANCE_MM,
+        VL53L1X_INVALID_DISTANCE_MM
+    },
+    {0U, 0U, 0U, 0U}
 };
 
-/* 两路 TOF 的 SCL 引脚表 */
+/* 四路 TOF 的 SCL 引脚表，顺序为 TOF1、TOF2、TOF3、TOF4 */
 static const gpio_pin_enum s_vl53l1x_scl_pins[VL53L1X_SENSOR_COUNT] =
 {
     VL53L1X_TOF1_SCL_PIN,
+    VL53L1X_TOF2_SCL_PIN,
+    VL53L1X_TOF3_SCL_PIN,
     VL53L1X_TOF4_SCL_PIN
 };
 
-/* 两路 TOF 的 SDA 引脚表 */
+/* 四路 TOF 的 SDA 引脚表，顺序为 TOF1、TOF2、TOF3、TOF4 */
 static const gpio_pin_enum s_vl53l1x_sda_pins[VL53L1X_SENSOR_COUNT] =
 {
     VL53L1X_TOF1_SDA_PIN,
+    VL53L1X_TOF2_SDA_PIN,
+    VL53L1X_TOF3_SDA_PIN,
     VL53L1X_TOF4_SDA_PIN
 };
 
@@ -186,61 +196,120 @@ static void VL53L1X_SyncDelay(uint32 delay)
 }
 
 /*
- * 函数功能：两路 IIC 同时发起 START。
+ * 函数功能：同步设置四路 SCL 电平。
+ * 输入参数：
+ *   level：目标电平，0=低电平，非 0=高电平
+ * 返回值：
+ *   无
+ */
+static void VL53L1X_SetAllScl(uint8 level)
+{
+    uint8 index = 0U;
+
+    for (index = 0U; index < VL53L1X_SENSOR_COUNT; index++)
+    {
+        if (0U != level)
+        {
+            gpio_high((gpio_pin_enum)s_vl53l1x_iic[index].scl_pin);
+        }
+        else
+        {
+            gpio_low((gpio_pin_enum)s_vl53l1x_iic[index].scl_pin);
+        }
+    }
+}
+
+/*
+ * 函数功能：同步设置四路 SDA 电平。
+ * 输入参数：
+ *   level：目标电平，0=低电平，非 0=高电平
+ * 返回值：
+ *   无
+ */
+static void VL53L1X_SetAllSda(uint8 level)
+{
+    uint8 index = 0U;
+
+    for (index = 0U; index < VL53L1X_SENSOR_COUNT; index++)
+    {
+        if (0U != level)
+        {
+            gpio_high((gpio_pin_enum)s_vl53l1x_iic[index].sda_pin);
+        }
+        else
+        {
+            gpio_low((gpio_pin_enum)s_vl53l1x_iic[index].sda_pin);
+        }
+    }
+}
+
+/*
+ * 函数功能：同步设置四路 SDA 输入输出方向。
+ * 输入参数：
+ *   dir：GPIO 方向
+ *   mode：GPIO 模式
+ * 返回值：
+ *   无
+ */
+static void VL53L1X_SetAllSdaDir(gpio_dir_enum dir, gpio_mode_enum mode)
+{
+    uint8 index = 0U;
+
+    for (index = 0U; index < VL53L1X_SENSOR_COUNT; index++)
+    {
+        gpio_set_dir((gpio_pin_enum)s_vl53l1x_iic[index].sda_pin, dir, mode);
+    }
+}
+
+/*
+ * 函数功能：四路 IIC 同时发起 START。
  * 输入参数：
  *   delay：时序延时参数
  * 返回值：
  *   无
  */
-static void VL53L1X_DualStart(uint32 delay)
+static void VL53L1X_SyncStart(uint32 delay)
 {
-    gpio_high((gpio_pin_enum)s_vl53l1x_iic[0].scl_pin);
-    gpio_high((gpio_pin_enum)s_vl53l1x_iic[1].scl_pin);
-    gpio_high((gpio_pin_enum)s_vl53l1x_iic[0].sda_pin);
-    gpio_high((gpio_pin_enum)s_vl53l1x_iic[1].sda_pin);
+    VL53L1X_SetAllScl(1U);
+    VL53L1X_SetAllSda(1U);
 
     VL53L1X_SyncDelay(delay);
-    gpio_low((gpio_pin_enum)s_vl53l1x_iic[0].sda_pin);
-    gpio_low((gpio_pin_enum)s_vl53l1x_iic[1].sda_pin);
+    VL53L1X_SetAllSda(0U);
     VL53L1X_SyncDelay(delay);
-    gpio_low((gpio_pin_enum)s_vl53l1x_iic[0].scl_pin);
-    gpio_low((gpio_pin_enum)s_vl53l1x_iic[1].scl_pin);
+    VL53L1X_SetAllScl(0U);
     VL53L1X_SyncDelay(delay);
 }
 
 /*
- * 函数功能：两路 IIC 同时发起 STOP。
+ * 函数功能：四路 IIC 同时发起 STOP。
  * 输入参数：
  *   delay：时序延时参数
  * 返回值：
  *   无
  */
-static void VL53L1X_DualStop(uint32 delay)
+static void VL53L1X_SyncStop(uint32 delay)
 {
-    gpio_low((gpio_pin_enum)s_vl53l1x_iic[0].sda_pin);
-    gpio_low((gpio_pin_enum)s_vl53l1x_iic[1].sda_pin);
-    gpio_low((gpio_pin_enum)s_vl53l1x_iic[0].scl_pin);
-    gpio_low((gpio_pin_enum)s_vl53l1x_iic[1].scl_pin);
+    VL53L1X_SetAllSda(0U);
+    VL53L1X_SetAllScl(0U);
 
     VL53L1X_SyncDelay(delay);
-    gpio_high((gpio_pin_enum)s_vl53l1x_iic[0].scl_pin);
-    gpio_high((gpio_pin_enum)s_vl53l1x_iic[1].scl_pin);
+    VL53L1X_SetAllScl(1U);
     VL53L1X_SyncDelay(delay);
-    gpio_high((gpio_pin_enum)s_vl53l1x_iic[0].sda_pin);
-    gpio_high((gpio_pin_enum)s_vl53l1x_iic[1].sda_pin);
+    VL53L1X_SetAllSda(1U);
     VL53L1X_SyncDelay(delay);
 }
 
 /*
- * 函数功能：两路 IIC 同时发送同一个字节，并返回 ACK 掩码。
+ * 函数功能：四路 IIC 同时发送同一个字节，并返回 ACK 掩码。
  * 输入参数：
  *   data：待发送字节
  *   delay：时序延时参数
  * 返回值：
- *   ACK 掩码，bit0 对应 TOF1，bit1 对应 TOF4
+ *   ACK 掩码，bit0~bit3 对应 TOF1~TOF4
  */
-static uint8 VL53L1X_DualSendByte(uint8 data, uint32 delay)
+static uint8 VL53L1X_SyncSendByte(uint8 data, uint32 delay)
 {
+    uint8 index = 0U;
     uint8 mask = 0x80U;
     uint8 ack_mask = 0U;
 
@@ -248,174 +317,159 @@ static uint8 VL53L1X_DualSendByte(uint8 data, uint32 delay)
     {
         if (0U != (data & mask))
         {
-            gpio_high((gpio_pin_enum)s_vl53l1x_iic[0].sda_pin);
-            gpio_high((gpio_pin_enum)s_vl53l1x_iic[1].sda_pin);
+            VL53L1X_SetAllSda(1U);
         }
         else
         {
-            gpio_low((gpio_pin_enum)s_vl53l1x_iic[0].sda_pin);
-            gpio_low((gpio_pin_enum)s_vl53l1x_iic[1].sda_pin);
+            VL53L1X_SetAllSda(0U);
         }
 
         mask >>= 1U;
         VL53L1X_SyncDelay(delay / 2U);
-        gpio_high((gpio_pin_enum)s_vl53l1x_iic[0].scl_pin);
-        gpio_high((gpio_pin_enum)s_vl53l1x_iic[1].scl_pin);
+        VL53L1X_SetAllScl(1U);
         VL53L1X_SyncDelay(delay);
-        gpio_low((gpio_pin_enum)s_vl53l1x_iic[0].scl_pin);
-        gpio_low((gpio_pin_enum)s_vl53l1x_iic[1].scl_pin);
+        VL53L1X_SetAllScl(0U);
         VL53L1X_SyncDelay(delay / 2U);
     }
 
-    gpio_low((gpio_pin_enum)s_vl53l1x_iic[0].scl_pin);
-    gpio_low((gpio_pin_enum)s_vl53l1x_iic[1].scl_pin);
-    gpio_high((gpio_pin_enum)s_vl53l1x_iic[0].sda_pin);
-    gpio_high((gpio_pin_enum)s_vl53l1x_iic[1].sda_pin);
-    gpio_set_dir((gpio_pin_enum)s_vl53l1x_iic[0].sda_pin, GPI, GPI_FLOATING_IN);
-    gpio_set_dir((gpio_pin_enum)s_vl53l1x_iic[1].sda_pin, GPI, GPI_FLOATING_IN);
+    VL53L1X_SetAllScl(0U);
+    VL53L1X_SetAllSda(1U);
+    VL53L1X_SetAllSdaDir(GPI, GPI_FLOATING_IN);
     VL53L1X_SyncDelay(delay);
 
-    gpio_high((gpio_pin_enum)s_vl53l1x_iic[0].scl_pin);
-    gpio_high((gpio_pin_enum)s_vl53l1x_iic[1].scl_pin);
+    VL53L1X_SetAllScl(1U);
     VL53L1X_SyncDelay(delay);
 
-    if (!gpio_get_level((gpio_pin_enum)s_vl53l1x_iic[0].sda_pin))
+    for (index = 0U; index < VL53L1X_SENSOR_COUNT; index++)
     {
-        ack_mask |= 0x01U;
-    }
-    if (!gpio_get_level((gpio_pin_enum)s_vl53l1x_iic[1].sda_pin))
-    {
-        ack_mask |= 0x02U;
+        if (!gpio_get_level((gpio_pin_enum)s_vl53l1x_iic[index].sda_pin))
+        {
+            ack_mask |= (uint8)(1U << index);
+        }
     }
 
-    gpio_low((gpio_pin_enum)s_vl53l1x_iic[0].scl_pin);
-    gpio_low((gpio_pin_enum)s_vl53l1x_iic[1].scl_pin);
-    gpio_set_dir((gpio_pin_enum)s_vl53l1x_iic[0].sda_pin, GPO, GPO_OPEN_DTAIN);
-    gpio_set_dir((gpio_pin_enum)s_vl53l1x_iic[1].sda_pin, GPO, GPO_OPEN_DTAIN);
+    VL53L1X_SetAllScl(0U);
+    VL53L1X_SetAllSdaDir(GPO, GPO_OPEN_DTAIN);
     VL53L1X_SyncDelay(delay);
 
     return ack_mask;
 }
 
 /*
- * 函数功能：两路 IIC 同时读取一个字节。
+ * 函数功能：四路 IIC 同时读取一个字节。
  * 输入参数：
- *   out_data：输出数组，长度为 2
+ *   out_data：输出数组，长度为 VL53L1X_SENSOR_COUNT
  *   nack：1 表示最后一个字节发送 NACK，0 表示发送 ACK
  *   delay：时序延时参数
  * 返回值：
  *   无
  */
-static void VL53L1X_DualReadByte(uint8 out_data[VL53L1X_SENSOR_COUNT], uint8 nack, uint32 delay)
+static void VL53L1X_SyncReadByte(uint8 out_data[VL53L1X_SENSOR_COUNT], uint8 nack, uint32 delay)
 {
+    uint8 index = 0U;
     uint8 bit_count = 8U;
 
-    out_data[0] = 0U;
-    out_data[1] = 0U;
+    for (index = 0U; index < VL53L1X_SENSOR_COUNT; index++)
+    {
+        out_data[index] = 0U;
+    }
 
-    gpio_low((gpio_pin_enum)s_vl53l1x_iic[0].scl_pin);
-    gpio_low((gpio_pin_enum)s_vl53l1x_iic[1].scl_pin);
+    VL53L1X_SetAllScl(0U);
     VL53L1X_SyncDelay(delay);
-    gpio_high((gpio_pin_enum)s_vl53l1x_iic[0].sda_pin);
-    gpio_high((gpio_pin_enum)s_vl53l1x_iic[1].sda_pin);
-    gpio_set_dir((gpio_pin_enum)s_vl53l1x_iic[0].sda_pin, GPI, GPI_FLOATING_IN);
-    gpio_set_dir((gpio_pin_enum)s_vl53l1x_iic[1].sda_pin, GPI, GPI_FLOATING_IN);
+    VL53L1X_SetAllSda(1U);
+    VL53L1X_SetAllSdaDir(GPI, GPI_FLOATING_IN);
 
     while (0U != bit_count--)
     {
-        gpio_low((gpio_pin_enum)s_vl53l1x_iic[0].scl_pin);
-        gpio_low((gpio_pin_enum)s_vl53l1x_iic[1].scl_pin);
+        VL53L1X_SetAllScl(0U);
         VL53L1X_SyncDelay(delay);
-        gpio_high((gpio_pin_enum)s_vl53l1x_iic[0].scl_pin);
-        gpio_high((gpio_pin_enum)s_vl53l1x_iic[1].scl_pin);
+        VL53L1X_SetAllScl(1U);
         VL53L1X_SyncDelay(delay);
-        out_data[0] = (uint8)((out_data[0] << 1U) | gpio_get_level((gpio_pin_enum)s_vl53l1x_iic[0].sda_pin));
-        out_data[1] = (uint8)((out_data[1] << 1U) | gpio_get_level((gpio_pin_enum)s_vl53l1x_iic[1].sda_pin));
+        for (index = 0U; index < VL53L1X_SENSOR_COUNT; index++)
+        {
+            out_data[index] = (uint8)((out_data[index] << 1U) | gpio_get_level((gpio_pin_enum)s_vl53l1x_iic[index].sda_pin));
+        }
     }
 
-    gpio_low((gpio_pin_enum)s_vl53l1x_iic[0].scl_pin);
-    gpio_low((gpio_pin_enum)s_vl53l1x_iic[1].scl_pin);
-    gpio_set_dir((gpio_pin_enum)s_vl53l1x_iic[0].sda_pin, GPO, GPO_OPEN_DTAIN);
-    gpio_set_dir((gpio_pin_enum)s_vl53l1x_iic[1].sda_pin, GPO, GPO_OPEN_DTAIN);
+    VL53L1X_SetAllScl(0U);
+    VL53L1X_SetAllSdaDir(GPO, GPO_OPEN_DTAIN);
     VL53L1X_SyncDelay(delay);
 
     if (0U != nack)
     {
-        gpio_high((gpio_pin_enum)s_vl53l1x_iic[0].sda_pin);
-        gpio_high((gpio_pin_enum)s_vl53l1x_iic[1].sda_pin);
+        VL53L1X_SetAllSda(1U);
     }
     else
     {
-        gpio_low((gpio_pin_enum)s_vl53l1x_iic[0].sda_pin);
-        gpio_low((gpio_pin_enum)s_vl53l1x_iic[1].sda_pin);
+        VL53L1X_SetAllSda(0U);
     }
 
     VL53L1X_SyncDelay(delay);
-    gpio_high((gpio_pin_enum)s_vl53l1x_iic[0].scl_pin);
-    gpio_high((gpio_pin_enum)s_vl53l1x_iic[1].scl_pin);
+    VL53L1X_SetAllScl(1U);
     VL53L1X_SyncDelay(delay);
-    gpio_low((gpio_pin_enum)s_vl53l1x_iic[0].scl_pin);
-    gpio_low((gpio_pin_enum)s_vl53l1x_iic[1].scl_pin);
-    gpio_high((gpio_pin_enum)s_vl53l1x_iic[0].sda_pin);
-    gpio_high((gpio_pin_enum)s_vl53l1x_iic[1].sda_pin);
+    VL53L1X_SetAllScl(0U);
+    VL53L1X_SetAllSda(1U);
 }
 
 /*
- * 函数功能：两路 TOF 同时读取同一个寄存器块。
+ * 函数功能：四路 TOF 同时读取同一个寄存器块。
  * 输入参数：
  *   reg_addr：16 位寄存器地址
- *   buf：输出缓冲区，第一维为两路 TOF
+ *   buf：输出缓冲区，第一维为四路 TOF
  *   len：读取字节数
  * 返回值：
- *   ACK 掩码，bit0 对应 TOF1，bit1 对应 TOF4
+ *   ACK 掩码，bit0~bit3 对应 TOF1~TOF4
  */
-static uint8 VL53L1X_DualReadRegArray(uint16 reg_addr,
+static uint8 VL53L1X_SyncReadRegArray(uint16 reg_addr,
                                       uint8 buf[VL53L1X_SENSOR_COUNT][2],
                                       uint32 len)
 {
     uint32 index = 0U;
-    uint8 ack_mask = 0x03U;
+    uint8 tof_index = 0U;
+    uint8 ack_mask = VL53L1X_ACK_ALL_MASK;
     uint8 read_byte[VL53L1X_SENSOR_COUNT];
     uint8 write_addr = (uint8)(VL53L1X_IIC_ADDR << 1U);
     uint8 read_addr = (uint8)((VL53L1X_IIC_ADDR << 1U) | 0x01U);
 
-    VL53L1X_DualStart(VL53L1X_IIC_DELAY);
-    ack_mask &= VL53L1X_DualSendByte(write_addr, VL53L1X_IIC_DELAY);
-    ack_mask &= VL53L1X_DualSendByte((uint8)(reg_addr >> 8U), VL53L1X_IIC_DELAY);
-    ack_mask &= VL53L1X_DualSendByte((uint8)(reg_addr & 0xFFU), VL53L1X_IIC_DELAY);
-    VL53L1X_DualStart(VL53L1X_IIC_DELAY);
-    ack_mask &= VL53L1X_DualSendByte(read_addr, VL53L1X_IIC_DELAY);
+    VL53L1X_SyncStart(VL53L1X_IIC_DELAY);
+    ack_mask &= VL53L1X_SyncSendByte(write_addr, VL53L1X_IIC_DELAY);
+    ack_mask &= VL53L1X_SyncSendByte((uint8)(reg_addr >> 8U), VL53L1X_IIC_DELAY);
+    ack_mask &= VL53L1X_SyncSendByte((uint8)(reg_addr & 0xFFU), VL53L1X_IIC_DELAY);
+    VL53L1X_SyncStart(VL53L1X_IIC_DELAY);
+    ack_mask &= VL53L1X_SyncSendByte(read_addr, VL53L1X_IIC_DELAY);
 
     for (index = 0U; index < len; index++)
     {
-        VL53L1X_DualReadByte(read_byte, (index == (len - 1U)) ? 1U : 0U, VL53L1X_IIC_DELAY);
-        buf[0][index] = read_byte[0];
-        buf[1][index] = read_byte[1];
+        VL53L1X_SyncReadByte(read_byte, (index == (len - 1U)) ? 1U : 0U, VL53L1X_IIC_DELAY);
+        for (tof_index = 0U; tof_index < VL53L1X_SENSOR_COUNT; tof_index++)
+        {
+            buf[tof_index][index] = read_byte[tof_index];
+        }
     }
 
-    VL53L1X_DualStop(VL53L1X_IIC_DELAY);
+    VL53L1X_SyncStop(VL53L1X_IIC_DELAY);
     return ack_mask;
 }
 
 /*
- * 函数功能：两路 TOF 同时写入同一个 8 位寄存器。
+ * 函数功能：四路 TOF 同时写入同一个 8 位寄存器。
  * 输入参数：
  *   reg_addr：16 位寄存器地址
  *   value：待写入的 8 位值
  * 返回值：
- *   ACK 掩码，bit0 对应 TOF1，bit1 对应 TOF4
+ *   ACK 掩码，bit0~bit3 对应 TOF1~TOF4
  */
-static uint8 VL53L1X_DualWriteReg8(uint16 reg_addr, uint8 value)
+static uint8 VL53L1X_SyncWriteReg8(uint16 reg_addr, uint8 value)
 {
-    uint8 ack_mask = 0x03U;
+    uint8 ack_mask = VL53L1X_ACK_ALL_MASK;
     uint8 write_addr = (uint8)(VL53L1X_IIC_ADDR << 1U);
 
-    VL53L1X_DualStart(VL53L1X_IIC_DELAY);
-    ack_mask &= VL53L1X_DualSendByte(write_addr, VL53L1X_IIC_DELAY);
-    ack_mask &= VL53L1X_DualSendByte((uint8)(reg_addr >> 8U), VL53L1X_IIC_DELAY);
-    ack_mask &= VL53L1X_DualSendByte((uint8)(reg_addr & 0xFFU), VL53L1X_IIC_DELAY);
-    ack_mask &= VL53L1X_DualSendByte(value, VL53L1X_IIC_DELAY);
-    VL53L1X_DualStop(VL53L1X_IIC_DELAY);
+    VL53L1X_SyncStart(VL53L1X_IIC_DELAY);
+    ack_mask &= VL53L1X_SyncSendByte(write_addr, VL53L1X_IIC_DELAY);
+    ack_mask &= VL53L1X_SyncSendByte((uint8)(reg_addr >> 8U), VL53L1X_IIC_DELAY);
+    ack_mask &= VL53L1X_SyncSendByte((uint8)(reg_addr & 0xFFU), VL53L1X_IIC_DELAY);
+    ack_mask &= VL53L1X_SyncSendByte(value, VL53L1X_IIC_DELAY);
+    VL53L1X_SyncStop(VL53L1X_IIC_DELAY);
 
     return ack_mask;
 }
@@ -423,7 +477,7 @@ static uint8 VL53L1X_DualWriteReg8(uint16 reg_addr, uint8 value)
 /*
  * 函数功能：初始化指定一路 TOF。
  * 输入参数：
- *   index：通道索引，0=TOF1，1=TOF4
+ *   index：通道索引，0=TOF1，1=TOF2，2=TOF3，3=TOF4
  * 返回值：
  *   1：初始化成功
  *   0：初始化失败
@@ -520,7 +574,7 @@ static uint8 VL53L1X_InitSingle(uint8 index)
 }
 
 /*
- * 函数功能：初始化两路 VL53L1X。
+ * 函数功能：初始化四路 VL53L1X。
  * 输入参数：
  *   无
  * 返回值：
@@ -530,19 +584,16 @@ void VL53L1X_Init(void)
 {
     uint8 index = 0U;
 
-    s_vl53l1x_data.distance_mm[0] = VL53L1X_INVALID_DISTANCE_MM;
-    s_vl53l1x_data.distance_mm[1] = VL53L1X_INVALID_DISTANCE_MM;
-    s_vl53l1x_data.valid[0] = 0U;
-    s_vl53l1x_data.valid[1] = 0U;
-
     for (index = 0U; index < VL53L1X_SENSOR_COUNT; index++)
     {
+        s_vl53l1x_data.distance_mm[index] = VL53L1X_INVALID_DISTANCE_MM;
+        s_vl53l1x_data.valid[index] = 0U;
         (void)VL53L1X_InitSingle(index);
     }
 }
 
 /*
- * 函数功能：非堵塞更新两路 VL53L1X 最新测距结果。
+ * 函数功能：非堵塞更新四路 VL53L1X 最新测距结果。
  * 输入参数：
  *   无
  * 返回值：
@@ -555,13 +606,17 @@ void VL53L1X_Update(void)
     uint8 ack_status = 0U;
     uint8 ack_distance = 0U;
     uint8 ready_mask = 0U;
-    uint8 ready_buf[VL53L1X_SENSOR_COUNT][2] = {{0U, 0U}, {0U, 0U}};
-    uint8 status_buf[VL53L1X_SENSOR_COUNT][2] = {{0xFFU, 0x00U}, {0xFFU, 0x00U}};
-    uint8 distance_buf[VL53L1X_SENSOR_COUNT][2] = {{0xFFU, 0xFFU}, {0xFFU, 0xFFU}};
+    uint8 ready_buf[VL53L1X_SENSOR_COUNT][2] = {0U};
+    uint8 status_buf[VL53L1X_SENSOR_COUNT][2] = {0U};
+    uint8 distance_buf[VL53L1X_SENSOR_COUNT][2] = {0U};
     uint16 distance_mm = 0U;
 
     for (index = 0U; index < VL53L1X_SENSOR_COUNT; index++)
     {
+        status_buf[index][0] = 0xFFU;
+        distance_buf[index][0] = 0xFFU;
+        distance_buf[index][1] = 0xFFU;
+
         if (0U != s_vl53l1x_init_ok[index])
         {
             VL53L1X_PinConfig(s_vl53l1x_scl_pins[index], s_vl53l1x_sda_pins[index]);
@@ -573,7 +628,7 @@ void VL53L1X_Update(void)
         }
     }
 
-    ack_ready = VL53L1X_DualReadRegArray(VL53L1X_REG_GPIO_STATUS, ready_buf, 1U);
+    ack_ready = VL53L1X_SyncReadRegArray(VL53L1X_REG_GPIO_STATUS, ready_buf, 1U);
 
     for (index = 0U; index < VL53L1X_SENSOR_COUNT; index++)
     {
@@ -600,9 +655,9 @@ void VL53L1X_Update(void)
         return;
     }
 
-    ack_status = VL53L1X_DualReadRegArray(VL53L1X_REG_RANGE_STATUS, status_buf, 1U);
-    ack_distance = VL53L1X_DualReadRegArray(VL53L1X_REG_DISTANCE_MM, distance_buf, 2U);
-    (void)VL53L1X_DualWriteReg8(VL53L1X_REG_INTERRUPT_CLEAR, 0x01U);
+    ack_status = VL53L1X_SyncReadRegArray(VL53L1X_REG_RANGE_STATUS, status_buf, 1U);
+    ack_distance = VL53L1X_SyncReadRegArray(VL53L1X_REG_DISTANCE_MM, distance_buf, 2U);
+    (void)VL53L1X_SyncWriteReg8(VL53L1X_REG_INTERRUPT_CLEAR, 0x01U);
 
     for (index = 0U; index < VL53L1X_SENSOR_COUNT; index++)
     {
@@ -632,7 +687,7 @@ void VL53L1X_Update(void)
 }
 
 /*
- * 函数功能：获取两路 VL53L1X 最新缓存数据。
+ * 函数功能：获取四路 VL53L1X 最新缓存数据。
  * 输入参数：
  *   无
  * 返回值：

@@ -9,9 +9,10 @@ float g_tof4_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
 uint8 g_tof_fused_valid = 0U;
 float g_tof_fused_vz_mps = 0.0f;
 float g_height_fused_vz_mps = 0.0f;
+extern volatile uint32 tick_1000us_cnt;
 
 #define HEIGHT_EST_TOF1_INDEX           0U
-#define HEIGHT_EST_TOF4_INDEX           1U
+#define HEIGHT_EST_TOF4_INDEX           3U
 #define HEIGHT_EST_DT_S                 0.01f
 #define HEIGHT_EST_MEDIAN_WIN           3U
 #define HEIGHT_EST_STEP_LIMIT_MM        30.0f
@@ -289,9 +290,13 @@ void TOF_update_100HZ(void)
         }
     }
 
+    float acc_z_mps2 = AccelCalibration_GetAccelDownForOutputMps2();
     g_tof_fused_height_mm = s_height_est_mm;
     g_tof_fused_vz_mps = s_height_est_vz_mps;
     g_height_fused_vz_mps = s_height_est_vz_mps;
+    wifi_justfloat(tick_1000us_cnt,tof_data->distance_mm[0],tof_data->distance_mm[1],tof_data->distance_mm[2],tof_data->distance_mm[3],
+        g_euler.roll, g_euler.pitch, g_euler.yaw,acc_z_mps2
+                   );
 }
 
 void Height_Est_update_100HZ(void)

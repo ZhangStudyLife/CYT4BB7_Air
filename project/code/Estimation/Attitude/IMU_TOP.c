@@ -231,11 +231,11 @@ void IMU_Update_1000HZ(void)
 	g_euler = MahonyAhrs_GetEulerDegrees(&g_mahony_ahrs);
 	AccelCalibration_Update_1000HZ();
 
-	wifi_justfloat(tick_1000us_cnt,
-				ICM42688.gyro_x,ICM42688.gyro_y,ICM42688.gyro_z,ICM42688.acc_x,ICM42688.acc_y,ICM42688.acc_z,
-				g_icm42688_aux.gyro_x, g_icm42688_aux.gyro_y, g_icm42688_aux.gyro_z, g_icm42688_aux.acc_x, g_icm42688_aux.acc_y, g_icm42688_aux.acc_z,
-				g_euler.roll, g_euler.pitch, g_euler.yaw
-			);
+	// wifi_justfloat(tick_1000us_cnt,
+	// 			ICM42688.gyro_x,ICM42688.gyro_y,ICM42688.gyro_z,ICM42688.acc_x,ICM42688.acc_y,ICM42688.acc_z,
+	// 			g_icm42688_aux.gyro_x, g_icm42688_aux.gyro_y, g_icm42688_aux.gyro_z, g_icm42688_aux.acc_x, g_icm42688_aux.acc_y, g_icm42688_aux.acc_z,
+	// 			g_euler.roll, g_euler.pitch, g_euler.yaw
+	// 		);
 
 }
 

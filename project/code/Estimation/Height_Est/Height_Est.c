@@ -21,11 +21,12 @@ extern volatile uint32 tick_1000us_cnt;
 #define HEIGHT_EST_MEDIAN_WIN           3U
 #define HEIGHT_EST_STEP_LIMIT_MM        30.0f
 #define HEIGHT_EST_RESIDUAL_GATE_MM     120.0f
-#define HEIGHT_EST_AB_ALPHA             0.18f
-#define HEIGHT_EST_AB_BETA              0.03f
+#define HEIGHT_EST_AB_ALPHA             0.21f
+#define HEIGHT_EST_AB_BETA              0.02f
 #define HEIGHT_EST_PREDICT_HOLD_CNT     15U
 #define HEIGHT_EST_VEL_DECAY            0.95f
 #define HEIGHT_EST_WEIGHT_EPS           0.001f
+#define HEIGHT_EST_HUBER_K_MM           25.0f
 #define HEIGHT_EST_TOF_PITCH_ARM_MM     65.40f
 #define HEIGHT_EST_TOF_ROLL_ARM_MM      84.81f
 
@@ -114,6 +115,32 @@ static float HeightEst_ResidualWeight(uint8 valid, float residual_mm)
     return 1.0f - abs_residual_mm / HEIGHT_EST_RESIDUAL_GATE_MM;
 }
 
+static float HeightEst_MedianMm(float *values, uint8 count)
+{
+    uint8 i;
+    uint8 j;
+
+    for (i = 0U; i < count; i++)
+    {
+        for (j = i + 1U; j < count; j++)
+        {
+            if (values[j] < values[i])
+            {
+                float temp = values[i];
+                values[i] = values[j];
+                values[j] = temp;
+            }
+        }
+    }
+
+    if (0U != (count & 1U))
+    {
+        return values[count >> 1U];
+    }
+
+    return 0.5f * (values[(count >> 1U) - 1U] + values[count >> 1U]);
+}
+
 void TOF_Init(void)
 {
     HeightEst_ResetAll();
@@ -123,14 +150,25 @@ void TOF_Init(void)
 void TOF_update_100HZ(void)
 {
     const VL53L1X_data_struct *tof_data = 0;
-    uint8 tof1_valid = 0U;
-    uint8 tof4_valid = 0U;
+    uint8 index = 0U;
+    uint8 sample_count = 0U;
+    uint8 valid_count = 0U;
     uint8 meas_valid = 0U;
     uint8 hard_relock = 0U;
     float h_pred_mm = (float)VL53L1X_VALID_RANGE_MAX;
     float v_pred_mps = 0.0f;
     float weighted_sum = 0.0f;
     float weight_sum = 0.0f;
+    float center_mm = (float)VL53L1X_VALID_RANGE_MAX;
+    float tof_height_mm[VL53L1X_SENSOR_COUNT] = {
+        (float)VL53L1X_INVALID_DISTANCE_MM,
+        (float)VL53L1X_INVALID_DISTANCE_MM,
+        (float)VL53L1X_INVALID_DISTANCE_MM,
+        (float)VL53L1X_INVALID_DISTANCE_MM
+    };
+    float q[VL53L1X_SENSOR_COUNT] = {0.0f, 0.0f, 0.0f, 0.0f};
+    float center_buf[VL53L1X_SENSOR_COUNT] = {0.0f, 0.0f, 0.0f, 0.0f};
+    uint8 tof_valid[VL53L1X_SENSOR_COUNT] = {0U, 0U, 0U, 0U};
     float z_meas_mm = (float)VL53L1X_VALID_RANGE_MAX;
     float log_tof1_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
     float log_tof2_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
@@ -156,8 +194,8 @@ void TOF_update_100HZ(void)
     {
         if (0U != tof_data->valid[HEIGHT_EST_TOF1_INDEX])
         {
-            g_tof1_height_mm = HeightEst_ProcessChannel(HEIGHT_EST_TOF1_INDEX, tof_data->distance_mm[HEIGHT_EST_TOF1_INDEX]);
-            tof1_valid = 1U;
+            tof_height_mm[HEIGHT_EST_TOF1_INDEX] = HeightEst_ProcessChannel(HEIGHT_EST_TOF1_INDEX, tof_data->distance_mm[HEIGHT_EST_TOF1_INDEX]);
+            tof_valid[HEIGHT_EST_TOF1_INDEX] = 1U;
         }
         else
         {
@@ -166,7 +204,8 @@ void TOF_update_100HZ(void)
 
         if (0U != tof_data->valid[HEIGHT_EST_TOF2_INDEX])
         {
-            g_tof2_height_mm = HeightEst_ProcessChannel(HEIGHT_EST_TOF2_INDEX, tof_data->distance_mm[HEIGHT_EST_TOF2_INDEX]);
+            tof_height_mm[HEIGHT_EST_TOF2_INDEX] = HeightEst_ProcessChannel(HEIGHT_EST_TOF2_INDEX, tof_data->distance_mm[HEIGHT_EST_TOF2_INDEX]);
+            tof_valid[HEIGHT_EST_TOF2_INDEX] = 1U;
         }
         else
         {
@@ -175,7 +214,8 @@ void TOF_update_100HZ(void)
 
         if (0U != tof_data->valid[HEIGHT_EST_TOF3_INDEX])
         {
-            g_tof3_height_mm = HeightEst_ProcessChannel(HEIGHT_EST_TOF3_INDEX, tof_data->distance_mm[HEIGHT_EST_TOF3_INDEX]);
+            tof_height_mm[HEIGHT_EST_TOF3_INDEX] = HeightEst_ProcessChannel(HEIGHT_EST_TOF3_INDEX, tof_data->distance_mm[HEIGHT_EST_TOF3_INDEX]);
+            tof_valid[HEIGHT_EST_TOF3_INDEX] = 1U;
         }
         else
         {
@@ -184,8 +224,8 @@ void TOF_update_100HZ(void)
 
         if (0U != tof_data->valid[HEIGHT_EST_TOF4_INDEX])
         {
-            g_tof4_height_mm = HeightEst_ProcessChannel(HEIGHT_EST_TOF4_INDEX, tof_data->distance_mm[HEIGHT_EST_TOF4_INDEX]);
-            tof4_valid = 1U;
+            tof_height_mm[HEIGHT_EST_TOF4_INDEX] = HeightEst_ProcessChannel(HEIGHT_EST_TOF4_INDEX, tof_data->distance_mm[HEIGHT_EST_TOF4_INDEX]);
+            tof_valid[HEIGHT_EST_TOF4_INDEX] = 1U;
         }
         else
         {
@@ -200,53 +240,120 @@ void TOF_update_100HZ(void)
         HeightEst_ResetChannel(HEIGHT_EST_TOF4_INDEX);
     }
 
+    g_tof1_height_mm = tof_height_mm[HEIGHT_EST_TOF1_INDEX];
+    g_tof2_height_mm = tof_height_mm[HEIGHT_EST_TOF2_INDEX];
+    g_tof3_height_mm = tof_height_mm[HEIGHT_EST_TOF3_INDEX];
+    g_tof4_height_mm = tof_height_mm[HEIGHT_EST_TOF4_INDEX];
+
     if (0U != s_height_est_ready)
     {
-        float q1 = HeightEst_ResidualWeight(tof1_valid, g_tof1_height_mm - h_pred_mm);
-        float q4 = HeightEst_ResidualWeight(tof4_valid, g_tof4_height_mm - h_pred_mm);
-
-        if (q1 > 0.0f)
+        for (index = 0U; index < VL53L1X_SENSOR_COUNT; index++)
         {
-            weighted_sum += q1 * g_tof1_height_mm;
-            weight_sum += q1;
+            if (0U != tof_valid[index])
+            {
+                q[index] = HeightEst_ResidualWeight(1U, tof_height_mm[index] - h_pred_mm);
+                valid_count++;
+                if (q[index] > 0.0f)
+                {
+                    center_buf[sample_count++] = tof_height_mm[index];
+                }
+            }
         }
-        if (q4 > 0.0f)
+
+        if (sample_count > 0U)
         {
-            weighted_sum += q4 * g_tof4_height_mm;
-            weight_sum += q4;
+            center_mm = HeightEst_MedianMm(center_buf, sample_count);
+
+            for (index = 0U; index < VL53L1X_SENSOR_COUNT; index++)
+            {
+                if (q[index] > 0.0f)
+                {
+                    float deviation_mm = fabsf(tof_height_mm[index] - center_mm);
+                    float robust_weight = 1.0f;
+
+                    if (deviation_mm > HEIGHT_EST_HUBER_K_MM)
+                    {
+                        robust_weight = HEIGHT_EST_HUBER_K_MM / deviation_mm;
+                    }
+
+                    q[index] *= robust_weight;
+                    weighted_sum += q[index] * tof_height_mm[index];
+                    weight_sum += q[index];
+                }
+            }
         }
     }
     else
     {
-        if (0U != tof1_valid)
+        for (index = 0U; index < VL53L1X_SENSOR_COUNT; index++)
         {
-            weighted_sum += g_tof1_height_mm;
-            weight_sum += 1.0f;
+            if (0U != tof_valid[index])
+            {
+                center_buf[sample_count++] = tof_height_mm[index];
+                valid_count++;
+            }
         }
-        if (0U != tof4_valid)
+
+        if (sample_count > 0U)
         {
-            weighted_sum += g_tof4_height_mm;
-            weight_sum += 1.0f;
+            center_mm = HeightEst_MedianMm(center_buf, sample_count);
+
+            for (index = 0U; index < VL53L1X_SENSOR_COUNT; index++)
+            {
+                if (0U != tof_valid[index])
+                {
+                    float deviation_mm = fabsf(tof_height_mm[index] - center_mm);
+                    float robust_weight = 1.0f;
+
+                    if (deviation_mm > HEIGHT_EST_HUBER_K_MM)
+                    {
+                        robust_weight = HEIGHT_EST_HUBER_K_MM / deviation_mm;
+                    }
+
+                    weighted_sum += robust_weight * tof_height_mm[index];
+                    weight_sum += robust_weight;
+                }
+            }
         }
     }
 
     if ((weight_sum <= HEIGHT_EST_WEIGHT_EPS) &&
-        ((0U != tof1_valid) || (0U != tof4_valid)) &&
+        (valid_count >= 2U) &&
         (s_predict_hold_cnt >= HEIGHT_EST_PREDICT_HOLD_CNT))
     {
         hard_relock = 1U;
         weighted_sum = 0.0f;
         weight_sum = 0.0f;
+        sample_count = 0U;
 
-        if (0U != tof1_valid)
+        for (index = 0U; index < VL53L1X_SENSOR_COUNT; index++)
         {
-            weighted_sum += g_tof1_height_mm;
-            weight_sum += 1.0f;
+            if (0U != tof_valid[index])
+            {
+                center_buf[sample_count++] = tof_height_mm[index];
+            }
         }
-        if (0U != tof4_valid)
+
+        if (sample_count > 0U)
         {
-            weighted_sum += g_tof4_height_mm;
-            weight_sum += 1.0f;
+            center_mm = HeightEst_MedianMm(center_buf, sample_count);
+
+            for (index = 0U; index < VL53L1X_SENSOR_COUNT; index++)
+            {
+                if (0U != tof_valid[index])
+                {
+                    float deviation_mm = fabsf(tof_height_mm[index] - center_mm);
+                    float robust_weight = 1.0f;
+
+                    if (deviation_mm > HEIGHT_EST_HUBER_K_MM)
+                    {
+                        robust_weight = HEIGHT_EST_HUBER_K_MM / deviation_mm;
+                    }
+
+                    weighted_sum += robust_weight * tof_height_mm[index];
+                    weight_sum += robust_weight;
+                }
+            }
         }
     }
 

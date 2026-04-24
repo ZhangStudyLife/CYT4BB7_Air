@@ -532,14 +532,14 @@ void FC_Loop_100Hz(void)
         break;
     }
 
-    wifi_justfloat(tick_1000us_cnt,fc_state,
-                   target_height_m * 1000.0f,
-                   g_tof_fused_height_mm,
-                   roll_angle_target, g_euler.roll,
-                   pitch_angle_target, g_euler.pitch,
-                   roll_gyro_target, g_imufilter_1000hz.gyrox,
-                   pitch_gyro_target, g_imufilter_1000hz.gyroy,
-                   CRSF_STD[7]);
+    // wifi_justfloat(tick_1000us_cnt,fc_state,
+    //                target_height_m * 1000.0f,
+    //                g_tof_fused_height_mm,
+    //                roll_angle_target, g_euler.roll,
+    //                pitch_angle_target, g_euler.pitch,
+    //                roll_gyro_target, g_imufilter_1000hz.gyrox,
+    //                pitch_gyro_target, g_imufilter_1000hz.gyroy,
+    //                CRSF_STD[7]);
 
     // wifi_justfloat(g_tof1_height_mm,             // 0: TOF1 原始高度，单位 mm
     //                g_tof4_height_mm,             // 1: TOF4 原始高度，单位 mm
@@ -591,6 +591,23 @@ void FC_Loop_500Hz(void)
         roll_gyro_target = roll_ctrl;
         pitch_gyro_target = pitch_ctrl;
         yaw_gyro_target = 0; // 不闭环航向角，保持当前值
+
+
+        wifi_justfloat(tick_1000us_cnt,
+               roll_gyro_target,
+               g_imufilter_1000hz.gyrox,
+               ICM42688.gyro_x,
+               roll_gyro_pid.p_term,
+               roll_gyro_pid.i_term,
+               roll_gyro_pid.d_term,
+               roll_gyro_pid.output,
+               g_motor_cmd.roll,
+               g_motor_cmd.throttle,
+               g_motor_state.output[0],
+               g_motor_state.output[1],
+               g_motor_state.output[2],
+               g_motor_state.output[3]);
+
     }
 }
 

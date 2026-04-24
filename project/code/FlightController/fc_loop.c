@@ -556,6 +556,11 @@ void FC_Loop_500Hz(void)
         float pitch_angle_meas = g_euler.pitch;
         float yaw_angle_meas = g_euler.yaw;
 
+        if (roll_angle_target > 20.0f){roll_angle_target = 20.0f;}
+        if (roll_angle_target < -20.0f){roll_angle_target = -20.0f;}
+        if (pitch_angle_target > 20.0f){pitch_angle_target = 20.0f;}
+        if (pitch_angle_target < -20.0f){pitch_angle_target = -20.0f;}
+
         /* 控制量限幅 */
         float limit = s_fc_angle_out_limit;
         float roll_ctrl = fc_clampf(PID_Update(&roll_angle_pid, roll_angle_target, roll_angle_meas, dt), -limit, limit);

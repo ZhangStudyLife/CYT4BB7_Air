@@ -1,0 +1,116 @@
+{
+  "04230354_tof_fused.csv": {
+    "raw_events": {
+      "low_valid": 532,
+      "single_outlier": 7821,
+      "common_jump": 0,
+      "spread_gt80": 7857,
+      "spread_gt120": 5106
+    },
+    "current": {
+      "label": "log_current",
+      "rows": 31736,
+      "eval_rows": 31636,
+      "ref_p50": 2.622314000000074,
+      "ref_p95": 9.264135700000045,
+      "ref_max": 31.70605499999988,
+      "loose_ref_p95": 9.722802424999994,
+      "outlier_p95": 16.03649900000005,
+      "outlier_max": 44.17233250000004,
+      "height_step_std": 1.3808620312162732,
+      "height_step_p95": 2.777905200000009,
+      "vz_step_std": 0.010209404664840074,
+      "quiet_vz_p95": 0.14536179999999987,
+      "abs_vz_p95": 0.1764155,
+      "predict_ratio": 0.0,
+      "one_accept": 0,
+      "hard_relock": 0
+    },
+    "best": {
+      "label": "cand",
+      "rows": 31736,
+      "eval_rows": 31636,
+      "ref_p50": 2.2864024150200635,
+      "ref_p95": 9.689599633003446,
+      "ref_max": 38.7979803237497,
+      "loose_ref_p95": 10.123267754131493,
+      "outlier_p95": 16.078469858873632,
+      "outlier_max": 36.83085265118984,
+      "height_step_std": 1.2820018201878063,
+      "height_step_p95": 2.5757319424713616,
+      "vz_step_std": 0.0033608660489304275,
+      "quiet_vz_p95": 0.10414014255064652,
+      "abs_vz_p95": 0.12051828885287294,
+      "predict_ratio": 0.00256037425717537,
+      "one_accept": 0,
+      "hard_relock": 0,
+      "params": {
+        "gate": 140.0,
+        "k": 15.0,
+        "alpha": 0.21,
+        "beta": 0.006,
+        "min_accept": 2,
+        "meas_slew": null
+      },
+      "score": 63.017361731212766
+    },
+    "out": "D:\\Car_Air_Protocol\\CYT4BB7_Air\\project\\code\\Estimation\\Height_Est\\0423_tof_fused\\04230354_tof_fused_optimal_huber4.csv"
+  },
+  "04230411_tof_fused.csv": {
+    "raw_events": {
+      "low_valid": 79,
+      "single_outlier": 5851,
+      "common_jump": 0,
+      "spread_gt80": 6059,
+      "spread_gt120": 3110
+    },
+    "current": {
+      "label": "log_current",
+      "rows": 27901,
+      "eval_rows": 27801,
+      "ref_p50": 2.412140000000022,
+      "ref_p95": 6.627279349999981,
+      "ref_max": 29.41919000000007,
+      "loose_ref_p95": 7.074854874999987,
+      "outlier_p95": 12.875656500000048,
+      "outlier_max": 42.31036300000005,
+      "height_step_std": 1.0197770841348897,
+      "height_step_p95": 1.9760893000000406,
+      "vz_step_std": 0.006493790498611211,
+      "quiet_vz_p95": 0.1139547999999999,
+      "abs_vz_p95": 0.148971,
+      "predict_ratio": 0.0,
+      "one_accept": 0,
+      "hard_relock": 0
+    },
+    "best": {
+      "label": "cand",
+      "rows": 27901,
+      "eval_rows": 27801,
+      "ref_p50": 1.9097694668358827,
+      "ref_p95": 6.520297459178401,
+      "ref_max": 27.175358081722493,
+      "loose_ref_p95": 7.040275339457972,
+      "outlier_p95": 12.38005072823995,
+      "outlier_max": 42.03414889131227,
+      "height_step_std": 0.9656158107882608,
+      "height_step_p95": 1.9119139801772007,
+      "vz_step_std": 0.0024343427119473517,
+      "quiet_vz_p95": 0.0958910788459577,
+      "abs_vz_p95": 0.10626564944868243,
+      "predict_ratio": 3.5969929139239594e-05,
+      "one_accept": 20,
+      "hard_relock": 0,
+      "params": {
+        "gate": 140.0,
+        "k": 15.0,
+        "alpha": 0.21,
+        "beta": 0.006,
+        "min_accept": 1,
+        "meas_slew": null
+      },
+      "score": 52.03802621030766
+    },
+    "out": "D:\\Car_Air_Protocol\\CYT4BB7_Air\\project\\code\\Estimation\\Height_Est\\0423_tof_fused\\04230411_tof_fused_optimal_huber4.csv"
+  }
+}

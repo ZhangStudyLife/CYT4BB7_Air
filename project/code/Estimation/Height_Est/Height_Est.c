@@ -22,11 +22,11 @@ extern volatile uint32 tick_1000us_cnt;
 #define HEIGHT_EST_STEP_LIMIT_MM        30.0f
 #define HEIGHT_EST_RESIDUAL_GATE_MM     120.0f
 #define HEIGHT_EST_AB_ALPHA             0.21f
-#define HEIGHT_EST_AB_BETA              0.02f
+#define HEIGHT_EST_AB_BETA              0.006f
 #define HEIGHT_EST_PREDICT_HOLD_CNT     15U
 #define HEIGHT_EST_VEL_DECAY            0.95f
 #define HEIGHT_EST_WEIGHT_EPS           0.001f
-#define HEIGHT_EST_HUBER_K_MM           25.0f
+#define HEIGHT_EST_HUBER_K_MM           20.0f
 #define HEIGHT_EST_TOF_PITCH_ARM_MM     65.40f
 #define HEIGHT_EST_TOF_ROLL_ARM_MM      84.81f
 
@@ -260,7 +260,7 @@ void TOF_update_100HZ(void)
             }
         }
 
-        if (sample_count > 0U)
+        if (sample_count >= 2U)
         {
             center_mm = HeightEst_MedianMm(center_buf, sample_count);
 

@@ -24,7 +24,7 @@ int main(void)
     PMW3901_Init();
     // LC302_Init();
     IMU_Init_All();
-    (void)ICM42688_Aux_Init();
+    // (void)ICM42688_Aux_Init();           //对比用的陀螺仪关掉
     crsf_init();
     AccelCalibration_Init();
     IMUCalib_Init();
@@ -63,7 +63,7 @@ int main(void)
             g_tick_1000HZ--;
 
             IMU_Update_1000HZ();
-            ICM42688_Aux_Update_1000Hz(tick_1000us_cnt);
+            // ICM42688_Aux_Update_1000Hz(tick_1000us_cnt);         //对比用的陀螺仪关掉
             Pos_Est_Update_1000HZ();
 
             div500++;

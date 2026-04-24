@@ -532,6 +532,15 @@ void FC_Loop_100Hz(void)
         break;
     }
 
+    wifi_justfloat(tick_1000us_cnt,fc_state,
+                   target_height_m * 1000.0f,
+                   g_tof_fused_height_mm,
+                   roll_angle_target, g_euler.roll,
+                   pitch_angle_target, g_euler.pitch,
+                   roll_gyro_target, g_imufilter_1000hz.gyrox,
+                   pitch_gyro_target, g_imufilter_1000hz.gyroy,
+                   CRSF_STD[7]);
+
     // wifi_justfloat(g_tof1_height_mm,             // 0: TOF1 原始高度，单位 mm
     //                g_tof4_height_mm,             // 1: TOF4 原始高度，单位 mm
     //                g_tof_fused_height_mm,        // 2: TOF 融合高度，单位 mm
@@ -556,10 +565,22 @@ void FC_Loop_500Hz(void)
         float pitch_angle_meas = g_euler.pitch;
         float yaw_angle_meas = g_euler.yaw;
 
-        if (roll_angle_target > 20.0f){roll_angle_target = 20.0f;}
-        if (roll_angle_target < -20.0f){roll_angle_target = -20.0f;}
-        if (pitch_angle_target > 20.0f){pitch_angle_target = 20.0f;}
-        if (pitch_angle_target < -20.0f){pitch_angle_target = -20.0f;}
+        if (roll_angle_target > 20.0f)
+        {
+            roll_angle_target = 20.0f;
+        }
+        if (roll_angle_target < -20.0f)
+        {
+            roll_angle_target = -20.0f;
+        }
+        if (pitch_angle_target > 20.0f)
+        {
+            pitch_angle_target = 20.0f;
+        }
+        if (pitch_angle_target < -20.0f)
+        {
+            pitch_angle_target = -20.0f;
+        }
 
         /* 控制量限幅 */
         float limit = s_fc_angle_out_limit;

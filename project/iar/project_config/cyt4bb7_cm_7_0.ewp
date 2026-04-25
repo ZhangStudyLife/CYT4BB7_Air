@@ -2667,6 +2667,15 @@
                 </file>
             </group>
             <group>
+                <name>BMI088</name>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\BMI088\BMI088.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\BMI088\BMI088.h</name>
+                </file>
+            </group>
+            <group>
                 <name>LC302</name>
                 <file>
                     <name>$PROJ_DIR$\..\..\code\HW_Drivers\LC302\LC302.c</name>

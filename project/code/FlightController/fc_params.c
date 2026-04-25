@@ -81,7 +81,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pitch_mech_trim_deg = -3.0f; /* Pitch 机械配平角 */
 
     /* ===== Roll 轴角速度环参数 ===== */
-    params->roll_gyro_kp = 3.2f;
+    params->roll_gyro_kp = 3.6f;
     params->roll_gyro_ki = 0.85f;
     params->roll_gyro_kd = 0.055f;
     params->roll_gyro_kff = 0.0f;

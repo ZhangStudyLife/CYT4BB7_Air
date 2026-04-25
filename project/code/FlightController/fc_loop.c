@@ -382,7 +382,6 @@ void FC_Loop_100Hz(void)
     float ch2;
     float height_m;
     float height_err_mm;
-    float height_vz_raw_mps;
     float throttle_z_cmd;
     uint32 tick_now = tick_1000us_cnt;
     uint32 diff = tick_now - tick_1000us_cnt_last;
@@ -395,7 +394,6 @@ void FC_Loop_100Hz(void)
     }
 
     height_m = g_tof_fused_height_mm * 0.001f;
-    height_vz_raw_mps = g_tof_fused_vz_mps;
 
     // wifi_justfloat(tick_1000us_cnt,g_tof1_height_mm,g_tof4_height_mm,g_tof_fused_height_mm,height_vz_raw_mps,dt,
     // g_imufilter_1000hz.accx,g_imufilter_1000hz.accy,g_imufilter_1000hz.accz,g_euler.pitch,g_euler.roll,g_euler.yaw);
@@ -541,14 +539,18 @@ void FC_Loop_100Hz(void)
     //                pitch_gyro_target, g_imufilter_1000hz.gyroy,
     //                CRSF_STD[7]);
 
-    // wifi_justfloat(g_tof1_height_mm,             // 0: TOF1 原始高度，单位 mm
-    //                g_tof4_height_mm,             // 1: TOF4 原始高度，单位 mm
-    //                g_tof_fused_height_mm,        // 2: TOF 融合高度，单位 mm
-    //                target_height_m * 1000.0f,    // 3: 目标高度，单位 mm
-    //                height_vz_raw_mps,            // 4: 原始高度差分速度，单位 m/s（上升为正）
-    //                s_height_vz_mps,              // 5: 速度环使用的融合速度，单位 m/s（上升为正）
-    //                height_pos_out,               // 6: 高度位置环输出（速度目标），单位 m/s
-    //                (float)g_motor_cmd.throttle); // 7: 当前总油门指令值
+    wifi_justfloat((float)tick_1000us_cnt,     /* 时间戳 */
+                   target_height_m * 1000.0f,  /* 目标高度，单位 mm */
+                   g_tof_fused_height_mm,      /* 当前高度，单位 mm */
+                   height_pos_out,             /* 速度目标(位置环输出) */
+                   s_height_vz_mps,            /* 速度反馈 */
+                   height_pos_pid.p_term,      /* 位置环P */
+                   height_pos_pid.d_term,      /* 位置环D */
+                   height_vel_pid.p_term,      /* 速度环P */
+                   height_vel_pid.i_term,      /* 速度环I */
+                   height_vel_out,             /* 速度环输出 */
+                   (float)g_motor_cmd.throttle /* 总油门指令 */
+    );
 }
 
 void FC_Loop_500Hz(void)
@@ -592,7 +594,6 @@ void FC_Loop_500Hz(void)
         pitch_gyro_target = pitch_ctrl;
         yaw_gyro_target = 0; // 不闭环航向角，保持当前值
 
-
         // wifi_justfloat(tick_1000us_cnt,
         //        roll_gyro_target,
         //        g_imufilter_1000hz.gyrox,
@@ -607,7 +608,6 @@ void FC_Loop_500Hz(void)
         //        g_motor_state.output[1],
         //        g_motor_state.output[2],
         //        g_motor_state.output[3]);
-
     }
 }
 
@@ -657,13 +657,11 @@ void FC_Loop_1000Hz(void)
         Motor_Mixer(&g_motor_cmd);
     }
 
-
-
-    wifi_justfloat(tick_1000us_cnt,
-        g_imufilter_1000hz.gyrox,roll_gyro_target,roll_gyro_pid.p_term,roll_gyro_pid.i_term,roll_gyro_pid.d_term,
-        g_euler.roll,roll_angle_target,roll_angle_pid.p_term,roll_angle_pid.i_term,roll_angle_pid.d_term,
-        pitch_angle_target,g_euler.pitch,g_tof_fused_height_mm,target_height_m * 1000.0f
-                   );
+    // wifi_justfloat(tick_1000us_cnt,
+    //     g_imufilter_1000hz.gyrox,roll_gyro_target,roll_gyro_pid.p_term,roll_gyro_pid.i_term,roll_gyro_pid.d_term,
+    //     g_euler.roll,roll_angle_target,roll_angle_pid.p_term,roll_angle_pid.i_term,roll_angle_pid.d_term,
+    //     pitch_angle_target,g_euler.pitch,g_tof_fused_height_mm,target_height_m * 1000.0f
+    //                );
 
     // float dec_x;
     // float dec_y;

@@ -10,6 +10,10 @@ imudata_t g_imufilter_1000hz;
 imudata_t g_imudata_500hz;
 /* 250Hz 融合链路滤波输出 */
 imudata_t g_imudata_250hz;
+/* IMU 原始输入冲击标志：1=当前处于冲击保持窗口 */
+uint8_t g_imu_shock_flag;
+/* IMU 原始输入合加速度模长，单位 g */
+float g_imu_acc_norm_g;
 
 /* IMU 内部滤波器状态 */
 static struct
@@ -24,6 +28,7 @@ static struct
     IMUBiquad_t accel_lpf[IMU_AXIS_NUM];    /* 加速度计主低通 */
 
     uint8_t initialized; /* 首帧直通标志 */
+    uint16_t shock_hold_count; /* IMU 冲击保持计数，单位 1kHz 采样点 */
 } s_filt;
 
 /**
@@ -133,9 +138,12 @@ void IMUFilter_Init(void)
     }
 
     s_filt.initialized = 0U;
+    s_filt.shock_hold_count = 0U;
     g_imufilter_1000hz = (imudata_t){0};
     g_imudata_500hz = (imudata_t){0};
     g_imudata_250hz = (imudata_t){0};
+    g_imu_shock_flag = 0U;
+    g_imu_acc_norm_g = 0.0f;
 }
 
 /**
@@ -153,6 +161,8 @@ void IMUFilter_Update(float gx, float gy, float gz,
     float accel_in[IMU_AXIS_NUM];
     float gyro_out[IMU_AXIS_NUM];
     float accel_out[IMU_AXIS_NUM];
+    float gyro_abs_max;
+    float accel_abs_max;
     uint8_t axis;
 
     gyro_in[0] = gx;
@@ -161,6 +171,45 @@ void IMUFilter_Update(float gx, float gy, float gz,
     accel_in[0] = ax;
     accel_in[1] = ay;
     accel_in[2] = az;
+
+    /* 用原始输入判断冲击，后续姿态/光流链路只拿这个标志做门控 */
+    gyro_abs_max = fabsf(gx);
+    if (fabsf(gy) > gyro_abs_max)
+    {
+        gyro_abs_max = fabsf(gy);
+    }
+    if (fabsf(gz) > gyro_abs_max)
+    {
+        gyro_abs_max = fabsf(gz);
+    }
+
+    accel_abs_max = fabsf(ax);
+    if (fabsf(ay) > accel_abs_max)
+    {
+        accel_abs_max = fabsf(ay);
+    }
+    if (fabsf(az) > accel_abs_max)
+    {
+        accel_abs_max = fabsf(az);
+    }
+
+    g_imu_acc_norm_g = sqrtf(ax * ax + ay * ay + az * az);
+    if ((accel_abs_max >= IMU_SHOCK_ACCEL_AXIS_G) ||
+        (g_imu_acc_norm_g >= IMU_SHOCK_ACCEL_NORM_G) ||
+        (gyro_abs_max >= IMU_SHOCK_GYRO_AXIS_DPS))
+    {
+        s_filt.shock_hold_count = IMU_SHOCK_HOLD_SAMPLES;
+    }
+
+    if (s_filt.shock_hold_count > 0U)
+    {
+        g_imu_shock_flag = 1U;
+        s_filt.shock_hold_count--;
+    }
+    else
+    {
+        g_imu_shock_flag = 0U;
+    }
 
     if (0U == s_filt.initialized)
     {

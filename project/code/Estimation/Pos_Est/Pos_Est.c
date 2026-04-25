@@ -172,6 +172,7 @@
 
 #include "Pos_Est.h"
 #include "FlowGyroDecoupler_LC302.h"
+#include "../Attitude/IMU_Filtter.h"
 #include "HW_Drivers/PMW3901/PMW3901.h"
 #include "HW_Drivers/LC302/LC302.h"
 #include "filter.h"
@@ -327,6 +328,13 @@ void Pos_Est_Update_1000HZ(void)
     acc_x_temp = (cp * acc_body[0] + sp * sr * acc_body[1] + sp * cr * acc_body[2]) * 9.80665f * 100.0f;
     acc_y_temp = (cr * acc_body[1] - sr * acc_body[2]) * 9.80665f * 100.0f;
 
+    /* IMU 冲击窗口内不让水平加速度污染后续速度积分 */
+    if (g_imu_shock_flag != 0U)
+    {
+        acc_x_temp = 0.0f;
+        acc_y_temp = 0.0f;
+    }
+
     acc_x_lp = LPF1_Update(&s_acc_lp_x, acc_x_temp);
     acc_y_lp = LPF1_Update(&s_acc_lp_y, acc_y_temp);
 
@@ -373,10 +381,19 @@ void Pos_Est_Update_50HZ(void)
     opflow_vel_x = dec_x * coeff * 50.0f;
     opflow_vel_y = dec_y * coeff * 50.0f;
 
-    /* X: 光流左正右负，acc_y 右正左负，所以预测项取负 */
-    vel_x_pred = Pos_Est_vel_x_kf - acc_y_lp * dt;
-    /* Y: 光流前正后负，acc_x 前正后负，所以预测项同号 */
-    vel_y_pred = Pos_Est_vel_y_kf + acc_x_lp * dt;
+    /* IMU 冲击窗口内冻结加速度预测，只保留光流校正 */
+    if (g_imu_shock_flag != 0U)
+    {
+        vel_x_pred = Pos_Est_vel_x_kf;
+        vel_y_pred = Pos_Est_vel_y_kf;
+    }
+    else
+    {
+        /* X: 光流左正右负，acc_y 右正左负，所以预测项取负 */
+        vel_x_pred = Pos_Est_vel_x_kf - acc_y_lp * dt;
+        /* Y: 光流前正后负，acc_x 前正后负，所以预测项同号 */
+        vel_y_pred = Pos_Est_vel_y_kf + acc_x_lp * dt;
+    }
 
     Pos_Est_vel_x_last = Pos_Est_vel_x;
     Pos_Est_vel_y_last = Pos_Est_vel_y;

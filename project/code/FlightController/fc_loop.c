@@ -657,6 +657,14 @@ void FC_Loop_1000Hz(void)
         Motor_Mixer(&g_motor_cmd);
     }
 
+
+
+    wifi_justfloat(tick_1000us_cnt,
+        g_imufilter_1000hz.gyrox,roll_gyro_target,roll_gyro_pid.p_term,roll_gyro_pid.i_term,roll_gyro_pid.d_term,
+        g_euler.roll,roll_angle_target,roll_angle_pid.p_term,roll_angle_pid.i_term,roll_angle_pid.d_term,
+        pitch_angle_target,g_euler.pitch,g_tof_fused_height_mm,target_height_m * 1000.0f
+                   );
+
     // float dec_x;
     // float dec_y;
     // dec_x = FlowGyroDecoupler_GetDecX();

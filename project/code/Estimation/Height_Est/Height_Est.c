@@ -22,7 +22,7 @@ extern volatile uint32 tick_1000us_cnt;
 #define HEIGHT_EST_STEP_LIMIT_MM        30.0f
 #define HEIGHT_EST_RESIDUAL_GATE_MM     120.0f
 #define HEIGHT_EST_AB_ALPHA             0.21f
-#define HEIGHT_EST_AB_BETA              0.006f
+#define HEIGHT_EST_AB_BETA              0.012f
 #define HEIGHT_EST_PREDICT_HOLD_CNT     15U
 #define HEIGHT_EST_VEL_DECAY            0.95f
 #define HEIGHT_EST_WEIGHT_EPS           0.001f

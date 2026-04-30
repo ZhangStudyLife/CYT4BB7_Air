@@ -64,7 +64,7 @@ static const float s_fc_angle_aw_gain = 0.15f;
 /* 姿态角外环积分松弛阈值，目标变化过快时降低积分堆积 */
 static const float s_fc_angle_iterm_relax_threshold = 30.0f;
 static const float s_fc_deg_to_rad = 0.017453293f;
-static const float s_fc_tilt_cos_min = 0.9f;
+static const float s_fc_tilt_cos_min = 0.8f;
 static const float s_fc_tilt_comp_throttle_max = 10000.0f;
 
 /*
@@ -539,18 +539,22 @@ void FC_Loop_100Hz(void)
     //                pitch_gyro_target, g_imufilter_1000hz.gyroy,
     //                CRSF_STD[7]);
 
-    wifi_justfloat((float)tick_1000us_cnt,     /* 时间戳 */
-                   target_height_m * 1000.0f,  /* 目标高度，单位 mm */
-                   g_tof_fused_height_mm,      /* 当前高度，单位 mm */
-                   height_pos_out,             /* 速度目标(位置环输出) */
-                   s_height_vz_mps,            /* 速度反馈 */
-                   height_pos_pid.p_term,      /* 位置环P */
-                   height_pos_pid.d_term,      /* 位置环D */
-                   height_vel_pid.p_term,      /* 速度环P */
-                   height_vel_pid.i_term,      /* 速度环I */
-                   height_vel_out,             /* 速度环输出 */
-                   (float)g_motor_cmd.throttle /* 总油门指令 */
-    );
+    // wifi_justfloat((float)tick_1000us_cnt,      /* 时间戳 */
+    //                target_height_m * 1000.0f,   /* 目标高度，单位 mm */
+    //                g_tof_fused_height_mm,       /* 当前高度，单位 mm */
+    //                height_pos_out,              /* 速度目标(位置环输出) */
+    //                s_height_vz_mps,             /* 速度反馈 */
+    //                height_pos_pid.p_term,       /* 位置环P */
+    //                height_pos_pid.d_term,       /* 位置环D */
+    //                height_vel_pid.p_term,       /* 速度环P */
+    //                height_vel_pid.i_term,       /* 速度环I */
+    //                height_vel_out,              /* 速度环输出 */
+    //                (float)g_motor_cmd.throttle, /* 总油门指令 */
+    //                g_tof1_height_mm,
+    //                g_tof2_height_mm,
+    //                g_tof3_height_mm,
+    //                g_tof4_height_mm);
+    wifi_justfloat(g_tof1_height_mm, g_tof2_height_mm, g_tof3_height_mm, g_tof4_height_mm);
 }
 
 void FC_Loop_500Hz(void)
@@ -644,9 +648,10 @@ void FC_Loop_1000Hz(void)
         (void)yaw_ctrl;
         /* 电机混控：总油门 = 基础油门 + 高度控制输出 */
         {
-            float throttle_cmd_raw = g_fc_params.base_throttle + height_vel_out;
-            float throttle_cmd_comp = FC_Apply_Tilt_Throttle_Compensation(throttle_cmd_raw);
-            g_motor_cmd.throttle = (int32_t)fc_clampf((float)(int32_t)throttle_cmd_comp, 3000.0f, 6000.0f);
+
+            float base_throttle = FC_Apply_Tilt_Throttle_Compensation(g_fc_params.base_throttle);
+            float throttle_cmd_raw = base_throttle + height_vel_out;
+            g_motor_cmd.throttle = (int32_t)fc_clampf((float)(int32_t)throttle_cmd_raw, 2500.0f, 6000.0f);
         }
         g_motor_cmd.roll = roll_ctrl;
         g_motor_cmd.pitch = -pitch_ctrl;

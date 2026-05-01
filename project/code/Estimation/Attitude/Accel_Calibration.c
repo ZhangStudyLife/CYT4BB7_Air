@@ -3554,6 +3554,39 @@ void AccelCalibration_GetParams(AccelCalibrationParams_t *params)
     params->gravity_mps2 = g_accel_calibration.gravity_mps2;
 }
 
+static void imu_calib_apply_default_accel_calibration(void)
+{
+    AccelCalibrationParams_t params;
+
+    /* 由29点椭球拟合得到的最优校准参数, max_norm_err=0.0005g */
+    params.accel_bias_g[0] = 0.00264310f;
+    params.accel_bias_g[1] = -0.00159120f;
+    params.accel_bias_g[2] = -0.01090268f;
+
+    params.accel_corr_matrix[0][0] = 1.00330021f;
+    params.accel_corr_matrix[0][1] = 0.00299467f;
+    params.accel_corr_matrix[0][2] = -0.00116886f;
+    params.accel_corr_matrix[1][0] = 0.00000000f;
+    params.accel_corr_matrix[1][1] = 0.99966587f;
+    params.accel_corr_matrix[1][2] = 0.00052598f;
+    params.accel_corr_matrix[2][0] = 0.00000000f;
+    params.accel_corr_matrix[2][1] = 0.00000000f;
+    params.accel_corr_matrix[2][2] = 0.99903492f;
+
+    params.accel_scale[0] = 1.00330021f;
+    params.accel_scale[1] = 0.99966587f;
+    params.accel_scale[2] = 0.99903492f;
+
+    params.use_full_matrix = 1U;
+    params.gravity_mps2 = 9.80665f;
+    memcpy(params.imu_to_body, g_accel_calibration.imu_to_body, sizeof(params.imu_to_body));
+
+    AccelCalibration_LoadParams(&params);
+    IMUCalib_SaveCurrentToFlash();
+
+    printf("cal,default,optimal,max_err=0.0005g\r\n");
+}
+
 void IMUCalib_Init(void)
 {
     flash_init();
@@ -3565,6 +3598,7 @@ void IMUCalib_Init(void)
     else
     {
         printf("cal,default\r\n");
+        imu_calib_apply_default_accel_calibration();
     }
     imu_calib_print_boot_reminder();
 }

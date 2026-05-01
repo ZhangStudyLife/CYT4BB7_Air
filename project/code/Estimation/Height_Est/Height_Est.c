@@ -35,7 +35,7 @@ extern volatile uint32 tick_1000us_cnt;                        /* 1ms 系统节�
 #define HEIGHT_EST_ACC_CLIP_MPS2        5.0f                /* 垂直加速度预测限幅，单位 m/s^2 */
 #define HEIGHT_EST_VEL_LIMIT_MPS        3.5f                /* 高度速度状态限幅，单位 m/s */
 #define HEIGHT_EST_BIAS_LIMIT_MPS2      1.0f                /* 垂直加速度偏置状态限幅，单位 m/s^2 */
-#define HEIGHT_EST_KF_SIGMA_A           2.5f                /* KF 加速度过程噪声，单位 m/s^2 */
+#define HEIGHT_EST_KF_SIGMA_A           3.2f                /* KF 加速度过程噪声，单位 m/s^2 */
 #define HEIGHT_EST_KF_SIGMA_B           0.08f               /* KF 加速度偏置过程噪声，单位 m/s^2 */
 #define HEIGHT_EST_KF_SIGMA_H           0.025f              /* KF 标准 TOF 观测噪声，单位 m */
 #define HEIGHT_EST_KF_SIGMA_H_BAD       0.08f               /* KF 离散 TOF 观测噪声，单位 m */

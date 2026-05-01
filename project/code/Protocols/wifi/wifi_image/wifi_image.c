@@ -86,7 +86,7 @@ uint8_t wifi_image_SendFrame(const uint8_t *image,
         (s_wifi_image_cfg_width != cfg_width) ||
         (s_wifi_image_cfg_height != cfg_height))
     {
-        seekfree_assistant_interface_init(SEEKFREE_ASSISTANT_WIFI_SPI);
+        // seekfree_assistant_interface_init(SEEKFREE_ASSISTANT_WIFI_SPI);
         s_wifi_image_assistant_inited = 1U;
         s_wifi_image_cfg_width = cfg_width;
         s_wifi_image_cfg_height = cfg_height;

@@ -13,7 +13,7 @@
 
 #define MOTOR_DRIVER_BACKEND_PWM      (0U)
 #define MOTOR_DRIVER_BACKEND_UART     (1U)
-#define MOTOR_DRIVER_BACKEND          (MOTOR_DRIVER_BACKEND_UART)
+#define MOTOR_DRIVER_BACKEND          (MOTOR_DRIVER_BACKEND_PWM)
 
 #ifdef __cplusplus
 extern "C" {

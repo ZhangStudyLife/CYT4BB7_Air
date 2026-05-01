@@ -78,15 +78,18 @@ static void wifi_cmd_reset_line_state(void)
 
 static uint8 wifi_cmd_wait_tx_idle(void)
 {
+#if 0
     uint32 guard = 0U;
 
-    while ((0U != wifi_spi_is_busy()) && (guard < WIFI_CMD_TEXT_SEND_POLL_LIMIT))
+    // while ((0U != wifi_spi_is_busy()) && (guard < WIFI_CMD_TEXT_SEND_POLL_LIMIT))
     {
-        wifi_spi_send_poll();
+        // wifi_spi_send_poll();
         guard++;
     }
 
-    return (0U == wifi_spi_is_busy()) ? 1U : 0U;
+    // return (0U == wifi_spi_is_busy()) ? 1U : 0U;
+#endif
+    return 1U;
 }
 
 static uint8 wifi_cmd_finish_pending_flush(void)
@@ -229,7 +232,9 @@ static void wifi_cmd_feed_byte(char ch)
 
 void wifi_cmd_Init(void)
 {
+#if 0
     uint8 ret;
+#endif
 
     s_wifi_cmd_ready = 0U;
     s_wifi_cmd_use_udp_flush = 1U;
@@ -238,16 +243,17 @@ void wifi_cmd_Init(void)
     memset(s_wifi_cmd_line, 0, sizeof(s_wifi_cmd_line));
     wifi_cmd_reset_line_state();
 
-    ret = wifi_spi_init((char *)WIFI_SSID_TEST, (char *)WIFI_PASSWORD_TEST);
+#if 0
+    // ret = wifi_spi_init((char *)WIFI_SSID_TEST, (char *)WIFI_PASSWORD_TEST);
     if (0U == ret)
     {
 #if (0U == WIFI_IMAGE_ENABLE)
-        ret = wifi_spi_socket_connect("UDP", (char *)UDP_REMOTE_IP, (char *)UDP_REMOTE_PORT, (char *)UDP_LOCAL_PORT);
+        // ret = wifi_spi_socket_connect("UDP", (char *)UDP_REMOTE_IP, (char *)UDP_REMOTE_PORT, (char *)UDP_LOCAL_PORT);
 #else
-        ret = wifi_spi_socket_connect((char *)WIFI_IMAGE_TCP_CLIENT_TRANSPORT,
-                                      (char *)UDP_REMOTE_IP,
-                                      (char *)UDP_REMOTE_PORT,
-                                      (char *)UDP_LOCAL_PORT);
+        // ret = wifi_spi_socket_connect((char *)WIFI_IMAGE_TCP_CLIENT_TRANSPORT,
+        //                               (char *)UDP_REMOTE_IP,
+        //                               (char *)UDP_REMOTE_PORT,
+        //                               (char *)UDP_LOCAL_PORT);
 #endif
     }
 
@@ -265,19 +271,21 @@ void wifi_cmd_Init(void)
         Beep_Stop();
         Beep_Play(50U, 0.5f, 5U);
     }
+#endif
 }
 
 // 04110316 zyz实际测试花费88us
 void wifi_cmd_Poll(void)
 {
+#if 0
     uint8 rx_buffer[WIFI_CMD_RX_BUFFER_SIZE];
     uint32 read_len;
     uint32 i;
     /* 推进非阻塞发送状态机，确保发送在主循环中持续推进 */
-    wifi_spi_send_poll();
+    // wifi_spi_send_poll();
 
     /* 发送完成后再触发UDP立即发送，避免与发送事务重叠 */
-    if ((0U != s_wifi_cmd_flush_pending) && (0U == wifi_spi_is_busy()))
+    // if ((0U != s_wifi_cmd_flush_pending) && (0U == wifi_spi_is_busy()))
     {
         if (0U != wifi_cmd_FlushNow())
         {
@@ -290,11 +298,12 @@ void wifi_cmd_Poll(void)
     {
         return;
     }
-    read_len = wifi_spi_read_buffer(rx_buffer, (uint32)sizeof(rx_buffer));
+    // read_len = wifi_spi_read_buffer(rx_buffer, (uint32)sizeof(rx_buffer));
     for (i = 0U; i < read_len; i++)
     {
         wifi_cmd_feed_byte((char)rx_buffer[i]);
     }
+#endif
 }
 
 uint8 wifi_cmd_IsReady(void)
@@ -314,15 +323,20 @@ uint8 wifi_cmd_IsTextBusy(void)
  */
 uint8 wifi_cmd_SendBufferNoFlush(const uint8 *buffer, uint32 len)
 {
+#if 0
     uint32 remain_len;
+#endif
 
     if ((NULL == buffer) || (0U == len) || (0U == s_wifi_cmd_ready))
     {
         return 0U;
     }
 
-    remain_len = wifi_spi_send_buffer(buffer, len);
-    return (0U == remain_len) ? 1U : 0U;
+#if 0
+    // remain_len = wifi_spi_send_buffer(buffer, len);
+    // return (0U == remain_len) ? 1U : 0U;
+#endif
+    return 0U;
 }
 
 /*
@@ -342,7 +356,10 @@ uint8 wifi_cmd_FlushNow(void)
         return 1U;
     }
 
-    return (0U == wifi_spi_udp_send_now()) ? 1U : 0U;
+#if 0
+    // return (0U == wifi_spi_udp_send_now()) ? 1U : 0U;
+#endif
+    return 0U;
 }
 
 /*

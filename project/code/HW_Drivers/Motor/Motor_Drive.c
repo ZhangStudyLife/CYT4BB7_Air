@@ -7,7 +7,10 @@
 
 #include "Motor_Drive.h"
 #include "zf_common_headfile.h"
+
+#if (MOTOR_DRIVER_BACKEND == MOTOR_DRIVER_BACKEND_UART)
 #include "small_driver_uart_control.h"
+#endif
 
 #if (MOTOR_DRIVER_BACKEND == MOTOR_DRIVER_BACKEND_PWM)
 #define MOTOR_OUTPUT_STOP_VALUE    (MOTOR_DUTY_MIN)

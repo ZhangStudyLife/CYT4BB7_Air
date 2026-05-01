@@ -2,7 +2,7 @@
 #define POS_EST_H
 
 #include "zf_common_headfile.h"
-#include "FlowGyroDecoupler.h"
+// #include "FlowGyroDecoupler.h"
 
 #ifdef __cplusplus
 extern "C" {

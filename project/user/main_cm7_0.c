@@ -123,6 +123,7 @@ int main(void)
             g_tick_1000HZ--;
 
             IMU_Update_1000HZ();
+            Height_Est_update_1000HZ();
             // ICM42688_Aux_Update_1000Hz(tick_1000us_cnt);         //对比用的陀螺仪关掉
             // BMI088_Update_1000Hz(tick_1000us_cnt);
             Pos_Est_Update_1000HZ();

@@ -8,14 +8,14 @@
 extern "C" {
 #endif
 
-extern float g_tof_fused_height_mm;  /* TOF 融合高度，单位 mm */
+extern float g_tof_fused_height_mm;  /* TOF/KF 融合高度，单位 mm */
 extern float g_tof1_height_mm;       /* 1 号电机下方 TOF 高度，单位 mm */
 extern float g_tof2_height_mm;       /* 2 号电机下方 TOF 高度，单位 mm */
 extern float g_tof3_height_mm;       /* 3 号电机下方 TOF 高度，单位 mm */
 extern float g_tof4_height_mm;       /* 4 号电机下方 TOF 高度，单位 mm */
-extern uint8 g_tof_fused_valid;      /* TOF 融合高度有效标志：1=有效，0=无效 */
-extern float g_tof_fused_vz_mps;     /* TOF 单次差分速度，单位 m/s，上升为正 */
-extern float g_height_fused_vz_mps;  /* TOF 差分速度 3Hz 低通结果，单位 m/s，上升为正 */
+extern uint8 g_tof_fused_valid;      /* TOF/KF 融合高度有效标志：1=有效，0=无效 */
+extern float g_tof_fused_vz_mps;     /* 高度融合速度，单位 m/s，上升为正 */
+extern float g_height_fused_vz_mps;  /* 控制环使用的高度速度，单位 m/s，上升为正 */
 
 /*
  * 函数功能：初始化 TOF 相关状态与驱动。
@@ -36,7 +36,16 @@ void TOF_Init(void);
 void TOF_update_100HZ(void);
 
 /*
- * 函数功能：100Hz 更新高度速度估计，输出 raw 速度与低通速度。
+ * 函数功能：1kHz 更新高度 KF 预测状态。
+ * 输入参数：
+ *   无
+ * 返回值：
+ *   无
+ */
+void Height_Est_update_1000HZ(void);
+
+/*
+ * 函数功能：100Hz 更新 TOF 融合观测并校正高度 KF。
  * 输入参数：
  *   无
  * 返回值：

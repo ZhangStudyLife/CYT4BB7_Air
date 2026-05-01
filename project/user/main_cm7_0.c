@@ -146,7 +146,7 @@ int main(void)
             CRSF_Update_100HZ();
             FC_Loop_100Hz();
             wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
-            if (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING)
+            if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_STANDBY)
             {
                 ips114_show_debug();
             }

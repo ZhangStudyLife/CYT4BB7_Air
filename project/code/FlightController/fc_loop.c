@@ -462,21 +462,21 @@ void FC_Loop_100Hz(void)
         s_hover_throttle += alpha * (throttle_z_cmd - s_hover_throttle);
         s_hover_throttle = fc_clampf(s_hover_throttle, FC_HOVER_THR_MIN, FC_HOVER_THR_MAX);
     }
-    // if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
-    {
-        wifi_justfloat(tick_1000us_cnt,
-                       target_height_m * 1000.0f,
-                       g_tof_fused_height_mm,
-                       height_pos_out,
-                       s_height_vz_mps,
-                       height_vel_pid.p_term,
-                       height_vel_pid.i_term,
-                       height_vel_pid.d_term,
-                       height_vel_out,
-                       g_motor_cmd.throttle,
-                       g_tof_fused_valid
-                       );
-    }
+    // // if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
+    // {
+    //     wifi_justfloat(tick_1000us_cnt,
+    //                    target_height_m * 1000.0f,
+    //                    g_tof_fused_height_mm,
+    //                    height_pos_out,
+    //                    s_height_vz_mps,
+    //                    height_vel_pid.p_term,
+    //                    height_vel_pid.i_term,
+    //                    height_vel_pid.d_term,
+    //                    height_vel_out,
+    //                    g_motor_cmd.throttle,
+    //                    g_tof_fused_valid
+    //                    );
+    // }
 
     switch (s_flight_mode)
     {
@@ -589,21 +589,20 @@ void FC_Loop_500Hz(void)
         pitch_gyro_target = pitch_ctrl;
         yaw_gyro_target = 0; // 不闭环航向角，保持当前值
 
-        // wifi_justfloat(tick_1000us_cnt,
-        //        roll_gyro_target,
-        //        g_imufilter_1000hz.gyrox,
-        //        ICM42688.gyro_x,
-        //        roll_gyro_pid.p_term,
-        //        roll_gyro_pid.i_term,
-        //        roll_gyro_pid.d_term,
-        //        roll_gyro_pid.output,
-        //        g_motor_cmd.roll,
-        //        g_motor_cmd.throttle,
-        //        g_motor_state.output[0],
-        //        g_motor_state.output[1],
-        //        g_motor_state.output[2],
-        //        g_motor_state.output[3]);
+
     }
+            wifi_justfloat(tick_1000us_cnt,
+                       roll_angle_target,
+                       g_euler.roll,
+                       roll_gyro_target,
+                       g_imufilter_1000hz.gyrox,
+                       ICM42688.gyro_x,
+                       roll_gyro_pid.p_term,
+                       roll_gyro_pid.i_term,
+                       roll_gyro_pid.d_term,
+                       roll_gyro_pid.output,
+                       g_motor_cmd.roll,
+                       g_motor_cmd.throttle);
 }
 
 void FC_Loop_1000Hz(void)

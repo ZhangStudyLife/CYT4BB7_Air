@@ -5,9 +5,9 @@
 #include "../code/HW_Drivers/ICM42688_Aux/ICM42688_Aux.h"
 /* ======================== IMU 全局状�?======================== */
 /* IMU滤波数据通过 g_imufilter_1000hz (IMU_Filtter.h) 访问 */
-MahonyAhrs_t g_mahony_ahrs;       /* Mahony 姿态解算器状�?*/
-MahonyAhrs_Euler_t g_euler;       /* 当前姿态欧拉角（度�?*/
-uint8 g_imu_ready = 0U;           /* IMU 是否完成初始化与自检 */
+MahonyAhrs_t g_mahony_ahrs;					   /* Mahony 姿态解算器状�?*/
+MahonyAhrs_Euler_t g_euler;					   /* 当前姿态欧拉角（度�?*/
+uint8 g_imu_ready = 0U;						   /* IMU 是否完成初始化与自检 */
 static imudata_t s_imu_raw_calib_1000hz = {0}; /* 当前 1kHz 原始 IMU 快照，供校准链读取 */
 static uint8 s_imu_initializing = 0U;
 extern uint32 tick_1000us_cnt;
@@ -36,7 +36,7 @@ static uint8 IMU_IsFiniteFloat(float value)
  *   通过指针返回当前帧原始 IMU 快照；空指针会被忽略
  */
 void IMU_GetRawSampleForCalibration(float *gx, float *gy, float *gz,
-                                    float *ax, float *ay, float *az)
+									float *ax, float *ay, float *az)
 {
 	if (gx != NULL)
 	{
@@ -98,8 +98,8 @@ static uint8 IMU_Startup_SelfCheck(void)
 						 ICM42688.gyro_z * ICM42688.gyro_z);
 
 		acc_mag = sqrtf(ICM42688.acc_x * ICM42688.acc_x +
-					   ICM42688.acc_y * ICM42688.acc_y +
-					   ICM42688.acc_z * ICM42688.acc_z);
+						ICM42688.acc_y * ICM42688.acc_y +
+						ICM42688.acc_z * ICM42688.acc_z);
 
 		gyro_abs_sum += gyro_abs;
 		acc_mag_sum += acc_mag;
@@ -199,7 +199,7 @@ void IMU_Update_1000HZ(void)
 
 	/* 3. 校准后数据送入滤波器 */
 	IMUFilter_Update(ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,
-	                 cal_ax, cal_ay, cal_az);
+					 cal_ax, cal_ay, cal_az);
 
 	/* 4. 校准状态机 + 高级处理（当前帧） */
 	IMUCalib_Update_1000HZ();
@@ -211,7 +211,6 @@ void IMU_Update_1000HZ(void)
 	ahrs_ax = g_imufilter_1000hz.accx;
 	ahrs_ay = g_imufilter_1000hz.accy;
 	ahrs_az = g_imufilter_1000hz.accz;
-
 
 	if ((0U != IMU_IsFiniteFloat(ahrs_gx)) &&
 		(0U != IMU_IsFiniteFloat(ahrs_gy)) &&
@@ -232,15 +231,24 @@ void IMU_Update_1000HZ(void)
 	AccelCalibration_Update_1000HZ();
 
 	// wifi_justfloat(tick_1000us_cnt,
-	// 			ICM42688.gyro_x,ICM42688.gyro_y,ICM42688.gyro_z,ICM42688.acc_x,ICM42688.acc_y,ICM42688.acc_z,
-	// 			g_icm42688_aux.gyro_x, g_icm42688_aux.gyro_y, g_icm42688_aux.gyro_z, g_icm42688_aux.acc_x, g_icm42688_aux.acc_y, g_icm42688_aux.acc_z,
-	// 			g_euler.roll, g_euler.pitch, g_euler.yaw
-	// 		);
-
+	// 			   ICM42688.gyro_x,
+	// 			   ICM42688.gyro_y,
+	// 			   ICM42688.gyro_z,
+	// 			   ICM42688.acc_x,
+	// 			   ICM42688.acc_y,
+	// 			   ICM42688.acc_z,
+	// 			   g_imufilter_1000hz.gyrox,
+	// 			   g_imufilter_1000hz.gyroy,
+	// 			   g_imufilter_1000hz.gyroz,
+	// 			   g_imufilter_1000hz.accx,
+	// 			   g_imufilter_1000hz.accy,
+	// 			   g_imufilter_1000hz.accz,
+	// 			   g_euler.roll,
+	// 			   g_euler.pitch,
+	// 			   g_euler.yaw);
 }
 
 uint8 IMU_Is_Ready(void)
 {
 	return g_imu_ready;
 }
-

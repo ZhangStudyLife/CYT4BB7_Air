@@ -462,7 +462,7 @@ void FC_Loop_100Hz(void)
         s_hover_throttle += alpha * (throttle_z_cmd - s_hover_throttle);
         s_hover_throttle = fc_clampf(s_hover_throttle, FC_HOVER_THR_MIN, FC_HOVER_THR_MAX);
     }
-    if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
+    // if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
     {
         wifi_justfloat(tick_1000us_cnt,
                        target_height_m * 1000.0f,

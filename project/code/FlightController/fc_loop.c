@@ -436,17 +436,12 @@ void FC_Loop_100Hz(void)
             s_target_height_slew_m += delta;
             target_height_m = s_target_height_slew_m;
         }
-        if (0U != g_tof_fused_valid)
+        if (0U == g_tof_fused_valid)
         {
-            height_vel_out = PID_Update(&height_vel_pid, height_pos_out, s_height_vz_mps, dt);
-            height_vel_out = fc_clampf(height_vel_out, s_fc_height_vel_out_min, s_fc_height_vel_out_max);
-        }
-        else
-        {
-            s_height_vz_mps = 0.0f;
             height_pos_out = 0.0f;
-            height_vel_out = 0.0f;
         }
+        height_vel_out = PID_Update(&height_vel_pid, height_pos_out, s_height_vz_mps, dt);
+        height_vel_out = fc_clampf(height_vel_out, s_fc_height_vel_out_min, s_fc_height_vel_out_max);
     }
     else
     {
@@ -467,25 +462,21 @@ void FC_Loop_100Hz(void)
         s_hover_throttle += alpha * (throttle_z_cmd - s_hover_throttle);
         s_hover_throttle = fc_clampf(s_hover_throttle, FC_HOVER_THR_MIN, FC_HOVER_THR_MAX);
     }
-    // if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
-    // {
-    //     wifi_justfloat(tick_1000us_cnt,
-    //                    target_height_m * 1000.0f,
-    //                    g_tof_fused_height_mm,
-    //                    height_err_mm,
-    //                    height_pos_out,
-    //                    s_height_vz_mps,
-    //                    height_vz_raw_mps,
-    //                    height_vel_pid.error,
-    //                    height_vel_pid.p_term,
-    //                    height_vel_pid.i_term,
-    //                    height_vel_pid.d_term,
-    //                    height_vel_out,
-    //                    throttle_z_cmd,
-    //                    g_tof_measure_height_mm,
-    //                    g_tof_fused_valid,
-    //                    g_tof_measure_mask);
-    // }
+    if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
+    {
+        wifi_justfloat(tick_1000us_cnt,
+                       target_height_m * 1000.0f,
+                       g_tof_fused_height_mm,
+                       height_pos_out,
+                       s_height_vz_mps,
+                       height_vel_pid.p_term,
+                       height_vel_pid.i_term,
+                       height_vel_pid.d_term,
+                       height_vel_out,
+                       g_motor_cmd.throttle,
+                       g_tof_fused_valid
+                       );
+    }
 
     switch (s_flight_mode)
     {

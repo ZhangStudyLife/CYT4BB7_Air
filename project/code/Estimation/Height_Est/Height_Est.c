@@ -802,16 +802,16 @@ void TOF_update_100HZ(void)
     log_tof2_height_mm = HeightEst_ClampHeightMm(g_tof2_height_mm);
     log_tof3_height_mm = HeightEst_ClampHeightMm(g_tof3_height_mm);
     log_tof4_height_mm = HeightEst_ClampHeightMm(g_tof4_height_mm);
-    /* 仅发送四路姿态解耦后的高度，1300 mm 视为无效，离线再重算融合参数 */
-    FC_START_CRSF_state_e fc_state = FC_START_CRSF_Get_State();
-    if (fc_state == FC_START_CRSF_STATE_FLYING)
-    {
-        wifi_justfloat(
-            tick_1000us_cnt,
-            log_tof1_height_mm, log_tof2_height_mm, log_tof3_height_mm, log_tof4_height_mm,
-            g_euler.roll, g_euler.pitch, acc_z_mps2, g_tof_fused_vz_mps,g_tof_fused_height_mm
-        );
-    }
+    // /* 仅发送四路姿态解耦后的高度，1300 mm 视为无效，离线再重算融合参数 */
+    // FC_START_CRSF_state_e fc_state = FC_START_CRSF_Get_State();
+    // if (fc_state == FC_START_CRSF_STATE_FLYING)
+    // {
+    //     wifi_justfloat(
+    //         tick_1000us_cnt,
+    //         log_tof1_height_mm, log_tof2_height_mm, log_tof3_height_mm, log_tof4_height_mm,
+    //         g_euler.roll, g_euler.pitch, acc_z_mps2, g_tof_fused_vz_mps,g_tof_fused_height_mm
+    //     );
+    // }
 }
 
 /*

@@ -13,7 +13,7 @@ static const float s_mode2_vel_limit_cmps = 100.0f;
 /* 速度目标死区，单位 cm/s */
 static const float s_mode2_vel_deadzone_cmps = 6.0f;
 /* 姿态角输出限幅，单位度 */
-static const float s_mode2_angle_limit_deg = 20.0f;
+static const float s_mode2_angle_limit_deg = 10.0f;
 
 /*
  * 函数名: FC_Mode2_ApplyDeadzone
@@ -116,14 +116,17 @@ void FC_Mode2_50Hz(float dt)
                       -s_mode2_vel_limit_cmps, s_mode2_vel_limit_cmps),
         s_mode2_vel_deadzone_cmps);
 
-    velx_out = PID_Update(&s_mode2_velx_pid, velx_target, -Pos_Est_vel_x, dt);
-    vely_out = PID_Update(&s_mode2_vely_pid, vely_target, -Pos_Est_vel_y, dt);
+    // velx_out = PID_Update(&s_mode2_velx_pid, velx_target, -Pos_Est_vel_x, dt);
+    // vely_out = PID_Update(&s_mode2_vely_pid, vely_target, -Pos_Est_vel_y, dt);
 
-    velx_out = FC_Mode_Clamp(velx_out, -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
-    vely_out = FC_Mode_Clamp(vely_out, -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
+    
 
-    roll_angle_target = velx_out + FC_Mode_Get_Roll_Mech_Trim_Deg();
-    pitch_angle_target = vely_out + FC_Mode_Get_Pitch_Mech_Trim_Deg();
+    velx_out = PID_Update(&s_mode2_velx_pid, velx_target, -opflow_vel_x, dt);
+    vely_out = PID_Update(&s_mode2_vely_pid, vely_target, -opflow_vel_y, dt);    
+
+    roll_angle_target = FC_Mode_Clamp(velx_out+ FC_Mode_Get_Roll_Mech_Trim_Deg(), -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
+    pitch_angle_target = FC_Mode_Clamp(vely_out+ FC_Mode_Get_Pitch_Mech_Trim_Deg(), -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
+
 
     // wifi_justfloat(
     //                g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY, g_pmw3901_raw.squal,

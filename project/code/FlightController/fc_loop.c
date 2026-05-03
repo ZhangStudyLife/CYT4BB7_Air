@@ -497,11 +497,11 @@ void FC_Loop_100Hz(void)
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_4:
-        FC_Mode1_100Hz();
+        FC_Mode0_100Hz();
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_5:
-        FC_Mode5_100Hz();
+        FC_Mode0_100Hz();
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_6:
@@ -648,10 +648,10 @@ void FC_Loop_1000Hz(void)
         g_motor_cmd.yaw = yaw_ctrl;
 
         // 测试固定的控制输出
-        g_motor_cmd.roll = 0;
-        g_motor_cmd.pitch = -0;
-        g_motor_cmd.yaw = 0;
-        g_motor_cmd.throttle = 3000;
+        // g_motor_cmd.roll = 0;
+        // g_motor_cmd.pitch = -0;
+        // g_motor_cmd.yaw = 0;
+        // g_motor_cmd.throttle = 3000;
         // CRSF_STD[2] -1000~1000 映射到油门的 2600 ~ 5200
         // g_motor_cmd.throttle = (int32_t)(CRSF_STD[2] * 1.3f + 3900.0f);
 

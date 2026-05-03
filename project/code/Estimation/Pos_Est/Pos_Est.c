@@ -195,7 +195,10 @@ extern volatile uint32 tick_1000us_cnt;
 float opflow_vel_x = 0.0f;
 /* 光流解算得到的 Y 轴速度，单位 cm/s，往前飞为正，往后飞为负 */
 float opflow_vel_y = 0.0f;
-
+/* 光流解算得到的 X 轴速度，单位 cm/s，往左飞为正，往右飞为负 经过4HZ低通*/
+float opflow_vel_x_lpf = 0.0f;
+/* 光流解算得到的 Y 轴速度，单位 cm/s，往前飞为正，往后飞为负 经过4HZ低通*/
+float opflow_vel_y_lpf = 0.0f;
 /* 位置估计的 X 轴速度，单位 cm/s */
 float Pos_Est_vel_x = 0.0f;
 /* 位置估计的上一拍 X 轴速度，单位 cm/s */
@@ -343,18 +346,15 @@ void Pos_Est_Update_1000HZ(void)
     // float dec_x_lc302 = FlowGyroDecoupler_LC302_GetDecX();
     // float dec_y_lc302 = FlowGyroDecoupler_LC302_GetDecY();
     // FC_START_CRSF_state_e FC_START_CRSF_state = FC_START_CRSF_Get_State();
-    float dec_x , dec_y;
+    float dec_x, dec_y;
     dec_x = FlowGyroDecoupler_LC302_GetDecX();
     dec_y = FlowGyroDecoupler_LC302_GetDecY();
-    wifi_justfloat(tick_1000us_cnt,
-                   acc_x_temp, acc_y_temp,
-                   
-                   g_tof_fused_height_mm * 0.001f,
-                   lc302_data.flow_x_integral, lc302_data.flow_y_integral,
-                   g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy,g_imufilter_1000hz.gyroz,g_euler.pitch, g_euler.roll, g_euler.yaw,
-                   dec_x, dec_y,lc302_data.integration_timespan,lc302_data.valid
-    );
-
+    // wifi_justfloat(tick_1000us_cnt,
+    //                acc_x_temp, acc_y_temp,
+    //                g_tof_fused_height_mm * 0.001f,
+    //                lc302_data.flow_x_integral, lc302_data.flow_y_integral,
+    //                g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz, g_euler.pitch, g_euler.roll, g_euler.yaw,
+    //                dec_x, dec_y, lc302_data.integration_timespan, lc302_data.valid);
 }
 
 /*
@@ -380,11 +380,18 @@ void Pos_Est_Update_50HZ(void)
     dec_y = FlowGyroDecoupler_LC302_GetDecY();
     height = g_tof_fused_height_mm / 1000.0f;
 
-
-
     /* 计算光流速度，此刻加入高度补偿，单位 cm/s */
-    opflow_vel_x = height*dec_x/((float)lc302_data.integration_timespan*0.000001f)*100.0f;
-    opflow_vel_y = height*dec_y/((float)lc302_data.integration_timespan*0.000001f)*100.0f;
+    if (lc302_data.valid != 0U && height >= 0.2f)
+    {
+        opflow_vel_x = height * dec_x * 0.48076923f;
+        opflow_vel_y = height * dec_y * 0.48076923f;
+    }
+    else
+    {
+        opflow_vel_x = 0.0f;
+        opflow_vel_y = 0.0f;
+    }
+
 
     /* IMU 冲击窗口内冻结加速度预测，只保留光流校正 */
     if (g_imu_shock_flag != 0U)
@@ -429,5 +436,4 @@ void Pos_Est_Update_50HZ(void)
 
     Pos_Est_pos_x = Pos_Est_pos_x_last + 0.5f * (Pos_Est_vel_x_last + Pos_Est_vel_x) * dt;
     Pos_Est_pos_y = Pos_Est_pos_y_last + 0.5f * (Pos_Est_vel_y_last + Pos_Est_vel_y) * dt;
-
 }

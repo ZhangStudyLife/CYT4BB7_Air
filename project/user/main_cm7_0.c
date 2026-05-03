@@ -149,7 +149,7 @@ int main(void)
             wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
             if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_STANDBY)
             {
-                ips114_show_debug();
+                // ips114_show_debug();
             }
             slot50 = div50;
             if (slot50 == 0U)

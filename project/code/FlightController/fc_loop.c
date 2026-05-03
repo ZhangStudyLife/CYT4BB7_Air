@@ -591,18 +591,18 @@ void FC_Loop_500Hz(void)
 
 
     }
-            wifi_justfloat(tick_1000us_cnt,
-                       pitch_angle_target,
-                       g_euler.pitch,
-                       pitch_gyro_target,
-                       g_imufilter_1000hz.gyroy,
-                       ICM42688.gyro_y,
-                       pitch_gyro_pid.p_term,
-                       pitch_gyro_pid.i_term,
-                       pitch_gyro_pid.d_term,
-                       pitch_gyro_pid.output,
-                       g_motor_cmd.pitch,
-                       g_motor_cmd.throttle);
+            // wifi_justfloat(tick_1000us_cnt,
+            //            pitch_angle_target,
+            //            g_euler.pitch,
+            //            pitch_gyro_target,
+            //            g_imufilter_1000hz.gyroy,
+            //            ICM42688.gyro_y,
+            //            pitch_gyro_pid.p_term,
+            //            pitch_gyro_pid.i_term,
+            //            pitch_gyro_pid.d_term,
+            //            pitch_gyro_pid.output,
+            //            g_motor_cmd.pitch,
+            //            g_motor_cmd.throttle);
 }
 
 void FC_Loop_1000Hz(void)
@@ -646,6 +646,12 @@ void FC_Loop_1000Hz(void)
         g_motor_cmd.roll = roll_ctrl;
         g_motor_cmd.pitch = -pitch_ctrl;
         g_motor_cmd.yaw = yaw_ctrl;
+
+        // 测试固定的控制输出
+        g_motor_cmd.roll = 0;
+        g_motor_cmd.pitch = -0;
+        g_motor_cmd.yaw = 0;
+        g_motor_cmd.throttle = 3000;
         // CRSF_STD[2] -1000~1000 映射到油门的 2600 ~ 5200
         // g_motor_cmd.throttle = (int32_t)(CRSF_STD[2] * 1.3f + 3900.0f);
 

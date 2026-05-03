@@ -343,6 +343,17 @@ void Pos_Est_Update_1000HZ(void)
     // float dec_x_lc302 = FlowGyroDecoupler_LC302_GetDecX();
     // float dec_y_lc302 = FlowGyroDecoupler_LC302_GetDecY();
     // FC_START_CRSF_state_e FC_START_CRSF_state = FC_START_CRSF_Get_State();
+    float dec_x , dec_y;
+    dec_x = FlowGyroDecoupler_LC302_GetDecX();
+    dec_y = FlowGyroDecoupler_LC302_GetDecY();
+    wifi_justfloat(tick_1000us_cnt,
+                   acc_x_temp, acc_y_temp,
+                   
+                   g_tof_fused_height_mm * 0.001f,
+                   lc302_data.flow_x_integral, lc302_data.flow_y_integral,
+                   g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy,g_imufilter_1000hz.gyroz,g_euler.pitch, g_euler.roll, g_euler.yaw,
+                   dec_x, dec_y
+    );
 
 }
 

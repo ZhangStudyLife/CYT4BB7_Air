@@ -352,7 +352,7 @@ void Pos_Est_Update_1000HZ(void)
                    g_tof_fused_height_mm * 0.001f,
                    lc302_data.flow_x_integral, lc302_data.flow_y_integral,
                    g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy,g_imufilter_1000hz.gyroz,g_euler.pitch, g_euler.roll, g_euler.yaw,
-                   dec_x, dec_y
+                   dec_x, dec_y,lc302_data.integration_timespan,lc302_data.valid
     );
 
 }
@@ -368,7 +368,6 @@ void Pos_Est_Update_50HZ(void)
     float dec_x;
     float dec_y;
     float height;
-    float coeff;
     float vel_x_pred;
     float vel_y_pred;
     const float dt = 0.02f;
@@ -381,16 +380,11 @@ void Pos_Est_Update_50HZ(void)
     dec_y = FlowGyroDecoupler_LC302_GetDecY();
     height = g_tof_fused_height_mm / 1000.0f;
 
-    /* 1m 高度下 1 像素约对应 0.2131946 cm 位移，同时对过低高度做保护 */
-    coeff = 0.2131946f * (height - 0.05f);
-    if (height < 0.2f)
-    {
-        coeff = 0.0f;
-    }
+
 
     /* 计算光流速度，此刻加入高度补偿，单位 cm/s */
-    opflow_vel_x = dec_x * coeff * 50.0f;
-    opflow_vel_y = dec_y * coeff * 50.0f;
+    opflow_vel_x = height*dec_x/((float)lc302_data.integration_timespan*0.000001f)*100.0f;
+    opflow_vel_y = height*dec_y/((float)lc302_data.integration_timespan*0.000001f)*100.0f;
 
     /* IMU 冲击窗口内冻结加速度预测，只保留光流校正 */
     if (g_imu_shock_flag != 0U)

@@ -29,6 +29,10 @@ OpticalFlowData lc302_data    = {0};
 #define LC302_HEADER2   0x0A
 #define LC302_TAIL      0x55
 #define LC302_PAYLOAD   10u      // payload 字节数
+/* LC302 模块有效帧标志值 */
+#define LC302_VALID_VALUE             245u
+/* LC302 连续 50Hz 无新帧超时次数，5 次约 100ms */
+#define LC302_TIMEOUT_50HZ_COUNT      5u
 
 // -------------------- 状态机定义 --------------------
 typedef enum
@@ -49,6 +53,8 @@ static uint8        s_rx_crc = 0;           // 从帧中读到的校验字节
 
 static OpticalFlowData s_isr_data  = {0};   // ISR 影子缓冲
 static volatile uint8  s_isr_ready = 0;     // ISR 新帧标志
+/* 连续无新帧计数，单位为 LC302_Update_50HZ 调用次数 */
+static uint8           s_no_frame_count = 0;
 
 // -------------------- 状态机核心（单字节处理）--------------------
 static void lc302_feed_byte(uint8 byte)
@@ -97,13 +103,17 @@ static void lc302_feed_byte(uint8 byte)
                 s_isr_data.ground_distance      = (uint16)s_buf[6] | ((uint16)s_buf[7] << 8);
                 s_isr_data.valid                = s_buf[8];
                 s_isr_data.version              = s_buf[9];
-                s_isr_ready                     = 1;
-                if (s_isr_data.valid == 0)
+                if (s_isr_data.valid != LC302_VALID_VALUE)
                 {
-                    // 数据无效时，清零关键字段以避免误用
-                    s_isr_data.flow_x_integral = 0;
-                    s_isr_data.flow_y_integral = 0;
+                    // 数据无效时清零发布，避免上层误用上一帧
+                    s_isr_data.flow_x_integral      = 0;
+                    s_isr_data.flow_y_integral      = 0;
+                    s_isr_data.integration_timespan = 0;
+                    s_isr_data.ground_distance      = 0;
+                    s_isr_data.valid                = 0;
+                    s_isr_data.version              = 0;
                 }
+                s_isr_ready = 1;
             }
             // 无论成功与否，回到等待帧头状态
             s_state = WAIT_FE;
@@ -123,6 +133,16 @@ static void lc302_feed_byte(uint8 byte)
  */
 void LC302_Init(void)
 {
+    lc302_data.flow_x_integral      = 0;
+    lc302_data.flow_y_integral      = 0;
+    lc302_data.integration_timespan = 0;
+    lc302_data.ground_distance      = 0;
+    lc302_data.valid                = 0;
+    lc302_data.version              = 0;
+    s_isr_data                      = lc302_data;
+    s_isr_ready                     = 0;
+    s_no_frame_count                = 0;
+
     system_delay_ms(100);
     uart_init(LC302_UART, LC302_BAUD, LC302_TX_PIN, LC302_RX_PIN);
     uart_rx_interrupt(LC302_UART, 1);   // 1=使能 RX_TRIGGER 中断，0=禁用；uart_init 默认传0禁用，此处必须显式传1
@@ -136,12 +156,38 @@ void LC302_Init(void)
  */
 void LC302_Update_50HZ(void)
 {
+    uint8 has_new_frame = 0;
+    uint32 primask = interrupt_global_disable();
+
     if (s_isr_ready)
     {
-        uint32 primask = interrupt_global_disable();
         lc302_data  = s_isr_data;
         s_isr_ready = 0;
-        interrupt_global_enable(primask);
+        has_new_frame = 1;
+    }
+
+    interrupt_global_enable(primask);
+
+    if (has_new_frame)
+    {
+        s_no_frame_count = 0;
+    }
+    else
+    {
+        if (s_no_frame_count < LC302_TIMEOUT_50HZ_COUNT)
+        {
+            s_no_frame_count++;
+        }
+
+        if (s_no_frame_count >= LC302_TIMEOUT_50HZ_COUNT)
+        {
+            lc302_data.flow_x_integral      = 0;
+            lc302_data.flow_y_integral      = 0;
+            lc302_data.integration_timespan = 0;
+            lc302_data.ground_distance      = 0;
+            lc302_data.valid                = 0;
+            lc302_data.version              = 0;
+        }
     }
 }
 

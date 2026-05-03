@@ -592,16 +592,16 @@ void FC_Loop_500Hz(void)
 
     }
             wifi_justfloat(tick_1000us_cnt,
-                       roll_angle_target,
-                       g_euler.roll,
-                       roll_gyro_target,
-                       g_imufilter_1000hz.gyrox,
-                       ICM42688.gyro_x,
-                       roll_gyro_pid.p_term,
-                       roll_gyro_pid.i_term,
-                       roll_gyro_pid.d_term,
-                       roll_gyro_pid.output,
-                       g_motor_cmd.roll,
+                       pitch_angle_target,
+                       g_euler.pitch,
+                       pitch_gyro_target,
+                       g_imufilter_1000hz.gyroy,
+                       ICM42688.gyro_y,
+                       pitch_gyro_pid.p_term,
+                       pitch_gyro_pid.i_term,
+                       pitch_gyro_pid.d_term,
+                       pitch_gyro_pid.output,
+                       g_motor_cmd.pitch,
                        g_motor_cmd.throttle);
 }
 

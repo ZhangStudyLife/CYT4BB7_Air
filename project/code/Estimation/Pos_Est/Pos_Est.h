@@ -19,6 +19,8 @@ void Pos_Est_Update_50HZ(void);
 
 extern float opflow_vel_x;
 extern float opflow_vel_y;
+extern float opflow_vel_x_lpf;
+extern float opflow_vel_y_lpf;
 extern float Pos_Est_vel_x;
 extern float Pos_Est_vel_y;
 extern float acc_x_lp;

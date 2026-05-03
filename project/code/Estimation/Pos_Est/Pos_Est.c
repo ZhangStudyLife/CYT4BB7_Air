@@ -182,6 +182,8 @@ extern volatile uint32 tick_1000us_cnt;
 
 /* 50Hz 末端速度一阶低通截止频率约 15.1Hz，对应 alpha = 0.85 */
 #define POS_EST_VEL_OUT_LPF_ALPHA (0.85f)
+/* 50Hz 光流速度一阶低通截止频率约 4Hz，对应 alpha ≈ 0.395 */
+#define POS_EST_OPFLOW_VEL_LPF_ALPHA (0.395f)
 
 /* 1000Hz 水平加速度一阶低通 alpha
  * 上游 g_imufilter_1000hz 已经过 12Hz Butterworth LPF（群延迟约 19ms），
@@ -230,6 +232,10 @@ static LPF1_t s_acc_lp_y;
 static LPF1_t s_vel_out_lp_x;
 /* Y 轴末端速度一阶低通状态 */
 static LPF1_t s_vel_out_lp_y;
+/* X 轴光流速度一阶低通状态 */
+static LPF1_t s_opflow_vel_lp_x;
+/* Y 轴光流速度一阶低通状态 */
+static LPF1_t s_opflow_vel_lp_y;
 
 /* X 轴加速度一阶低通输出，单位 cm/s^2，飞机往前加速为正，往后加速为负 */
 float acc_x_lp = 0.0f;
@@ -252,7 +258,13 @@ void Pos_Est_Init(void)
     LPF1_Init(&s_acc_lp_y, POS_EST_ACC_LPF_ALPHA);
     LPF1_Init(&s_vel_out_lp_x, POS_EST_VEL_OUT_LPF_ALPHA);
     LPF1_Init(&s_vel_out_lp_y, POS_EST_VEL_OUT_LPF_ALPHA);
+    LPF1_Init(&s_opflow_vel_lp_x, POS_EST_OPFLOW_VEL_LPF_ALPHA);
+    LPF1_Init(&s_opflow_vel_lp_y, POS_EST_OPFLOW_VEL_LPF_ALPHA);
 
+    opflow_vel_x = 0.0f;
+    opflow_vel_y = 0.0f;
+    opflow_vel_x_lpf = 0.0f;
+    opflow_vel_y_lpf = 0.0f;
     Pos_Est_pos_x = 0.0f;
     Pos_Est_pos_y = 0.0f;
     Pos_Est_pos_x_last = 0.0f;
@@ -275,9 +287,15 @@ void Pos_Est_Reinit(void)
     LPF1_Reset(&s_acc_lp_y);
     LPF1_Reset(&s_vel_out_lp_x);
     LPF1_Reset(&s_vel_out_lp_y);
+    LPF1_Reset(&s_opflow_vel_lp_x);
+    LPF1_Reset(&s_opflow_vel_lp_y);
 
     acc_x_lp = 0.0f;
     acc_y_lp = 0.0f;
+    opflow_vel_x = 0.0f;
+    opflow_vel_y = 0.0f;
+    opflow_vel_x_lpf = 0.0f;
+    opflow_vel_y_lpf = 0.0f;
     Pos_Est_vel_x_kf = 0.0f;
     Pos_Est_vel_y_kf = 0.0f;
     Pos_Est_pos_x = 0.0f;
@@ -355,6 +373,14 @@ void Pos_Est_Update_1000HZ(void)
     //                lc302_data.flow_x_integral, lc302_data.flow_y_integral,
     //                g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz, g_euler.pitch, g_euler.roll, g_euler.yaw,
     //                dec_x, dec_y, lc302_data.integration_timespan, lc302_data.valid);
+
+    wifi_justfloat(tick_1000us_cnt,
+    acc_x_temp, acc_y_temp,
+    g_tof_fused_height_mm * 0.001f,
+    dec_x, dec_y,
+    opflow_vel_x, opflow_vel_y,
+    g_euler.pitch, g_euler.roll, g_euler.yaw
+    );
 }
 
 /*
@@ -391,6 +417,9 @@ void Pos_Est_Update_50HZ(void)
         opflow_vel_x = 0.0f;
         opflow_vel_y = 0.0f;
     }
+
+    opflow_vel_x_lpf = LPF1_Update(&s_opflow_vel_lp_x, opflow_vel_x);
+    opflow_vel_y_lpf = LPF1_Update(&s_opflow_vel_lp_y, opflow_vel_y);
 
 
     /* IMU 冲击窗口内冻结加速度预测，只保留光流校正 */

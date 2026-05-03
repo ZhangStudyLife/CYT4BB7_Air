@@ -119,10 +119,10 @@ void FC_Mode2_50Hz(float dt)
     // velx_out = PID_Update(&s_mode2_velx_pid, velx_target, -Pos_Est_vel_x, dt);
     // vely_out = PID_Update(&s_mode2_vely_pid, vely_target, -Pos_Est_vel_y, dt);
 
-    
 
-    velx_out = PID_Update(&s_mode2_velx_pid, velx_target, -opflow_vel_x, dt);
-    vely_out = PID_Update(&s_mode2_vely_pid, vely_target, -opflow_vel_y, dt);    
+
+    velx_out = PID_Update(&s_mode2_velx_pid, velx_target, -opflow_vel_x_lpf, dt);
+    vely_out = PID_Update(&s_mode2_vely_pid, vely_target, -opflow_vel_y_lpf, dt);    
 
     roll_angle_target = FC_Mode_Clamp(velx_out+ FC_Mode_Get_Roll_Mech_Trim_Deg(), -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
     pitch_angle_target = FC_Mode_Clamp(vely_out+ FC_Mode_Get_Pitch_Mech_Trim_Deg(), -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);

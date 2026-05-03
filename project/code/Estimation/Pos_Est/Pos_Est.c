@@ -173,6 +173,7 @@
 #include "Pos_Est.h"
 #include "FlowGyroDecoupler_LC302.h"
 #include "../Attitude/IMU_Filtter.h"
+#include "../Height_Est/Height_Est.h"
 // #include "HW_Drivers/PMW3901/PMW3901.h"
 #include "HW_Drivers/LC302/LC302.h"
 #include "filter.h"
@@ -185,13 +186,16 @@ extern volatile uint32 tick_1000us_cnt;
 /* 50Hz 光流速度一阶低通截止频率约 4Hz，对应 alpha ≈ 0.395 */
 #define POS_EST_OPFLOW_VEL_LPF_ALPHA (0.395f)
 
-/* 1000Hz 水平加速度一阶低通 alpha
- * 上游 g_imufilter_1000hz 已经过 12Hz Butterworth LPF（群延迟约 19ms），
- * 此处额外 LPF 仅用于轻微平滑，alpha 取大值以避免引入过多相位延迟。
- * alpha=0.30 → fc≈56.8Hz，群延迟≈3ms，总 acc 延迟≈22ms
- * 当前值基于 03302334 模式2日志做保守收紧，优先缩短 acc 相位延迟，
- * 但不在缺少原始 1000Hz 水平加速度日志的前提下做激进放开。 */
-#define POS_EST_ACC_LPF_ALPHA (0.30f)
+/* 1000Hz 水平加速度相位补偿低通 alpha，05032148 日志回放折中 fc≈1.00Hz */
+#define POS_EST_ACC_LPF_ALPHA (0.00626349f)
+/* 1000Hz 加速度速度预测积分步长，单位 s */
+#define POS_EST_ACC_DT_S (0.001f)
+/* 前后轴水平加速度限幅，单位 cm/s^2 */
+#define POS_EST_ACC_FWD_LIMIT_CMSS (240.0f)
+/* 左右轴水平加速度限幅，单位 cm/s^2 */
+#define POS_EST_ACC_RIGHT_LIMIT_CMSS (340.0f)
+/* 光流校正无效时每 20ms 速度自衰减系数 */
+#define POS_EST_FLOW_LOST_DECAY (0.98f)
 
 /* 光流解算得到的 X 轴速度，单位 cm/s，往左飞为正，往右飞为负 */
 float opflow_vel_x = 0.0f;
@@ -236,6 +240,10 @@ static LPF1_t s_vel_out_lp_y;
 static LPF1_t s_opflow_vel_lp_x;
 /* Y 轴光流速度一阶低通状态 */
 static LPF1_t s_opflow_vel_lp_y;
+/* X 轴速度预测状态，单位 cm/s */
+static float s_vel_pred_x = 0.0f;
+/* Y 轴速度预测状态，单位 cm/s */
+static float s_vel_pred_y = 0.0f;
 
 /* X 轴加速度一阶低通输出，单位 cm/s^2，飞机往前加速为正，往后加速为负 */
 float acc_x_lp = 0.0f;
@@ -265,12 +273,18 @@ void Pos_Est_Init(void)
     opflow_vel_y = 0.0f;
     opflow_vel_x_lpf = 0.0f;
     opflow_vel_y_lpf = 0.0f;
+    Pos_Est_vel_x = 0.0f;
+    Pos_Est_vel_y = 0.0f;
+    Pos_Est_vel_x_last = 0.0f;
+    Pos_Est_vel_y_last = 0.0f;
     Pos_Est_pos_x = 0.0f;
     Pos_Est_pos_y = 0.0f;
     Pos_Est_pos_x_last = 0.0f;
     Pos_Est_pos_y_last = 0.0f;
     Pos_Est_vel_x_kf = 0.0f;
     Pos_Est_vel_y_kf = 0.0f;
+    s_vel_pred_x = 0.0f;
+    s_vel_pred_y = 0.0f;
 }
 
 /*
@@ -296,12 +310,18 @@ void Pos_Est_Reinit(void)
     opflow_vel_y = 0.0f;
     opflow_vel_x_lpf = 0.0f;
     opflow_vel_y_lpf = 0.0f;
+    Pos_Est_vel_x = 0.0f;
+    Pos_Est_vel_y = 0.0f;
+    Pos_Est_vel_x_last = 0.0f;
+    Pos_Est_vel_y_last = 0.0f;
     Pos_Est_vel_x_kf = 0.0f;
     Pos_Est_vel_y_kf = 0.0f;
     Pos_Est_pos_x = 0.0f;
     Pos_Est_pos_y = 0.0f;
     Pos_Est_pos_x_last = 0.0f;
     Pos_Est_pos_y_last = 0.0f;
+    s_vel_pred_x = 0.0f;
+    s_vel_pred_y = 0.0f;
 }
 
 /*
@@ -356,17 +376,41 @@ void Pos_Est_Update_1000HZ(void)
         acc_y_temp = 0.0f;
     }
 
+    if (acc_x_temp > POS_EST_ACC_FWD_LIMIT_CMSS)
+    {
+        acc_x_temp = POS_EST_ACC_FWD_LIMIT_CMSS;
+    }
+    else if (acc_x_temp < -POS_EST_ACC_FWD_LIMIT_CMSS)
+    {
+        acc_x_temp = -POS_EST_ACC_FWD_LIMIT_CMSS;
+    }
+
+    if (acc_y_temp > POS_EST_ACC_RIGHT_LIMIT_CMSS)
+    {
+        acc_y_temp = POS_EST_ACC_RIGHT_LIMIT_CMSS;
+    }
+    else if (acc_y_temp < -POS_EST_ACC_RIGHT_LIMIT_CMSS)
+    {
+        acc_y_temp = -POS_EST_ACC_RIGHT_LIMIT_CMSS;
+    }
+
     acc_x_lp = LPF1_Update(&s_acc_lp_x, acc_x_temp);
     acc_y_lp = LPF1_Update(&s_acc_lp_y, acc_y_temp);
+
+    if (g_imu_shock_flag == 0U)
+    {
+        s_vel_pred_x -= acc_y_lp * POS_EST_ACC_DT_S;
+        s_vel_pred_y += acc_x_lp * POS_EST_ACC_DT_S;
+    }
 
     // float dec_x_pmw3901 = FlowGyroDecoupler_GetDecX();
     // float dec_y_pmw3901 = FlowGyroDecoupler_GetDecY();
     // float dec_x_lc302 = FlowGyroDecoupler_LC302_GetDecX();
     // float dec_y_lc302 = FlowGyroDecoupler_LC302_GetDecY();
     // FC_START_CRSF_state_e FC_START_CRSF_state = FC_START_CRSF_Get_State();
-    float dec_x, dec_y;
-    dec_x = FlowGyroDecoupler_LC302_GetDecX();
-    dec_y = FlowGyroDecoupler_LC302_GetDecY();
+    // float dec_x, dec_y;
+    // dec_x = FlowGyroDecoupler_LC302_GetDecX();
+    // dec_y = FlowGyroDecoupler_LC302_GetDecY();
     // wifi_justfloat(tick_1000us_cnt,
     //                acc_x_temp, acc_y_temp,
     //                g_tof_fused_height_mm * 0.001f,
@@ -375,12 +419,12 @@ void Pos_Est_Update_1000HZ(void)
     //                dec_x, dec_y, lc302_data.integration_timespan, lc302_data.valid);
 
     wifi_justfloat(tick_1000us_cnt,
-    acc_x_temp, acc_y_temp,
-    g_tof_fused_height_mm * 0.001f,
-    dec_x, dec_y,
-    opflow_vel_x, opflow_vel_y,
-    g_euler.pitch, g_euler.roll, g_euler.yaw
-    );
+                   acc_x_temp, acc_y_temp,
+                   g_tof_fused_height_mm * 0.001f,
+                   opflow_vel_x, opflow_vel_y,
+                   opflow_vel_x_lpf, opflow_vel_y_lpf,
+                   s_vel_pred_x, s_vel_pred_y,
+                   g_euler.pitch, g_euler.roll, g_euler.yaw);
 }
 
 /*
@@ -394,6 +438,7 @@ void Pos_Est_Update_50HZ(void)
     float dec_x;
     float dec_y;
     float height;
+    uint8_t opflow_valid;
     float vel_x_pred;
     float vel_y_pred;
     const float dt = 0.02f;
@@ -405,9 +450,10 @@ void Pos_Est_Update_50HZ(void)
     dec_x = FlowGyroDecoupler_LC302_GetDecX();
     dec_y = FlowGyroDecoupler_LC302_GetDecY();
     height = g_tof_fused_height_mm / 1000.0f;
+    opflow_valid = (lc302_data.valid != 0U) && (g_tof_fused_valid != 0U) && (height >= 0.2f);
 
     /* 计算光流速度，此刻加入高度补偿，单位 cm/s */
-    if (lc302_data.valid != 0U && height >= 0.2f)
+    if (opflow_valid != 0U)
     {
         opflow_vel_x = height * dec_x * 0.48076923f;
         opflow_vel_y = height * dec_y * 0.48076923f;
@@ -421,19 +467,18 @@ void Pos_Est_Update_50HZ(void)
     opflow_vel_x_lpf = LPF1_Update(&s_opflow_vel_lp_x, opflow_vel_x);
     opflow_vel_y_lpf = LPF1_Update(&s_opflow_vel_lp_y, opflow_vel_y);
 
-
     /* IMU 冲击窗口内冻结加速度预测，只保留光流校正 */
     if (g_imu_shock_flag != 0U)
     {
-        vel_x_pred = Pos_Est_vel_x_kf;
-        vel_y_pred = Pos_Est_vel_y_kf;
+        vel_x_pred = Pos_Est_vel_x;
+        vel_y_pred = Pos_Est_vel_y;
     }
     else
     {
         /* X: 光流左正右负，acc_y 右正左负，所以预测项取负 */
-        vel_x_pred = Pos_Est_vel_x_kf - acc_y_lp * dt;
+        vel_x_pred = s_vel_pred_x;
         /* Y: 光流前正后负，acc_x 前正后负，所以预测项同号 */
-        vel_y_pred = Pos_Est_vel_y_kf + acc_x_lp * dt;
+        vel_y_pred = s_vel_pred_y;
     }
 
     Pos_Est_vel_x_last = Pos_Est_vel_x;
@@ -441,22 +486,24 @@ void Pos_Est_Update_50HZ(void)
 
     /* LC302 有效性门控：模块数据无效或高度过低时不参与融合 */
     {
-        uint8_t opflow_valid = (lc302_data.valid != 0U) && (height >= 0.2f);
         float k_use = opflow_valid ? g_fc_params.pos_est_k_flow : 0.0f;
 
         /* 用光流测量对惯性预测做互补校正 */
-        Pos_Est_vel_x = vel_x_pred + k_use * (opflow_vel_x - vel_x_pred);
-        Pos_Est_vel_y = vel_y_pred + k_use * (opflow_vel_y - vel_y_pred);
+        Pos_Est_vel_x = vel_x_pred + k_use * (opflow_vel_x_lpf - vel_x_pred);
+        Pos_Est_vel_y = vel_y_pred + k_use * (opflow_vel_y_lpf - vel_y_pred);
 
         /* 光流失效时对融合速度施加摩擦衰减，防止加速度偏置积分漂移 */
         if (!opflow_valid)
         {
-            Pos_Est_vel_x *= 0.96f;
-            Pos_Est_vel_y *= 0.96f;
+            Pos_Est_vel_x *= POS_EST_FLOW_LOST_DECAY;
+            Pos_Est_vel_y *= POS_EST_FLOW_LOST_DECAY;
         }
     }
 
-    /* 速度末端改为一阶低通，50Hz 下截止频率 10Hz */
+    s_vel_pred_x = Pos_Est_vel_x;
+    s_vel_pred_y = Pos_Est_vel_y;
+
+    /* 速度末端一阶低通，50Hz 下截止频率约 15Hz */
     Pos_Est_vel_x_kf = LPF1_Update(&s_vel_out_lp_x, Pos_Est_vel_x);
     Pos_Est_vel_y_kf = LPF1_Update(&s_vel_out_lp_y, Pos_Est_vel_y);
 

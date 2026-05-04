@@ -187,8 +187,8 @@ extern volatile uint32 tick_1000us_cnt;
 /* 50Hz 光流速度一阶低通截止频率约 15Hz，对应 alpha ≈ 0.8482 */
 #define POS_EST_OPFLOW_VEL_LPF_ALPHA (0.84816420f)
 
-/* 1000Hz 水平加速度相位补偿低通 alpha，05032148 日志回放折中 fc≈1.00Hz */
-#define POS_EST_ACC_LPF_ALPHA (0.00626349f)
+/* 1000Hz 水平加速度相位补偿低通 alpha，截止频率 fc≈5.00Hz */
+#define POS_EST_ACC_LPF_ALPHA (0.03092757f)
 /* 1000Hz 加速度速度预测积分步长，单位 s */
 #define POS_EST_ACC_DT_S (0.001f)
 /* 前后轴水平加速度限幅，单位 cm/s^2 */
@@ -221,19 +221,11 @@ float Pos_Est_pos_y = 0.0f;
 /* 位置估计的上一拍 Y 轴位置，单位 cm */
 float Pos_Est_pos_y_last = 0.0f;
 
-/* X 轴速度 Kalman 输出，单位 cm/s */
-float Pos_Est_vel_x_kf = 0.0f;
-/* Y 轴速度 Kalman 输出，单位 cm/s */
-float Pos_Est_vel_y_kf = 0.0f;
 
 /* X 轴加速度一阶低通状态 */
 static LPF1_t s_acc_lp_x;
 /* Y 轴加速度一阶低通状态 */
 static LPF1_t s_acc_lp_y;
-/* X 轴末端速度一阶低通状态 */
-static LPF1_t s_vel_out_lp_x;
-/* Y 轴末端速度一阶低通状态 */
-static LPF1_t s_vel_out_lp_y;
 /* X 轴光流速度一阶低通状态 */
 static LPF1_t s_opflow_vel_lp_x;
 /* Y 轴光流速度一阶低通状态 */
@@ -263,8 +255,6 @@ void Pos_Est_Init(void)
     FlowGyroDecoupler_LC302_Init();
     LPF1_Init(&s_acc_lp_x, POS_EST_ACC_LPF_ALPHA);
     LPF1_Init(&s_acc_lp_y, POS_EST_ACC_LPF_ALPHA);
-    LPF1_Init(&s_vel_out_lp_x, POS_EST_VEL_OUT_LPF_ALPHA);
-    LPF1_Init(&s_vel_out_lp_y, POS_EST_VEL_OUT_LPF_ALPHA);
     LPF1_Init(&s_opflow_vel_lp_x, POS_EST_OPFLOW_VEL_LPF_ALPHA);
     LPF1_Init(&s_opflow_vel_lp_y, POS_EST_OPFLOW_VEL_LPF_ALPHA);
 
@@ -280,8 +270,6 @@ void Pos_Est_Init(void)
     Pos_Est_pos_y = 0.0f;
     Pos_Est_pos_x_last = 0.0f;
     Pos_Est_pos_y_last = 0.0f;
-    Pos_Est_vel_x_kf = 0.0f;
-    Pos_Est_vel_y_kf = 0.0f;
     s_vel_pred_x = 0.0f;
     s_vel_pred_y = 0.0f;
 }
@@ -298,8 +286,6 @@ void Pos_Est_Reinit(void)
     FlowGyroDecoupler_LC302_Reinit();
     LPF1_Reset(&s_acc_lp_x);
     LPF1_Reset(&s_acc_lp_y);
-    LPF1_Reset(&s_vel_out_lp_x);
-    LPF1_Reset(&s_vel_out_lp_y);
     LPF1_Reset(&s_opflow_vel_lp_x);
     LPF1_Reset(&s_opflow_vel_lp_y);
 
@@ -313,8 +299,6 @@ void Pos_Est_Reinit(void)
     Pos_Est_vel_y = 0.0f;
     Pos_Est_vel_x_last = 0.0f;
     Pos_Est_vel_y_last = 0.0f;
-    Pos_Est_vel_x_kf = 0.0f;
-    Pos_Est_vel_y_kf = 0.0f;
     Pos_Est_pos_x = 0.0f;
     Pos_Est_pos_y = 0.0f;
     Pos_Est_pos_x_last = 0.0f;
@@ -499,9 +483,6 @@ void Pos_Est_Update_50HZ(void)
     s_vel_pred_x = Pos_Est_vel_x;
     s_vel_pred_y = Pos_Est_vel_y;
 
-    /* 速度末端一阶低通，50Hz 下截止频率约 15Hz */
-    Pos_Est_vel_x_kf = LPF1_Update(&s_vel_out_lp_x, Pos_Est_vel_x);
-    Pos_Est_vel_y_kf = LPF1_Update(&s_vel_out_lp_y, Pos_Est_vel_y);
 
     Pos_Est_pos_x_last = Pos_Est_pos_x;
     Pos_Est_pos_y_last = Pos_Est_pos_y;

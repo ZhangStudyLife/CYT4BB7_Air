@@ -25,103 +25,62 @@ OpticalFlowData_Aux lc302_data_Aux    = {0};
 
 
 // -------------------- 内部常量 --------------------
-#define LC302_HEADER1_Aux   0xFE
-#define LC302_HEADER2_Aux   0x0A
-#define LC302_TAIL_Aux      0x55
-#define LC302_PAYLOAD_Aux   10u      // payload 字节数
-/* LC302 Aux 模块有效帧标志值 */
-#define LC302_VALID_VALUE_Aux             245u
-/* LC302 Aux 连续 50Hz 无新帧超时次数，5 次约 100ms */
-#define LC302_TIMEOUT_50HZ_COUNT_Aux      5u
-
-// -------------------- 状态机定义 --------------------
-typedef enum
-{
-    WAIT_FE_Aux   = 0,  // 等待帧头 0xFE
-    WAIT_0A_Aux   = 1,  // 等待帧头 0x0A
-    RECV_DATA_Aux = 2,  // 接收 10 字节 payload
-    RECV_CRC_Aux  = 3,  // 接收 XOR 校验字节
-    RECV_TAIL_Aux = 4   // 接收帧尾 0x55
-} Lc302State_Aux;
+#define LC302_HEADER1_Aux      0xFEu    // 帧头 1
+#define LC302_HEADER2_Aux      0x0Au    // 帧头 2
+#define LC302_TAIL_Aux         0x55u    // 帧尾
+#define LC302_FRAME_LEN_Aux    14u      // 完整帧字节数
+#define LC302_CRC_INDEX_Aux    12u      // XOR 校验字节下标
+#define LC302_TAIL_INDEX_Aux   13u      // 帧尾字节下标
 
 // -------------------- 内部状态变量 --------------------
-static Lc302State_Aux   s_state_Aux  = WAIT_FE_Aux;
-static uint8            s_buf_Aux[LC302_PAYLOAD_Aux];   // payload 缓冲区
-static uint8            s_idx_Aux    = 0;                // 已接收 payload 字节数
-static uint8            s_crc_Aux    = 0;                // 滚动 XOR 值
-static uint8            s_rx_crc_Aux = 0;                // 从帧中读到的校验字节
+static uint8            s_receiver_data_Aux[LC302_FRAME_LEN_Aux] = {0};   // 接收完整原始帧
+static uint8            s_receiver_len_Aux = 0;                           // 当前已接收字节数
 
 static OpticalFlowData_Aux s_isr_data_Aux  = {0};        // ISR 影子缓冲
 static volatile uint8      s_isr_ready_Aux = 0;          // ISR 新帧标志
-/* 连续无新帧计数，单位为 LC302_Update_50HZ_Aux 调用次数 */
-static uint8               s_no_frame_count_Aux = 0;
 
-// -------------------- 状态机核心（单字节处理）--------------------
+// -------------------- 串口接收核心（单字节处理）--------------------
 static void lc302_feed_byte_Aux(uint8 byte)
 {
-    switch (s_state_Aux)
+    uint8 parity_bit_sum = 0;
+    uint8 i;
+
+    s_receiver_data_Aux[s_receiver_len_Aux++] = byte;
+
+    if ((s_receiver_len_Aux == 1u) && (s_receiver_data_Aux[0] != LC302_HEADER1_Aux))
     {
-        case WAIT_FE_Aux:
-            if (byte == LC302_HEADER1_Aux)
-                s_state_Aux = WAIT_0A_Aux;
-            break;
+        s_receiver_len_Aux = 0;
+        return;
+    }
 
-        case WAIT_0A_Aux:
-            if (byte == LC302_HEADER2_Aux)
-            {
-                s_idx_Aux   = 0;
-                s_crc_Aux   = 0;
-                s_state_Aux = RECV_DATA_Aux;
-            }
-            else
-            {
-                // 非 0x0A：检查是否是新的 0xFE（鲁棒性）
-                s_state_Aux = (byte == LC302_HEADER1_Aux) ? WAIT_0A_Aux : WAIT_FE_Aux;
-            }
-            break;
+    if ((s_receiver_len_Aux == 2u) && (s_receiver_data_Aux[1] != LC302_HEADER2_Aux))
+    {
+        s_receiver_len_Aux = (byte == LC302_HEADER1_Aux) ? 1u : 0u;
+        s_receiver_data_Aux[0] = byte;
+        return;
+    }
 
-        case RECV_DATA_Aux:
-            s_buf_Aux[s_idx_Aux] = byte;
-            s_crc_Aux           ^= byte;
-            s_idx_Aux++;
-            if (s_idx_Aux >= LC302_PAYLOAD_Aux)
-                s_state_Aux = RECV_CRC_Aux;
-            break;
+    if (s_receiver_len_Aux >= LC302_FRAME_LEN_Aux)
+    {
+        for (i = 2u; i < LC302_CRC_INDEX_Aux; i++)
+        {
+            parity_bit_sum ^= s_receiver_data_Aux[i];
+        }
 
-        case RECV_CRC_Aux:
-            s_rx_crc_Aux = byte;
-            s_state_Aux  = RECV_TAIL_Aux;
-            break;
+        if ((s_receiver_data_Aux[LC302_TAIL_INDEX_Aux] == LC302_TAIL_Aux) &&
+            (parity_bit_sum == s_receiver_data_Aux[LC302_CRC_INDEX_Aux]))
+        {
+            // 校验通过，解析完整 receiver_data[14] 中的 payload
+            s_isr_data_Aux.flow_x_integral      = (int16)((uint16)s_receiver_data_Aux[2] | ((uint16)s_receiver_data_Aux[3] << 8));
+            s_isr_data_Aux.flow_y_integral      = (int16)((uint16)s_receiver_data_Aux[4] | ((uint16)s_receiver_data_Aux[5] << 8));
+            s_isr_data_Aux.integration_timespan = (uint16)s_receiver_data_Aux[6] | ((uint16)s_receiver_data_Aux[7] << 8);
+            s_isr_data_Aux.ground_distance      = (uint16)s_receiver_data_Aux[8] | ((uint16)s_receiver_data_Aux[9] << 8);
+            s_isr_data_Aux.valid                = s_receiver_data_Aux[10];
+            s_isr_data_Aux.version              = s_receiver_data_Aux[11];
+            s_isr_ready_Aux = 1;
+        }
 
-        case RECV_TAIL_Aux:
-            if (byte == LC302_TAIL_Aux && s_rx_crc_Aux == s_crc_Aux)
-            {
-                // 校验通过，解析 payload 到 ISR 影子缓冲（小端序，与 ARM Cortex-M7 一致）
-                s_isr_data_Aux.flow_x_integral      = (int16)((uint16)s_buf_Aux[0] | ((uint16)s_buf_Aux[1] << 8));
-                s_isr_data_Aux.flow_y_integral      = (int16)((uint16)s_buf_Aux[2] | ((uint16)s_buf_Aux[3] << 8));
-                s_isr_data_Aux.integration_timespan = (uint16)s_buf_Aux[4] | ((uint16)s_buf_Aux[5] << 8);
-                s_isr_data_Aux.ground_distance      = (uint16)s_buf_Aux[6] | ((uint16)s_buf_Aux[7] << 8);
-                s_isr_data_Aux.valid                = s_buf_Aux[8];
-                s_isr_data_Aux.version              = s_buf_Aux[9];
-                if (s_isr_data_Aux.valid != LC302_VALID_VALUE_Aux)
-                {
-                    // 数据无效时清零发布，避免上层误用上一帧
-                    s_isr_data_Aux.flow_x_integral      = 0;
-                    s_isr_data_Aux.flow_y_integral      = 0;
-                    s_isr_data_Aux.integration_timespan = 0;
-                    s_isr_data_Aux.ground_distance      = 0;
-                    s_isr_data_Aux.valid                = 0;
-                    s_isr_data_Aux.version              = 0;
-                }
-                s_isr_ready_Aux = 1;
-            }
-            // 无论成功与否，回到等待帧头状态
-            s_state_Aux = WAIT_FE_Aux;
-            break;
-
-        default:
-            s_state_Aux = WAIT_FE_Aux;
-            break;
+        s_receiver_len_Aux = 0;
     }
 }
 
@@ -141,7 +100,7 @@ void LC302_Init_Aux(void)
     lc302_data_Aux.version              = 0;
     s_isr_data_Aux                      = lc302_data_Aux;
     s_isr_ready_Aux                     = 0;
-    s_no_frame_count_Aux                = 0;
+    s_receiver_len_Aux                  = 0;
 
     system_delay_ms(100);
     uart_init(LC302_UART_Aux, LC302_BAUD_Aux, LC302_TX_PIN_Aux, LC302_RX_PIN_Aux);
@@ -156,39 +115,15 @@ void LC302_Init_Aux(void)
  */
 void LC302_Update_50HZ_Aux(void)
 {
-    uint8 has_new_frame = 0;
     uint32 primask = interrupt_global_disable();
 
     if (s_isr_ready_Aux)
     {
         lc302_data_Aux  = s_isr_data_Aux;
         s_isr_ready_Aux = 0;
-        has_new_frame = 1;
     }
 
     interrupt_global_enable(primask);
-
-    if (has_new_frame)
-    {
-        s_no_frame_count_Aux = 0;
-    }
-    else
-    {
-        if (s_no_frame_count_Aux < LC302_TIMEOUT_50HZ_COUNT_Aux)
-        {
-            s_no_frame_count_Aux++;
-        }
-
-        if (s_no_frame_count_Aux >= LC302_TIMEOUT_50HZ_COUNT_Aux)
-        {
-            lc302_data_Aux.flow_x_integral      = 0;
-            lc302_data_Aux.flow_y_integral      = 0;
-            lc302_data_Aux.integration_timespan = 0;
-            lc302_data_Aux.ground_distance      = 0;
-            lc302_data_Aux.valid                = 0;
-            lc302_data_Aux.version              = 0;
-        }
-    }
 }
 
 /**
@@ -198,7 +133,7 @@ void LC302_Update_50HZ_Aux(void)
 void LC302_uart_handler_Aux(void)
 {
     uint8 byte;
-    if (uart_query_byte(LC302_UART_Aux, &byte))
+    while (uart_query_byte(LC302_UART_Aux, &byte))
     {
         lc302_feed_byte_Aux(byte);
     }

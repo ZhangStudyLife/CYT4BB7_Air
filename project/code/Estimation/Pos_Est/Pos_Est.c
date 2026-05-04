@@ -183,8 +183,8 @@ extern volatile uint32 tick_1000us_cnt;
 
 /* 50Hz 末端速度一阶低通截止频率约 15.1Hz，对应 alpha = 0.85 */
 #define POS_EST_VEL_OUT_LPF_ALPHA (0.85f)
-/* 50Hz 光流速度一阶低通截止频率约 4Hz，对应 alpha ≈ 0.395 */
-#define POS_EST_OPFLOW_VEL_LPF_ALPHA (0.395f)
+/* 50Hz 光流速度一阶低通截止频率约 15Hz，对应 alpha ≈ 0.8482 */
+#define POS_EST_OPFLOW_VEL_LPF_ALPHA (0.84816420f)
 
 /* 1000Hz 水平加速度相位补偿低通 alpha，05032148 日志回放折中 fc≈1.00Hz */
 #define POS_EST_ACC_LPF_ALPHA (0.00626349f)
@@ -417,12 +417,16 @@ void Pos_Est_Update_1000HZ(void)
     //                lc302_data.flow_x_integral, lc302_data.flow_y_integral,
     //                g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz, g_euler.pitch, g_euler.roll, g_euler.yaw,
     //                dec_x, dec_y, lc302_data.integration_timespan, lc302_data.valid);
-
+    float dec_x;
+    float dec_y;
+    dec_x = FlowGyroDecoupler_LC302_GetDecX();
+    dec_y = FlowGyroDecoupler_LC302_GetDecY();
     wifi_justfloat(tick_1000us_cnt,
                    acc_x_temp, acc_y_temp,
                    g_tof_fused_height_mm * 0.001f,
+                   lc302_data.flow_x_integral, lc302_data.flow_y_integral,
+                   dec_x, dec_y,
                    opflow_vel_x, opflow_vel_y,
-                   opflow_vel_x_lpf, opflow_vel_y_lpf,
                    s_vel_pred_x, s_vel_pred_y,
                    g_euler.pitch, g_euler.roll, g_euler.yaw);
 }

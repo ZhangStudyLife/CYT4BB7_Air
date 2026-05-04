@@ -182,7 +182,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode1_brake_exit_vel_cmps = 10.0f;
 
     /* ===== 位置估计参数 ===== */
-    params->pos_est_k_flow = 0.04f;
+    params->pos_est_k_flow = 0.06f;
 }
 
 /*

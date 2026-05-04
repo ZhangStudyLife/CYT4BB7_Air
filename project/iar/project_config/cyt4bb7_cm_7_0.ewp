@@ -2683,6 +2683,12 @@
                 <file>
                     <name>$PROJ_DIR$\..\..\code\HW_Drivers\LC302\LC302.h</name>
                 </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\LC302\LC302_Aux.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\LC302\LC302_Aux.h</name>
+                </file>
                 <configuration>
                     <name>Debug</name>
                     <settings>

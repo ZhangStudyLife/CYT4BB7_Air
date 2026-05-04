@@ -182,11 +182,7 @@ void uart2_isr (void)
 {
     if(uart_isr_mask(UART_2))            // 串口2接收中断
     {
-#if (MOTOR_DRIVER_BACKEND == MOTOR_DRIVER_BACKEND_UART)
-        uart_control_callback();         // 串口四合一电调回调函数
-#else
-        gnss_uart_callback();            // GPS模块回调函数      
-#endif
+        LC302_uart_handler_Aux();        // LC302 Aux 光流模块回调函数
     }
     else                                // 串口2发送中断
     {

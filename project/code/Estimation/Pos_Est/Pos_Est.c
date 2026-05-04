@@ -176,6 +176,7 @@
 #include "../Height_Est/Height_Est.h"
 // #include "HW_Drivers/PMW3901/PMW3901.h"
 #include "HW_Drivers/LC302/LC302.h"
+#include "HW_Drivers/LC302/LC302_Aux.h"
 #include "filter.h"
 #include "FlightController/fc_params.h"
 
@@ -191,12 +192,9 @@ extern volatile uint32 tick_1000us_cnt;
 /* 1000Hz 加速度速度预测积分步长，单位 s */
 #define POS_EST_ACC_DT_S (0.001f)
 /* 前后轴水平加速度限幅，单位 cm/s^2 */
-#define POS_EST_ACC_FWD_LIMIT_CMSS (240.0f)
+#define POS_EST_ACC_FWD_LIMIT_CMSS (600.0f)
 /* 左右轴水平加速度限幅，单位 cm/s^2 */
-#define POS_EST_ACC_RIGHT_LIMIT_CMSS (340.0f)
-/* 光流校正无效时每 20ms 速度自衰减系数 */
-#define POS_EST_FLOW_LOST_DECAY (0.98f)
-
+#define POS_EST_ACC_RIGHT_LIMIT_CMSS (600.0f)
 /* 光流解算得到的 X 轴速度，单位 cm/s，往左飞为正，往右飞为负 */
 float opflow_vel_x = 0.0f;
 /* 光流解算得到的 Y 轴速度，单位 cm/s，往前飞为正，往后飞为负 */
@@ -260,6 +258,7 @@ void Pos_Est_Init(void)
 {
     // PMW3901_Init();
     LC302_Init();
+    LC302_Init_Aux();
     // FlowGyroDecoupler_Init();
     FlowGyroDecoupler_LC302_Init();
     LPF1_Init(&s_acc_lp_x, POS_EST_ACC_LPF_ALPHA);
@@ -423,10 +422,13 @@ void Pos_Est_Update_1000HZ(void)
     dec_y = FlowGyroDecoupler_LC302_GetDecY();
     wifi_justfloat(tick_1000us_cnt,
                    acc_x_temp, acc_y_temp,
+                   acc_x_lp, acc_y_lp,
                    g_tof_fused_height_mm * 0.001f,
                    lc302_data.flow_x_integral, lc302_data.flow_y_integral,
-                   dec_x, dec_y,
-                   opflow_vel_x, opflow_vel_y,
+                   lc302_data_Aux.flow_x_integral, lc302_data_Aux.flow_y_integral,
+                //    dec_x, dec_y,
+                //    opflow_vel_x, opflow_vel_y,
+                //    opflow_vel_x_lpf, opflow_vel_y_lpf,
                    s_vel_pred_x, s_vel_pred_y,
                    g_euler.pitch, g_euler.roll, g_euler.yaw);
 }
@@ -442,6 +444,7 @@ void Pos_Est_Update_50HZ(void)
     float dec_x;
     float dec_y;
     float height;
+    uint8_t dec_updated;
     uint8_t opflow_valid;
     float vel_x_pred;
     float vel_y_pred;
@@ -449,28 +452,22 @@ void Pos_Est_Update_50HZ(void)
 
     // PMW3901_Update_50HZ();
     LC302_Update_50HZ();
+    LC302_Update_50HZ_Aux();
     // FlowGyroDecoupler_Update50Hz(tick_1000us_cnt, g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY);
-    FlowGyroDecoupler_LC302_Update50Hz(tick_1000us_cnt, lc302_data.flow_x_integral, lc302_data.flow_y_integral);
+    dec_updated = FlowGyroDecoupler_LC302_Update50Hz(tick_1000us_cnt, lc302_data.flow_x_integral, lc302_data.flow_y_integral, lc302_data.valid);
     dec_x = FlowGyroDecoupler_LC302_GetDecX();
     dec_y = FlowGyroDecoupler_LC302_GetDecY();
     height = g_tof_fused_height_mm / 1000.0f;
-    opflow_valid = (lc302_data.valid != 0U) && (g_tof_fused_valid != 0U) && (height >= 0.2f);
+    opflow_valid = (dec_updated != 0U) && (g_tof_fused_valid != 0U) && (height >= 0.2f);
 
     /* 计算光流速度，此刻加入高度补偿，单位 cm/s */
     if (opflow_valid != 0U)
     {
         opflow_vel_x = height * dec_x * 0.48076923f;
         opflow_vel_y = height * dec_y * 0.48076923f;
+        opflow_vel_x_lpf = LPF1_Update(&s_opflow_vel_lp_x, opflow_vel_x);
+        opflow_vel_y_lpf = LPF1_Update(&s_opflow_vel_lp_y, opflow_vel_y);
     }
-    else
-    {
-        opflow_vel_x = 0.0f;
-        opflow_vel_y = 0.0f;
-    }
-
-    opflow_vel_x_lpf = LPF1_Update(&s_opflow_vel_lp_x, opflow_vel_x);
-    opflow_vel_y_lpf = LPF1_Update(&s_opflow_vel_lp_y, opflow_vel_y);
-
     /* IMU 冲击窗口内冻结加速度预测，只保留光流校正 */
     if (g_imu_shock_flag != 0U)
     {
@@ -488,20 +485,15 @@ void Pos_Est_Update_50HZ(void)
     Pos_Est_vel_x_last = Pos_Est_vel_x;
     Pos_Est_vel_y_last = Pos_Est_vel_y;
 
-    /* LC302 有效性门控：模块数据无效或高度过低时不参与融合 */
+    if (opflow_valid != 0U)
     {
-        float k_use = opflow_valid ? g_fc_params.pos_est_k_flow : 0.0f;
-
-        /* 用光流测量对惯性预测做互补校正 */
-        Pos_Est_vel_x = vel_x_pred + k_use * (opflow_vel_x_lpf - vel_x_pred);
-        Pos_Est_vel_y = vel_y_pred + k_use * (opflow_vel_y_lpf - vel_y_pred);
-
-        /* 光流失效时对融合速度施加摩擦衰减，防止加速度偏置积分漂移 */
-        if (!opflow_valid)
-        {
-            Pos_Est_vel_x *= POS_EST_FLOW_LOST_DECAY;
-            Pos_Est_vel_y *= POS_EST_FLOW_LOST_DECAY;
-        }
+        Pos_Est_vel_x = vel_x_pred + g_fc_params.pos_est_k_flow * (opflow_vel_x_lpf - vel_x_pred);
+        Pos_Est_vel_y = vel_y_pred + g_fc_params.pos_est_k_flow * (opflow_vel_y_lpf - vel_y_pred);
+    }
+    else
+    {
+        Pos_Est_vel_x = vel_x_pred;
+        Pos_Est_vel_y = vel_y_pred;
     }
 
     s_vel_pred_x = Pos_Est_vel_x;

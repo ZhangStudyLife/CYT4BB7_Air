@@ -30,10 +30,10 @@ void FlowGyroDecoupler_LC302_Push1000Hz(uint32 t_ms, float gyro_x, float gyro_y)
 
 /*
  * 函数功能：在 50Hz 下根据当前窗口的积分补偿量更新 LC302 解耦结果
- * 输入参数：t_read_ms-当前光流读取时刻；delta_x-X 轴原始光流增量；delta_y-Y 轴原始光流增量
- * 返回值：1 表示本次已完成更新
+ * 输入参数：t_read_ms-当前光流读取时刻；delta_x-X 轴原始光流增量；delta_y-Y 轴原始光流增量；valid-LC302 数据有效标志
+ * 返回值：1 表示本次已完成更新，0 表示数据无效未更新解耦结果
  */
-uint8 FlowGyroDecoupler_LC302_Update50Hz(uint32 t_read_ms, int16_t delta_x, int16_t delta_y);
+uint8 FlowGyroDecoupler_LC302_Update50Hz(uint32 t_read_ms, int16_t delta_x, int16_t delta_y, uint8 valid);
 
 /*
  * 函数功能：获取 LC302 X 轴解耦后的光流增量

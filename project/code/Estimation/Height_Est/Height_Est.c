@@ -19,6 +19,8 @@ extern volatile uint32 tick_1000us_cnt;                        /* 1ms 系统节�
 #define HEIGHT_EST_TOF3_INDEX           2U                  /* 3 号 TOF 数据索引 */
 #define HEIGHT_EST_TOF4_INDEX           3U                  /* 4 号 TOF 数据索引 */
 #define HEIGHT_EST_IMU_DT_S             0.001f              /* IMU 预测周期，单位 s */
+#define HEIGHT_EST_TOF_DT_S             0.01f               /* TOF 速度差分周期，单位 s */
+#define HEIGHT_EST_VZ_LPF_ALPHA         0.08613f            /* 100Hz 下 1.5Hz 一阶低通系数 */
 #define HEIGHT_EST_MEDIAN_WIN           3U                  /* 单路 TOF 中值滤波窗口长度 */
 #define HEIGHT_EST_STEP_LIMIT_MM        30.0f               /* 单路 TOF 每次更新最大跳变，单位 mm */
 #define HEIGHT_EST_RESIDUAL_GATE_MM     120.0f              /* 预测高度残差门限，单位 mm */
@@ -52,6 +54,9 @@ static Median_t s_tof_median[VL53L1X_SENSOR_COUNT];          /* 四路 TOF 中�
 static StepLim_t s_tof_step[VL53L1X_SENSOR_COUNT];           /* 四路 TOF 步进限幅状态 */
 static float s_height_est_mm = (float)VL53L1X_VALID_RANGE_MAX; /* KF 高度状态，单位 mm */
 static float s_height_est_vz_mps = 0.0f;                     /* KF 垂直速度状态，单位 m/s，上升为正 */
+static LPF1_t s_height_out_vz_lpf;                          /* 高度差分输出速度低通滤波器，单位 m/s */
+static float s_height_out_last_mm = (float)VL53L1X_VALID_RANGE_MAX; /* 上一帧输出高度，单位 mm */
+static uint8 s_height_out_vz_ready = 0U;                     /* 高度差分输出速度是否已有上一帧高度 */
 static float s_height_acc_bias_up_mps2 = 0.0f;               /* KF 垂直向上加速度偏置，单位 m/s^2 */
 static float s_height_acc_lpf_up_mps2 = 0.0f;                /* 垂直向上加速度低通状态，单位 m/s^2 */
 static uint8 s_height_acc_lpf_ready = 0U;                    /* 垂直加速度低通是否已初始化 */
@@ -160,6 +165,40 @@ static void HeightEst_InitKfState(float height_mm)
     s_height_acc_lpf_up_mps2 = 0.0f;
     s_height_acc_lpf_ready = 0U;
     HeightEst_ResetKfCovariance();
+}
+
+/*
+ * 函数功能：根据 100Hz 输出高度差分计算公开速度，并进行 1.5Hz 一阶低通。
+ * 输入参数：
+ *   height_mm：本帧输出高度，单位 mm。
+ *   valid：本帧高度有效标志，1=有效，0=无效。
+ * 返回值：
+ *   低通后的高度速度，单位 m/s，上升为正。
+ */
+static float HeightEst_UpdateOutputVz(float height_mm, uint8 valid)
+{
+    float vz_raw_mps;
+
+    if (0U == valid)
+    {
+        LPF1_Reset(&s_height_out_vz_lpf);
+        s_height_out_last_mm = height_mm;
+        s_height_out_vz_ready = 0U;
+        return 0.0f;
+    }
+
+    if (0U == s_height_out_vz_ready)
+    {
+        s_height_out_last_mm = height_mm;
+        s_height_out_vz_ready = 1U;
+        LPF1_Reset(&s_height_out_vz_lpf);
+        return 0.0f;
+    }
+
+    vz_raw_mps = (height_mm - s_height_out_last_mm) * 0.001f / HEIGHT_EST_TOF_DT_S;
+    s_height_out_last_mm = height_mm;
+
+    return LPF1_Update(&s_height_out_vz_lpf, vz_raw_mps);
 }
 
 /*
@@ -384,6 +423,9 @@ static void HeightEst_ResetAll(void)
 
     s_height_est_mm = (float)VL53L1X_VALID_RANGE_MAX;
     s_height_est_vz_mps = 0.0f;
+    LPF1_Init(&s_height_out_vz_lpf, HEIGHT_EST_VZ_LPF_ALPHA);
+    s_height_out_last_mm = (float)VL53L1X_VALID_RANGE_MAX;
+    s_height_out_vz_ready = 0U;
     s_height_acc_bias_up_mps2 = 0.0f;
     s_height_acc_lpf_up_mps2 = 0.0f;
     s_height_acc_lpf_ready = 0U;
@@ -534,6 +576,7 @@ void TOF_update_100HZ(void)
     float log_tof3_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
     float log_tof4_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
     float acc_z_mps2 = 0.0f;
+    float output_vz_mps = 0.0f;
     float deviation_mm = 0.0f;
     float robust_weight = 1.0f;
 
@@ -796,8 +839,9 @@ void TOF_update_100HZ(void)
 
     acc_z_mps2 = AccelCalibration_GetAccelDownForOutputMps2();
     g_tof_fused_height_mm = s_height_est_mm;
-    g_tof_fused_vz_mps = s_height_est_vz_mps;
-    g_height_fused_vz_mps = s_height_est_vz_mps;
+    output_vz_mps = HeightEst_UpdateOutputVz(g_tof_fused_height_mm, g_tof_fused_valid);
+    g_tof_fused_vz_mps = output_vz_mps;
+    g_height_fused_vz_mps = output_vz_mps;
     log_tof1_height_mm = HeightEst_ClampHeightMm(g_tof1_height_mm);
     log_tof2_height_mm = HeightEst_ClampHeightMm(g_tof2_height_mm);
     log_tof3_height_mm = HeightEst_ClampHeightMm(g_tof3_height_mm);

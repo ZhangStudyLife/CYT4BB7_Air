@@ -5,12 +5,17 @@
 #pragma location=".global_ram_data"
 volatile ipc_image_payload_t g_ipc_image_shared;
 
+#define IPC_FLIGHT_STATE_MAGIC   (0xA5000000UL)  /* 核0到核1飞行状态 IPC 命令标记 */
+#define IPC_FLIGHT_STATE_MASK    (0xFFFF0000UL)  /* 飞行状态 IPC 命令匹配掩码 */
+#define IPC_FLIGHT_STATE_FLYING  (0x00000001UL)  /* 飞行状态 IPC 命令：1=飞行中 */
+
 /* ======================== CM7_1 发送侧 ======================== */
 #if defined(CY_CORE_CM7_1)
 
 #include "../Estimation/Pos_Est/image.h"
 
 static uint32 s_tx_seq = 0;
+static volatile uint8 s_core0_flying = 0U;
 
 void ipc_image_send(void)
 {
@@ -35,6 +40,32 @@ void ipc_image_send(void)
 
 #endif /* CY_CORE_CM7_1 */
 
+uint8 ipc_flight_state_send(uint8 flying)
+{
+#if defined(CY_CORE_CM7_0)
+    uint32 ipc_data = IPC_FLIGHT_STATE_MAGIC;
+
+    if (0U != flying)
+    {
+        ipc_data |= IPC_FLIGHT_STATE_FLYING;
+    }
+
+    return ipc_send_data(ipc_data);
+#else
+    (void)flying;
+    return 1U;
+#endif
+}
+
+uint8 ipc_core0_is_flying(void)
+{
+#if defined(CY_CORE_CM7_1)
+    return s_core0_flying;
+#else
+    return 0U;
+#endif
+}
+
 /* ======================== 通用回调（两核都编译） ======================== */
 
 #if defined(CY_CORE_CM7_0)
@@ -47,6 +78,11 @@ void ipc_image_callback(uint32 ipc_data)
 #if defined(CY_CORE_CM7_0)
     s_rx_seq   = ipc_data;
     s_new_data = 1;
+#elif defined(CY_CORE_CM7_1)
+    if ((ipc_data & IPC_FLIGHT_STATE_MASK) == IPC_FLIGHT_STATE_MAGIC)
+    {
+        s_core0_flying = (0U != (ipc_data & IPC_FLIGHT_STATE_FLYING)) ? 1U : 0U;
+    }
 #else
     (void)ipc_data;
 #endif

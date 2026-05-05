@@ -36,6 +36,9 @@ uint8 ipc_image_is_new(void);
 /* CM7_0: 拷贝最新共享数据到 out */
 void ipc_image_get(ipc_image_payload_t *out);
 
+uint8 ipc_flight_state_send(uint8 flying);
+uint8 ipc_core0_is_flying(void);
+
 #ifdef __cplusplus
 }
 #endif

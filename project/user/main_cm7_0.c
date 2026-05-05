@@ -10,6 +10,8 @@ static uint8 div500 = 0U;
 static uint8 div50 = 0U;
 static uint8 slot50 = 0U;
 static uint8 div10 = 0U;
+static uint8 s_ipc_last_flying = 0U; /* 上一次成功通知给核1的飞行状态 */
+static uint8 s_ipc_flying_retry_div = 0U; /* 飞行状态 IPC 通知失败后的 100Hz 重试分频 */
 
 /*
  * 函数功能: 在 IPS114 上显示飞控调试信息。
@@ -147,6 +149,29 @@ int main(void)
             CRSF_Update_100HZ();
             FC_Loop_100Hz();
             wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
+            {
+                uint8 flying = (FC_START_CRSF_STATE_FLYING == FC_START_CRSF_Get_State()) ? 1U : 0U;
+
+                if (flying != s_ipc_last_flying)
+                {
+                    if (0U == s_ipc_flying_retry_div)
+                    {
+                        if (0U == ipc_flight_state_send(flying))
+                        {
+                            s_ipc_last_flying = flying;
+                        }
+                        s_ipc_flying_retry_div = 10U;
+                    }
+                    else
+                    {
+                        s_ipc_flying_retry_div--;
+                    }
+                }
+                else
+                {
+                    s_ipc_flying_retry_div = 0U;
+                }
+            }
             if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_STANDBY)
             {
                 // ips114_show_debug();

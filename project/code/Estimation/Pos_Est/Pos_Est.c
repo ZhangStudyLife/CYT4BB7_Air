@@ -221,10 +221,6 @@ float Pos_Est_pos_y = 0.0f;
 /* 位置估计的上一拍 Y 轴位置，单位 cm */
 float Pos_Est_pos_y_last = 0.0f;
 
-/* X 轴加速度一阶低通状态 */
-static LPF1_t s_acc_lp_x;
-/* Y 轴加速度一阶低通状态 */
-static LPF1_t s_acc_lp_y;
 /* X 轴光流速度一阶低通状态 */
 static LPF1_t s_opflow_vel_lp_x;
 /* Y 轴光流速度一阶低通状态 */
@@ -234,12 +230,11 @@ static float s_vel_pred_x = 0.0f;
 /* Y 轴速度预测状态，单位 cm/s */
 static float s_vel_pred_y = 0.0f;
 
-/* X 轴加速度一阶低通输出，单位 cm/s^2，飞机往前加速为正，往后加速为负 */
-float acc_x_lp = 0.0f;
-/* Y 轴加速度一阶低通输出，单位 cm/s^2，飞机往右加速为正，往左加速为负 */
-float acc_y_lp = 0.0f;
+/* X 轴加速度 单位 cm/s^2，飞机往前加速为正，往后加速为负 */
 float acc_x_temp = 0.0f;
+/* Y 轴加速度 单位 cm/s^2，飞机往右加速为正，往左加速为负 */
 float acc_y_temp = 0.0f;
+
 /*
  * 函数名: Pos_Est_Init
  * 功能: 初始化光流位置估计模块和相关滤波器
@@ -253,8 +248,6 @@ void Pos_Est_Init(void)
     LC302_Init_Aux();
     // FlowGyroDecoupler_Init();
     FlowGyroDecoupler_LC302_Init();
-    LPF1_Init(&s_acc_lp_x, POS_EST_ACC_LPF_ALPHA);
-    LPF1_Init(&s_acc_lp_y, POS_EST_ACC_LPF_ALPHA);
     LPF1_Init(&s_opflow_vel_lp_x, POS_EST_OPFLOW_VEL_LPF_ALPHA);
     LPF1_Init(&s_opflow_vel_lp_y, POS_EST_OPFLOW_VEL_LPF_ALPHA);
 
@@ -284,13 +277,11 @@ void Pos_Est_Reinit(void)
 {
     // FlowGyroDecoupler_Reinit();
     FlowGyroDecoupler_LC302_Reinit();
-    LPF1_Reset(&s_acc_lp_x);
-    LPF1_Reset(&s_acc_lp_y);
     LPF1_Reset(&s_opflow_vel_lp_x);
     LPF1_Reset(&s_opflow_vel_lp_y);
 
-    acc_x_lp = 0.0f;
-    acc_y_lp = 0.0f;
+    acc_x_temp = 0.0f;
+    acc_y_temp = 0.0f;
     opflow_vel_x = 0.0f;
     opflow_vel_y = 0.0f;
     opflow_vel_x_lpf = 0.0f;
@@ -375,13 +366,11 @@ void Pos_Est_Update_1000HZ(void)
         acc_y_temp = -POS_EST_ACC_RIGHT_LIMIT_CMSS;
     }
 
-    acc_x_lp = LPF1_Update(&s_acc_lp_x, acc_x_temp);
-    acc_y_lp = LPF1_Update(&s_acc_lp_y, acc_y_temp);
 
     if (g_imu_shock_flag == 0U)
     {
-        s_vel_pred_x -= acc_y_lp * POS_EST_ACC_DT_S;
-        s_vel_pred_y += acc_x_lp * POS_EST_ACC_DT_S;
+        s_vel_pred_x -= acc_y_temp * POS_EST_ACC_DT_S;
+        s_vel_pred_y += acc_x_temp * POS_EST_ACC_DT_S;
     }
 
     // float dec_x_pmw3901 = FlowGyroDecoupler_GetDecX();
@@ -425,8 +414,7 @@ void Pos_Est_Update_50HZ(void)
 {
     float dec_x;
     float dec_y;
-    float height;
-    uint8_t dec_updated;
+    float height_mm;
     uint8_t opflow_valid;
     float vel_x_pred;
     float vel_y_pred;
@@ -438,17 +426,25 @@ void Pos_Est_Update_50HZ(void)
     LC302_Update_50HZ();
     LC302_Update_50HZ_Aux();
     // FlowGyroDecoupler_Update50Hz(tick_1000us_cnt, g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY);
-    dec_updated = FlowGyroDecoupler_LC302_Update50Hz(tick_1000us_cnt, lc302_data.flow_x_integral, lc302_data.flow_y_integral, lc302_data.valid);
+    (void)FlowGyroDecoupler_LC302_Update50Hz(tick_1000us_cnt, lc302_data.flow_x_integral, lc302_data.flow_y_integral, lc302_data.valid);
     dec_x = FlowGyroDecoupler_LC302_GetDecX();
     dec_y = FlowGyroDecoupler_LC302_GetDecY();
-    height = g_tof_fused_height_mm / 1000.0f;
-    opflow_valid = (dec_updated != 0U) && (g_tof_fused_valid != 0U) && (height >= 0.2f);
+    height_mm = g_tof_fused_height_mm;
+    if (height_mm > VL53L1X_VALID_RANGE_MAX)
+    {
+        height_mm = VL53L1X_VALID_RANGE_MAX;
+    }
+    else if (height_mm < 200.0f)
+    {
+        height_mm = 200.0f;
+    }
+    opflow_valid = (height_mm >= 200.0f);
 
     /* 计算光流速度，此刻加入高度补偿，单位 cm/s */
     if (opflow_valid != 0U)
     {
-        opflow_vel_x = height * dec_x * 0.48076923f;
-        opflow_vel_y = height * dec_y * 0.48076923f;
+        opflow_vel_x = (height_mm * 0.001f) * dec_x * 0.48076923f;
+        opflow_vel_y = (height_mm * 0.001f) * dec_y * 0.48076923f;
         opflow_vel_x_lpf = LPF1_Update(&s_opflow_vel_lp_x, opflow_vel_x);
         opflow_vel_y_lpf = LPF1_Update(&s_opflow_vel_lp_y, opflow_vel_y);
     }

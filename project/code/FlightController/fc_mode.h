@@ -184,6 +184,15 @@ void FC_Mode2_100Hz(void);
 void FC_Mode2_50Hz(float dt);
 
 /*
+ * 模式2 X/Y 轴速度环 PID 实例。
+ * 作用: 供外部模块读取速度环输出和调试状态。
+ */
+extern pid_t g_mode2_velx_pid;
+extern pid_t g_mode2_vely_pid;
+extern float g_mode2_velx_target;
+extern float g_mode2_vely_target;
+
+/*
  * 函数名: FC_Mode3_Init
  * 功能: 初始化模式3控制所需资源
  * 输入参数: 无

@@ -431,6 +431,8 @@ void Pos_Est_Update_50HZ(void)
     float vel_x_pred;
     float vel_y_pred;
     const float dt = 0.02f;
+    float innovation_x;
+    float innovation_y;
 
     // PMW3901_Update_50HZ();
     LC302_Update_50HZ();
@@ -469,8 +471,28 @@ void Pos_Est_Update_50HZ(void)
 
     if (opflow_valid != 0U)
     {
-        Pos_Est_vel_x = vel_x_pred + g_fc_params.pos_est_k_flow * (opflow_vel_x_lpf - vel_x_pred);
-        Pos_Est_vel_y = vel_y_pred + g_fc_params.pos_est_k_flow * (opflow_vel_y_lpf - vel_y_pred);
+        innovation_x = opflow_vel_x_lpf - vel_x_pred;
+        innovation_y = opflow_vel_y_lpf - vel_y_pred;
+        if (innovation_x > 100.0f)
+        {
+            innovation_x = 100.0f;
+        }
+        else if (innovation_x < -100.0f)
+        {
+            innovation_x = -100.0f;
+        }
+
+        if (innovation_y > 100.0f)
+        {
+            innovation_y = 100.0f;
+        }
+        else if (innovation_y < -100.0f)
+        {
+            innovation_y = -100.0f;
+        }
+
+        Pos_Est_vel_x = vel_x_pred + g_fc_params.pos_est_k_flow * innovation_x;
+        Pos_Est_vel_y = vel_y_pred + g_fc_params.pos_est_k_flow * innovation_y;
     }
     else
     {

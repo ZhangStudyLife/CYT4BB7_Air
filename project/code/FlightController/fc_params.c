@@ -153,7 +153,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pos_z_d_lpf = 0.2f;
 
     /* ===== X 轴速度环参数 ===== */
-    params->vel_x_kp = 0.12f;
+    params->vel_x_kp = 0.14f;
     params->vel_x_ki = 0.030f;
     params->vel_x_kd = 0.0f;
     params->vel_x_kff = 0.0f;
@@ -161,7 +161,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->vel_x_d_lpf = 0.0f;
 
     /* ===== Y 轴速度环参数 ===== */
-    params->vel_y_kp = 0.12f;
+    params->vel_y_kp = 0.14f;
     params->vel_y_ki = 0.030f;
     params->vel_y_kd = 0.0f;
     params->vel_y_kff = 0.0f;
@@ -182,7 +182,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode1_brake_exit_vel_cmps = 10.0f;
 
     /* ===== 位置估计参数 ===== */
-    params->pos_est_k_flow = 0.06f;
+    params->pos_est_k_flow = 0.08f;
 }
 
 /*

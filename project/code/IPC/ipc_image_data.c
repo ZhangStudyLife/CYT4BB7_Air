@@ -71,6 +71,8 @@ uint8 ipc_core0_is_flying(void)
 #if defined(CY_CORE_CM7_0)
 static volatile uint8  s_new_data = 0;
 static volatile uint32 s_rx_seq   = 0;
+/* CM7_0侧最新图像结果缓存，供飞控模式读取 */
+static ipc_image_payload_t s_latest_image;
 #endif
 
 void ipc_image_callback(uint32 ipc_data)
@@ -103,7 +105,49 @@ uint8 ipc_image_is_new(void)
 
 void ipc_image_get(ipc_image_payload_t *out)
 {
-    memcpy((void *)out, (const void *)&g_ipc_image_shared, sizeof(ipc_image_payload_t));
+    memcpy((void *)&s_latest_image, (const void *)&g_ipc_image_shared, sizeof(ipc_image_payload_t));
+    if (out != 0)
+    {
+        memcpy((void *)out, (const void *)&s_latest_image, sizeof(ipc_image_payload_t));
+    }
+}
+
+uint8 ipc_image_get_first_valid_circle(ipc_image_circle_t *out)
+{
+    uint8 i;
+
+    ipc_image_get(0);
+
+    for (i = 0U; i < IPC_IMAGE_MAX_CIRCLES; i++)
+    {
+        if (0U != s_latest_image.circles[i].valid)
+        {
+            if (out != 0)
+            {
+                *out = s_latest_image.circles[i];
+            }
+            return 1U;
+        }
+    }
+
+    if (out != 0)
+    {
+        memset((void *)out, 0, sizeof(ipc_image_circle_t));
+    }
+    return 0U;
 }
 
 #endif /* CY_CORE_CM7_0 */
+
+#if !defined(CY_CORE_CM7_0)
+
+uint8 ipc_image_get_first_valid_circle(ipc_image_circle_t *out)
+{
+    if (out != 0)
+    {
+        memset((void *)out, 0, sizeof(ipc_image_circle_t));
+    }
+    return 0U;
+}
+
+#endif

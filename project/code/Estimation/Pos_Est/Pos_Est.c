@@ -188,7 +188,7 @@ extern volatile uint32 tick_1000us_cnt;
 #define POS_EST_OPFLOW_VEL_LPF_ALPHA (0.84816420f)
 
 /* 1000Hz 水平加速度相位补偿低通 alpha，截止频率 fc≈5.00Hz */
-#define POS_EST_ACC_LPF_ALPHA (0.03092757f)
+#define POS_EST_ACC_LPF_ALPHA (0.1012f)
 /* 1000Hz 加速度速度预测积分步长，单位 s */
 #define POS_EST_ACC_DT_S (0.001f)
 /* 前后轴水平加速度限幅，单位 cm/s^2 */
@@ -221,7 +221,6 @@ float Pos_Est_pos_y = 0.0f;
 /* 位置估计的上一拍 Y 轴位置，单位 cm */
 float Pos_Est_pos_y_last = 0.0f;
 
-
 /* X 轴加速度一阶低通状态 */
 static LPF1_t s_acc_lp_x;
 /* Y 轴加速度一阶低通状态 */
@@ -239,7 +238,8 @@ static float s_vel_pred_y = 0.0f;
 float acc_x_lp = 0.0f;
 /* Y 轴加速度一阶低通输出，单位 cm/s^2，飞机往右加速为正，往左加速为负 */
 float acc_y_lp = 0.0f;
-
+float acc_x_temp = 0.0f;
+float acc_y_temp = 0.0f;
 /*
  * 函数名: Pos_Est_Init
  * 功能: 初始化光流位置估计模块和相关滤波器
@@ -324,8 +324,6 @@ void Pos_Est_Update_1000HZ(void)
 {
     float acc_sensor[3];
     float acc_body[3];
-    float acc_x_temp;
-    float acc_y_temp;
     float sp;
     float cp;
     float sr;
@@ -404,17 +402,17 @@ void Pos_Est_Update_1000HZ(void)
     float dec_y;
     dec_x = FlowGyroDecoupler_LC302_GetDecX();
     dec_y = FlowGyroDecoupler_LC302_GetDecY();
-    wifi_justfloat(tick_1000us_cnt,
-                   acc_x_temp, acc_y_temp,
-                   acc_x_lp, acc_y_lp,
-                   g_tof_fused_height_mm * 0.001f,
-                   lc302_data.flow_x_integral, lc302_data.flow_y_integral,
-                   lc302_data_Aux.flow_x_integral, lc302_data_Aux.flow_y_integral,
-                //    dec_x, dec_y,
-                //    opflow_vel_x, opflow_vel_y,
-                //    opflow_vel_x_lpf, opflow_vel_y_lpf,
-                   s_vel_pred_x, s_vel_pred_y,
-                   g_euler.pitch, g_euler.roll, g_euler.yaw);
+    // wifi_justfloat(tick_1000us_cnt,
+    //                acc_x_temp, acc_y_temp,
+    //                acc_x_lp, acc_y_lp,
+    //                g_tof_fused_height_mm * 0.001f,
+    //                lc302_data.flow_x_integral, lc302_data.flow_y_integral,
+    //                lc302_data_Aux.flow_x_integral, lc302_data_Aux.flow_y_integral,
+    //             //    dec_x, dec_y,
+    //             //    opflow_vel_x, opflow_vel_y,
+    //             //    opflow_vel_x_lpf, opflow_vel_y_lpf,
+    //                s_vel_pred_x, s_vel_pred_y,
+    //                g_euler.pitch, g_euler.roll, g_euler.yaw);
 }
 
 /*
@@ -482,7 +480,6 @@ void Pos_Est_Update_50HZ(void)
 
     s_vel_pred_x = Pos_Est_vel_x;
     s_vel_pred_y = Pos_Est_vel_y;
-
 
     Pos_Est_pos_x_last = Pos_Est_pos_x;
     Pos_Est_pos_y_last = Pos_Est_pos_y;

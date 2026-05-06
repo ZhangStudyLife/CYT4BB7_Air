@@ -6,10 +6,10 @@ static pid_t s_mode2_velx_pid;
 /* 模式2 Y 轴速度环 PID */
 static pid_t s_mode2_vely_pid;
 
-/* 遥控到速度映射比例：1000 单位 → 100 cm/s */
-static const float s_mode2_rc_to_speed_scale = 0.1f;
+/* 遥控到速度映射比例：1000 单位 → 200 cm/s */
+static const float s_mode2_rc_to_speed_scale = 0.2f;
 /* 速度目标上限，单位 cm/s */
-static const float s_mode2_vel_limit_cmps = 100.0f;
+static const float s_mode2_vel_limit_cmps = 200.0f;
 /* 速度目标死区，单位 cm/s */
 static const float s_mode2_vel_deadzone_cmps = 6.0f;
 /* 姿态角输出限幅，单位度 */
@@ -127,6 +127,14 @@ void FC_Mode2_50Hz(float dt)
     roll_angle_target = FC_Mode_Clamp(velx_out+ FC_Mode_Get_Roll_Mech_Trim_Deg(), -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
     pitch_angle_target = FC_Mode_Clamp(vely_out+ FC_Mode_Get_Pitch_Mech_Trim_Deg(), -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
 
+
+    wifi_justfloat(lc302_data.flow_x_integral,lc302_data.flow_y_integral
+        ,opflow_vel_x,opflow_vel_y,
+        acc_x_temp,acc_y_temp,
+        Pos_Est_vel_x,-velx_target,
+        Pos_Est_vel_y,-vely_target,
+        roll_angle_target,g_euler.roll,pitch_angle_target,g_euler.pitch);
+        
 
     // wifi_justfloat(
     //                g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY, g_pmw3901_raw.squal,

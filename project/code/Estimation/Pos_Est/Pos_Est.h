@@ -5,13 +5,14 @@
 // #include "FlowGyroDecoupler.h"
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-void Pos_Est_Init(void);
-void Pos_Est_Reinit(void);
-void Pos_Est_Update_1000HZ(void);
-void Pos_Est_Update_50HZ(void);
+    void Pos_Est_Init(void);
+    void Pos_Est_Reinit(void);
+    void Pos_Est_Update_1000HZ(void);
+    void Pos_Est_Update_50HZ(void);
 
 #ifdef __cplusplus
 }
@@ -25,5 +26,7 @@ extern float Pos_Est_vel_x;
 extern float Pos_Est_vel_y;
 extern float acc_x_lp;
 extern float acc_y_lp;
+extern float acc_x_temp;
+extern float acc_y_temp;
 
 #endif /* POS_EST_H */

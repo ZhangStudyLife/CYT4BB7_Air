@@ -359,7 +359,7 @@ void FC_Loop_50Hz(void)
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_8:
-        FC_Mode0_50Hz(dt);
+        FC_Mode8_50Hz(dt);
         break;
 
     default:
@@ -513,7 +513,7 @@ void FC_Loop_100Hz(void)
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_8:
-        FC_Mode0_100Hz();
+        FC_Mode8_100Hz();
         break;
 
     default:

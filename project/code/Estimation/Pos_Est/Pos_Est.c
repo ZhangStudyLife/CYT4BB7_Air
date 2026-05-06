@@ -415,6 +415,8 @@ void Pos_Est_Update_50HZ(void)
     float dec_x;
     float dec_y;
     float height_mm;
+    float height_m;
+    float k_flow_eff;
     uint8_t opflow_valid;
     float vel_x_pred;
     float vel_y_pred;
@@ -437,6 +439,19 @@ void Pos_Est_Update_50HZ(void)
     else if (height_mm < 200.0f)
     {
         height_mm = 200.0f;
+    }
+    height_m = height_mm * 0.001f;
+    if (height_m < 0.20f)
+    {
+        k_flow_eff = 0.0f;
+    }
+    else if (height_m < 0.50f)
+    {
+        k_flow_eff = g_fc_params.pos_est_k_flow * (height_m - 0.20f) / 0.30f;
+    }
+    else
+    {
+        k_flow_eff = g_fc_params.pos_est_k_flow;
     }
     opflow_valid = (height_mm >= 200.0f);
 
@@ -487,8 +502,8 @@ void Pos_Est_Update_50HZ(void)
             innovation_y = -100.0f;
         }
 
-        Pos_Est_vel_x = vel_x_pred + g_fc_params.pos_est_k_flow * innovation_x;
-        Pos_Est_vel_y = vel_y_pred + g_fc_params.pos_est_k_flow * innovation_y;
+        Pos_Est_vel_x = vel_x_pred + k_flow_eff * innovation_x;
+        Pos_Est_vel_y = vel_y_pred + k_flow_eff * innovation_y;
     }
     else
     {

@@ -593,12 +593,12 @@ void FC_Loop_500Hz(void)
     }
 
 
-    wifi_justfloat(g_tof_fused_height_mm/1000.0f,lc302_data.flow_x_integral, lc302_data.flow_y_integral,
-                   opflow_vel_x, opflow_vel_y,
-                   acc_x_temp, acc_y_temp,
-                   Pos_Est_vel_x, g_mode2_velx_target,
-                   Pos_Est_vel_y, g_mode2_vely_target,
-                   roll_angle_target, g_euler.roll, pitch_angle_target, g_euler.pitch);
+    // wifi_justfloat(g_tof_fused_height_mm/1000.0f,lc302_data.flow_x_integral, lc302_data.flow_y_integral,
+    //                opflow_vel_x, opflow_vel_y,
+    //                acc_x_temp, acc_y_temp,
+    //                Pos_Est_vel_x, g_mode2_velx_target,
+    //                Pos_Est_vel_y, g_mode2_vely_target,
+    //                roll_angle_target, g_euler.roll, pitch_angle_target, g_euler.pitch);
             // wifi_justfloat(tick_1000us_cnt,
             //            pitch_angle_target,
             //            g_euler.pitch,
@@ -665,6 +665,11 @@ void FC_Loop_1000Hz(void)
 
         Motor_Mixer(&g_motor_cmd);
     }
+
+    wifi_justfloat(tick_1000us_cnt,
+        roll_angle_target, g_euler.roll,roll_gyro_target,g_imufilter_1000hz.gyrox,roll_angle_pid.ff_term,
+        pitch_angle_target, g_euler.pitch,pitch_gyro_target,g_imufilter_1000hz.gyroy,pitch_angle_pid.ff_term);
+
 
     // wifi_justfloat(tick_1000us_cnt,
     //     g_imufilter_1000hz.gyrox,roll_gyro_target,roll_gyro_pid.p_term,roll_gyro_pid.i_term,roll_gyro_pid.d_term,

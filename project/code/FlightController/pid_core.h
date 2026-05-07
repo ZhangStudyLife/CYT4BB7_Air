@@ -15,6 +15,15 @@ typedef struct
     float d2;
 } pid_biquad_t;
 
+/* PID PT3 低通滤波器状态 */
+typedef struct
+{
+    float k;
+    float state1;
+    float state2;
+    float state3;
+} pid_pt3_t;
+
 typedef struct
 {
     float kp;
@@ -24,6 +33,8 @@ typedef struct
     float dt;
 
     float i_limit;
+    float ff_smoothing_ms; /* 前馈 PT3 平滑时间，单位 ms，0 表示旁路 */
+    float output_lpf_hz;   /* 输出 PT3 低通截止频率，单位 Hz，0 表示旁路 */
     float d_lpf_hz; /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
     float integral;
@@ -31,6 +42,9 @@ typedef struct
     float prev_sp;
     uint8_t d_initialized;
     pid_biquad_t d_lpf_filter; /* D 项滤波器系数与状态 */
+
+    pid_pt3_t ff_pt3_filter;     /* 前馈 PT3 滤波器状态 */
+    pid_pt3_t output_pt3_filter; /* 输出 PT3 滤波器状态 */
 
     float error;
     float p_term;
@@ -63,6 +77,16 @@ typedef struct
  */
 void PID_Init(pid_t *pid, float kp, float ki, float kd, float kff,
               float dt, float i_limit, float d_lpf);
+
+/**
+ * 函数功能: 配置 PID 前馈和输出 PT3 滤波。
+ * 输入参数:
+ *   pid             - PID 控制器实例指针。
+ *   ff_smoothing_ms - 前馈平滑时间，单位 ms，0 表示旁路。
+ *   output_lpf_hz   - 输出低通截止频率，单位 Hz，0 表示旁路。
+ * 返回值: 无。
+ */
+void PID_SetFeedforwardFilter(pid_t *pid, float ff_smoothing_ms, float output_lpf_hz);
 
 /**
  * 函数功能: 使用当前设定值和测量值更新 PID 输出。

@@ -63,6 +63,10 @@ static const float s_fc_angle_out_limit = 260.0f;
 static const float s_fc_angle_aw_gain = 0.15f;
 /* 姿态角外环积分松弛阈值，目标变化过快时降低积分堆积 */
 static const float s_fc_angle_iterm_relax_threshold = 30.0f;
+/* 姿态角外环前馈 PT3 平滑时间，参考 Betaflight Angle FF 默认值，单位 ms */
+static const float s_fc_angle_ff_smoothing_ms = 80.0f;
+/* 姿态角外环输出 PT3 低通截止频率，参考 Betaflight attitudeFilter，单位 Hz */
+static const float s_fc_angle_output_lpf_hz = 50.0f;
 static const float s_fc_deg_to_rad = 0.017453293f;
 static const float s_fc_tilt_cos_min = 0.8f;
 static const float s_fc_tilt_comp_throttle_max = 10000.0f;
@@ -197,6 +201,7 @@ void FC_Loop_Init(void)
     roll_angle_pid.output_min = -s_fc_angle_out_limit;
     roll_angle_pid.output_max = s_fc_angle_out_limit;
     roll_angle_pid.iterm_relax_threshold = s_fc_angle_iterm_relax_threshold;
+    PID_SetFeedforwardFilter(&roll_angle_pid, s_fc_angle_ff_smoothing_ms, s_fc_angle_output_lpf_hz);
     PID_Init(&pitch_angle_pid,
              g_fc_params.pitch_angle_kp, g_fc_params.pitch_angle_ki, g_fc_params.pitch_angle_kd,
              g_fc_params.pitch_angle_kff, g_fc_params.angle_dt,
@@ -207,6 +212,7 @@ void FC_Loop_Init(void)
     pitch_angle_pid.output_min = -s_fc_angle_out_limit;
     pitch_angle_pid.output_max = s_fc_angle_out_limit;
     pitch_angle_pid.iterm_relax_threshold = s_fc_angle_iterm_relax_threshold;
+    PID_SetFeedforwardFilter(&pitch_angle_pid, s_fc_angle_ff_smoothing_ms, s_fc_angle_output_lpf_hz);
     PID_Init(&yaw_angle_pid,
              g_fc_params.yaw_angle_kp, g_fc_params.yaw_angle_ki, g_fc_params.yaw_angle_kd,
              g_fc_params.yaw_angle_kff, g_fc_params.angle_dt,

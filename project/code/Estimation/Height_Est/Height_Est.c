@@ -19,20 +19,20 @@ float g_height_fused_vz_mps = 0.0f;                            /* 控制环使�
 #define HEIGHT_EST_TOF4_INDEX           3U                  /* 4 号 TOF 数据索引 */
 #define HEIGHT_EST_TOF_DT_S             0.01f               /* TOF 速度观测周期，单位 s */
 #define HEIGHT_EST_HEIGHT_LPF_ALPHA     0.22120f            /* 高度输出 4Hz 一阶低通系数 */
-#define HEIGHT_EST_HEIGHT_ALPHA         0.06f               /* 高度估计器 TOF 校正系数 */
+#define HEIGHT_EST_HEIGHT_ALPHA         0.05f               /* 高度估计器 TOF 校正系数 */
 #define HEIGHT_EST_HEIGHT_RES_SOFT_M    0.08f               /* 高度估计器残差软门限，单位 m */
 #define HEIGHT_EST_HEIGHT_RES_HARD_M    0.22f               /* 高度估计器残差硬门限，单位 m */
 #define HEIGHT_EST_HEIGHT_MISS_MAX      15U                 /* 高度估计器允许 TOF 短时丢失的 100Hz 次数 */
-#define HEIGHT_EST_HEIGHT_RELOCK_STEP_MM 20.0f              /* 高度估计器长丢失后单次重捕获限幅，单位 mm */
+#define HEIGHT_EST_HEIGHT_RELOCK_STEP_MM 12.0f              /* 高度估计器长丢失后单次重捕获限幅，单位 mm */
 #define HEIGHT_EST_VZ_LPF_ALPHA         0.39508f            /* 控制速度输出 8Hz 一阶低通系数 */
 #define HEIGHT_EST_VZ_OBS_ALPHA         0.14f               /* 控制速度观测器高度校正系数 */
-#define HEIGHT_EST_VZ_OBS_BETA          0.022f              /* 控制速度观测器速度校正系数 */
+#define HEIGHT_EST_VZ_OBS_BETA          0.018f              /* 控制速度观测器速度校正系数 */
 #define HEIGHT_EST_VZ_OBS_LEAK_ALPHA    0.97183f            /* 控制速度观测器 0.35s 速度泄漏系数 */
-#define HEIGHT_EST_VZ_OBS_ACC_DEADBAND  0.22f               /* 控制速度观测器加速度死区，单位 m/s^2 */
+#define HEIGHT_EST_VZ_OBS_ACC_DEADBAND  0.26f               /* 控制速度观测器加速度死区，单位 m/s^2 */
 #define HEIGHT_EST_VZ_OBS_ACC_CLIP      4.0f                /* 控制速度观测器加速度限幅，单位 m/s^2 */
 #define HEIGHT_EST_VZ_OBS_RES_SOFT_M    0.08f               /* 控制速度观测器残差软门限，单位 m */
 #define HEIGHT_EST_VZ_OBS_RES_HARD_M    0.20f               /* 控制速度观测器残差硬门限，单位 m */
-#define HEIGHT_EST_VZ_OBS_DV_LIMIT      0.03f               /* 控制速度观测器单次速度校正限幅，单位 m/s */
+#define HEIGHT_EST_VZ_OBS_DV_LIMIT      0.025f              /* 控制速度观测器单次速度校正限幅，单位 m/s */
 #define HEIGHT_EST_VZ_OBS_LIMIT_MPS     1.5f                /* 控制速度观测器输出速度限幅，单位 m/s */
 #define HEIGHT_EST_VZ_OBS_MISS_MAX      15U                 /* 控制速度观测器允许 TOF 短时丢失的 100Hz 次数 */
 #define HEIGHT_EST_TOF_TRIM_GATE_MM     80.0f               /* 控制速度观测器 TOF 截尾门限，单位 mm */

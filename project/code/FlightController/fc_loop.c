@@ -36,6 +36,8 @@ static float s_height_vz_mps = 0.0f;
 /* 目标高度斜坡限速器状态 */
 static float s_target_height_slew_m = 0.0f;
 static uint8_t s_height_slew_inited = 0U;
+/* Yaw 角度目标是否已经对齐当前机头方向 */
+static uint8_t s_yaw_target_inited = 0U;
 /* 目标高度上升斜坡限速，单位 m/s */
 #define FC_TARGET_H_RAMP_UP_MPS 0.15f
 /* 目标高度下降斜坡限速，单位 m/s */
@@ -60,6 +62,16 @@ static const float s_fc_height_vel_out_max = 1500.0f;
 /* 姿态角外环输出到角速度目标的限幅，单位 deg/s */
 static const float s_fc_angle_out_limit = 260.0f;
 static const float s_fc_yaw_out_limit = 900.0f;
+/* Yaw 摇杆死区，单位 CRSF_STD */
+static const float s_fc_yaw_stick_deadzone = 30.0f;
+/* Yaw 手动最大角速度，单位 deg/s */
+static const float s_fc_yaw_manual_rate_max_dps = 60.0f;
+/* Yaw 角度保持修正限幅，单位 deg/s */
+static const float s_fc_yaw_hold_rate_limit_dps = 45.0f;
+/* Yaw 最终角速度目标限幅，单位 deg/s */
+static const float s_fc_yaw_rate_target_limit_dps = 90.0f;
+/* Yaw 目标相对当前航向的最大超前角，单位 deg */
+static const float s_fc_yaw_target_delta_limit_deg = 45.0f;
 /* 姿态角外环 anti-windup 回算增益 */
 static const float s_fc_angle_aw_gain = 0.15f;
 /* 姿态角外环积分松弛阈值，目标变化过快时降低积分堆积 */
@@ -93,6 +105,48 @@ static float fc_clampf(float value, float min_value, float max_value)
         return max_value;
     }
     return value;
+}
+
+/*
+ * 函数名: FC_Wrap180Deg
+ * 功能: 将角度包裹到 [-180, 180]，避免 yaw 跨边界时出现 360 度跳变
+ * 输入参数:
+ *   angle_deg - 输入角度，单位 deg
+ * 返回值:
+ *   包裹后的角度，单位 deg
+ */
+static float FC_Wrap180Deg(float angle_deg)
+{
+    while (angle_deg > 180.0f)
+    {
+        angle_deg -= 360.0f;
+    }
+    while (angle_deg < -180.0f)
+    {
+        angle_deg += 360.0f;
+    }
+    return angle_deg;
+}
+
+/*
+ * 函数名: FC_Apply_Yaw_Stick_Deadzone
+ * 功能: 对 yaw 摇杆输入施加对称死区，死区外平移回零，保持输出连续
+ * 输入参数:
+ *   stick - CRSF 标准化 yaw 输入，范围约 [-1000, 1000]
+ * 返回值:
+ *   死区处理后的 yaw 输入
+ */
+static float FC_Apply_Yaw_Stick_Deadzone(float stick)
+{
+    if (stick > s_fc_yaw_stick_deadzone)
+    {
+        return stick - s_fc_yaw_stick_deadzone;
+    }
+    if (stick < -s_fc_yaw_stick_deadzone)
+    {
+        return stick + s_fc_yaw_stick_deadzone;
+    }
+    return 0.0f;
 }
 
 /*
@@ -296,6 +350,7 @@ void FC_Loop_Reset(void)
     target_height_m = 1.0f;
     s_height_slew_inited = 0U;
     s_target_height_slew_m = 0.0f;
+    s_yaw_target_inited = 0U;
     s_hover_throttle = (float)g_fc_params.base_throttle;
 }
 
@@ -568,6 +623,10 @@ void FC_Loop_500Hz(void)
         float roll_angle_meas = g_euler.roll;
         float pitch_angle_meas = g_euler.pitch;
         float yaw_angle_meas = g_euler.yaw;
+        float yaw_stick;
+        float yaw_rate_cmd;
+        float yaw_error_deg;
+        float yaw_hold_rate;
 
         if (roll_angle_target > 20.0f)
         {
@@ -590,13 +649,44 @@ void FC_Loop_500Hz(void)
         float limit = s_fc_angle_out_limit;
         float roll_ctrl = fc_clampf(PID_Update(&roll_angle_pid, roll_angle_target, roll_angle_meas, dt), -limit, limit);
         float pitch_ctrl = fc_clampf(PID_Update(&pitch_angle_pid, pitch_angle_target, pitch_angle_meas, dt), -limit, limit);
-        (void)PID_Update(&yaw_angle_pid, yaw_angle_target, yaw_angle_meas, dt);
+
+        /* 首次进入飞行态时锁住当前航向，避免 yaw 目标从 0 度硬拉飞机 */
+        if (0U == s_yaw_target_inited)
+        {
+            yaw_angle_target = FC_Wrap180Deg(yaw_angle_meas);
+            PID_Reset(&yaw_angle_pid);
+            s_yaw_target_inited = 1U;
+        }
+
+        /* 将遥控器第 4 路 yaw 输入映射为角速度目标，并积分成角度目标 */
+        yaw_stick = FC_Apply_Yaw_Stick_Deadzone(fc_clampf((float)CRSF_STD[3], -1000.0f, 1000.0f));
+        yaw_rate_cmd = (yaw_stick / (1000.0f - s_fc_yaw_stick_deadzone)) * s_fc_yaw_manual_rate_max_dps;
+        yaw_rate_cmd = fc_clampf(yaw_rate_cmd, -s_fc_yaw_manual_rate_max_dps, s_fc_yaw_manual_rate_max_dps);
+        yaw_angle_target = FC_Wrap180Deg(yaw_angle_target + yaw_rate_cmd * dt);
+
+        /* 限制角度目标相对当前航向的超前量，防止手动转向时目标跑飞太远 */
+        yaw_error_deg = FC_Wrap180Deg(yaw_angle_target - yaw_angle_meas);
+        yaw_error_deg = fc_clampf(yaw_error_deg,
+                                  -s_fc_yaw_target_delta_limit_deg,
+                                  s_fc_yaw_target_delta_limit_deg);
+        yaw_angle_target = FC_Wrap180Deg(yaw_angle_meas + yaw_error_deg);
+
+        yaw_hold_rate = fc_clampf(PID_Update(&yaw_angle_pid, yaw_error_deg, 0.0f, dt),
+                                  -s_fc_yaw_hold_rate_limit_dps,
+                                  s_fc_yaw_hold_rate_limit_dps);
 
         roll_gyro_target = roll_ctrl;
         pitch_gyro_target = pitch_ctrl;
-        yaw_gyro_target = 0; // 不闭环航向角，保持当前值
+        yaw_gyro_target = fc_clampf(yaw_rate_cmd + yaw_hold_rate,
+                                    -s_fc_yaw_rate_target_limit_dps,
+                                    s_fc_yaw_rate_target_limit_dps);
 
 
+    }
+    else
+    {
+        s_yaw_target_inited = 0U;
+        yaw_gyro_target = 0.0f;
     }
 
 
@@ -691,20 +781,20 @@ void FC_Loop_1000Hz(void)
     //     );
 
 
-    wifi_justfloat(tick_1000us_cnt,
-        target_height_m * 1000.0f,
-        g_tof_fused_height_mm,
-        height_pos_out,
-        g_height_fused_vz_mps,
-        height_vel_pid.p_term,
-        height_vel_pid.i_term,
-        g_imufilter_1000hz.gyroz,
-        g_motor_cmd.yaw,
-        g_motor_cmd.throttle,
-        g_euler.pitch,
-        g_euler.roll,
-        g_euler.yaw
-        );
+    // wifi_justfloat(tick_1000us_cnt,
+    //     target_height_m * 1000.0f,
+    //     g_tof_fused_height_mm,
+    //     height_pos_out,
+    //     g_height_fused_vz_mps,
+    //     height_vel_pid.p_term,
+    //     height_vel_pid.i_term,
+    //     g_imufilter_1000hz.gyroz,
+    //     g_motor_cmd.yaw,
+    //     g_motor_cmd.throttle,
+    //     g_euler.pitch,
+    //     g_euler.roll,
+    //     g_euler.yaw
+    //     );
 
 
     // wifi_justfloat(tick_1000us_cnt,

@@ -12,7 +12,9 @@
 /* 飞控参数 Flash 魔数：用于识别有效参数块 */
 #define FC_PARAMS_FLASH_MAGIC   (0x46504346UL)
 /* 飞控参数 Flash 版本号：结构变化时递增 */
-#define FC_PARAMS_FLASH_VERSION (5U)
+#define FC_PARAMS_FLASH_VERSION (6U)
+/* 飞控参数 Flash 可兼容读取的最小版本号 */
+#define FC_PARAMS_FLASH_MIN_COMPAT_VERSION (5U)
 
 /* 飞控参数 Flash 数据块：保存头信息和完整参数结构体 */
 typedef struct
@@ -121,7 +123,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pitch_angle_d_lpf = 15.0f;
 
     /* ===== Yaw 轴角度环参数 ===== */
-    params->yaw_angle_kp = 0.0f;
+    params->yaw_angle_kp = 1.5f;
     params->yaw_angle_ki = 0.0f;
     params->yaw_angle_kd = 0.0f;
     params->yaw_angle_kff = 0.0f;
@@ -207,7 +209,8 @@ static uint8 fc_params_blob_is_valid(const fc_params_flash_blob_t *blob)
         return 0U;
     }
 
-    if (blob->version != FC_PARAMS_FLASH_VERSION)
+    if ((blob->version < FC_PARAMS_FLASH_MIN_COMPAT_VERSION) ||
+        (blob->version > FC_PARAMS_FLASH_VERSION))
     {
         return 0U;
     }
@@ -219,6 +222,33 @@ static uint8 fc_params_blob_is_valid(const fc_params_flash_blob_t *blob)
 
     checksum = fc_params_checksum_calc(&blob->params, (uint32)sizeof(blob->params));
     return (checksum == blob->checksum) ? 1U : 0U;
+}
+
+/*
+ * 函数名: fc_params_migrate_loaded
+ * 功能: 对旧版 Flash 参数做最小兼容迁移，避免新增默认值被旧参数清零
+ * 输入参数:
+ *   params  - 已加载到 RAM 的参数结构体指针
+ *   version - Flash 参数版本号
+ * 返回值: 无
+ */
+static void fc_params_migrate_loaded(fc_params_t *params, uint16 version)
+{
+    if (NULL == params)
+    {
+        return;
+    }
+
+    if ((version < 6U) &&
+        (params->yaw_angle_kp == 0.0f) &&
+        (params->yaw_angle_ki == 0.0f) &&
+        (params->yaw_angle_kd == 0.0f) &&
+        (params->yaw_angle_kff == 0.0f))
+    {
+        params->yaw_angle_kp = 1.5f;
+        params->yaw_angle_i_limit = 0.0f;
+        params->yaw_angle_d_lpf = 0.0f;
+    }
 }
 
 /*
@@ -253,6 +283,7 @@ uint8 FC_Params_LoadFromFlash(void)
     }
 
     memcpy(&g_fc_params, &blob.params, sizeof(g_fc_params));
+    fc_params_migrate_loaded(&g_fc_params, blob.version);
     return 1U;
 }
 

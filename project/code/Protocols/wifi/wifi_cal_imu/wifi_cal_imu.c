@@ -132,7 +132,7 @@ static void wifi_cal_imu_send_help_overview(void)
     (void)wifi_cmd_SendLine("用法4: imu start accel");
     (void)wifi_cmd_SendLine("用法5: imu start accel_man");
     (void)wifi_cmd_SendLine("用法6: imu acc collect / imu acc stop");
-    (void)wifi_cmd_SendLine("用法7: imu load / imu save / imu clear / imu flash");
+    (void)wifi_cmd_SendLine("用法7: imu load / imu save / imu default / imu clear / imu flash");
     (void)wifi_cmd_SendLine("说明1: imu status 与 imu flash 任意状态都允许执行");
     (void)wifi_cmd_SendLine("说明2: 其他 imu 写命令仅待机且未解锁时允许执行");
     (void)wifi_cmd_SendLine("说明3: 手动校准请先执行 imu start accel_man，再按 imu acc collect / imu acc stop");
@@ -188,6 +188,22 @@ static void wifi_cal_imu_send_help_save(void)
     (void)wifi_cmd_SendLine("说明: 校准进行中会返回 ERR imu busy");
     (void)wifi_cmd_SendLine("成功回包: OK imu save");
     (void)wifi_cmd_SendLine("OK imu help save");
+}
+
+/*
+ * 函数功能: 输出 default 子命令帮助
+ * 输入参数: 无
+ * 返回值: 无
+ */
+static void wifi_cal_imu_send_help_default(void)
+{
+    (void)wifi_cmd_SendLine("主题: imu default");
+    (void)wifi_cmd_SendLine("用法: imu default");
+    (void)wifi_cmd_SendLine("功能: 将代码内置默认加速度校准参数立即写入 Flash");
+    (void)wifi_cmd_SendLine("限制: 仅待机且未解锁时允许执行");
+    (void)wifi_cmd_SendLine("说明: 用于强制覆盖 Flash 中已有的旧加速度校准参数");
+    (void)wifi_cmd_SendLine("成功回包: OK imu default");
+    (void)wifi_cmd_SendLine("OK imu help default");
 }
 
 /*
@@ -297,6 +313,12 @@ static uint8_t wifi_cal_imu_process_help_topic(const char *topic)
     if (0 == wifi_cmd_ascii_stricmp(topic, "save"))
     {
         wifi_cal_imu_send_help_save();
+        return 1U;
+    }
+
+    if (0 == wifi_cmd_ascii_stricmp(topic, "default"))
+    {
+        wifi_cal_imu_send_help_default();
         return 1U;
     }
 
@@ -433,6 +455,34 @@ static void wifi_cal_imu_process_save(void)
     }
 
     (void)wifi_cmd_SendLine("OK imu save");
+}
+
+/*
+ * 函数功能: 处理 imu default 命令
+ * 输入参数: 无
+ * 返回值: 无
+ */
+static void wifi_cal_imu_process_default(void)
+{
+    if (0U == wifi_cal_imu_is_edit_allowed())
+    {
+        wifi_cal_imu_reply_error("state");
+        return;
+    }
+
+    if (0U != IMUCalib_IsBusy())
+    {
+        wifi_cal_imu_reply_error("busy");
+        return;
+    }
+
+    if (0U == IMUCalib_ApplyDefaultToFlash())
+    {
+        wifi_cal_imu_reply_error("flash");
+        return;
+    }
+
+    (void)wifi_cmd_SendLine("OK imu default");
 }
 
 /*
@@ -776,6 +826,24 @@ void wifi_cal_imu_ProcessLine(char *line)
         if ((0U != wifi_cmd_is_help_flag(token_arg1)) && (NULL == token_arg2))
         {
             wifi_cal_imu_send_help_save();
+            return;
+        }
+
+        wifi_cal_imu_reply_error("format");
+        return;
+    }
+
+    if (0 == strcmp(token_cmd, "default"))
+    {
+        if (NULL == token_arg1)
+        {
+            wifi_cal_imu_process_default();
+            return;
+        }
+
+        if ((0U != wifi_cmd_is_help_flag(token_arg1)) && (NULL == token_arg2))
+        {
+            wifi_cal_imu_send_help_default();
             return;
         }
 

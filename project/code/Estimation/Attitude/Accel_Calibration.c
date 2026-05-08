@@ -152,6 +152,7 @@ AccelCalibration_t g_accel_calibration = {0};
 static IMUCalibRuntime_t s_imu_calib = {0};
 /* IMU 校准文本输出回调，优先用于 WiFi 文本提示 */
 static IMUCalibTextSink_t s_imu_calib_text_sink = NULL;
+static void imu_calib_apply_default_accel_calibration(void);
 
 /* ========================= Ellipsoid calibration runtime ========================= */
 #define ELLIP_MAX_ORIENT         (20U)
@@ -2837,6 +2838,17 @@ static void imu_calib_process_command(char *line)
         return;
     }
 
+    if (strcmp(line, "cal default") == 0)
+    {
+        if (s_imu_calib.busy != 0U)
+        {
+            printf("cal,busy\r\n");
+            return;
+        }
+        imu_calib_apply_default_accel_calibration();
+        return;
+    }
+
     if (strcmp(line, "cal clear") == 0)
     {
         if (s_imu_calib.busy != 0U)
@@ -2899,6 +2911,7 @@ static void imu_calib_print_boot_reminder(void)
     printf("cal,remind,cmd,cal ellip start\r\n");
     printf("cal,remind,cmd,cal load\r\n");
     printf("cal,remind,cmd,cal save\r\n");
+    printf("cal,remind,cmd,cal default\r\n");
     printf("cal,remind,cmd,cal clear\r\n");
 }
 
@@ -3559,23 +3572,23 @@ static void imu_calib_apply_default_accel_calibration(void)
     AccelCalibrationParams_t params;
 
     /* 由29点椭球拟合得到的最优校准参数, max_norm_err=0.0005g */
-    params.accel_bias_g[0] = 0.00264310f;
-    params.accel_bias_g[1] = -0.00159120f;
-    params.accel_bias_g[2] = -0.01090268f;
+    params.accel_bias_g[0] = 0.00231217f;
+    params.accel_bias_g[1] = -0.00166184f;
+    params.accel_bias_g[2] = -0.01358864f;
 
-    params.accel_corr_matrix[0][0] = 1.00330021f;
-    params.accel_corr_matrix[0][1] = 0.00299467f;
-    params.accel_corr_matrix[0][2] = -0.00116886f;
+    params.accel_corr_matrix[0][0] = 1.00377779f;
+    params.accel_corr_matrix[0][1] = 0.00727085f;
+    params.accel_corr_matrix[0][2] = -0.00097577f;
     params.accel_corr_matrix[1][0] = 0.00000000f;
-    params.accel_corr_matrix[1][1] = 0.99966587f;
-    params.accel_corr_matrix[1][2] = 0.00052598f;
+    params.accel_corr_matrix[1][1] = 0.99980692f;
+    params.accel_corr_matrix[1][2] = 0.00038574f;
     params.accel_corr_matrix[2][0] = 0.00000000f;
     params.accel_corr_matrix[2][1] = 0.00000000f;
-    params.accel_corr_matrix[2][2] = 0.99903492f;
+    params.accel_corr_matrix[2][2] = 0.99999515f;
 
-    params.accel_scale[0] = 1.00330021f;
-    params.accel_scale[1] = 0.99966587f;
-    params.accel_scale[2] = 0.99903492f;
+    params.accel_scale[0] = 1.00377779f;
+    params.accel_scale[1] = 0.99980692f;
+    params.accel_scale[2] = 0.99999515f;
 
     params.use_full_matrix = 1U;
     params.gravity_mps2 = 9.80665f;
@@ -3620,6 +3633,12 @@ uint8_t IMUCalib_SaveCurrentToFlash(void)
 
     imu_calib_fill_blob(&blob);
     flash_write_page(0U, IMU_CALIB_FLASH_PAGE, (const uint32_t *)&blob, words);
+    return 1U;
+}
+
+uint8_t IMUCalib_ApplyDefaultToFlash(void)
+{
+    imu_calib_apply_default_accel_calibration();
     return 1U;
 }
 

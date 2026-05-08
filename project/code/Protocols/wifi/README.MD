@@ -66,13 +66,14 @@
 - `imu acc stop`
 - `imu load`
 - `imu save`
+- `imu default`
 - `imu clear`
 - `imu flash`
 
 说明：
 
 - `imu status` 与 `imu flash` 任意状态都允许执行
-- `imu load/save/clear/start .../imu acc ...` 只在待机且未解锁时允许执行
+- `imu load/save/default/clear/start .../imu acc ...` 只在待机且未解锁时允许执行
 - 校准进行中再次下发 `imu load/save/clear/start ...` 会返回 `ERR imu busy`
 - `imu start accel` 为自动椭球校准
 - `imu start accel_man` 为手动椭球校准

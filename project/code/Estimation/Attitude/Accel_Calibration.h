@@ -204,6 +204,8 @@ void IMUCalib_Update_1000HZ(void);
 uint8_t IMUCalib_LoadFromFlashAndApply(void);
 /* 将当前 IMU 校准参数保存到 Flash */
 uint8_t IMUCalib_SaveCurrentToFlash(void);
+/* 将代码内置默认 IMU 加速度校准参数写入 Flash */
+uint8_t IMUCalib_ApplyDefaultToFlash(void);
 /* 擦除 Flash 中的 IMU 校准参数 */
 uint8_t IMUCalib_ClearFlash(void);
 /* 查询 IMU 校准是否正在执行 */

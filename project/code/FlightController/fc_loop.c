@@ -673,8 +673,21 @@ void FC_Loop_1000Hz(void)
     }
 
     wifi_justfloat(tick_1000us_cnt,
-        roll_angle_target, g_euler.roll,roll_gyro_target,g_imufilter_1000hz.gyrox,roll_angle_pid.ff_term,
-        pitch_angle_target, g_euler.pitch,pitch_gyro_target,g_imufilter_1000hz.gyroy,pitch_angle_pid.ff_term);
+        target_height_m * 1000.0f,
+        g_tof1_height_mm,
+        g_tof2_height_mm,
+        g_tof3_height_mm,
+        g_tof4_height_mm,
+        g_tof_fused_height_mm,
+        height_pos_out,
+        g_height_fused_vz_mps,
+        g_imufilter_1000hz.accx,
+        g_imufilter_1000hz.accy,
+        g_imufilter_1000hz.accz,
+        g_euler.pitch,
+        g_euler.roll,
+        g_euler.yaw
+        );
 
 
     // wifi_justfloat(tick_1000us_cnt,

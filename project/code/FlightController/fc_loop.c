@@ -696,6 +696,8 @@ void FC_Loop_1000Hz(void)
         g_tof_fused_height_mm,
         height_pos_out,
         g_height_fused_vz_mps,
+        height_vel_pid.p_term,
+        height_vel_pid.i_term,
         g_imufilter_1000hz.gyroz,
         g_motor_cmd.yaw,
         g_motor_cmd.throttle,

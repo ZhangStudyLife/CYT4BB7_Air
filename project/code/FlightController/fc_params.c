@@ -145,7 +145,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pos_y_d_lpf = 0.0f;
 
     /* ===== Z 轴位置环参数 ===== */
-    params->pos_z_kp = 0.7f;
+    params->pos_z_kp = 0.85f;
     params->pos_z_ki = 0.0f;
     params->pos_z_kd = 0.00f;
     params->pos_z_kff = 0.0f;
@@ -169,11 +169,11 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->vel_y_d_lpf = 0.0f;
 
     /* ===== Z 轴速度环参数 ===== */
-    params->vel_z_kp = 700.0f;
-    params->vel_z_ki = 70.0f;
+    params->vel_z_kp = 780.0f;
+    params->vel_z_ki = 75.0f;
     params->vel_z_kd = 0.0f;
     params->vel_z_kff = 0.0f;
-    params->vel_z_i_limit = 1200.0f;
+    params->vel_z_i_limit = 900.0f;
     params->vel_z_d_lpf = 0.0f;
 
     /* ===== 模式 1 跟杆前馈与刹车参数 ===== */

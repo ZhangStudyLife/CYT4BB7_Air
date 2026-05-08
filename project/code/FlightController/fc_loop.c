@@ -59,6 +59,7 @@ static const float s_fc_height_vel_out_min = -1500.0f;
 static const float s_fc_height_vel_out_max = 1500.0f;
 /* 姿态角外环输出到角速度目标的限幅，单位 deg/s */
 static const float s_fc_angle_out_limit = 260.0f;
+static const float s_fc_yaw_out_limit = 900.0f;
 /* 姿态角外环 anti-windup 回算增益 */
 static const float s_fc_angle_aw_gain = 0.15f;
 /* 姿态角外环积分松弛阈值，目标变化过快时降低积分堆积 */
@@ -638,7 +639,8 @@ void FC_Loop_1000Hz(void)
         float limit = 10000.0f;
         int32_t roll_ctrl = (int32_t)fc_clampf(PID_Update(&roll_gyro_pid, roll_gyro_target, roll_gyro_meas, dt), -limit, limit);
         int32_t pitch_ctrl = (int32_t)fc_clampf(PID_Update(&pitch_gyro_pid, pitch_gyro_target, pitch_gyro_meas, dt), -limit, limit);
-        int32_t yaw_ctrl = (int32_t)fc_clampf(PID_Update(&yaw_gyro_pid, yaw_gyro_target, yaw_gyro_meas, dt), -limit, limit);
+        int32_t yaw_ctrl = (int32_t)fc_clampf(PID_Update(&yaw_gyro_pid, yaw_gyro_target, yaw_gyro_meas, dt),
+                                              -s_fc_yaw_out_limit, s_fc_yaw_out_limit);
         /* 角速度环调试切换到 Pitch：目标、原始陀螺、滤波后陀螺、控制输出和 PID 分项 */
         // wifi_justfloat(pitch_gyro_target,
         //                         pitch_gyro_raw,这两个CSV文件是我离线标定的数据
@@ -649,7 +651,6 @@ void FC_Loop_1000Hz(void)
         //                         pitch_gyro_pid.d_term,
         //                         pitch_gyro_pid.error,
         //                         8u);
-        (void)yaw_ctrl;
         /* 电机混控：总油门 = 基础油门 + 高度控制输出 */
         {
 

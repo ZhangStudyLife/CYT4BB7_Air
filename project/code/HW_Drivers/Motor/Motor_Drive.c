@@ -90,6 +90,11 @@ static inline int32 clamp_i(int32 value, int32 min_val, int32 max_val)
     return value;
 }
 
+static inline int32 abs_i(int32 value)
+{
+    return (value >= 0) ? value : -value;
+}
+
 /**
  * @brief   油门值转换为PWM duty值
  * @param   throttle 油门量（0~10000）
@@ -305,8 +310,8 @@ void Motor_Mixer(const motor_mixer_input_t *input)
 
     /* 计算各电机输出 */
     int32 motor_out[MOTOR_NUM];
-    int32 max_out = 0;
-    int32 min_out = MOTOR_INPUT_MAX;
+    int32 yaw_contrib[MOTOR_NUM];
+    int32 yaw_scale = MOTOR_INPUT_MAX;
 
     for (uint8 i = 0; i < MOTOR_NUM; i++)
     {
@@ -318,32 +323,42 @@ void Motor_Mixer(const motor_mixer_input_t *input)
          */
         int32 roll_contrib  = (roll  * MOTOR_MIX_MATRIX[i][0]) / MOTOR_INPUT_MAX;
         int32 pitch_contrib = (pitch * MOTOR_MIX_MATRIX[i][1]) / MOTOR_INPUT_MAX;
-        int32 yaw_contrib   = (yaw   * MOTOR_MIX_MATRIX[i][2]) / MOTOR_INPUT_MAX;
+        int32 yaw_abs;
+        int32 yaw_room;
+        int32 scale_limit;
 
-        motor_out[i] = throttle + roll_contrib + pitch_contrib + yaw_contrib;
+        yaw_contrib[i] = (yaw * MOTOR_MIX_MATRIX[i][2]) / MOTOR_INPUT_MAX;
+        motor_out[i] = throttle + roll_contrib + pitch_contrib;
 
-        if (motor_out[i] > max_out) max_out = motor_out[i];
-        if (motor_out[i] < min_out) min_out = motor_out[i];
+        yaw_abs = abs_i(yaw_contrib[i]);
+        if (yaw_abs > 0)
+        {
+            if (yaw_contrib[i] > 0)
+            {
+                yaw_room = MOTOR_INPUT_MAX - motor_out[i];
+            }
+            else
+            {
+                yaw_room = motor_out[i] - MOTOR_IDLE_THROTTLE;
+            }
+
+            if (yaw_room < 0)
+            {
+                yaw_room = 0;
+            }
+            scale_limit = (yaw_room * MOTOR_INPUT_MAX) / yaw_abs;
+            if (scale_limit < yaw_scale)
+            {
+                yaw_scale = scale_limit;
+            }
+        }
     }
 
-    /* 饱和处理：如果超出范围，整体平移保持姿态控制能力 */
-    int32 offset = 0;
+    yaw_scale = clamp_i(yaw_scale, 0, MOTOR_INPUT_MAX);
 
-    if (max_out > MOTOR_INPUT_MAX)
-    {
-        /* 上限饱和：整体下移 */
-        offset = MOTOR_INPUT_MAX - max_out;
-    }
-    else if (min_out < MOTOR_IDLE_THROTTLE)
-    {
-        /* 下限饱和：整体上移，确保不低于怠速 */
-        offset = MOTOR_IDLE_THROTTLE - min_out;
-    }
-
-    /* 应用偏移并限幅输出（下限为怠速，防止BLDC失速） */
     for (uint8 i = 0; i < MOTOR_NUM; i++)
     {
-        motor_out[i] += offset;
+        motor_out[i] += (yaw_contrib[i] * yaw_scale) / MOTOR_INPUT_MAX;
         motor_out[i] = clamp_i(motor_out[i], MOTOR_IDLE_THROTTLE, MOTOR_INPUT_MAX);
 
         g_motor_state.output[i] = motor_out[i];

@@ -672,18 +672,32 @@ void FC_Loop_1000Hz(void)
         Motor_Mixer(&g_motor_cmd);
     }
 
+    // wifi_justfloat(tick_1000us_cnt,
+    //     target_height_m * 1000.0f,
+    //     g_tof1_height_mm,
+    //     g_tof2_height_mm,
+    //     g_tof3_height_mm,
+    //     g_tof4_height_mm,
+    //     g_tof_fused_height_mm,
+    //     height_pos_out,
+    //     g_height_fused_vz_mps,
+    //     g_imufilter_1000hz.accx,
+    //     g_imufilter_1000hz.accy,
+    //     g_imufilter_1000hz.accz,
+    //     g_euler.pitch,
+    //     g_euler.roll,
+    //     g_euler.yaw
+    //     );
+
+
     wifi_justfloat(tick_1000us_cnt,
         target_height_m * 1000.0f,
-        g_tof1_height_mm,
-        g_tof2_height_mm,
-        g_tof3_height_mm,
-        g_tof4_height_mm,
         g_tof_fused_height_mm,
         height_pos_out,
         g_height_fused_vz_mps,
-        g_imufilter_1000hz.accx,
-        g_imufilter_1000hz.accy,
-        g_imufilter_1000hz.accz,
+        g_imufilter_1000hz.gyroz,
+        g_motor_cmd.yaw,
+        g_motor_cmd.throttle,
         g_euler.pitch,
         g_euler.roll,
         g_euler.yaw

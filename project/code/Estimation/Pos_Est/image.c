@@ -12,6 +12,10 @@
 #define IMAGE_ADAPTIVE_THRESHOLD_TOP_LOW (50U) /* 阈值下限（防止过暗） */
 #define IMAGE_ADAPTIVE_THRESHOLD_TOP_HIGH (200U) /* 阈值上限（防止过亮） */
 #define IMAGE_ADAPTIVE_THRESHOLD_TOP_Y (0) /* 预留参数：上部区域分界行 */
+#define IMAGE_TARGET_PIXEL_X (94.0f) /* 目标投影点X坐标，左上角为原点 */
+#define IMAGE_TARGET_PIXEL_Y (100.0f) /* 目标投影点Y坐标，左上角为原点 */
+#define IMAGE_TARGET_CENTER_X (((float)MT9V03X_W * 0.5f) - IMAGE_TARGET_PIXEL_X) /* 目标投影点X中心系偏移 */
+#define IMAGE_TARGET_CENTER_Y (IMAGE_TARGET_PIXEL_Y - ((float)MT9V03X_H * 0.5f)) /* 目标投影点Y中心系偏移 */
 
 /* 内部完整单帧灰度图缓存，单位像素灰度值 */
 static uint8 s_image_frame[MT9V03X_H][MT9V03X_W];
@@ -417,9 +421,9 @@ static void image_find_connected_components(void)
             break;
         }
         g_image_circles[insert_slot].x =
-            ((float)MT9V03X_W * 0.5f) - ((float)s_sum_x[top_labels[insert_slot]] / (float)top_counts[insert_slot]);
+            (((float)MT9V03X_W * 0.5f) - ((float)s_sum_x[top_labels[insert_slot]] / (float)top_counts[insert_slot])) - IMAGE_TARGET_CENTER_X;
         g_image_circles[insert_slot].y =
-            ((float)s_sum_y[top_labels[insert_slot]] / (float)top_counts[insert_slot]) - ((float)MT9V03X_H * 0.5f);
+            (((float)s_sum_y[top_labels[insert_slot]] / (float)top_counts[insert_slot]) - ((float)MT9V03X_H * 0.5f)) - IMAGE_TARGET_CENTER_Y;
         g_image_circles[insert_slot].radius = sqrtf((float)top_counts[insert_slot] / 3.1415926f);
         g_image_circles[insert_slot].valid = 1U;
     }

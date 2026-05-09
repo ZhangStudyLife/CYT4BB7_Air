@@ -131,6 +131,19 @@ typedef struct
 
     /* ===== 位置估计参数 ===== */
     float pos_est_k_flow;              /* 光流速度融合权重，范围 0~1 */
+    /* ===== 模式 8 图像位置环参数 ===== */
+    float mode8_img_x_kp;              /* 模式8图像X位置环P增益 */
+    float mode8_img_x_ki;              /* 模式8图像X位置环I增益 */
+    float mode8_img_x_kd;              /* 模式8图像X位置环D增益 */
+    float mode8_img_x_kff;             /* 模式8图像X位置环前馈增益 */
+    float mode8_img_x_i_limit;         /* 模式8图像X位置环积分限幅 */
+    float mode8_img_x_d_lpf;           /* 模式8图像X位置环D项低通截止频率，单位Hz */
+    float mode8_img_y_kp;              /* 模式8图像Y位置环P增益 */
+    float mode8_img_y_ki;              /* 模式8图像Y位置环I增益 */
+    float mode8_img_y_kd;              /* 模式8图像Y位置环D增益 */
+    float mode8_img_y_kff;             /* 模式8图像Y位置环前馈增益 */
+    float mode8_img_y_i_limit;         /* 模式8图像Y位置环积分限幅 */
+    float mode8_img_y_d_lpf;           /* 模式8图像Y位置环D项低通截止频率，单位Hz */
 } fc_params_t;
 
 /* 飞控参数全局实例：运行时调参只会修改这份 RAM 变量 */

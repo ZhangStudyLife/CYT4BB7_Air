@@ -9,14 +9,14 @@ extern "C" {
 
 typedef struct
 {
-    float x;        /* 飞机在图像圆心的右侧 , X为正 */
-    float y;        /* 飞机在图像圆心的上方 , Y为正 */
+    float x;        /* 飞机相对目标投影点在右侧，X为正 */
+    float y;        /* 飞机相对目标投影点在前方，Y为正 */
     float radius;   /* 白色圆形目标半径，单位像素 */
     uint8 valid;    /* 白色圆形目标是否有效，1=有效，0=无效 */
 } image_circle;
 
 #define IMAGE_MAX_CIRCLE_COUNT (5U) /* 最多检测几个圆形目标 */
-#define IMAGE_MIN_COMPONENT_AREA (5U) /* 连通域最小面积阈值（像素数），小于该值不输出到圆形结果数组 */
+#define IMAGE_MIN_COMPONENT_AREA (10U) /* 连通域最小面积阈值（像素数），小于该值不输出到圆形结果数组 */
 extern image_circle g_image_circles[IMAGE_MAX_CIRCLE_COUNT]; /* 当前帧白色圆形目标检测结果,数组按照从大到小排序 */
 
 

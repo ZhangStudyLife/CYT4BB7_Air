@@ -147,7 +147,20 @@ static const wifi_params_entry_t s_wifi_params_table[] =
     WIFI_PARAMS_FLOAT_ITEM("mode1_track_ff_deg_per_cmps", mode1_track_ff_deg_per_cmps, 0.0f, 1.0f),
     WIFI_PARAMS_FLOAT_ITEM("mode1_brake_kp", mode1_brake_kp, 0.0f, 50.0f),
     WIFI_PARAMS_FLOAT_ITEM("mode1_brake_exit_vel_cmps", mode1_brake_exit_vel_cmps, 0.0f, 300.0f),
-    WIFI_PARAMS_FLOAT_ITEM("pos_est_k_flow", pos_est_k_flow, 0.0f, 1.0f)
+    WIFI_PARAMS_FLOAT_ITEM("pos_est_k_flow", pos_est_k_flow, 0.0f, 1.0f),
+
+    WIFI_PARAMS_FLOAT_ITEM("mode8_img_x_kp", mode8_img_x_kp, 0.0f, 3000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode8_img_x_ki", mode8_img_x_ki, 0.0f, 3000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode8_img_x_kd", mode8_img_x_kd, 0.0f, 3000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode8_img_x_kff", mode8_img_x_kff, 0.0f, 3000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode8_img_x_i_limit", mode8_img_x_i_limit, 0.0f, 5000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode8_img_x_d_lpf", mode8_img_x_d_lpf, 0.0f, 500.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode8_img_y_kp", mode8_img_y_kp, 0.0f, 3000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode8_img_y_ki", mode8_img_y_ki, 0.0f, 3000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode8_img_y_kd", mode8_img_y_kd, 0.0f, 3000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode8_img_y_kff", mode8_img_y_kff, 0.0f, 3000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode8_img_y_i_limit", mode8_img_y_i_limit, 0.0f, 5000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode8_img_y_d_lpf", mode8_img_y_d_lpf, 0.0f, 500.0f)
 };
 
 static wifi_params_diag_t s_wifi_params_diag = {0}; /* 最近一次参数命令处理诊断 */

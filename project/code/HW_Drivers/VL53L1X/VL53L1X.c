@@ -609,7 +609,8 @@ void VL53L1X_Update(void)
     uint8 ready_buf[VL53L1X_SENSOR_COUNT][2] = {0U};
     uint8 status_buf[VL53L1X_SENSOR_COUNT][2] = {0U};
     uint8 distance_buf[VL53L1X_SENSOR_COUNT][2] = {0U};
-    uint16 distance_mm = 0U;
+    uint16 raw_distance_mm = 0U;
+    uint16 clipped_distance_mm = 0U;
 
     for (index = 0U; index < VL53L1X_SENSOR_COUNT; index++)
     {
@@ -675,13 +676,14 @@ void VL53L1X_Update(void)
             continue;
         }
 
-        distance_mm = (uint16)(((uint16)distance_buf[index][0] << 8U) | distance_buf[index][1]);
-        if (distance_mm > (uint16)VL53L1X_VALID_RANGE_MAX)
+        raw_distance_mm = (uint16)(((uint16)distance_buf[index][0] << 8U) | distance_buf[index][1]);
+        clipped_distance_mm = raw_distance_mm;
+        if (clipped_distance_mm > (uint16)VL53L1X_VALID_RANGE_MAX)
         {
-            distance_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
+            clipped_distance_mm = (uint16)VL53L1X_VALID_RANGE_MAX;
         }
 
-        s_vl53l1x_data.distance_mm[index] = distance_mm;
+        s_vl53l1x_data.distance_mm[index] = clipped_distance_mm;
         s_vl53l1x_data.valid[index] = 1U;
     }
 }

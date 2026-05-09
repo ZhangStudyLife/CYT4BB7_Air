@@ -21,9 +21,9 @@ float g_height_fused_vz_mps = 0.0f;                            /* 控制环使�
 #define HEIGHT_EST_HEIGHT_LPF_ALPHA     0.22120f            /* 高度输出 4Hz 一阶低通系数 */
 #define HEIGHT_EST_HEIGHT_ALPHA         0.05f               /* 高度估计器 TOF 校正系数 */
 #define HEIGHT_EST_HEIGHT_RES_SOFT_M    0.08f               /* 高度估计器残差软门限，单位 m */
-#define HEIGHT_EST_HEIGHT_RES_HARD_M    0.22f               /* 高度估计器残差硬门限，单位 m */
+#define HEIGHT_EST_HEIGHT_RES_HARD_M    0.28f               /* 高度估计器残差硬门限，单位 m */
 #define HEIGHT_EST_HEIGHT_MISS_MAX      15U                 /* 高度估计器允许 TOF 短时丢失的 100Hz 次数 */
-#define HEIGHT_EST_HEIGHT_RELOCK_STEP_MM 12.0f              /* 高度估计器长丢失后单次重捕获限幅，单位 mm */
+#define HEIGHT_EST_HEIGHT_RELOCK_STEP_MM 20.0f              /* 高度估计器长丢失后单次重捕获限幅，单位 mm */
 #define HEIGHT_EST_VZ_LPF_ALPHA         0.39508f            /* 控制速度输出 8Hz 一阶低通系数 */
 #define HEIGHT_EST_VZ_OBS_ALPHA         0.14f               /* 控制速度观测器高度校正系数 */
 #define HEIGHT_EST_VZ_OBS_BETA          0.018f              /* 控制速度观测器速度校正系数 */
@@ -31,27 +31,27 @@ float g_height_fused_vz_mps = 0.0f;                            /* 控制环使�
 #define HEIGHT_EST_VZ_OBS_ACC_DEADBAND  0.26f               /* 控制速度观测器加速度死区，单位 m/s^2 */
 #define HEIGHT_EST_VZ_OBS_ACC_CLIP      4.0f                /* 控制速度观测器加速度限幅，单位 m/s^2 */
 #define HEIGHT_EST_VZ_OBS_RES_SOFT_M    0.08f               /* 控制速度观测器残差软门限，单位 m */
-#define HEIGHT_EST_VZ_OBS_RES_HARD_M    0.20f               /* 控制速度观测器残差硬门限，单位 m */
+#define HEIGHT_EST_VZ_OBS_RES_HARD_M    0.26f               /* 控制速度观测器残差硬门限，单位 m */
 #define HEIGHT_EST_VZ_OBS_DV_LIMIT      0.025f              /* 控制速度观测器单次速度校正限幅，单位 m/s */
 #define HEIGHT_EST_VZ_OBS_LIMIT_MPS     1.5f                /* 控制速度观测器输出速度限幅，单位 m/s */
 #define HEIGHT_EST_VZ_OBS_MISS_MAX      15U                 /* 控制速度观测器允许 TOF 短时丢失的 100Hz 次数 */
-#define HEIGHT_EST_TOF_TRIM_GATE_MM     80.0f               /* 控制速度观测器 TOF 截尾门限，单位 mm */
+#define HEIGHT_EST_TOF_TRIM_GATE_MM     110.0f              /* 控制速度观测器 TOF 截尾门限，单位 mm */
 #define HEIGHT_EST_TOF1_BIAS_MM         (-14.18f)            /* 1 号 TOF 相对偏置，单位 mm */
 #define HEIGHT_EST_TOF2_BIAS_MM         (14.33f)             /* 2 号 TOF 相对偏置，单位 mm */
 #define HEIGHT_EST_TOF3_BIAS_MM         (-37.02f)            /* 3 号 TOF 相对偏置，单位 mm */
 #define HEIGHT_EST_TOF4_BIAS_MM         (55.94f)             /* 4 号 TOF 相对偏置，单位 mm */
 #define HEIGHT_EST_MEDIAN_WIN           3U                  /* 单路 TOF 中值滤波窗口长度 */
-#define HEIGHT_EST_STEP_LIMIT_MM        30.0f               /* 单路 TOF 每次更新最大跳变，单位 mm */
+#define HEIGHT_EST_STEP_LIMIT_MM        45.0f               /* 单路 TOF 每次更新最大跳变，单位 mm */
 #define HEIGHT_EST_VEL_DECAY            0.95f               /* TOF 长时间无效后的速度衰减系数 */
 #define HEIGHT_EST_WEIGHT_EPS           0.001f              /* 融合权重有效下限 */
 #define HEIGHT_EST_TOF_PITCH_ARM_MM     65.40f              /* TOF 相对中心的 pitch 力臂，单位 mm */
 #define HEIGHT_EST_TOF_ROLL_ARM_MM      84.81f              /* TOF 相对中心的 roll 力臂，单位 mm */
 #define HEIGHT_EST_TOF_VALID_MIN_MM     50.0f               /* TOF 原始测距有效最小值，单位 mm */
-#define HEIGHT_EST_TOF_VALID_MAX_MM     1290.0f             /* TOF 原始测距有效最大值，单位 mm */
+#define HEIGHT_EST_TOF_VALID_MAX_MM     VL53L1X_VALID_RANGE_MAX /* TOF 原始测距有效最大值，单位 mm */
 #define HEIGHT_EST_TOF_MIN_COUNT        3U                  /* 高度融合最少 TOF 有效路数 */
-#define HEIGHT_EST_TOF_SPREAD_GOOD_MM   120.0f              /* TOF 样本离散良好门限，单位 mm */
-#define HEIGHT_EST_TOF_SPREAD_OK_MM     180.0f              /* TOF 样本离散可用门限，单位 mm */
-#define HEIGHT_EST_STATE_MAX_MM         1600.0f             /* 高度内部状态最大值，单位 mm */
+#define HEIGHT_EST_TOF_SPREAD_GOOD_MM   150.0f              /* TOF 样本离散良好门限，单位 mm */
+#define HEIGHT_EST_TOF_SPREAD_OK_MM     240.0f              /* TOF 样本离散可用门限，单位 mm */
+#define HEIGHT_EST_STATE_MAX_MM         VL53L1X_VALID_RANGE_MAX /* 高度内部状态最大值，单位 mm */
 
 static Median_t s_tof_median[VL53L1X_SENSOR_COUNT];          /* 四路 TOF 中值滤波状态 */
 static StepLim_t s_tof_step[VL53L1X_SENSOR_COUNT];           /* 四路 TOF 步进限幅状态 */
@@ -618,7 +618,7 @@ void TOF_update_100HZ(void)
     {
         if ((0U != tof_data->valid[HEIGHT_EST_TOF1_INDEX]) &&
             ((float)tof_data->distance_mm[HEIGHT_EST_TOF1_INDEX] >= HEIGHT_EST_TOF_VALID_MIN_MM) &&
-            ((float)tof_data->distance_mm[HEIGHT_EST_TOF1_INDEX] < HEIGHT_EST_TOF_VALID_MAX_MM))
+            ((float)tof_data->distance_mm[HEIGHT_EST_TOF1_INDEX] <= HEIGHT_EST_TOF_VALID_MAX_MM))
         {
             tof_height_mm[HEIGHT_EST_TOF1_INDEX] = HeightEst_ProcessChannel(HEIGHT_EST_TOF1_INDEX, tof_data->distance_mm[HEIGHT_EST_TOF1_INDEX]);
             tof_valid[HEIGHT_EST_TOF1_INDEX] = 1U;
@@ -630,7 +630,7 @@ void TOF_update_100HZ(void)
 
         if ((0U != tof_data->valid[HEIGHT_EST_TOF2_INDEX]) &&
             ((float)tof_data->distance_mm[HEIGHT_EST_TOF2_INDEX] >= HEIGHT_EST_TOF_VALID_MIN_MM) &&
-            ((float)tof_data->distance_mm[HEIGHT_EST_TOF2_INDEX] < HEIGHT_EST_TOF_VALID_MAX_MM))
+            ((float)tof_data->distance_mm[HEIGHT_EST_TOF2_INDEX] <= HEIGHT_EST_TOF_VALID_MAX_MM))
         {
             tof_height_mm[HEIGHT_EST_TOF2_INDEX] = HeightEst_ProcessChannel(HEIGHT_EST_TOF2_INDEX, tof_data->distance_mm[HEIGHT_EST_TOF2_INDEX]);
             tof_valid[HEIGHT_EST_TOF2_INDEX] = 1U;
@@ -642,7 +642,7 @@ void TOF_update_100HZ(void)
 
         if ((0U != tof_data->valid[HEIGHT_EST_TOF3_INDEX]) &&
             ((float)tof_data->distance_mm[HEIGHT_EST_TOF3_INDEX] >= HEIGHT_EST_TOF_VALID_MIN_MM) &&
-            ((float)tof_data->distance_mm[HEIGHT_EST_TOF3_INDEX] < HEIGHT_EST_TOF_VALID_MAX_MM))
+            ((float)tof_data->distance_mm[HEIGHT_EST_TOF3_INDEX] <= HEIGHT_EST_TOF_VALID_MAX_MM))
         {
             tof_height_mm[HEIGHT_EST_TOF3_INDEX] = HeightEst_ProcessChannel(HEIGHT_EST_TOF3_INDEX, tof_data->distance_mm[HEIGHT_EST_TOF3_INDEX]);
             tof_valid[HEIGHT_EST_TOF3_INDEX] = 1U;
@@ -654,7 +654,7 @@ void TOF_update_100HZ(void)
 
         if ((0U != tof_data->valid[HEIGHT_EST_TOF4_INDEX]) &&
             ((float)tof_data->distance_mm[HEIGHT_EST_TOF4_INDEX] >= HEIGHT_EST_TOF_VALID_MIN_MM) &&
-            ((float)tof_data->distance_mm[HEIGHT_EST_TOF4_INDEX] < HEIGHT_EST_TOF_VALID_MAX_MM))
+            ((float)tof_data->distance_mm[HEIGHT_EST_TOF4_INDEX] <= HEIGHT_EST_TOF_VALID_MAX_MM))
         {
             tof_height_mm[HEIGHT_EST_TOF4_INDEX] = HeightEst_ProcessChannel(HEIGHT_EST_TOF4_INDEX, tof_data->distance_mm[HEIGHT_EST_TOF4_INDEX]);
             tof_valid[HEIGHT_EST_TOF4_INDEX] = 1U;

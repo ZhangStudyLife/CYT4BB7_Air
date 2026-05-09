@@ -582,6 +582,16 @@ void FC_Loop_100Hz(void)
         FC_Mode0_100Hz();
         break;
     }
+    const VL53L1X_data_struct *temp = VL53L1X_GetData();
+    wifi_justfloat(tick_1000us_cnt,
+        temp->distance_mm[0],temp->valid[0],
+        temp->distance_mm[1],temp->valid[1],
+        temp->distance_mm[2],temp->valid[2],
+        temp->distance_mm[3],temp->valid[3],
+        g_tof_fused_height_mm, g_tof_fused_valid
+    );
+
+
 
     // wifi_justfloat(tick_1000us_cnt,fc_state,
     //                target_height_m * 1000.0f,

@@ -4,7 +4,7 @@
 #include "zf_common_headfile.h"
 
 /* TOF 最大有效测距，单位 mm */
-#define VL53L1X_VALID_RANGE_MAX          (1300.0f)
+#define VL53L1X_VALID_RANGE_MAX          (1400.0f)
 /* TOF 无效距离哨兵值，单位 mm */
 #define VL53L1X_INVALID_DISTANCE_MM      (8192U)
 /* 当前使用四路 TOF */

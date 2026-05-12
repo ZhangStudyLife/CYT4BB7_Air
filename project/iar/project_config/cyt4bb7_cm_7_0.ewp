@@ -3563,6 +3563,15 @@
         <group>
             <name>Protocols</name>
             <group>
+                <name>AirComm</name>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\AirComm\air_comm_air.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\AirComm\air_comm_air.h</name>
+                </file>
+            </group>
+            <group>
                 <name>crsf</name>
                 <file>
                     <name>$PROJ_DIR$\..\..\code\Protocols\crsf\crsf.c</name>

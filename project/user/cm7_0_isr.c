@@ -51,6 +51,7 @@ void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数
         g_tick_1000HZ++;
     }
     tick_1000us_cnt++;
+    air_comm_air_tick_1MS();
 }
 
 void pit0_ch1_isr()                     // 定时器通道 1 周期中断服务函数      
@@ -182,6 +183,12 @@ void uart2_isr (void)
 {
     if(uart_isr_mask(UART_2))            // 串口2接收中断
     {
+        uint8 dat;
+
+        while(uart_query_byte(UART_2, &dat))
+        {
+            air_comm_air_rx_byte(dat);
+        }
         // LC302_uart_handler_Aux();        // LC302 Aux 光流模块回调函数
     }
     else                                // 串口2发送中断

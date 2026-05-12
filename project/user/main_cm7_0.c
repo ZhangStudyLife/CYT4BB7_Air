@@ -101,6 +101,7 @@ int main(void)
     Motor_Init();
     ipc_communicate_init(IPC_PORT_1, ipc_image_callback);
     FC_START_CRSF_Init();
+    air_comm_air_init();
     wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
     pit_us_init(PIT_CH0, 1000);
     pit_ms_init(PIT_CH1, 10);
@@ -148,6 +149,7 @@ int main(void)
             Height_Est_update_100HZ();
             CRSF_Update_100HZ();
             FC_Loop_100Hz();
+            air_comm_air_update_100HZ();
             wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
             {
                 uint8 flying = (FC_START_CRSF_STATE_FLYING == FC_START_CRSF_Get_State()) ? 1U : 0U;
@@ -216,5 +218,6 @@ int main(void)
 #if (0U == WIFI_IMAGE_ENABLE)
         wifi_cmd_Poll();
 #endif
+        air_comm_air_poll();
     }
 }

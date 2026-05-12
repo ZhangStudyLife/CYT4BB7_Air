@@ -182,7 +182,7 @@ void uart2_isr (void)
 {
     if(uart_isr_mask(UART_2))            // 串口2接收中断
     {
-        LC302_uart_handler_Aux();        // LC302 Aux 光流模块回调函数
+        // LC302_uart_handler_Aux();        // LC302 Aux 光流模块回调函数
     }
     else                                // 串口2发送中断
     {

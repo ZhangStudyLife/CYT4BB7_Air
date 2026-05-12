@@ -245,7 +245,7 @@ void Pos_Est_Init(void)
 {
     // PMW3901_Init();
     LC302_Init();
-    LC302_Init_Aux();
+    // LC302_Init_Aux();
     // FlowGyroDecoupler_Init();
     FlowGyroDecoupler_LC302_Init();
     LPF1_Init(&s_opflow_vel_lp_x, POS_EST_OPFLOW_VEL_LPF_ALPHA);
@@ -426,7 +426,7 @@ void Pos_Est_Update_50HZ(void)
 
     // PMW3901_Update_50HZ();
     LC302_Update_50HZ();
-    LC302_Update_50HZ_Aux();
+    // LC302_Update_50HZ_Aux();
     // FlowGyroDecoupler_Update50Hz(tick_1000us_cnt, g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY);
     (void)FlowGyroDecoupler_LC302_Update50Hz(tick_1000us_cnt, lc302_data.flow_x_integral, lc302_data.flow_y_integral, lc302_data.valid);
     dec_x = FlowGyroDecoupler_LC302_GetDecX();

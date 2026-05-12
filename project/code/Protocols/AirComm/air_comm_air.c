@@ -1,5 +1,12 @@
 #include "air_comm_air.h"
 
+#include "FlightController/fc_loop.h"
+#include "FlightController/fc_params.h"
+#include "FlightController/fc_start_crsf.h"
+
+#define AIR_COMM_MSG_GET_PARAM               (0x07U)
+#define AIR_COMM_MSG_ACK_GET_PARAM           (0x08U)
+
 /* 帧头 4 字节：0xAA 0xAA 0x55 0x55，选这个是为了在串口噪声中容易识别 */
 #define AIR_COMM_HEADER_0                    (0xAAU)
 #define AIR_COMM_HEADER_1                    (0xAAU)
@@ -10,7 +17,7 @@
 #define AIR_COMM_FRAME_OVERHEAD              (9U)    /* 帧开销：4帧头 + type + seq + len + 2crc */
 #define AIR_COMM_MAX_FRAME                   (AIR_COMM_MAX_PAYLOAD + AIR_COMM_FRAME_OVERHEAD)
 #define AIR_COMM_RX_QUEUE_SIZE               (512U)  /* 接收环形队列大小（字节） */
-#define AIR_COMM_PARAM_TABLE_MAX             (12U)   /* 最多注册参数个数 */
+#define AIR_COMM_PARAM_TABLE_MAX             (100U)  /* 最多注册参数个数 */
 #define AIR_COMM_FUNC_TABLE_MAX              (16U)   /* 最多注册函数个数 */
 
 /* 消息类型定义 */
@@ -19,7 +26,7 @@
 #define AIR_COMM_MSG_EXEC_FUNC               (0x03U) /* 小车→无人机：调用函数 */
 #define AIR_COMM_MSG_ACK_FUNC                (0x04U) /* 无人机→小车：函数调用回执 */
 #define AIR_COMM_MSG_HEARTBEAT               (0x05U) /* 双向：心跳 */
-#define AIR_COMM_MSG_RUN_DATA                (0x06U) /* 无人机→小车：运行数据上报 */
+#define AIR_COMM_MSG_RUN_DATA                (0x06U) /* 双向：实时数据 */
 
 #define AIR_COMM_HEARTBEAT_MS                (200U)  /* 心跳发送间隔（ms） */
 #define AIR_COMM_OFFLINE_MS                  (600U)  /* 超过此时间没收到心跳判定离线 */
@@ -28,10 +35,17 @@
 typedef struct
 {
     const char *name;
-    float *var;
+    void *var;
+    uint8 type;
     float min;
     float max;
 } air_comm_air_param_t;
+
+#define AIR_COMM_REGISTER_FLOAT(member, min_v, max_v) \
+    (void)air_comm_air_register_param(#member, &g_fc_params.member, AIR_COMM_AIR_PARAM_TYPE_FLOAT, (min_v), (max_v))
+
+#define AIR_COMM_REGISTER_INT32(member, min_v, max_v) \
+    (void)air_comm_air_register_param(#member, &g_fc_params.member, AIR_COMM_AIR_PARAM_TYPE_INT32, (float)(min_v), (float)(max_v))
 
 /* 函数表条目：func_id 编号 + 函数指针 */
 typedef struct
@@ -87,6 +101,10 @@ static air_comm_air_rx_queue_t s_air_comm_rx_queue;     /* 接收环形队列 */
 static air_comm_air_stats_t s_air_comm_stats;           /* 统计计数器 */
 static air_comm_air_param_t s_air_comm_params[AIR_COMM_PARAM_TABLE_MAX]; /* 参数表 */
 static air_comm_air_func_t s_air_comm_funcs[AIR_COMM_FUNC_TABLE_MAX];    /* 函数表 */
+static air_comm_run_data_fn s_air_comm_run_data_callback;
+static float s_air_comm_last_run_data[AIR_COMM_AIR_RUN_DATA_MAX_FLOATS];
+static uint8 s_air_comm_last_run_data_count;
+static uint8 s_air_comm_last_run_data_valid;
 static uint8 s_air_comm_param_count = 0U;  /* 已注册参数数 */
 static uint8 s_air_comm_func_count = 0U;   /* 已注册函数数 */
 
@@ -296,6 +314,34 @@ static uint8 air_comm_send_ack_param(uint8 seq,
     return air_comm_send_frame(AIR_COMM_MSG_ACK_PARAM, seq, payload, pos);
 }
 
+static uint8 air_comm_send_ack_get_param(uint8 seq,
+                                         uint8 status,
+                                         const uint8 *name,
+                                         uint8 name_len,
+                                         float actual)
+{
+    uint8 payload[2U + AIR_COMM_AIR_PARAM_NAME_MAX + 4U];
+    uint8 pos = 0U;
+
+    if(name_len > AIR_COMM_AIR_PARAM_NAME_MAX)
+    {
+        name_len = 0U;
+        name = NULL;
+    }
+
+    payload[pos++] = status;
+    payload[pos++] = name_len;
+    if((name_len > 0U) && (name != NULL))
+    {
+        memcpy(&payload[pos], name, name_len);
+        pos = (uint8)(pos + name_len);
+    }
+    air_comm_write_float(&payload[pos], actual);
+    pos = (uint8)(pos + 4U);
+
+    return air_comm_send_frame(AIR_COMM_MSG_ACK_GET_PARAM, seq, payload, pos);
+}
+
 /* 发送函数调用回执，告知小车调用结果（result 目前保留为 0） */
 static uint8 air_comm_send_ack_func(uint8 seq, uint8 func_id, uint8 status, float result)
 {
@@ -329,6 +375,38 @@ static air_comm_air_param_t *air_comm_find_param(const uint8 *name, uint8 name_l
     }
 
     return NULL;
+}
+
+static float air_comm_param_read(const air_comm_air_param_t *param)
+{
+    if(param == NULL)
+    {
+        return 0.0f;
+    }
+
+    if(param->type == AIR_COMM_AIR_PARAM_TYPE_INT32)
+    {
+        return (float)(*(const int32_t *)param->var);
+    }
+
+    return *(const float *)param->var;
+}
+
+static void air_comm_param_write(air_comm_air_param_t *param, float value)
+{
+    if(param == NULL)
+    {
+        return;
+    }
+
+    if(param->type == AIR_COMM_AIR_PARAM_TYPE_INT32)
+    {
+        *(int32_t *)param->var = (int32_t)value;
+    }
+    else
+    {
+        *(float *)param->var = value;
+    }
 }
 
 /* 按 func_id 在函数表中查找，找不到返回 NULL */
@@ -389,23 +467,35 @@ static void air_comm_handle_set_param(uint8 seq, const uint8 *payload, uint8 len
     {
         status = AIR_COMM_AIR_STATUS_NOT_FOUND;
     }
+    else if(FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
+    {
+        actual = air_comm_param_read(param);
+        status = AIR_COMM_AIR_STATUS_ERROR;
+    }
     else if(value < param->min)
     {
         actual = param->min;
-        *(param->var) = actual;
+        air_comm_param_write(param, actual);
         status = AIR_COMM_AIR_STATUS_OUT_OF_RANGE;
     }
     else if(value > param->max)
     {
         actual = param->max;
-        *(param->var) = actual;
+        air_comm_param_write(param, actual);
         status = AIR_COMM_AIR_STATUS_OUT_OF_RANGE;
     }
     else
     {
         actual = value;
-        *(param->var) = actual;
+        air_comm_param_write(param, actual);
         status = AIR_COMM_AIR_STATUS_OK;
+    }
+
+    if((param != NULL) &&
+       (status != AIR_COMM_AIR_STATUS_ERROR))
+    {
+        actual = air_comm_param_read(param);
+        FC_Loop_Init();
     }
 
     if(status == AIR_COMM_AIR_STATUS_OK)
@@ -418,6 +508,44 @@ static void air_comm_handle_set_param(uint8 seq, const uint8 *payload, uint8 len
     }
 
     (void)air_comm_send_ack_param(seq, status, name, name_len, actual);
+}
+
+static void air_comm_handle_get_param(uint8 seq, const uint8 *payload, uint8 len)
+{
+    uint8 name_len;
+    const uint8 *name;
+    float actual = 0.0f;
+    uint8 status = AIR_COMM_AIR_STATUS_ERROR;
+    air_comm_air_param_t *param = NULL;
+
+    if((payload == NULL) || (len < 1U))
+    {
+        (void)air_comm_send_ack_get_param(seq, status, NULL, 0U, actual);
+        return;
+    }
+
+    name_len = payload[0];
+    name = &payload[1];
+    if((name_len == 0U) ||
+       (name_len > AIR_COMM_AIR_PARAM_NAME_MAX) ||
+       (len < (uint8)(1U + name_len)))
+    {
+        (void)air_comm_send_ack_get_param(seq, status, NULL, 0U, actual);
+        return;
+    }
+
+    param = air_comm_find_param(name, name_len);
+    if(param == NULL)
+    {
+        status = AIR_COMM_AIR_STATUS_NOT_FOUND;
+    }
+    else
+    {
+        actual = air_comm_param_read(param);
+        status = AIR_COMM_AIR_STATUS_OK;
+    }
+
+    (void)air_comm_send_ack_get_param(seq, status, name, name_len, actual);
 }
 
 /*
@@ -459,6 +587,48 @@ static void air_comm_handle_exec_func(uint8 seq, const uint8 *payload, uint8 len
     (void)air_comm_send_ack_func(seq, func_id, status, 0.0f);
 }
 
+static void air_comm_handle_run_data(const uint8 *payload, uint8 len)
+{
+    uint8 count;
+    uint16 required_len;
+    uint8 index;
+    float data[AIR_COMM_AIR_RUN_DATA_MAX_FLOATS];
+
+    if((payload == NULL) || (len < 1U))
+    {
+        return;
+    }
+
+    count = payload[0];
+    if(count > AIR_COMM_AIR_RUN_DATA_MAX_FLOATS)
+    {
+        return;
+    }
+
+    required_len = (uint16)(1U + ((uint16)count * 4U));
+    if((uint16)len < required_len)
+    {
+        return;
+    }
+
+    for(index = 0U; index < count; index++)
+    {
+        data[index] = air_comm_read_float(&payload[1U + ((uint16)index * 4U)]);
+    }
+
+    if(count > 0U)
+    {
+        memcpy(s_air_comm_last_run_data, data, (size_t)count * sizeof(float));
+    }
+    s_air_comm_last_run_data_count = count;
+    s_air_comm_last_run_data_valid = 1U;
+
+    if(s_air_comm_run_data_callback != NULL)
+    {
+        s_air_comm_run_data_callback(data, count);
+    }
+}
+
 /* 帧分发：根据消息类型调用对应的处理函数 */
 static void air_comm_handle_frame(uint8 type, uint8 seq, const uint8 *payload, uint8 len)
 {
@@ -472,9 +642,17 @@ static void air_comm_handle_frame(uint8 type, uint8 seq, const uint8 *payload, u
             air_comm_handle_exec_func(seq, payload, len);
             break;
 
+        case AIR_COMM_MSG_GET_PARAM:
+            air_comm_handle_get_param(seq, payload, len);
+            break;
+
         case AIR_COMM_MSG_HEARTBEAT:
             s_air_comm_stats.heartbeat_rx_count++;
             air_comm_mark_car_online();
+            break;
+
+        case AIR_COMM_MSG_RUN_DATA:
+            air_comm_handle_run_data(payload, len);
             break;
 
         default:
@@ -696,26 +874,122 @@ void air_comm_air_init(void)
     memset(&s_air_comm_stats, 0, sizeof(s_air_comm_stats));
     memset(s_air_comm_params, 0, sizeof(s_air_comm_params));
     memset(s_air_comm_funcs, 0, sizeof(s_air_comm_funcs));
+    memset(s_air_comm_last_run_data, 0, sizeof(s_air_comm_last_run_data));
 
     s_air_comm_initialized = 0U;
     s_air_comm_seq = 0U;
     s_air_comm_tick_ms = 0U;
     s_air_comm_last_heartbeat_ms = 0U;
     s_air_comm_last_car_ms = 0U;
+    s_air_comm_run_data_callback = NULL;
+    s_air_comm_last_run_data_count = 0U;
+    s_air_comm_last_run_data_valid = 0U;
     s_air_comm_param_count = 0U;
     s_air_comm_func_count = 0U;
 
-    /* 重置可远程调参的默认值 */
-    air_min_area = 5.0f;
-    air_hold_ms = 30.0f;
-    air_x_bias = 0.0f;
-    air_y_bias = 0.0f;
+    AIR_COMM_REGISTER_FLOAT(gyro_dt, 0.0001f, 0.1f);
+    AIR_COMM_REGISTER_FLOAT(angle_dt, 0.0001f, 0.1f);
+    AIR_COMM_REGISTER_FLOAT(pos_xy_dt, 0.0001f, 0.2f);
+    AIR_COMM_REGISTER_FLOAT(pos_z_dt, 0.0001f, 0.2f);
+    AIR_COMM_REGISTER_FLOAT(vel_xy_dt, 0.0001f, 0.2f);
+    AIR_COMM_REGISTER_FLOAT(vel_z_dt, 0.0001f, 0.2f);
+    AIR_COMM_REGISTER_INT32(base_throttle, 0, 6000);
+    AIR_COMM_REGISTER_FLOAT(roll_mech_trim_deg, -30.0f, 30.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_mech_trim_deg, -30.0f, 30.0f);
 
-    /* 注册 4 个可被小车远程设置的参数 */
-    (void)air_comm_air_register_param("air_min_area", &air_min_area, 0.0f, 500.0f);
-    (void)air_comm_air_register_param("air_hold_ms", &air_hold_ms, 0.0f, 200.0f);
-    (void)air_comm_air_register_param("air_x_bias", &air_x_bias, -40.0f, 40.0f);
-    (void)air_comm_air_register_param("air_y_bias", &air_y_bias, -40.0f, 40.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_gyro_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_gyro_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_gyro_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_gyro_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_gyro_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_gyro_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_gyro_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_gyro_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_gyro_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_gyro_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_gyro_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_gyro_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_gyro_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_gyro_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_gyro_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_gyro_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_gyro_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_gyro_d_lpf, 0.0f, 500.0f);
+
+    AIR_COMM_REGISTER_FLOAT(roll_angle_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_angle_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_angle_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_angle_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_angle_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_angle_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_angle_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_angle_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_angle_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_angle_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_angle_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_angle_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_angle_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_angle_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_angle_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_angle_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_angle_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_angle_d_lpf, 0.0f, 500.0f);
+
+    AIR_COMM_REGISTER_FLOAT(pos_x_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pos_x_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pos_x_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pos_x_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pos_x_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(pos_x_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(pos_y_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pos_y_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pos_y_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pos_y_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pos_y_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(pos_y_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(pos_z_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pos_z_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pos_z_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pos_z_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pos_z_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(pos_z_d_lpf, 0.0f, 500.0f);
+
+    AIR_COMM_REGISTER_FLOAT(vel_x_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_x_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_x_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_x_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_x_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_x_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_y_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_y_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_y_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_y_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_y_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_y_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_z_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_z_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_z_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_z_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_z_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_z_d_lpf, 0.0f, 500.0f);
+
+    AIR_COMM_REGISTER_FLOAT(mode1_track_ff_deg_per_cmps, 0.0f, 1.0f);
+    AIR_COMM_REGISTER_FLOAT(mode1_brake_kp, 0.0f, 50.0f);
+    AIR_COMM_REGISTER_FLOAT(mode1_brake_exit_vel_cmps, 0.0f, 300.0f);
+    AIR_COMM_REGISTER_FLOAT(pos_est_k_flow, 0.0f, 1.0f);
+
+    AIR_COMM_REGISTER_FLOAT(mode8_img_x_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_x_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_x_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_x_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_x_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_x_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_y_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_y_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_y_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_y_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_y_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_y_d_lpf, 0.0f, 500.0f);
 
     /* 配置 UART_2：波特率 1152000，TX=P10_1，RX=P10_0，开接收中断 */
     uart_init(UART_2, AIR_COMM_AIR_BAUDRATE, UART2_TX_P10_1, UART2_RX_P10_0);
@@ -818,11 +1092,11 @@ uint8 air_comm_air_is_car_online(void)
  * 同名参数会更新绑定的变量和范围（不会重复占位）。
  * 名字长度超过 16 字节（不含 '\0'）会失败。
  */
-uint8 air_comm_air_register_param(const char *name, float *var, float min, float max)
+uint8 air_comm_air_register_param(const char *name, void *var, uint8 type, float min, float max)
 {
     uint8 i;
 
-    if((name == NULL) || (var == NULL) || (min > max))
+    if((name == NULL) || (var == NULL) || (min > max) || (type > AIR_COMM_AIR_PARAM_TYPE_INT32))
     {
         return 0U;
     }
@@ -833,6 +1107,7 @@ uint8 air_comm_air_register_param(const char *name, float *var, float min, float
         if(strcmp(s_air_comm_params[i].name, name) == 0)
         {
             s_air_comm_params[i].var = var;
+            s_air_comm_params[i].type = type;
             s_air_comm_params[i].min = min;
             s_air_comm_params[i].max = max;
             return 1U;
@@ -851,6 +1126,7 @@ uint8 air_comm_air_register_param(const char *name, float *var, float min, float
 
     s_air_comm_params[s_air_comm_param_count].name = name;
     s_air_comm_params[s_air_comm_param_count].var = var;
+    s_air_comm_params[s_air_comm_param_count].type = type;
     s_air_comm_params[s_air_comm_param_count].min = min;
     s_air_comm_params[s_air_comm_param_count].max = max;
     s_air_comm_param_count++;
@@ -899,7 +1175,7 @@ uint8 air_comm_air_register_func(uint8 func_id, void (*func)(void))
  * 最多 32 个 float，每个 4 字节，小端序。
  * 发送成功才自增 seq。
  */
-uint8 air_comm_air_send_run_data(const float *data, uint8 count)
+uint8 air_comm_send_run_data(const float *data, uint8 count)
 {
     uint8 payload[1U + (AIR_COMM_AIR_RUN_DATA_MAX_FLOATS * 4U)];
     uint8 pos = 0U;
@@ -927,6 +1203,42 @@ uint8 air_comm_air_send_run_data(const float *data, uint8 count)
     }
 
     s_air_comm_seq++;
+    return 1U;
+}
+
+uint8 air_comm_air_send_run_data(const float *data, uint8 count)
+{
+    return air_comm_send_run_data(data, count);
+}
+
+void air_comm_set_run_data_callback(air_comm_run_data_fn callback)
+{
+    s_air_comm_run_data_callback = callback;
+}
+
+uint8 air_comm_get_last_run_data(float *data, uint8 max_count, uint8 *count)
+{
+    if(count != NULL)
+    {
+        *count = 0U;
+    }
+
+    if((data == NULL) ||
+       (count == NULL) ||
+       (s_air_comm_last_run_data_valid == 0U) ||
+       (max_count < s_air_comm_last_run_data_count))
+    {
+        return 0U;
+    }
+
+    if(s_air_comm_last_run_data_count > 0U)
+    {
+        memcpy(data,
+               s_air_comm_last_run_data,
+               (size_t)s_air_comm_last_run_data_count * sizeof(float));
+    }
+    *count = s_air_comm_last_run_data_count;
+
     return 1U;
 }
 

@@ -583,30 +583,30 @@ void FC_Loop_100Hz(void)
         break;
     }
     {
-        air_comm_air_stats_t air_stats;
+        // air_comm_air_stats_t air_stats;
 
-        memset(&air_stats, 0, sizeof(air_stats));
-        air_comm_air_get_stats(&air_stats);
-        wifi_justfloat((float)tick_1000us_cnt,
-                       (float)air_stats.online_status,
-                       (float)air_stats.heartbeat_rx_count,
-                       (float)air_stats.heartbeat_tx_count,
-                       (float)air_stats.rx_frame_count,
-                       (float)air_stats.tx_frame_count,
-                       (float)air_stats.set_param_ok_count,
-                       (float)air_stats.set_param_fail_count,
-                       (float)air_stats.exec_func_ok_count,
-                       (float)air_stats.exec_func_fail_count,
-                       (float)air_stats.crc_error_count,
-                       (float)air_stats.rx_queue_overflow_count,
-                       air_min_area,
-                       air_hold_ms,
-                       air_x_bias,
-                       air_y_bias);
+        // memset(&air_stats, 0, sizeof(air_stats));
+        // air_comm_air_get_stats(&air_stats);
+        // wifi_justfloat((float)tick_1000us_cnt,
+        //                (float)air_stats.online_status,
+        //                (float)air_stats.heartbeat_rx_count,
+        //                (float)air_stats.heartbeat_tx_count,
+        //                (float)air_stats.rx_frame_count,
+        //                (float)air_stats.tx_frame_count,
+        //                (float)air_stats.set_param_ok_count,
+        //                (float)air_stats.set_param_fail_count,
+        //                (float)air_stats.exec_func_ok_count,
+        //                (float)air_stats.exec_func_fail_count,
+        //                (float)air_stats.crc_error_count,
+        //                (float)air_stats.rx_queue_overflow_count,
+        //                air_min_area,
+        //                air_hold_ms,
+        //                air_x_bias,
+        //                air_y_bias);
     }
 
-
-
+    // 依托这个确认了车端的flash确实有效以及确实可以修改飞机的参数
+    // wifi_justfloat((float)air_comm_air_is_car_online(),g_fc_params.roll_gyro_kp,g_fc_params.base_throttle);
     // wifi_justfloat(tick_1000us_cnt,fc_state,
     //                target_height_m * 1000.0f,
     //                g_tof_fused_height_mm,

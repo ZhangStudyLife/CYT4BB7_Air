@@ -6,7 +6,7 @@
 /*
  * 模块作用：
  * 无人机端车空串口通信模块。无人机 CYT4BB7 通过 UART_2 与小车 CYT4BB7 通信，
- * 支持参数远程设置、函数远程调用、心跳保活和运行数据上报。
+ * 支持参数远程设置、函数远程调用、心跳保活和实时数据双向收发。
  *
  * 角色关系：
  * 小车是"主机"，主动发 SET_PARAM / EXEC_FUNC / HEARTBEAT 给无人机。
@@ -23,7 +23,7 @@
  * 0x03 EXEC_FUNC  小车→无人机  远程调用函数
  * 0x04 ACK_FUNC   无人机→小车  函数调用结果回执
  * 0x05 HEARTBEAT  双向          心跳包，payload 带 tick_ms 时间戳
- * 0x06 RUN_DATA   无人机→小车  运行数据上报（float 数组）
+ * 0x06 RUN_DATA   双向          实时数据（float 数组，不需要 ACK）
  *
  * 在线判断：
  * 无人机每 200ms 发一次心跳，小车也每 200ms 发一次。
@@ -34,8 +34,8 @@
  * RX 中断收到字节后放进环形队列，poll 函数消费队列并解析。
  */
 
-#define AIR_COMM_AIR_PARAM_NAME_MAX          (16U)   /* 参数名最大长度（不含 '\0'） */
-#define AIR_COMM_AIR_RUN_DATA_MAX_FLOATS     (32U)   /* 单次运行数据上报最多 float 个数 */
+#define AIR_COMM_AIR_PARAM_NAME_MAX          (32U)   /* 参数名最大长度（不含 '\0'） */
+#define AIR_COMM_AIR_RUN_DATA_MAX_FLOATS     (32U)   /* 单次实时数据最多 float 个数 */
 #define AIR_COMM_AIR_BAUDRATE                (1152000U) /* UART 波特率 */
 
 /* 参数/函数操作返回状态 */
@@ -43,6 +43,11 @@
 #define AIR_COMM_AIR_STATUS_NOT_FOUND        (1U)    /* 参数名或 func_id 未注册 */
 #define AIR_COMM_AIR_STATUS_OUT_OF_RANGE     (2U)    /* 值超出 [min, max]，已限幅 */
 #define AIR_COMM_AIR_STATUS_ERROR            (3U)    /* 通用错误（payload 长度不对等） */
+
+#define AIR_COMM_AIR_PARAM_TYPE_FLOAT        (0U)
+#define AIR_COMM_AIR_PARAM_TYPE_INT32        (1U)
+
+typedef void (*air_comm_run_data_fn)(const float *data, uint8 count);
 
 /*
  * 通信统计结构体。
@@ -115,7 +120,7 @@ uint8 air_comm_air_is_car_online(void);
  * min/max: 允许的范围，超出会限幅并返回 OUT_OF_RANGE
  * 返回 1=成功，0=失败（表满、名字太长等）
  */
-uint8 air_comm_air_register_param(const char *name, float *var, float min, float max);
+uint8 air_comm_air_register_param(const char *name, void *var, uint8 type, float min, float max);
 
 /*
  * 注册一个可被远程调用的函数。
@@ -125,8 +130,12 @@ uint8 air_comm_air_register_param(const char *name, float *var, float min, float
  */
 uint8 air_comm_air_register_func(uint8 func_id, void (*func)(void));
 
+uint8 air_comm_send_run_data(const float *data, uint8 count);
+void air_comm_set_run_data_callback(air_comm_run_data_fn callback);
+uint8 air_comm_get_last_run_data(float *data, uint8 max_count, uint8 *count);
+
 /*
- * 向小车上报运行数据（float 数组）。
+ * 发送实时数据（float 数组）。
  * data: float 数组首地址
  * count: float 个数（<= 32）
  * 返回 1=发送成功，0=失败

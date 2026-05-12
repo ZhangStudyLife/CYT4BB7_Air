@@ -582,14 +582,28 @@ void FC_Loop_100Hz(void)
         FC_Mode0_100Hz();
         break;
     }
-    const VL53L1X_data_struct *temp = VL53L1X_GetData();
-    wifi_justfloat(tick_1000us_cnt,
-        temp->distance_mm[0],temp->valid[0],
-        temp->distance_mm[1],temp->valid[1],
-        temp->distance_mm[2],temp->valid[2],
-        temp->distance_mm[3],temp->valid[3],
-        g_tof_fused_height_mm, g_tof_fused_valid
-    );
+    {
+        air_comm_air_stats_t air_stats;
+
+        memset(&air_stats, 0, sizeof(air_stats));
+        air_comm_air_get_stats(&air_stats);
+        wifi_justfloat((float)tick_1000us_cnt,
+                       (float)air_stats.online_status,
+                       (float)air_stats.heartbeat_rx_count,
+                       (float)air_stats.heartbeat_tx_count,
+                       (float)air_stats.rx_frame_count,
+                       (float)air_stats.tx_frame_count,
+                       (float)air_stats.set_param_ok_count,
+                       (float)air_stats.set_param_fail_count,
+                       (float)air_stats.exec_func_ok_count,
+                       (float)air_stats.exec_func_fail_count,
+                       (float)air_stats.crc_error_count,
+                       (float)air_stats.rx_queue_overflow_count,
+                       air_min_area,
+                       air_hold_ms,
+                       air_x_bias,
+                       air_y_bias);
+    }
 
 
 

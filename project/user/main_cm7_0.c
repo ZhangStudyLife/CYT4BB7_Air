@@ -1,6 +1,5 @@
 #include "zf_common_headfile.h"
-#include "../code/HW_Drivers/ICM42688_Aux/ICM42688_Aux.h"
-#include "../code/HW_Drivers/BMI088/BMI088.h"
+
 
 volatile uint32 tick_1000us_cnt = 0U;
 volatile uint16 g_tick_1000HZ = 0U;
@@ -10,7 +9,7 @@ static uint8 div500 = 0U;
 static uint8 div50 = 0U;
 static uint8 slot50 = 0U;
 static uint8 div10 = 0U;
-static uint8 s_ipc_last_flying = 0U; /* 上一次成功通知给核1的飞行状态 */
+static uint8 s_ipc_last_flying = 0U;      /* 上一次成功通知给核1的飞行状态 */
 static uint8 s_ipc_flying_retry_div = 0U; /* 飞行状态 IPC 通知失败后的 100Hz 重试分频 */
 
 /*
@@ -25,7 +24,7 @@ void ips114_show_debug(void)
     const VL53L1X_data_struct *tof = VL53L1X_GetData();
     static uint8 screen_ready = 0U;
     char buf[64];
-    
+
     ips114_set_font(IPS114_8X16_FONT);
 
     if (0U == screen_ready)
@@ -38,39 +37,67 @@ void ips114_show_debug(void)
     ips114_set_color(RGB565_GREEN, RGB565_BLACK);
 
     // R1: ACC (X, Y, Z)
-    snprintf(buf, sizeof(buf), "ACC % 7.2f% 7.2f% 7.2f", 
+    snprintf(buf, sizeof(buf), "ACC % 7.2f% 7.2f% 7.2f",
              (double)g_imufilter_1000hz.accx, (double)g_imufilter_1000hz.accy, (double)g_imufilter_1000hz.accz);
     ips114_show_string(0U, 0U, buf);
 
     // R2: GYRO (X, Y, Z)
-    snprintf(buf, sizeof(buf), "GYR % 6.1f % 6.1f % 6.1f", 
+    snprintf(buf, sizeof(buf), "GYR % 6.1f % 6.1f % 6.1f",
              (double)g_imufilter_1000hz.gyrox, (double)g_imufilter_1000hz.gyroy, (double)g_imufilter_1000hz.gyroz);
     ips114_show_string(0U, 16U, buf);
 
     // R3: EULER (Roll, Pitch, Yaw)
-    snprintf(buf, sizeof(buf), "EUL % 6.1f % 6.1f % 6.1f", 
+    snprintf(buf, sizeof(buf), "EUL % 6.1f % 6.1f % 6.1f",
              (double)g_euler.roll, (double)g_euler.pitch, (double)g_euler.yaw);
     ips114_show_string(0U, 32U, buf);
 
     // R4: TOF 1-4 (Height_1, Height_2, Height_3, Height_4)
-    snprintf(buf, sizeof(buf), "TOF %4u %4u %4u %4u       ", 
+    snprintf(buf, sizeof(buf), "TOF %4u %4u %4u %4u       ",
              tof->distance_mm[0], tof->distance_mm[1], tof->distance_mm[2], tof->distance_mm[3]);
     ips114_show_string(0U, 48U, buf);
 
     // R5: Fused Height & Fused Vz
-    snprintf(buf, sizeof(buf), "FUS H:% 6.1f Vz:% 7.3f  ", 
+    snprintf(buf, sizeof(buf), "FUS H:% 6.1f Vz:% 7.3f  ",
              (double)g_tof_fused_height_mm, (double)g_height_fused_vz_mps);
     ips114_show_string(0U, 64U, buf);
 
     // R6: RC Status & CH1-CH4 (STD)
-    snprintf(buf, sizeof(buf), "RC %1d % 5d % 5d % 5d % 5d", 
+    snprintf(buf, sizeof(buf), "RC %1d % 5d % 5d % 5d % 5d",
              FC_START_CRSF_Get_State(), CRSF_STD[0], CRSF_STD[1], CRSF_STD[2], CRSF_STD[3]);
     ips114_show_string(0U, 80U, buf);
 
     // R7: Horizontal XY velocity (LC302 flow_x/y)
-    snprintf(buf, sizeof(buf), "FLO % 5d % 5d          ", 
+    snprintf(buf, sizeof(buf), "FLO % 5d % 5d          ",
              lc302_data.flow_x_integral, lc302_data.flow_y_integral);
     ips114_show_string(0U, 96U, buf);
+}
+
+volatile float g_car_encoder_left_front;
+volatile float g_car_encoder_right_front;
+volatile float g_car_encoder_left_rear;
+volatile float g_car_encoder_right_rear;
+volatile float g_car_imufilter_1000hz_accx;
+volatile float g_car_imufilter_1000hz_accy;
+volatile float g_car_imufilter_1000hz_accz;
+volatile float g_car_imufilter_1000hz_gyrox;
+volatile float g_car_imufilter_1000hz_gyroy;
+volatile float g_car_imufilter_1000hz_gyroz;
+
+static void on_car_data(const float *data, uint8 count)
+{
+    if (count >= 10)
+    {
+        g_car_encoder_left_front = data[0];
+        g_car_encoder_right_front = data[1];
+        g_car_encoder_left_rear = data[2];
+        g_car_encoder_right_rear = data[3];
+        g_car_imufilter_1000hz_accx = data[4];
+        g_car_imufilter_1000hz_accy = data[5];
+        g_car_imufilter_1000hz_accz = data[6];
+        g_car_imufilter_1000hz_gyrox = data[7];
+        g_car_imufilter_1000hz_gyroy = data[8];
+        g_car_imufilter_1000hz_gyroz = data[9];
+    }
 }
 
 int main(void)
@@ -102,7 +129,7 @@ int main(void)
     ipc_communicate_init(IPC_PORT_1, ipc_image_callback);
     FC_START_CRSF_Init();
     air_comm_air_init();
-    wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
+    wifi_justfloat_SetStandbyContext((0U == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
     pit_us_init(PIT_CH0, 1000);
     pit_ms_init(PIT_CH1, 10);
 
@@ -116,7 +143,7 @@ int main(void)
     Motor_SetThrottleAll((int32[]){0, 0, 0, 2000});
     system_delay_ms(500);
     Motor_SetThrottleAll((int32[]){0, 0, 0, 0});
-
+    air_comm_set_run_data_callback(on_car_data);
     while (true)
     {
         uint16 guard = 0U;
@@ -150,6 +177,31 @@ int main(void)
             CRSF_Update_100HZ();
             FC_Loop_100Hz();
             air_comm_air_update_100HZ();
+
+            float air_data[10];
+            air_data[0] = g_tof1_height_mm;
+            air_data[1] = g_tof2_height_mm;
+            air_data[2] = g_tof3_height_mm;
+            air_data[3] = g_tof4_height_mm;
+            air_data[4] = g_imufilter_1000hz.accx;
+            air_data[5] = g_imufilter_1000hz.accy;
+            air_data[6] = g_imufilter_1000hz.accz;
+            air_data[7] = g_imufilter_1000hz.gyrox;
+            air_data[8] = g_imufilter_1000hz.gyroy;
+            air_data[9] = g_imufilter_1000hz.gyroz;
+            air_comm_send_run_data(air_data, 10);
+
+
+            wifi_justfloat(g_car_encoder_left_front,
+                           g_car_encoder_right_front,
+                           g_car_encoder_left_rear,
+                           g_car_encoder_right_rear,
+                           g_car_imufilter_1000hz_accx,
+                           g_car_imufilter_1000hz_accy,
+                           g_car_imufilter_1000hz_accz,
+                           g_car_imufilter_1000hz_gyrox,
+                           g_car_imufilter_1000hz_gyroy,
+                           g_car_imufilter_1000hz_gyroz);
             wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
             {
                 uint8 flying = (FC_START_CRSF_STATE_FLYING == FC_START_CRSF_Get_State()) ? 1U : 0U;
@@ -204,7 +256,6 @@ int main(void)
             if (div10 >= 10U)
             {
 
-                
                 div10 = 0U;
                 FC_START_CRSF_Update();
 

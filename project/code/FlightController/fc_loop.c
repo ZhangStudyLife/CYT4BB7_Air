@@ -582,7 +582,7 @@ void FC_Loop_100Hz(void)
         FC_Mode0_100Hz();
         break;
     }
-    {
+    // {
         // air_comm_air_stats_t air_stats;
 
         // memset(&air_stats, 0, sizeof(air_stats));
@@ -603,7 +603,7 @@ void FC_Loop_100Hz(void)
         //                air_hold_ms,
         //                air_x_bias,
         //                air_y_bias);
-    }
+    // }
 
     // 依托这个确认了车端的flash确实有效以及确实可以修改飞机的参数
     // wifi_justfloat((float)air_comm_air_is_car_online(),g_fc_params.roll_gyro_kp,g_fc_params.base_throttle);

@@ -18,7 +18,6 @@
 #define AIR_COMM_MAX_FRAME                   (AIR_COMM_MAX_PAYLOAD + AIR_COMM_FRAME_OVERHEAD)
 #define AIR_COMM_RX_QUEUE_SIZE               (512U)  /* 接收环形队列大小（字节） */
 #define AIR_COMM_PARAM_TABLE_MAX             (100U)  /* 最多注册参数个数 */
-#define AIR_COMM_FUNC_TABLE_MAX              (16U)   /* 最多注册函数个数 */
 
 /* 消息类型定义 */
 #define AIR_COMM_MSG_SET_PARAM               (0x01U) /* 小车→无人机：设置参数 */
@@ -46,13 +45,6 @@ typedef struct
 
 #define AIR_COMM_REGISTER_INT32(member, min_v, max_v) \
     (void)air_comm_air_register_param(#member, &g_fc_params.member, AIR_COMM_AIR_PARAM_TYPE_INT32, (float)(min_v), (float)(max_v))
-
-/* 函数表条目：func_id 编号 + 函数指针 */
-typedef struct
-{
-    uint8 func_id;
-    void (*func)(void);
-} air_comm_air_func_t;
 
 /*
  * 接收解析器状态机。
@@ -100,13 +92,12 @@ static air_comm_air_rx_parser_t s_air_comm_rx;          /* 接收解析器 */
 static air_comm_air_rx_queue_t s_air_comm_rx_queue;     /* 接收环形队列 */
 static air_comm_air_stats_t s_air_comm_stats;           /* 统计计数器 */
 static air_comm_air_param_t s_air_comm_params[AIR_COMM_PARAM_TABLE_MAX]; /* 参数表 */
-static air_comm_air_func_t s_air_comm_funcs[AIR_COMM_FUNC_TABLE_MAX];    /* 函数表 */
 static air_comm_run_data_fn s_air_comm_run_data_callback;
+static air_comm_exec_command_fn s_air_comm_exec_command_callback;
 static float s_air_comm_last_run_data[AIR_COMM_AIR_RUN_DATA_MAX_FLOATS];
 static uint8 s_air_comm_last_run_data_count;
 static uint8 s_air_comm_last_run_data_valid;
 static uint8 s_air_comm_param_count = 0U;  /* 已注册参数数 */
-static uint8 s_air_comm_func_count = 0U;   /* 已注册函数数 */
 
 /*
  * CRC-16/CCITT-FALSE 计算。
@@ -343,17 +334,6 @@ static uint8 air_comm_send_ack_get_param(uint8 seq,
 }
 
 /* 发送函数调用回执，告知小车调用结果（result 目前保留为 0） */
-static uint8 air_comm_send_ack_func(uint8 seq, uint8 func_id, uint8 status, float result)
-{
-    uint8 payload[6];
-
-    payload[0] = func_id;
-    payload[1] = status;
-    air_comm_write_float(&payload[2], result);
-
-    return air_comm_send_frame(AIR_COMM_MSG_ACK_FUNC, seq, payload, 6U);
-}
-
 /* 收到小车心跳后，刷新在线状态和最后通信时间 */
 static void air_comm_mark_car_online(void)
 {
@@ -410,21 +390,6 @@ static void air_comm_param_write(air_comm_air_param_t *param, float value)
 }
 
 /* 按 func_id 在函数表中查找，找不到返回 NULL */
-static air_comm_air_func_t *air_comm_find_func(uint8 func_id)
-{
-    uint8 i;
-
-    for(i = 0U; i < s_air_comm_func_count; i++)
-    {
-        if(s_air_comm_funcs[i].func_id == func_id)
-        {
-            return &s_air_comm_funcs[i];
-        }
-    }
-
-    return NULL;
-}
-
 /*
  * 处理 SET_PARAM 消息。
  * payload 格式：name_len(1B) + name(name_len B) + value(4B float, 小端)
@@ -556,26 +521,39 @@ static void air_comm_handle_get_param(uint8 seq, const uint8 *payload, uint8 len
  */
 static void air_comm_handle_exec_func(uint8 seq, const uint8 *payload, uint8 len)
 {
-    uint8 func_id = 0U;
-    uint8 status = AIR_COMM_AIR_STATUS_ERROR;
-    air_comm_air_func_t *func = NULL;
+    uint8 name_len;
+    uint8 accepted;
+    char name[AIR_COMM_AIR_FUNC_NAME_MAX + 1U];
 
-    if((payload != NULL) && (len >= 1U))
+    if((payload == NULL) || (len < 1U))
     {
-        func_id = payload[0];
-        func = air_comm_find_func(func_id);
-        if(func == NULL)
-        {
-            status = AIR_COMM_AIR_STATUS_NOT_FOUND;
-        }
-        else
-        {
-            func->func();
-            status = AIR_COMM_AIR_STATUS_OK;
-        }
+        s_air_comm_stats.exec_func_fail_count++;
+        (void)air_comm_air_send_func_ack_text(seq, "ACK_ERROR 3 bad_payload");
+        return;
     }
 
-    if(status == AIR_COMM_AIR_STATUS_OK)
+    name_len = payload[0];
+    if((name_len == 0U) ||
+       (name_len > AIR_COMM_AIR_FUNC_NAME_MAX) ||
+       ((uint16)len < (uint16)(1U + name_len)))
+    {
+        s_air_comm_stats.exec_func_fail_count++;
+        (void)air_comm_air_send_func_ack_text(seq, "ACK_ERROR 3 bad_name");
+        return;
+    }
+
+    memcpy(name, &payload[1], name_len);
+    name[name_len] = '\0';
+
+    if(s_air_comm_exec_command_callback == NULL)
+    {
+        s_air_comm_stats.exec_func_fail_count++;
+        (void)air_comm_air_send_func_ack_text(seq, "ACK_ERROR 3 no_handler");
+        return;
+    }
+
+    accepted = s_air_comm_exec_command_callback(seq, name);
+    if(accepted != 0U)
     {
         s_air_comm_stats.exec_func_ok_count++;
     }
@@ -583,8 +561,6 @@ static void air_comm_handle_exec_func(uint8 seq, const uint8 *payload, uint8 len
     {
         s_air_comm_stats.exec_func_fail_count++;
     }
-
-    (void)air_comm_send_ack_func(seq, func_id, status, 0.0f);
 }
 
 static void air_comm_handle_run_data(const uint8 *payload, uint8 len)
@@ -873,7 +849,6 @@ void air_comm_air_init(void)
     memset(&s_air_comm_rx_queue, 0, sizeof(s_air_comm_rx_queue));
     memset(&s_air_comm_stats, 0, sizeof(s_air_comm_stats));
     memset(s_air_comm_params, 0, sizeof(s_air_comm_params));
-    memset(s_air_comm_funcs, 0, sizeof(s_air_comm_funcs));
     memset(s_air_comm_last_run_data, 0, sizeof(s_air_comm_last_run_data));
 
     s_air_comm_initialized = 0U;
@@ -882,10 +857,10 @@ void air_comm_air_init(void)
     s_air_comm_last_heartbeat_ms = 0U;
     s_air_comm_last_car_ms = 0U;
     s_air_comm_run_data_callback = NULL;
+    s_air_comm_exec_command_callback = NULL;
     s_air_comm_last_run_data_count = 0U;
     s_air_comm_last_run_data_valid = 0U;
     s_air_comm_param_count = 0U;
-    s_air_comm_func_count = 0U;
 
     AIR_COMM_REGISTER_FLOAT(gyro_dt, 0.0001f, 0.1f);
     AIR_COMM_REGISTER_FLOAT(angle_dt, 0.0001f, 0.1f);
@@ -1135,41 +1110,6 @@ uint8 air_comm_air_register_param(const char *name, void *var, uint8 type, float
 }
 
 /*
- * 注册可远程调用的函数。
- * 同 func_id 会更新函数指针（不重复占位）。
- */
-uint8 air_comm_air_register_func(uint8 func_id, void (*func)(void))
-{
-    uint8 i;
-
-    if(func == NULL)
-    {
-        return 0U;
-    }
-
-    /* 同 func_id 更新，不重复占位 */
-    for(i = 0U; i < s_air_comm_func_count; i++)
-    {
-        if(s_air_comm_funcs[i].func_id == func_id)
-        {
-            s_air_comm_funcs[i].func = func;
-            return 1U;
-        }
-    }
-
-    if(s_air_comm_func_count >= AIR_COMM_FUNC_TABLE_MAX)
-    {
-        return 0U;
-    }
-
-    s_air_comm_funcs[s_air_comm_func_count].func_id = func_id;
-    s_air_comm_funcs[s_air_comm_func_count].func = func;
-    s_air_comm_func_count++;
-
-    return 1U;
-}
-
-/*
  * 向小车上报运行数据。
  * payload 格式：count(1B) + float0(4B) + float1(4B) + ...
  * 最多 32 个 float，每个 4 字节，小端序。
@@ -1214,6 +1154,35 @@ uint8 air_comm_air_send_run_data(const float *data, uint8 count)
 void air_comm_set_run_data_callback(air_comm_run_data_fn callback)
 {
     s_air_comm_run_data_callback = callback;
+}
+
+void air_comm_air_set_exec_command_callback(air_comm_exec_command_fn callback)
+{
+    s_air_comm_exec_command_callback = callback;
+}
+
+uint8 air_comm_air_send_func_ack_text(uint8 seq, const char *text)
+{
+    uint16 text_len;
+    uint8 payload[AIR_COMM_AIR_ACK_TEXT_MAX];
+
+    if((s_air_comm_initialized == 0U) || (text == NULL))
+    {
+        return 0U;
+    }
+
+    text_len = (uint16)strlen(text);
+    if(text_len > AIR_COMM_AIR_ACK_TEXT_MAX)
+    {
+        text_len = AIR_COMM_AIR_ACK_TEXT_MAX;
+    }
+
+    if(text_len > 0U)
+    {
+        memcpy(payload, text, text_len);
+    }
+
+    return air_comm_send_frame(AIR_COMM_MSG_ACK_FUNC, seq, payload, (uint8)text_len);
 }
 
 uint8 air_comm_get_last_run_data(float *data, uint8 max_count, uint8 *count)

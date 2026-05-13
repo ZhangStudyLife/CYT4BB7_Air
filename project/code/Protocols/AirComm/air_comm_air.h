@@ -35,6 +35,8 @@
  */
 
 #define AIR_COMM_AIR_PARAM_NAME_MAX          (32U)   /* 参数名最大长度（不含 '\0'） */
+#define AIR_COMM_AIR_FUNC_NAME_MAX           (32U)   /* 远程命令函数名最大长度，不含 '\0' */
+#define AIR_COMM_AIR_ACK_TEXT_MAX            (96U)   /* 远程命令 ACK 文本最大长度，不含 '\0' */
 #define AIR_COMM_AIR_RUN_DATA_MAX_FLOATS     (32U)   /* 单次实时数据最多 float 个数 */
 #define AIR_COMM_AIR_BAUDRATE                (1152000U) /* UART 波特率 */
 
@@ -43,11 +45,13 @@
 #define AIR_COMM_AIR_STATUS_NOT_FOUND        (1U)    /* 参数名或 func_id 未注册 */
 #define AIR_COMM_AIR_STATUS_OUT_OF_RANGE     (2U)    /* 值超出 [min, max]，已限幅 */
 #define AIR_COMM_AIR_STATUS_ERROR            (3U)    /* 通用错误（payload 长度不对等） */
+#define AIR_COMM_AIR_STATUS_BUSY             (4U)    /* 远程命令忙，已有函数正在执行 */
 
 #define AIR_COMM_AIR_PARAM_TYPE_FLOAT        (0U)
 #define AIR_COMM_AIR_PARAM_TYPE_INT32        (1U)
 
 typedef void (*air_comm_run_data_fn)(const float *data, uint8 count);
+typedef uint8 (*air_comm_exec_command_fn)(uint8 seq, const char *name);
 
 /*
  * 通信统计结构体。
@@ -128,7 +132,8 @@ uint8 air_comm_air_register_param(const char *name, void *var, uint8 type, float
  * func:    函数指针，无参无返回值
  * 返回 1=成功，0=失败（表满或 func 为 NULL）
  */
-uint8 air_comm_air_register_func(uint8 func_id, void (*func)(void));
+void air_comm_air_set_exec_command_callback(air_comm_exec_command_fn callback);
+uint8 air_comm_air_send_func_ack_text(uint8 seq, const char *text);
 
 uint8 air_comm_send_run_data(const float *data, uint8 count);
 void air_comm_set_run_data_callback(air_comm_run_data_fn callback);

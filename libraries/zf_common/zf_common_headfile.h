@@ -79,6 +79,7 @@
 #include "../code/Estimation/Attitude/IMU_TOP.h"
 #include "../code/Protocols/crsf/crsf.h"
 #include "../code/Protocols/AirComm/air_comm_air.h"
+#include "../code/Protocols/AirComm/air_remote_cmd.h"
 #include "../code/Estimation/Attitude/Accel_Calibration.h"
 #include "../code/HW_Drivers/Motor/Motor_Drive.h"
 #include "../code/FlightController/fc_start_crsf.h"

@@ -3570,6 +3570,12 @@
                 <file>
                     <name>$PROJ_DIR$\..\..\code\Protocols\AirComm\air_comm_air.h</name>
                 </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\AirComm\air_remote_cmd.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\..\code\Protocols\AirComm\air_remote_cmd.h</name>
+                </file>
             </group>
             <group>
                 <name>crsf</name>

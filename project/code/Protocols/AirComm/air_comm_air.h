@@ -58,9 +58,7 @@ typedef enum
     AIR_COMM_AIR_COMMAND_MODE_INSTANT         /* 立即型远程命令：完成后自动退出 */
 } air_comm_air_command_mode_t;
 
-typedef uint8 (*air_comm_air_command_start_fn)(void);
-typedef void (*air_comm_air_command_poll_fn)(void);
-typedef void (*air_comm_air_command_stop_fn)(void);
+typedef void (*air_comm_air_command_fn)(void);
 
 /*
  * 通信统计结构体。
@@ -136,18 +134,18 @@ uint8 air_comm_air_is_car_online(void);
 uint8 air_comm_air_register_param(const char *name, void *var, uint8 type, float min, float max);
 
 /*
- * 注册一个可被小车执行的 Air 远程命令。
- * name:  远程命令名，0x03 payload 中传输的字符串
- * mode:  轮询型或立即型
- * start: 收到命令后立即调用，返回 0 表示拒绝执行
- * poll:  100Hz 周期调用，轮询型命令用于刷新状态和屏幕
- * stop:  收到 NONE 或命令结束时调用，用于恢复设备状态
+ * 注册轮询型 Air 远程命令。
+ * name: 远程命令名，0x03 payload 中传输的字符串。
+ * run:  100Hz 周期调用，只写命令需要持续运行的内容。
  */
-uint8 air_comm_air_register_command(const char *name,
-                                    air_comm_air_command_mode_t mode,
-                                    air_comm_air_command_start_fn start,
-                                    air_comm_air_command_poll_fn poll,
-                                    air_comm_air_command_stop_fn stop);
+uint8 air_comm_air_register_polling_command(const char *name, air_comm_air_command_fn run);
+
+/*
+ * 注册立即退出型 Air 远程命令。
+ * name: 远程命令名，0x03 payload 中传输的字符串。
+ * run:  ACK_OK 之后在 100Hz 调度中执行一次，完成后框架自动发送 ACK_EXIT_OK。
+ */
+uint8 air_comm_air_register_instant_command(const char *name, air_comm_air_command_fn run);
 uint8 air_comm_air_send_command_ack_text(uint8 seq, const char *text);
 
 uint8 air_comm_send_run_data(const float *data, uint8 count);

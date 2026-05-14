@@ -3,27 +3,16 @@
 
 #include "zf_common_headfile.h"
 
-typedef enum
-{
-    AIR_REMOTE_CMD_MODE_POLLING = 0,
-    AIR_REMOTE_CMD_MODE_INSTANT
-} air_remote_cmd_mode_t;
+typedef void (*air_remote_cmd_fn)(void);
 
-typedef uint8 (*air_remote_cmd_start_fn)(void);
-typedef void (*air_remote_cmd_poll_fn)(void);
-typedef void (*air_remote_cmd_stop_fn)(void);
-
-/* 初始化远程命令注册表，并接管 AirComm 的 0x03 函数名命令回调。 */
+/*
+ * 兼容旧文件名的远程命令接口。
+ * 当前主链路由 air_comm_air.c 直接处理 0x03 远程命令，这里只转发到统一注册接口，
+ * 避免保留旧 start/poll/stop 模型造成后续维护混淆。
+ */
 void air_remote_cmd_init(void);
-
-/* 注册远程命令：轮询型提供 poll/stop，立即型可用 poll 做非阻塞状态机。 */
-uint8 air_remote_cmd_register(const char *name,
-                              air_remote_cmd_mode_t mode,
-                              air_remote_cmd_start_fn start,
-                              air_remote_cmd_poll_fn poll,
-                              air_remote_cmd_stop_fn stop);
-
-/* 100Hz 调度入口：刷新轮询型函数，推进立即型函数状态机。 */
+uint8 air_remote_cmd_register_polling(const char *name, air_remote_cmd_fn run);
+uint8 air_remote_cmd_register_instant(const char *name, air_remote_cmd_fn run);
 void air_remote_cmd_update_100HZ(void);
 
 #endif

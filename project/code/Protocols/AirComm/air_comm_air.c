@@ -47,9 +47,7 @@ typedef struct
 {
     const char *name;
     air_comm_air_command_mode_t mode;
-    air_comm_air_command_start_fn start;
-    air_comm_air_command_poll_fn poll;
-    air_comm_air_command_stop_fn stop;
+    air_comm_air_command_fn run;
 } air_comm_air_command_t;
 
 #define AIR_COMM_REGISTER_FLOAT(member, min_v, max_v) \
@@ -264,20 +262,9 @@ static void air_comm_screen_stop(void)
     ips114_clear();
 }
 
-static uint8 air_comm_show_imu_start(void)
-{
-    air_comm_screen_reset();
-    return 1U;
-}
-
-static void air_comm_show_imu_poll(void)
+static void air_comm_show_imu_data(void)
 {
     char line[40];
-
-    if(s_air_comm_screen_ready == 0U)
-    {
-        air_comm_screen_reset();
-    }
 
     air_comm_screen_line(0U, "IMU RAW");
     snprintf(line, sizeof(line), "ACC X:%6d Y:%6d",
@@ -309,20 +296,9 @@ static void air_comm_show_imu_poll(void)
     air_comm_screen_line(7U, line);
 }
 
-static uint8 air_comm_show_flow_start(void)
-{
-    air_comm_screen_reset();
-    return 1U;
-}
-
-static void air_comm_show_flow_poll(void)
+static void air_comm_show_optical_flow_data(void)
 {
     char line[40];
-
-    if(s_air_comm_screen_ready == 0U)
-    {
-        air_comm_screen_reset();
-    }
 
     air_comm_screen_line(0U, "OPTICAL FLOW");
     snprintf(line, sizeof(line), "LC X:%6d Y:%6d",
@@ -358,53 +334,29 @@ static void air_comm_show_flow_poll(void)
 
 static void air_comm_stop_active_command(void)
 {
-    if((s_air_comm_active_command != NULL) &&
-       (s_air_comm_active_command->stop != NULL))
+    if(s_air_comm_active_command != NULL)
     {
-        s_air_comm_active_command->stop();
+        if(s_air_comm_active_command->mode == AIR_COMM_AIR_COMMAND_MODE_POLLING)
+        {
+            air_comm_screen_stop();
+        }
     }
 
     s_air_comm_active_command = NULL;
 }
 
-static uint8 air_comm_beep_start(void)
+static void air_comm_beep(void)
 {
     Beep_Play(50U, 0.2f, 3U);
-    return 1U;
-}
-
-static void air_comm_beep_poll(void)
-{
-    if(s_air_comm_active_command != NULL)
-    {
-        s_air_comm_last_done_valid = 1U;
-        s_air_comm_last_done_seq = s_air_comm_active_seq;
-        strncpy(s_air_comm_last_done_name,
-                s_air_comm_active_command->name,
-                AIR_COMM_AIR_COMMAND_NAME_MAX);
-        s_air_comm_last_done_name[AIR_COMM_AIR_COMMAND_NAME_MAX] = '\0';
-        s_air_comm_active_command = NULL;
-        (void)air_comm_air_send_command_ack_text(s_air_comm_active_seq, "ACK_EXIT_OK");
-    }
 }
 
 static void air_comm_register_default_commands(void)
 {
-    (void)air_comm_air_register_command("show_imu_data",
-                                        AIR_COMM_AIR_COMMAND_MODE_POLLING,
-                                        air_comm_show_imu_start,
-                                        air_comm_show_imu_poll,
-                                        air_comm_screen_stop);
-    (void)air_comm_air_register_command("show_optical_flow_data",
-                                        AIR_COMM_AIR_COMMAND_MODE_POLLING,
-                                        air_comm_show_flow_start,
-                                        air_comm_show_flow_poll,
-                                        air_comm_screen_stop);
-    (void)air_comm_air_register_command("beep",
-                                        AIR_COMM_AIR_COMMAND_MODE_INSTANT,
-                                        air_comm_beep_start,
-                                        air_comm_beep_poll,
-                                        NULL);
+    (void)air_comm_air_register_polling_command("show_imu_data",
+                                                air_comm_show_imu_data);
+    (void)air_comm_air_register_polling_command("show_optical_flow_data",
+                                                air_comm_show_optical_flow_data);
+    (void)air_comm_air_register_instant_command("beep", air_comm_beep);
 }
 
 /*
@@ -832,22 +784,24 @@ static void air_comm_handle_exec_command(uint8 seq, const uint8 *payload, uint8 
     s_air_comm_active_seq = seq;
     s_air_comm_last_done_valid = 0U;
 
-    if((command->start != NULL) && (command->start() == 0U))
+    if(command->run == NULL)
     {
         s_air_comm_active_command = NULL;
-        (void)air_comm_air_send_command_ack_text(seq, "ACK_ERROR 3 start_fail");
+        (void)air_comm_air_send_command_ack_text(seq, "ACK_ERROR 3 bad_command");
         s_air_comm_stats.command_fail_count++;
         return;
+    }
+
+    if(command->mode == AIR_COMM_AIR_COMMAND_MODE_POLLING)
+    {
+        air_comm_screen_reset();
     }
 
     snprintf(ack, sizeof(ack), "ACK_OK %s", command->name);
     (void)air_comm_air_send_command_ack_text(seq, ack);
     s_air_comm_stats.command_ok_count++;
 
-    if(command->mode == AIR_COMM_AIR_COMMAND_MODE_INSTANT)
-    {
-        /* 立即型命令由100Hz状态机发ACK_EXIT_OK，避免在接收解析中长时间阻塞。 */
-    }
+    /* 立即型命令也交给 100Hz 调度执行，避免在串口帧解析过程中运行用户代码。 */
 }
 
 static void air_comm_handle_run_data(const uint8 *payload, uint8 len)
@@ -1319,10 +1273,32 @@ void air_comm_air_update_100HZ(void)
         s_air_comm_last_heartbeat_ms = s_air_comm_tick_ms;
     }
 
-    if((s_air_comm_active_command != NULL) &&
-       (s_air_comm_active_command->poll != NULL))
+    if(s_air_comm_active_command != NULL)
     {
-        s_air_comm_active_command->poll();
+        if((s_air_comm_active_command->mode == AIR_COMM_AIR_COMMAND_MODE_POLLING) &&
+           (s_air_comm_active_command->run != NULL))
+        {
+            if(s_air_comm_screen_ready == 0U)
+            {
+                air_comm_screen_reset();
+            }
+            s_air_comm_active_command->run();
+        }
+        else if(s_air_comm_active_command->mode == AIR_COMM_AIR_COMMAND_MODE_INSTANT)
+        {
+            if(s_air_comm_active_command->run != NULL)
+            {
+                s_air_comm_active_command->run();
+            }
+            s_air_comm_last_done_valid = 1U;
+            s_air_comm_last_done_seq = s_air_comm_active_seq;
+            strncpy(s_air_comm_last_done_name,
+                    s_air_comm_active_command->name,
+                    AIR_COMM_AIR_COMMAND_NAME_MAX);
+            s_air_comm_last_done_name[AIR_COMM_AIR_COMMAND_NAME_MAX] = '\0';
+            s_air_comm_active_command = NULL;
+            (void)air_comm_air_send_command_ack_text(s_air_comm_active_seq, "ACK_EXIT_OK");
+        }
     }
 
     air_comm_task_online();
@@ -1459,15 +1435,13 @@ void air_comm_set_run_data_callback(air_comm_run_data_fn callback)
     s_air_comm_run_data_callback = callback;
 }
 
-uint8 air_comm_air_register_command(const char *name,
-                                    air_comm_air_command_mode_t mode,
-                                    air_comm_air_command_start_fn start,
-                                    air_comm_air_command_poll_fn poll,
-                                    air_comm_air_command_stop_fn stop)
+static uint8 air_comm_air_register_command_internal(const char *name,
+                                                    air_comm_air_command_mode_t mode,
+                                                    air_comm_air_command_fn run)
 {
     uint8 index;
 
-    if((name == NULL) || (mode > AIR_COMM_AIR_COMMAND_MODE_INSTANT))
+    if((name == NULL) || (run == NULL) || (mode > AIR_COMM_AIR_COMMAND_MODE_INSTANT))
     {
         return 0U;
     }
@@ -1477,19 +1451,12 @@ uint8 air_comm_air_register_command(const char *name,
         return 0U;
     }
 
-    if((mode == AIR_COMM_AIR_COMMAND_MODE_POLLING) && (poll == NULL))
-    {
-        return 0U;
-    }
-
     for(index = 0U; index < s_air_comm_command_count; index++)
     {
         if(air_comm_command_name_equal(s_air_comm_commands[index].name, name) != 0U)
         {
             s_air_comm_commands[index].mode = mode;
-            s_air_comm_commands[index].start = start;
-            s_air_comm_commands[index].poll = poll;
-            s_air_comm_commands[index].stop = stop;
+            s_air_comm_commands[index].run = run;
             return 1U;
         }
     }
@@ -1501,12 +1468,20 @@ uint8 air_comm_air_register_command(const char *name,
 
     s_air_comm_commands[s_air_comm_command_count].name = name;
     s_air_comm_commands[s_air_comm_command_count].mode = mode;
-    s_air_comm_commands[s_air_comm_command_count].start = start;
-    s_air_comm_commands[s_air_comm_command_count].poll = poll;
-    s_air_comm_commands[s_air_comm_command_count].stop = stop;
+    s_air_comm_commands[s_air_comm_command_count].run = run;
     s_air_comm_command_count++;
 
     return 1U;
+}
+
+uint8 air_comm_air_register_polling_command(const char *name, air_comm_air_command_fn run)
+{
+    return air_comm_air_register_command_internal(name, AIR_COMM_AIR_COMMAND_MODE_POLLING, run);
+}
+
+uint8 air_comm_air_register_instant_command(const char *name, air_comm_air_command_fn run)
+{
+    return air_comm_air_register_command_internal(name, AIR_COMM_AIR_COMMAND_MODE_INSTANT, run);
 }
 
 uint8 air_comm_air_send_command_ack_text(uint8 seq, const char *text)

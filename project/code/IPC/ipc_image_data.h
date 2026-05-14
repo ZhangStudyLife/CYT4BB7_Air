@@ -9,6 +9,11 @@ extern "C" {
 
 #define IPC_IMAGE_MAX_CIRCLES  5
 
+#define IPC_IMAGE_DEFAULT_X        (0.0f)  /* 默认视觉X偏差，主控去视觉化后固定为0 */
+#define IPC_IMAGE_DEFAULT_Y        (0.0f)  /* 默认视觉Y偏差，主控去视觉化后固定为0 */
+#define IPC_IMAGE_DEFAULT_RADIUS   (0.0f)  /* 默认视觉半径，主控去视觉化后固定为0 */
+#define IPC_IMAGE_DEFAULT_VALID    (1U)    /* 默认视觉有效标志，1=使用固定兜底坐标 */
+
 typedef struct {
     float    x;
     float    y;

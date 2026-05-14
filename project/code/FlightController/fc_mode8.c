@@ -23,6 +23,12 @@ static const float s_mode8_img_vel_limit_cmps = 100.0f;
 static const float s_mode8_angle_limit_deg = 15.0f;
 /* 图像闭环切手动速度闭环的摇杆阈值，单位遥控标准化量 */
 static const float s_mode8_visual_rc_gate = 150.0f;
+/* 默认视觉X偏差，单位沿用旧图像像素中心系；主控不再从 IPC 读取图像结果 */
+static const float s_mode8_default_img_x = IPC_IMAGE_DEFAULT_X;
+/* 默认视觉Y偏差，单位沿用旧图像像素中心系；主控不再从 IPC 读取图像结果 */
+static const float s_mode8_default_img_y = IPC_IMAGE_DEFAULT_Y;
+/* 默认视觉有效标志：1=使用固定兜底坐标，0=视为无目标 */
+static const uint8 s_mode8_default_img_valid = IPC_IMAGE_DEFAULT_VALID;
 
 /*
  * 函数名: FC_Mode8_ApplyDeadzone
@@ -107,7 +113,6 @@ void FC_Mode8_100Hz(void)
  */
 void FC_Mode8_50Hz(float dt)
 {
-    ipc_image_circle_t circle;
     float ch0;
     float ch1;
     float velx_target;
@@ -138,10 +143,10 @@ void FC_Mode8_50Hz(float dt)
                           -s_mode8_vel_limit_cmps, s_mode8_vel_limit_cmps),
             s_mode8_vel_deadzone_cmps);
     }
-    else if (0U != ipc_image_get_first_valid_circle(&circle))
+    else if (0U != s_mode8_default_img_valid)
     {
-        velx_target = PID_Update(&s_mode8_imgx_pid, 0.0f, circle.x, dt);
-        vely_target = PID_Update(&s_mode8_imgy_pid, 0.0f, -circle.y, dt);
+        velx_target = PID_Update(&s_mode8_imgx_pid, 0.0f, s_mode8_default_img_x, dt);
+        vely_target = PID_Update(&s_mode8_imgy_pid, 0.0f, -s_mode8_default_img_y, dt);
         velx_target = FC_Mode_Clamp(velx_target,
                                     -s_mode8_img_vel_limit_cmps, s_mode8_img_vel_limit_cmps);
         vely_target = FC_Mode_Clamp(vely_target,

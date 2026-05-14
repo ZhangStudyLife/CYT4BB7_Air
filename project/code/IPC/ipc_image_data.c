@@ -12,26 +12,17 @@ volatile ipc_image_payload_t g_ipc_image_shared;
 /* ======================== CM7_1 发送侧 ======================== */
 #if defined(CY_CORE_CM7_1)
 
-#include "../Estimation/Pos_Est/image.h"
-
 static uint32 s_tx_seq = 0;
 static volatile uint8 s_core0_flying = 0U;
 
 void ipc_image_send(void)
 {
-    uint8 i;
-    uint8 cnt = 0;
-
-    for (i = 0; i < IMAGE_MAX_CIRCLE_COUNT && i < IPC_IMAGE_MAX_CIRCLES; i++)
-    {
-        g_ipc_image_shared.circles[i].x      = g_image_circles[i].x;
-        g_ipc_image_shared.circles[i].y      = g_image_circles[i].y;
-        g_ipc_image_shared.circles[i].radius  = g_image_circles[i].radius;
-        g_ipc_image_shared.circles[i].valid   = g_image_circles[i].valid;
-        if (g_image_circles[i].valid)
-            cnt++;
-    }
-    g_ipc_image_shared.count = cnt;
+    memset((void *)&g_ipc_image_shared, 0, sizeof(g_ipc_image_shared));
+    g_ipc_image_shared.count = 1U;
+    g_ipc_image_shared.circles[0].x = IPC_IMAGE_DEFAULT_X;
+    g_ipc_image_shared.circles[0].y = IPC_IMAGE_DEFAULT_Y;
+    g_ipc_image_shared.circles[0].radius = IPC_IMAGE_DEFAULT_RADIUS;
+    g_ipc_image_shared.circles[0].valid = IPC_IMAGE_DEFAULT_VALID;
     s_tx_seq++;
     g_ipc_image_shared.seq = s_tx_seq;
 
@@ -105,7 +96,12 @@ uint8 ipc_image_is_new(void)
 
 void ipc_image_get(ipc_image_payload_t *out)
 {
-    memcpy((void *)&s_latest_image, (const void *)&g_ipc_image_shared, sizeof(ipc_image_payload_t));
+    memset((void *)&s_latest_image, 0, sizeof(s_latest_image));
+    s_latest_image.count = 1U;
+    s_latest_image.circles[0].x = IPC_IMAGE_DEFAULT_X;
+    s_latest_image.circles[0].y = IPC_IMAGE_DEFAULT_Y;
+    s_latest_image.circles[0].radius = IPC_IMAGE_DEFAULT_RADIUS;
+    s_latest_image.circles[0].valid = IPC_IMAGE_DEFAULT_VALID;
     if (out != 0)
     {
         memcpy((void *)out, (const void *)&s_latest_image, sizeof(ipc_image_payload_t));

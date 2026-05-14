@@ -234,12 +234,6 @@ int main(void)
             slot50 = div50;
             if (slot50 == 0U)
             {
-                if (ipc_image_is_new())
-                {
-                    ipc_image_payload_t img;
-                    ipc_image_get(&img);
-                    // wifi_justfloat(img.circles->valid, img.circles->x, img.circles->y);
-                }
                 Pos_Est_Update_50HZ();
                 crsf_send_50hz();
             }

@@ -18,12 +18,18 @@
 #define AIR_COMM_MAX_FRAME                   (AIR_COMM_MAX_PAYLOAD + AIR_COMM_FRAME_OVERHEAD)
 #define AIR_COMM_RX_QUEUE_SIZE               (512U)  /* 接收环形队列大小（字节） */
 #define AIR_COMM_PARAM_TABLE_MAX             (100U)  /* 最多注册参数个数 */
+#define AIR_COMM_COMMAND_TABLE_MAX           (8U)    /* 最多注册远程命令个数 */
+#define AIR_COMM_COMMAND_NONE                "NONE"  /* 特殊命令：退出当前远程命令 */
+#define AIR_COMM_COMMAND_MOTOR_PWM           (500)
+#define AIR_COMM_COMMAND_MOTOR_HOLD_TICKS    (10U)   /* 100Hz下保持约100ms */
+#define AIR_COMM_SCREEN_LINE_COUNT           (8U)
+#define AIR_COMM_SCREEN_LINE_LEN             (30U)   /* IPS114横屏8x16字体最多30列，避免越界断言 */
 
 /* 消息类型定义 */
 #define AIR_COMM_MSG_SET_PARAM               (0x01U) /* 小车→无人机：设置参数 */
 #define AIR_COMM_MSG_ACK_PARAM               (0x02U) /* 无人机→小车：参数设置回执 */
-#define AIR_COMM_MSG_EXEC_FUNC               (0x03U) /* 小车→无人机：调用函数 */
-#define AIR_COMM_MSG_ACK_FUNC                (0x04U) /* 无人机→小车：函数调用回执 */
+#define AIR_COMM_MSG_EXEC_COMMAND            (0x03U) /* 小车→无人机：执行远程命令 */
+#define AIR_COMM_MSG_ACK_COMMAND             (0x04U) /* 无人机→小车：远程命令回执 */
 #define AIR_COMM_MSG_HEARTBEAT               (0x05U) /* 双向：心跳 */
 #define AIR_COMM_MSG_RUN_DATA                (0x06U) /* 双向：实时数据 */
 
@@ -39,6 +45,24 @@ typedef struct
     float min;
     float max;
 } air_comm_air_param_t;
+
+typedef struct
+{
+    const char *name;
+    air_comm_air_command_mode_t mode;
+    air_comm_air_command_start_fn start;
+    air_comm_air_command_poll_fn poll;
+    air_comm_air_command_stop_fn stop;
+} air_comm_air_command_t;
+
+typedef struct
+{
+    uint8 active;
+    uint8 seq;
+    uint8 step;
+    uint8 tick;
+    uint8 motor_was_enabled;
+} air_comm_air_motor_test_t;
 
 #define AIR_COMM_REGISTER_FLOAT(member, min_v, max_v) \
     (void)air_comm_air_register_param(#member, &g_fc_params.member, AIR_COMM_AIR_PARAM_TYPE_FLOAT, (min_v), (max_v))
@@ -93,10 +117,19 @@ static air_comm_air_rx_queue_t s_air_comm_rx_queue;     /* 接收环形队列 */
 static air_comm_air_stats_t s_air_comm_stats;           /* 统计计数器 */
 static air_comm_air_param_t s_air_comm_params[AIR_COMM_PARAM_TABLE_MAX]; /* 参数表 */
 static air_comm_run_data_fn s_air_comm_run_data_callback;
-static air_comm_exec_command_fn s_air_comm_exec_command_callback;
+static air_comm_air_command_t s_air_comm_commands[AIR_COMM_COMMAND_TABLE_MAX];
+static const air_comm_air_command_t *s_air_comm_active_command;
+static air_comm_air_motor_test_t s_air_comm_motor_test;
 static float s_air_comm_last_run_data[AIR_COMM_AIR_RUN_DATA_MAX_FLOATS];
+static char s_air_comm_screen_cache[AIR_COMM_SCREEN_LINE_COUNT][AIR_COMM_SCREEN_LINE_LEN + 1U];
+static char s_air_comm_last_done_name[AIR_COMM_AIR_COMMAND_NAME_MAX + 1U];
 static uint8 s_air_comm_last_run_data_count;
 static uint8 s_air_comm_last_run_data_valid;
+static uint8 s_air_comm_command_count;
+static uint8 s_air_comm_active_seq;
+static uint8 s_air_comm_screen_ready;
+static uint8 s_air_comm_last_done_valid;
+static uint8 s_air_comm_last_done_seq;
 static uint8 s_air_comm_param_count = 0U;  /* 已注册参数数 */
 
 /*
@@ -161,6 +194,300 @@ static void air_comm_write_u32(uint8 *buffer, uint32 value)
     buffer[1] = (uint8)((value >> 8) & 0xFFU);
     buffer[2] = (uint8)((value >> 16) & 0xFFU);
     buffer[3] = (uint8)((value >> 24) & 0xFFU);
+}
+
+static uint8 air_comm_command_name_equal(const char *left, const char *right)
+{
+    if((left == NULL) || (right == NULL))
+    {
+        return 0U;
+    }
+
+    return (strcmp(left, right) == 0) ? 1U : 0U;
+}
+
+static const air_comm_air_command_t *air_comm_find_command(const char *name)
+{
+    uint8 index;
+
+    if(name == NULL)
+    {
+        return NULL;
+    }
+
+    for(index = 0U; index < s_air_comm_command_count; index++)
+    {
+        if(air_comm_command_name_equal(s_air_comm_commands[index].name, name) != 0U)
+        {
+            return &s_air_comm_commands[index];
+        }
+    }
+
+    return NULL;
+}
+
+static void air_comm_screen_reset(void)
+{
+    uint8 index;
+
+    ips114_set_font(IPS114_8X16_FONT);
+    ips114_set_color(RGB565_GREEN, RGB565_BLACK);
+    ips114_clear();
+    for(index = 0U; index < AIR_COMM_SCREEN_LINE_COUNT; index++)
+    {
+        s_air_comm_screen_cache[index][0] = '\0';
+    }
+    s_air_comm_screen_ready = 1U;
+}
+
+static void air_comm_screen_line(uint8 line, const char *text)
+{
+    char padded[AIR_COMM_SCREEN_LINE_LEN + 1U];
+    uint8 len;
+    uint8 index;
+
+    if((line >= AIR_COMM_SCREEN_LINE_COUNT) || (text == NULL))
+    {
+        return;
+    }
+
+    len = (uint8)strlen(text);
+    if(len > AIR_COMM_SCREEN_LINE_LEN)
+    {
+        len = AIR_COMM_SCREEN_LINE_LEN;
+    }
+
+    for(index = 0U; index < AIR_COMM_SCREEN_LINE_LEN; index++)
+    {
+        padded[index] = (index < len) ? text[index] : ' ';
+    }
+    padded[AIR_COMM_SCREEN_LINE_LEN] = '\0';
+
+    if(strcmp(s_air_comm_screen_cache[line], padded) != 0)
+    {
+        strcpy(s_air_comm_screen_cache[line], padded);
+        ips114_show_string(0U, (uint16)(line * 16U), padded);
+    }
+}
+
+static void air_comm_screen_stop(void)
+{
+    s_air_comm_screen_ready = 0U;
+    ips114_set_color(RGB565_WHITE, RGB565_BLACK);
+    ips114_clear();
+}
+
+static uint8 air_comm_show_imu_start(void)
+{
+    air_comm_screen_reset();
+    return 1U;
+}
+
+static void air_comm_show_imu_poll(void)
+{
+    char line[40];
+
+    if(s_air_comm_screen_ready == 0U)
+    {
+        air_comm_screen_reset();
+    }
+
+    air_comm_screen_line(0U, "IMU RAW");
+    snprintf(line, sizeof(line), "ACC X:%6d Y:%6d",
+             (int)ICM42688_RAW.acc_x_lsb,
+             (int)ICM42688_RAW.acc_y_lsb);
+    air_comm_screen_line(1U, line);
+    snprintf(line, sizeof(line), "ACC Z:%6d T:%6d",
+             (int)ICM42688_RAW.acc_z_lsb,
+             (int)ICM42688_RAW.temp_lsb);
+    air_comm_screen_line(2U, line);
+    snprintf(line, sizeof(line), "GYR X:%6d Y:%6d",
+             (int)ICM42688_RAW.gyro_x_lsb,
+             (int)ICM42688_RAW.gyro_y_lsb);
+    air_comm_screen_line(3U, line);
+    snprintf(line, sizeof(line), "GYR Z:%6d", (int)ICM42688_RAW.gyro_z_lsb);
+    air_comm_screen_line(4U, line);
+    snprintf(line, sizeof(line), "ACCg %5.2f %5.2f",
+             (double)g_imufilter_1000hz.accx,
+             (double)g_imufilter_1000hz.accy);
+    air_comm_screen_line(5U, line);
+    snprintf(line, sizeof(line), "GYRd %5.1f %5.1f",
+             (double)g_imufilter_1000hz.gyrox,
+             (double)g_imufilter_1000hz.gyroy);
+    air_comm_screen_line(6U, line);
+    snprintf(line, sizeof(line), "RPY %4.1f %4.1f %4.1f",
+             (double)g_euler.roll,
+             (double)g_euler.pitch,
+             (double)g_euler.yaw);
+    air_comm_screen_line(7U, line);
+}
+
+static uint8 air_comm_show_flow_start(void)
+{
+    air_comm_screen_reset();
+    return 1U;
+}
+
+static void air_comm_show_flow_poll(void)
+{
+    char line[40];
+
+    if(s_air_comm_screen_ready == 0U)
+    {
+        air_comm_screen_reset();
+    }
+
+    air_comm_screen_line(0U, "OPTICAL FLOW");
+    snprintf(line, sizeof(line), "LC X:%6d Y:%6d",
+             (int)lc302_data.flow_x_integral,
+             (int)lc302_data.flow_y_integral);
+    air_comm_screen_line(1U, line);
+    snprintf(line, sizeof(line), "DT:%6u DIS:%5u",
+             (unsigned int)lc302_data.integration_timespan,
+             (unsigned int)lc302_data.ground_distance);
+    air_comm_screen_line(2U, line);
+    snprintf(line, sizeof(line), "VALID:%u VER:%u",
+             (unsigned int)lc302_data.valid,
+             (unsigned int)lc302_data.version);
+    air_comm_screen_line(3U, line);
+    snprintf(line, sizeof(line), "PMW dX:%5d dY:%5d",
+             (int)g_pmw3901_raw.deltaX,
+             (int)g_pmw3901_raw.deltaY);
+    air_comm_screen_line(4U, line);
+    snprintf(line, sizeof(line), "SQUAL:%3u OBS:%3u",
+             (unsigned int)g_pmw3901_raw.squal,
+             (unsigned int)g_pmw3901_raw.observation);
+    air_comm_screen_line(5U, line);
+    snprintf(line, sizeof(line), "RAW %3u %3u %3u",
+             (unsigned int)g_pmw3901_raw.rawDataSum,
+             (unsigned int)g_pmw3901_raw.maxRawData,
+             (unsigned int)g_pmw3901_raw.minRawData);
+    air_comm_screen_line(6U, line);
+    snprintf(line, sizeof(line), "SHUT:%5u MOT:%3u",
+             (unsigned int)g_pmw3901_raw.shutter,
+             (unsigned int)g_pmw3901_raw.motion);
+    air_comm_screen_line(7U, line);
+}
+
+static void air_comm_motor_output(uint8 motor_index)
+{
+    int32 throttle[MOTOR_NUM] = {0, 0, 0, 0};
+
+    if(motor_index < MOTOR_NUM)
+    {
+        throttle[motor_index] = AIR_COMM_COMMAND_MOTOR_PWM;
+    }
+    Motor_SetThrottleAll(throttle);
+}
+
+static void air_comm_motor_finish(uint8 send_ack)
+{
+    int32 throttle[MOTOR_NUM] = {0, 0, 0, 0};
+
+    Motor_SetThrottleAll(throttle);
+    if(s_air_comm_motor_test.motor_was_enabled == 0U)
+    {
+        Motor_Disable();
+    }
+    s_air_comm_motor_test.active = 0U;
+    if(s_air_comm_active_command != NULL)
+    {
+        s_air_comm_last_done_valid = 1U;
+        s_air_comm_last_done_seq = s_air_comm_motor_test.seq;
+        strncpy(s_air_comm_last_done_name,
+                s_air_comm_active_command->name,
+                AIR_COMM_AIR_COMMAND_NAME_MAX);
+        s_air_comm_last_done_name[AIR_COMM_AIR_COMMAND_NAME_MAX] = '\0';
+    }
+    s_air_comm_active_command = NULL;
+    if(send_ack != 0U)
+    {
+        (void)air_comm_air_send_command_ack_text(s_air_comm_motor_test.seq, "ACK_EXIT_OK");
+    }
+}
+
+static uint8 air_comm_motor_start(void)
+{
+    int32 throttle[MOTOR_NUM] = {0, 0, 0, 0};
+
+    s_air_comm_motor_test.active = 1U;
+    s_air_comm_motor_test.seq = s_air_comm_active_seq;
+    s_air_comm_motor_test.step = 0U;
+    s_air_comm_motor_test.tick = 0U;
+    s_air_comm_motor_test.motor_was_enabled = Motor_IsEnabled();
+    if(s_air_comm_motor_test.motor_was_enabled == 0U)
+    {
+        Motor_Enable();
+    }
+    Motor_SetThrottleAll(throttle);
+    air_comm_motor_output(0U);
+
+    return 1U;
+}
+
+static void air_comm_motor_poll(void)
+{
+    if(s_air_comm_motor_test.active == 0U)
+    {
+        return;
+    }
+
+    s_air_comm_motor_test.tick++;
+    if(s_air_comm_motor_test.tick < AIR_COMM_COMMAND_MOTOR_HOLD_TICKS)
+    {
+        return;
+    }
+
+    s_air_comm_motor_test.tick = 0U;
+    s_air_comm_motor_test.step++;
+
+    if(s_air_comm_motor_test.step < MOTOR_NUM)
+    {
+        air_comm_motor_output(s_air_comm_motor_test.step);
+    }
+    else
+    {
+        air_comm_motor_finish(1U);
+    }
+}
+
+static void air_comm_motor_stop(void)
+{
+    if(s_air_comm_motor_test.active != 0U)
+    {
+        air_comm_motor_finish(0U);
+    }
+}
+
+static void air_comm_stop_active_command(void)
+{
+    if((s_air_comm_active_command != NULL) &&
+       (s_air_comm_active_command->stop != NULL))
+    {
+        s_air_comm_active_command->stop();
+    }
+
+    s_air_comm_active_command = NULL;
+    s_air_comm_motor_test.active = 0U;
+}
+
+static void air_comm_register_default_commands(void)
+{
+    (void)air_comm_air_register_command("show_imu_data",
+                                        AIR_COMM_AIR_COMMAND_MODE_POLLING,
+                                        air_comm_show_imu_start,
+                                        air_comm_show_imu_poll,
+                                        air_comm_screen_stop);
+    (void)air_comm_air_register_command("show_optical_flow_data",
+                                        AIR_COMM_AIR_COMMAND_MODE_POLLING,
+                                        air_comm_show_flow_start,
+                                        air_comm_show_flow_poll,
+                                        air_comm_screen_stop);
+    (void)air_comm_air_register_command("test_motors_pwm",
+                                        AIR_COMM_AIR_COMMAND_MODE_INSTANT,
+                                        air_comm_motor_start,
+                                        air_comm_motor_poll,
+                                        air_comm_motor_stop);
 }
 
 /*
@@ -333,7 +660,6 @@ static uint8 air_comm_send_ack_get_param(uint8 seq,
     return air_comm_send_frame(AIR_COMM_MSG_ACK_GET_PARAM, seq, payload, pos);
 }
 
-/* 发送函数调用回执，告知小车调用结果（result 目前保留为 0） */
 /* 收到小车心跳后，刷新在线状态和最后通信时间 */
 static void air_comm_mark_car_online(void)
 {
@@ -389,7 +715,6 @@ static void air_comm_param_write(air_comm_air_param_t *param, float value)
     }
 }
 
-/* 按 func_id 在函数表中查找，找不到返回 NULL */
 /*
  * 处理 SET_PARAM 消息。
  * payload 格式：name_len(1B) + name(name_len B) + value(4B float, 小端)
@@ -514,52 +839,97 @@ static void air_comm_handle_get_param(uint8 seq, const uint8 *payload, uint8 len
 }
 
 /*
- * 处理 EXEC_FUNC 消息。
- * payload 格式：func_id(1B)
- * 按 func_id 查表，找到就直接调用，然后发 ACK。
- * 注意：被调用的函数在中断/主循环上下文执行，不能阻塞。
+ * 处理 EXEC_COMMAND 消息。
+ * payload 格式：[name_len][name...]，按命令名查表并返回文本 ACK。
+ * 注意：命令入口在主循环上下文执行，不能长时间阻塞。
  */
-static void air_comm_handle_exec_func(uint8 seq, const uint8 *payload, uint8 len)
+static void air_comm_handle_exec_command(uint8 seq, const uint8 *payload, uint8 len)
 {
     uint8 name_len;
-    uint8 accepted;
-    char name[AIR_COMM_AIR_FUNC_NAME_MAX + 1U];
+    const air_comm_air_command_t *command;
+    char name[AIR_COMM_AIR_COMMAND_NAME_MAX + 1U];
+    char ack[AIR_COMM_AIR_ACK_TEXT_MAX + 1U];
 
     if((payload == NULL) || (len < 1U))
     {
-        s_air_comm_stats.exec_func_fail_count++;
-        (void)air_comm_air_send_func_ack_text(seq, "ACK_ERROR 3 bad_payload");
+        s_air_comm_stats.command_fail_count++;
+        (void)air_comm_air_send_command_ack_text(seq, "ACK_ERROR 3 bad_payload");
         return;
     }
 
     name_len = payload[0];
     if((name_len == 0U) ||
-       (name_len > AIR_COMM_AIR_FUNC_NAME_MAX) ||
+       (name_len > AIR_COMM_AIR_COMMAND_NAME_MAX) ||
        ((uint16)len < (uint16)(1U + name_len)))
     {
-        s_air_comm_stats.exec_func_fail_count++;
-        (void)air_comm_air_send_func_ack_text(seq, "ACK_ERROR 3 bad_name");
+        s_air_comm_stats.command_fail_count++;
+        (void)air_comm_air_send_command_ack_text(seq, "ACK_ERROR 3 bad_name");
         return;
     }
 
     memcpy(name, &payload[1], name_len);
     name[name_len] = '\0';
 
-    if(s_air_comm_exec_command_callback == NULL)
+    if(air_comm_command_name_equal(name, AIR_COMM_COMMAND_NONE) != 0U)
     {
-        s_air_comm_stats.exec_func_fail_count++;
-        (void)air_comm_air_send_func_ack_text(seq, "ACK_ERROR 3 no_handler");
+        air_comm_stop_active_command();
+        (void)air_comm_air_send_command_ack_text(seq, "ACK_EXIT_OK");
+        s_air_comm_stats.command_ok_count++;
         return;
     }
 
-    accepted = s_air_comm_exec_command_callback(seq, name);
-    if(accepted != 0U)
+    if((s_air_comm_last_done_valid != 0U) &&
+       (seq == s_air_comm_last_done_seq) &&
+       (air_comm_command_name_equal(s_air_comm_last_done_name, name) != 0U))
     {
-        s_air_comm_stats.exec_func_ok_count++;
+        (void)air_comm_air_send_command_ack_text(seq, "ACK_EXIT_OK");
+        s_air_comm_stats.command_ok_count++;
+        return;
     }
-    else
+
+    if(s_air_comm_active_command != NULL)
     {
-        s_air_comm_stats.exec_func_fail_count++;
+        if((seq == s_air_comm_active_seq) &&
+           (air_comm_command_name_equal(s_air_comm_active_command->name, name) != 0U))
+        {
+            snprintf(ack, sizeof(ack), "ACK_OK %s", s_air_comm_active_command->name);
+            (void)air_comm_air_send_command_ack_text(seq, ack);
+            s_air_comm_stats.command_ok_count++;
+            return;
+        }
+
+        (void)air_comm_air_send_command_ack_text(seq, "ACK_ERROR 4 busy");
+        s_air_comm_stats.command_fail_count++;
+        return;
+    }
+
+    command = air_comm_find_command(name);
+    if(command == NULL)
+    {
+        (void)air_comm_air_send_command_ack_text(seq, "ACK_ERROR 1 not_found");
+        s_air_comm_stats.command_fail_count++;
+        return;
+    }
+
+    s_air_comm_active_command = command;
+    s_air_comm_active_seq = seq;
+    s_air_comm_last_done_valid = 0U;
+
+    if((command->start != NULL) && (command->start() == 0U))
+    {
+        s_air_comm_active_command = NULL;
+        (void)air_comm_air_send_command_ack_text(seq, "ACK_ERROR 3 start_fail");
+        s_air_comm_stats.command_fail_count++;
+        return;
+    }
+
+    snprintf(ack, sizeof(ack), "ACK_OK %s", command->name);
+    (void)air_comm_air_send_command_ack_text(seq, ack);
+    s_air_comm_stats.command_ok_count++;
+
+    if(command->mode == AIR_COMM_AIR_COMMAND_MODE_INSTANT)
+    {
+        /* 立即型命令由100Hz状态机发ACK_EXIT_OK，避免在接收解析中长时间阻塞。 */
     }
 }
 
@@ -614,8 +984,8 @@ static void air_comm_handle_frame(uint8 type, uint8 seq, const uint8 *payload, u
             air_comm_handle_set_param(seq, payload, len);
             break;
 
-        case AIR_COMM_MSG_EXEC_FUNC:
-            air_comm_handle_exec_func(seq, payload, len);
+        case AIR_COMM_MSG_EXEC_COMMAND:
+            air_comm_handle_exec_command(seq, payload, len);
             break;
 
         case AIR_COMM_MSG_GET_PARAM:
@@ -671,6 +1041,7 @@ static void air_comm_process_rx_frame(void)
 
     s_air_comm_stats.rx_frame_count++;
     s_air_comm_stats.rx_byte_count += (uint32)(pos + 2U);
+    air_comm_mark_car_online();
     air_comm_handle_frame(s_air_comm_rx.type,
                           s_air_comm_rx.seq,
                           s_air_comm_rx.payload,
@@ -849,7 +1220,11 @@ void air_comm_air_init(void)
     memset(&s_air_comm_rx_queue, 0, sizeof(s_air_comm_rx_queue));
     memset(&s_air_comm_stats, 0, sizeof(s_air_comm_stats));
     memset(s_air_comm_params, 0, sizeof(s_air_comm_params));
+    memset(s_air_comm_commands, 0, sizeof(s_air_comm_commands));
+    memset(&s_air_comm_motor_test, 0, sizeof(s_air_comm_motor_test));
     memset(s_air_comm_last_run_data, 0, sizeof(s_air_comm_last_run_data));
+    memset(s_air_comm_screen_cache, 0, sizeof(s_air_comm_screen_cache));
+    memset(s_air_comm_last_done_name, 0, sizeof(s_air_comm_last_done_name));
 
     s_air_comm_initialized = 0U;
     s_air_comm_seq = 0U;
@@ -857,10 +1232,15 @@ void air_comm_air_init(void)
     s_air_comm_last_heartbeat_ms = 0U;
     s_air_comm_last_car_ms = 0U;
     s_air_comm_run_data_callback = NULL;
-    s_air_comm_exec_command_callback = NULL;
+    s_air_comm_active_command = NULL;
     s_air_comm_last_run_data_count = 0U;
     s_air_comm_last_run_data_valid = 0U;
     s_air_comm_param_count = 0U;
+    s_air_comm_command_count = 0U;
+    s_air_comm_active_seq = 0U;
+    s_air_comm_screen_ready = 0U;
+    s_air_comm_last_done_valid = 0U;
+    s_air_comm_last_done_seq = 0U;
 
     AIR_COMM_REGISTER_FLOAT(gyro_dt, 0.0001f, 0.1f);
     AIR_COMM_REGISTER_FLOAT(angle_dt, 0.0001f, 0.1f);
@@ -965,6 +1345,7 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(mode8_img_y_kff, 0.0f, 3000.0f);
     AIR_COMM_REGISTER_FLOAT(mode8_img_y_i_limit, 0.0f, 5000.0f);
     AIR_COMM_REGISTER_FLOAT(mode8_img_y_d_lpf, 0.0f, 500.0f);
+    air_comm_register_default_commands();
 
     /* 配置 UART_2：波特率 1152000，TX=P10_1，RX=P10_0，开接收中断 */
     uart_init(UART_2, AIR_COMM_AIR_BAUDRATE, UART2_TX_P10_1, UART2_RX_P10_0);
@@ -1020,6 +1401,12 @@ void air_comm_air_update_100HZ(void)
     {
         air_comm_send_heartbeat();
         s_air_comm_last_heartbeat_ms = s_air_comm_tick_ms;
+    }
+
+    if((s_air_comm_active_command != NULL) &&
+       (s_air_comm_active_command->poll != NULL))
+    {
+        s_air_comm_active_command->poll();
     }
 
     air_comm_task_online();
@@ -1156,12 +1543,57 @@ void air_comm_set_run_data_callback(air_comm_run_data_fn callback)
     s_air_comm_run_data_callback = callback;
 }
 
-void air_comm_air_set_exec_command_callback(air_comm_exec_command_fn callback)
+uint8 air_comm_air_register_command(const char *name,
+                                    air_comm_air_command_mode_t mode,
+                                    air_comm_air_command_start_fn start,
+                                    air_comm_air_command_poll_fn poll,
+                                    air_comm_air_command_stop_fn stop)
 {
-    s_air_comm_exec_command_callback = callback;
+    uint8 index;
+
+    if((name == NULL) || (mode > AIR_COMM_AIR_COMMAND_MODE_INSTANT))
+    {
+        return 0U;
+    }
+
+    if((strlen(name) == 0U) || (strlen(name) > AIR_COMM_AIR_COMMAND_NAME_MAX))
+    {
+        return 0U;
+    }
+
+    if((mode == AIR_COMM_AIR_COMMAND_MODE_POLLING) && (poll == NULL))
+    {
+        return 0U;
+    }
+
+    for(index = 0U; index < s_air_comm_command_count; index++)
+    {
+        if(air_comm_command_name_equal(s_air_comm_commands[index].name, name) != 0U)
+        {
+            s_air_comm_commands[index].mode = mode;
+            s_air_comm_commands[index].start = start;
+            s_air_comm_commands[index].poll = poll;
+            s_air_comm_commands[index].stop = stop;
+            return 1U;
+        }
+    }
+
+    if(s_air_comm_command_count >= AIR_COMM_COMMAND_TABLE_MAX)
+    {
+        return 0U;
+    }
+
+    s_air_comm_commands[s_air_comm_command_count].name = name;
+    s_air_comm_commands[s_air_comm_command_count].mode = mode;
+    s_air_comm_commands[s_air_comm_command_count].start = start;
+    s_air_comm_commands[s_air_comm_command_count].poll = poll;
+    s_air_comm_commands[s_air_comm_command_count].stop = stop;
+    s_air_comm_command_count++;
+
+    return 1U;
 }
 
-uint8 air_comm_air_send_func_ack_text(uint8 seq, const char *text)
+uint8 air_comm_air_send_command_ack_text(uint8 seq, const char *text)
 {
     uint16 text_len;
     uint8 payload[AIR_COMM_AIR_ACK_TEXT_MAX];
@@ -1182,7 +1614,7 @@ uint8 air_comm_air_send_func_ack_text(uint8 seq, const char *text)
         memcpy(payload, text, text_len);
     }
 
-    return air_comm_send_frame(AIR_COMM_MSG_ACK_FUNC, seq, payload, (uint8)text_len);
+    return air_comm_send_frame(AIR_COMM_MSG_ACK_COMMAND, seq, payload, (uint8)text_len);
 }
 
 uint8 air_comm_get_last_run_data(float *data, uint8 max_count, uint8 *count)

@@ -104,7 +104,7 @@ int main(void)
 {
     clock_init(SYSTEM_CLOCK_250M);
     SCB_DisableDCache();
-    // ips114_init();
+    ips114_init();
     Beep_Init();
     pit_ms_init(PIT_CH2, 10);
     /* 副 IMU 初始化日志走 WiFi 文本链路，所以 wifi_cmd_Init 必须早于 ICM42688_Aux_Init。 */
@@ -129,7 +129,6 @@ int main(void)
     ipc_communicate_init(IPC_PORT_1, ipc_image_callback);
     FC_START_CRSF_Init();
     air_comm_air_init();
-    air_remote_cmd_init();
     wifi_justfloat_SetStandbyContext((0U == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
     pit_us_init(PIT_CH0, 1000);
     pit_ms_init(PIT_CH1, 10);
@@ -178,7 +177,6 @@ int main(void)
             CRSF_Update_100HZ();
             FC_Loop_100Hz();
             air_comm_air_update_100HZ();
-            air_remote_cmd_update_100HZ();
 
             float air_data[10];
             air_data[0] = g_tof1_height_mm;

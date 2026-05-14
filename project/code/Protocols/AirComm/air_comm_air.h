@@ -6,10 +6,10 @@
 /*
  * 模块作用：
  * 无人机端车空串口通信模块。无人机 CYT4BB7 通过 UART_2 与小车 CYT4BB7 通信，
- * 支持参数远程设置、函数远程调用、心跳保活和实时数据双向收发。
+ * 支持参数远程设置、远程命令、心跳保活和实时数据双向收发。
  *
  * 角色关系：
- * 小车是"主机"，主动发 SET_PARAM / EXEC_FUNC / HEARTBEAT 给无人机。
+ * 小车是"主机"，主动发 SET_PARAM / EXEC_COMMAND / HEARTBEAT 给无人机。
  * 无人机是"从机"，收到后执行并回 ACK，同时周期发心跳告诉小车自己还活着。
  *
  * 帧格式：
@@ -20,8 +20,8 @@
  * 消息类型：
  * 0x01 SET_PARAM  小车→无人机  设置参数（按名字查找，带 min/max 限幅）
  * 0x02 ACK_PARAM  无人机→小车  参数设置结果回执
- * 0x03 EXEC_FUNC  小车→无人机  远程调用函数
- * 0x04 ACK_FUNC   无人机→小车  函数调用结果回执
+ * 0x03 EXEC_COMMAND 小车→无人机  执行远程命令
+ * 0x04 ACK_COMMAND  无人机→小车  远程命令结果回执
  * 0x05 HEARTBEAT  双向          心跳包，payload 带 tick_ms 时间戳
  * 0x06 RUN_DATA   双向          实时数据（float 数组，不需要 ACK）
  *
@@ -35,19 +35,30 @@
  */
 
 #define AIR_COMM_AIR_PARAM_NAME_MAX          (32U)   /* 参数名最大长度（不含 '\0'） */
+#define AIR_COMM_AIR_COMMAND_NAME_MAX        (32U)   /* 远程命令名最大长度，不含 '\0' */
+#define AIR_COMM_AIR_ACK_TEXT_MAX            (96U)   /* 远程命令 ACK 文本最大长度，不含 '\0' */
 #define AIR_COMM_AIR_RUN_DATA_MAX_FLOATS     (32U)   /* 单次实时数据最多 float 个数 */
 #define AIR_COMM_AIR_BAUDRATE                (1152000U) /* UART 波特率 */
 
-/* 参数/函数操作返回状态 */
+/* 参数/远程命令操作返回状态 */
 #define AIR_COMM_AIR_STATUS_OK               (0U)    /* 成功 */
-#define AIR_COMM_AIR_STATUS_NOT_FOUND        (1U)    /* 参数名或 func_id 未注册 */
+#define AIR_COMM_AIR_STATUS_NOT_FOUND        (1U)    /* 参数名或远程命令未注册 */
 #define AIR_COMM_AIR_STATUS_OUT_OF_RANGE     (2U)    /* 值超出 [min, max]，已限幅 */
 #define AIR_COMM_AIR_STATUS_ERROR            (3U)    /* 通用错误（payload 长度不对等） */
+#define AIR_COMM_AIR_STATUS_BUSY             (4U)    /* 远程命令忙，已有命令正在执行 */
 
 #define AIR_COMM_AIR_PARAM_TYPE_FLOAT        (0U)
 #define AIR_COMM_AIR_PARAM_TYPE_INT32        (1U)
 
 typedef void (*air_comm_run_data_fn)(const float *data, uint8 count);
+
+typedef enum
+{
+    AIR_COMM_AIR_COMMAND_MODE_POLLING = 0,    /* 轮询型远程命令：持续执行，直到收到 NONE */
+    AIR_COMM_AIR_COMMAND_MODE_INSTANT         /* 立即型远程命令：完成后自动退出 */
+} air_comm_air_command_mode_t;
+
+typedef void (*air_comm_air_command_fn)(void);
 
 /*
  * 通信统计结构体。
@@ -69,8 +80,8 @@ typedef struct
     uint32 heartbeat_rx_count;     /* 心跳接收次数 */
     uint32 set_param_ok_count;     /* 参数设置成功次数 */
     uint32 set_param_fail_count;   /* 参数设置失败次数 */
-    uint32 exec_func_ok_count;     /* 函数调用成功次数 */
-    uint32 exec_func_fail_count;   /* 函数调用失败次数 */
+    uint32 command_ok_count;       /* 远程命令成功次数 */
+    uint32 command_fail_count;     /* 远程命令失败次数 */
     uint8 online_status;           /* 0=未连接 1=在线 2=离线 */
 } air_comm_air_stats_t;
 
@@ -123,12 +134,19 @@ uint8 air_comm_air_is_car_online(void);
 uint8 air_comm_air_register_param(const char *name, void *var, uint8 type, float min, float max);
 
 /*
- * 注册一个可被远程调用的函数。
- * func_id: 函数编号（小车通过这个 ID 调用）
- * func:    函数指针，无参无返回值
- * 返回 1=成功，0=失败（表满或 func 为 NULL）
+ * 注册轮询型 Air 远程命令。
+ * name: 远程命令名，0x03 payload 中传输的字符串。
+ * run:  100Hz 周期调用，只写命令需要持续运行的内容。
  */
-uint8 air_comm_air_register_func(uint8 func_id, void (*func)(void));
+uint8 air_comm_air_register_polling_command(const char *name, air_comm_air_command_fn run);
+
+/*
+ * 注册立即退出型 Air 远程命令。
+ * name: 远程命令名，0x03 payload 中传输的字符串。
+ * run:  ACK_OK 之后在 100Hz 调度中执行一次，完成后框架自动发送 ACK_EXIT_OK。
+ */
+uint8 air_comm_air_register_instant_command(const char *name, air_comm_air_command_fn run);
+uint8 air_comm_air_send_command_ack_text(uint8 seq, const char *text);
 
 uint8 air_comm_send_run_data(const float *data, uint8 count);
 void air_comm_set_run_data_callback(air_comm_run_data_fn callback);

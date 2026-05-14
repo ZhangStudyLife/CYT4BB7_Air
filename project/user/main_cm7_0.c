@@ -103,7 +103,7 @@ int main(void)
 {
     clock_init(SYSTEM_CLOCK_250M);
     SCB_DisableDCache();
-    // ips114_init();
+    ips114_init();
     Beep_Init();
     pit_ms_init(PIT_CH2, 10);
     /* 副 IMU 初始化日志走 WiFi 文本链路，所以 wifi_cmd_Init 必须早于 ICM42688_Aux_Init。 */

@@ -1,6 +1,5 @@
 #include "zf_common_headfile.h"
 
-
 volatile uint32 tick_1000us_cnt = 0U;
 volatile uint16 g_tick_1000HZ = 0U;
 volatile uint8 g_tick_100HZ = 0U;
@@ -191,7 +190,6 @@ int main(void)
             air_data[9] = g_imufilter_1000hz.gyroz;
             air_comm_send_run_data(air_data, 10);
 
-
             wifi_justfloat(g_car_encoder_left_front,
                            g_car_encoder_right_front,
                            g_car_encoder_left_rear,
@@ -201,7 +199,10 @@ int main(void)
                            g_car_imufilter_1000hz_accz,
                            g_car_imufilter_1000hz_gyrox,
                            g_car_imufilter_1000hz_gyroy,
-                           g_car_imufilter_1000hz_gyroz);
+                           g_car_imufilter_1000hz_gyroz,
+                           g_euler.roll,
+                           g_euler.pitch,
+                           g_euler.yaw);
             wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
             {
                 uint8 flying = (FC_START_CRSF_STATE_FLYING == FC_START_CRSF_Get_State()) ? 1U : 0U;

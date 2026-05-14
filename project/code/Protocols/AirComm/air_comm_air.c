@@ -19,9 +19,6 @@
 #define AIR_COMM_RX_QUEUE_SIZE               (512U)  /* 接收环形队列大小（字节） */
 #define AIR_COMM_PARAM_TABLE_MAX             (100U)  /* 最多注册参数个数 */
 #define AIR_COMM_COMMAND_TABLE_MAX           (8U)    /* 最多注册远程命令个数 */
-#define AIR_COMM_COMMAND_NONE                "NONE"  /* 特殊命令：退出当前远程命令 */
-#define AIR_COMM_COMMAND_MOTOR_PWM           (500)
-#define AIR_COMM_COMMAND_MOTOR_HOLD_TICKS    (10U)   /* 100Hz下保持约100ms */
 #define AIR_COMM_SCREEN_LINE_COUNT           (8U)
 #define AIR_COMM_SCREEN_LINE_LEN             (30U)   /* IPS114横屏8x16字体最多30列，避免越界断言 */
 
@@ -54,15 +51,6 @@ typedef struct
     air_comm_air_command_poll_fn poll;
     air_comm_air_command_stop_fn stop;
 } air_comm_air_command_t;
-
-typedef struct
-{
-    uint8 active;
-    uint8 seq;
-    uint8 step;
-    uint8 tick;
-    uint8 motor_was_enabled;
-} air_comm_air_motor_test_t;
 
 #define AIR_COMM_REGISTER_FLOAT(member, min_v, max_v) \
     (void)air_comm_air_register_param(#member, &g_fc_params.member, AIR_COMM_AIR_PARAM_TYPE_FLOAT, (min_v), (max_v))
@@ -119,7 +107,6 @@ static air_comm_air_param_t s_air_comm_params[AIR_COMM_PARAM_TABLE_MAX]; /* 参�
 static air_comm_run_data_fn s_air_comm_run_data_callback;
 static air_comm_air_command_t s_air_comm_commands[AIR_COMM_COMMAND_TABLE_MAX];
 static const air_comm_air_command_t *s_air_comm_active_command;
-static air_comm_air_motor_test_t s_air_comm_motor_test;
 static float s_air_comm_last_run_data[AIR_COMM_AIR_RUN_DATA_MAX_FLOATS];
 static char s_air_comm_screen_cache[AIR_COMM_SCREEN_LINE_COUNT][AIR_COMM_SCREEN_LINE_LEN + 1U];
 static char s_air_comm_last_done_name[AIR_COMM_AIR_COMMAND_NAME_MAX + 1U];
@@ -369,96 +356,6 @@ static void air_comm_show_flow_poll(void)
     air_comm_screen_line(7U, line);
 }
 
-static void air_comm_motor_output(uint8 motor_index)
-{
-    int32 throttle[MOTOR_NUM] = {0, 0, 0, 0};
-
-    if(motor_index < MOTOR_NUM)
-    {
-        throttle[motor_index] = AIR_COMM_COMMAND_MOTOR_PWM;
-    }
-    Motor_SetThrottleAll(throttle);
-}
-
-static void air_comm_motor_finish(uint8 send_ack)
-{
-    int32 throttle[MOTOR_NUM] = {0, 0, 0, 0};
-
-    Motor_SetThrottleAll(throttle);
-    if(s_air_comm_motor_test.motor_was_enabled == 0U)
-    {
-        Motor_Disable();
-    }
-    s_air_comm_motor_test.active = 0U;
-    if(s_air_comm_active_command != NULL)
-    {
-        s_air_comm_last_done_valid = 1U;
-        s_air_comm_last_done_seq = s_air_comm_motor_test.seq;
-        strncpy(s_air_comm_last_done_name,
-                s_air_comm_active_command->name,
-                AIR_COMM_AIR_COMMAND_NAME_MAX);
-        s_air_comm_last_done_name[AIR_COMM_AIR_COMMAND_NAME_MAX] = '\0';
-    }
-    s_air_comm_active_command = NULL;
-    if(send_ack != 0U)
-    {
-        (void)air_comm_air_send_command_ack_text(s_air_comm_motor_test.seq, "ACK_EXIT_OK");
-    }
-}
-
-static uint8 air_comm_motor_start(void)
-{
-    int32 throttle[MOTOR_NUM] = {0, 0, 0, 0};
-
-    s_air_comm_motor_test.active = 1U;
-    s_air_comm_motor_test.seq = s_air_comm_active_seq;
-    s_air_comm_motor_test.step = 0U;
-    s_air_comm_motor_test.tick = 0U;
-    s_air_comm_motor_test.motor_was_enabled = Motor_IsEnabled();
-    if(s_air_comm_motor_test.motor_was_enabled == 0U)
-    {
-        Motor_Enable();
-    }
-    Motor_SetThrottleAll(throttle);
-    air_comm_motor_output(0U);
-
-    return 1U;
-}
-
-static void air_comm_motor_poll(void)
-{
-    if(s_air_comm_motor_test.active == 0U)
-    {
-        return;
-    }
-
-    s_air_comm_motor_test.tick++;
-    if(s_air_comm_motor_test.tick < AIR_COMM_COMMAND_MOTOR_HOLD_TICKS)
-    {
-        return;
-    }
-
-    s_air_comm_motor_test.tick = 0U;
-    s_air_comm_motor_test.step++;
-
-    if(s_air_comm_motor_test.step < MOTOR_NUM)
-    {
-        air_comm_motor_output(s_air_comm_motor_test.step);
-    }
-    else
-    {
-        air_comm_motor_finish(1U);
-    }
-}
-
-static void air_comm_motor_stop(void)
-{
-    if(s_air_comm_motor_test.active != 0U)
-    {
-        air_comm_motor_finish(0U);
-    }
-}
-
 static void air_comm_stop_active_command(void)
 {
     if((s_air_comm_active_command != NULL) &&
@@ -468,7 +365,27 @@ static void air_comm_stop_active_command(void)
     }
 
     s_air_comm_active_command = NULL;
-    s_air_comm_motor_test.active = 0U;
+}
+
+static uint8 air_comm_beep_start(void)
+{
+    Beep_Play(50U, 0.2f, 3U);
+    return 1U;
+}
+
+static void air_comm_beep_poll(void)
+{
+    if(s_air_comm_active_command != NULL)
+    {
+        s_air_comm_last_done_valid = 1U;
+        s_air_comm_last_done_seq = s_air_comm_active_seq;
+        strncpy(s_air_comm_last_done_name,
+                s_air_comm_active_command->name,
+                AIR_COMM_AIR_COMMAND_NAME_MAX);
+        s_air_comm_last_done_name[AIR_COMM_AIR_COMMAND_NAME_MAX] = '\0';
+        s_air_comm_active_command = NULL;
+        (void)air_comm_air_send_command_ack_text(s_air_comm_active_seq, "ACK_EXIT_OK");
+    }
 }
 
 static void air_comm_register_default_commands(void)
@@ -483,11 +400,11 @@ static void air_comm_register_default_commands(void)
                                         air_comm_show_flow_start,
                                         air_comm_show_flow_poll,
                                         air_comm_screen_stop);
-    (void)air_comm_air_register_command("test_motors_pwm",
+    (void)air_comm_air_register_command("beep",
                                         AIR_COMM_AIR_COMMAND_MODE_INSTANT,
-                                        air_comm_motor_start,
-                                        air_comm_motor_poll,
-                                        air_comm_motor_stop);
+                                        air_comm_beep_start,
+                                        air_comm_beep_poll,
+                                        NULL);
 }
 
 /*
@@ -870,7 +787,7 @@ static void air_comm_handle_exec_command(uint8 seq, const uint8 *payload, uint8 
     memcpy(name, &payload[1], name_len);
     name[name_len] = '\0';
 
-    if(air_comm_command_name_equal(name, AIR_COMM_COMMAND_NONE) != 0U)
+    if(air_comm_command_name_equal(name, "NONE") != 0U)
     {
         air_comm_stop_active_command();
         (void)air_comm_air_send_command_ack_text(seq, "ACK_EXIT_OK");
@@ -1221,7 +1138,6 @@ void air_comm_air_init(void)
     memset(&s_air_comm_stats, 0, sizeof(s_air_comm_stats));
     memset(s_air_comm_params, 0, sizeof(s_air_comm_params));
     memset(s_air_comm_commands, 0, sizeof(s_air_comm_commands));
-    memset(&s_air_comm_motor_test, 0, sizeof(s_air_comm_motor_test));
     memset(s_air_comm_last_run_data, 0, sizeof(s_air_comm_last_run_data));
     memset(s_air_comm_screen_cache, 0, sizeof(s_air_comm_screen_cache));
     memset(s_air_comm_last_done_name, 0, sizeof(s_air_comm_last_done_name));

@@ -1,9 +1,6 @@
 #include "air_remote_cmd.h"
 
 #define AIR_REMOTE_CMD_MAX_COUNT             (8U)
-#define AIR_REMOTE_CMD_NONE                  "NONE"
-#define AIR_REMOTE_CMD_MOTOR_PWM             (500)
-#define AIR_REMOTE_CMD_MOTOR_HOLD_TICKS      (10U)
 #define AIR_REMOTE_CMD_SCREEN_LINE_COUNT     (8U)
 #define AIR_REMOTE_CMD_SCREEN_LINE_LEN       (31U)
 
@@ -16,20 +13,10 @@ typedef struct
     air_remote_cmd_stop_fn stop;
 } air_remote_cmd_entry_t;
 
-typedef struct
-{
-    uint8 active;
-    uint8 seq;
-    uint8 step;
-    uint8 tick;
-    uint8 motor_was_enabled;
-} air_remote_motor_test_t;
-
 static air_remote_cmd_entry_t s_cmd_table[AIR_REMOTE_CMD_MAX_COUNT];
 static uint8 s_cmd_count;
 static const air_remote_cmd_entry_t *s_active_cmd;
 static uint8 s_active_seq;
-static air_remote_motor_test_t s_motor_test;
 static char s_screen_cache[AIR_REMOTE_CMD_SCREEN_LINE_COUNT][AIR_REMOTE_CMD_SCREEN_LINE_LEN + 1U];
 static uint8 s_screen_ready;
 static uint8 s_last_done_valid;
@@ -220,94 +207,6 @@ static void air_remote_cmd_screen_stop(void)
     ips114_clear();
 }
 
-static void air_remote_cmd_motor_output(uint8 motor_index)
-{
-    int32 throttle[MOTOR_NUM] = {0, 0, 0, 0};
-
-    if(motor_index < MOTOR_NUM)
-    {
-        throttle[motor_index] = AIR_REMOTE_CMD_MOTOR_PWM;
-    }
-    Motor_SetThrottleAll(throttle);
-}
-
-static void air_remote_cmd_motor_finish(uint8 send_ack)
-{
-    int32 throttle[MOTOR_NUM] = {0, 0, 0, 0};
-
-    Motor_SetThrottleAll(throttle);
-    if(s_motor_test.motor_was_enabled == 0U)
-    {
-        Motor_Disable();
-    }
-    s_motor_test.active = 0U;
-    if(s_active_cmd != NULL)
-    {
-        s_last_done_valid = 1U;
-        s_last_done_seq = s_motor_test.seq;
-        strncpy(s_last_done_name, s_active_cmd->name, AIR_COMM_AIR_FUNC_NAME_MAX);
-        s_last_done_name[AIR_COMM_AIR_FUNC_NAME_MAX] = '\0';
-    }
-    s_active_cmd = NULL;
-    if(send_ack != 0U)
-    {
-        (void)air_comm_air_send_func_ack_text(s_motor_test.seq, "ACK_EXIT_OK");
-    }
-}
-
-static uint8 air_remote_cmd_motor_start(void)
-{
-    int32 throttle[MOTOR_NUM] = {0, 0, 0, 0};
-
-    s_motor_test.active = 1U;
-    s_motor_test.seq = s_active_seq;
-    s_motor_test.step = 0U;
-    s_motor_test.tick = 0U;
-    s_motor_test.motor_was_enabled = Motor_IsEnabled();
-    if(s_motor_test.motor_was_enabled == 0U)
-    {
-        Motor_Enable();
-    }
-    Motor_SetThrottleAll(throttle);
-    air_remote_cmd_motor_output(0U);
-
-    return 1U;
-}
-
-static void air_remote_cmd_motor_poll(void)
-{
-    if(s_motor_test.active == 0U)
-    {
-        return;
-    }
-
-    s_motor_test.tick++;
-    if(s_motor_test.tick < AIR_REMOTE_CMD_MOTOR_HOLD_TICKS)
-    {
-        return;
-    }
-
-    s_motor_test.tick = 0U;
-    s_motor_test.step++;
-
-    if(s_motor_test.step < MOTOR_NUM)
-    {
-        air_remote_cmd_motor_output(s_motor_test.step);
-    }
-    else
-    {
-        air_remote_cmd_motor_finish(1U);
-    }
-}
-
-static void air_remote_cmd_motor_stop(void)
-{
-    if(s_motor_test.active != 0U)
-    {
-        air_remote_cmd_motor_finish(0U);
-    }
-}
-
 static void air_remote_cmd_stop_active(void)
 {
     if((s_active_cmd != NULL) && (s_active_cmd->stop != NULL))
@@ -316,7 +215,25 @@ static void air_remote_cmd_stop_active(void)
     }
 
     s_active_cmd = NULL;
-    s_motor_test.active = 0U;
+}
+
+static uint8 air_remote_cmd_beep_start(void)
+{
+    Beep_Play(50U, 0.2f, 3U);
+    return 1U;
+}
+
+static void air_remote_cmd_beep_poll(void)
+{
+    if(s_active_cmd != NULL)
+    {
+        s_last_done_valid = 1U;
+        s_last_done_seq = s_active_seq;
+        strncpy(s_last_done_name, s_active_cmd->name, AIR_COMM_AIR_FUNC_NAME_MAX);
+        s_last_done_name[AIR_COMM_AIR_FUNC_NAME_MAX] = '\0';
+        s_active_cmd = NULL;
+        (void)air_comm_air_send_func_ack_text(s_active_seq, "ACK_EXIT_OK");
+    }
 }
 
 static uint8 air_remote_cmd_handle(uint8 seq, const char *name)
@@ -330,7 +247,7 @@ static uint8 air_remote_cmd_handle(uint8 seq, const char *name)
         return 0U;
     }
 
-    if(strcmp(name, AIR_REMOTE_CMD_NONE) == 0)
+    if(strcmp(name, "NONE") == 0)
     {
         air_remote_cmd_stop_active();
         (void)air_comm_air_send_func_ack_text(seq, "ACK_EXIT_OK");
@@ -385,7 +302,6 @@ void air_remote_cmd_init(void)
     s_cmd_count = 0U;
     s_active_cmd = NULL;
     s_active_seq = 0U;
-    memset(&s_motor_test, 0, sizeof(s_motor_test));
     memset(s_screen_cache, 0, sizeof(s_screen_cache));
     s_screen_ready = 0U;
     s_last_done_valid = 0U;
@@ -402,11 +318,11 @@ void air_remote_cmd_init(void)
                                   air_remote_cmd_show_flow_start,
                                   air_remote_cmd_show_flow_poll,
                                   air_remote_cmd_screen_stop);
-    (void)air_remote_cmd_register("test_motors_pwm",
+    (void)air_remote_cmd_register("beep",
                                   AIR_REMOTE_CMD_MODE_INSTANT,
-                                  air_remote_cmd_motor_start,
-                                  air_remote_cmd_motor_poll,
-                                  air_remote_cmd_motor_stop);
+                                  air_remote_cmd_beep_start,
+                                  air_remote_cmd_beep_poll,
+                                  NULL);
 
     air_comm_air_set_exec_command_callback(air_remote_cmd_handle);
 }

@@ -161,6 +161,59 @@ void wifi_justfloat_GetTxStats(wifi_justfloat_tx_stats_t *stats)
     stats->avg_us = (uint32_t)avg_us;
 }
 
+uint8_t wifi_justfloat_Array(const float *data, uint8_t num)
+{
+    uint8_t i;
+    uint8_t ret;
+    uint16_t payload_len;
+    uint16_t frame_len;
+    uint32_t start_us;
+    uint32_t cost_us;
+    uint8_t frame[WIFI_JUSTFLOAT_MAX_FLOAT_NUM * 4U + 4U];
+
+#if (1U == WIFI_IMAGE_ENABLE)
+    (void)data;
+    (void)num;
+    return 0U;
+#endif
+
+    if ((NULL == data) || (0U == num) || (num > WIFI_JUSTFLOAT_MAX_FLOAT_NUM))
+    {
+        s_wifi_justfloat_profile.fail_count++;
+        return 1U;
+    }
+
+    if (0U == wifi_cmd_IsReady())
+    {
+        s_wifi_justfloat_profile.fail_count++;
+        return 1U;
+    }
+
+    if (0U == wifi_justfloat_should_send())
+    {
+        s_wifi_justfloat_profile.skip_count++;
+        return 0U;
+    }
+
+    for (i = 0U; i < num; i++)
+    {
+        memcpy(&frame[i * 4U], &data[i], sizeof(float));
+    }
+
+    payload_len = (uint16_t)num * 4U;
+    frame[payload_len + 0U] = WIFI_JUSTFLOAT_TAIL_0;
+    frame[payload_len + 1U] = WIFI_JUSTFLOAT_TAIL_1;
+    frame[payload_len + 2U] = WIFI_JUSTFLOAT_TAIL_2;
+    frame[payload_len + 3U] = WIFI_JUSTFLOAT_TAIL_3;
+    frame_len = payload_len + 4U;
+
+    start_us = timer_get(WIFI_JUSTFLOAT_TIMER_INDEX);
+    ret = (0U != wifi_cmd_SendBuffer(frame, frame_len)) ? 0U : 1U;
+    cost_us = timer_get(WIFI_JUSTFLOAT_TIMER_INDEX) - start_us;
+    wifi_justfloat_profile_update(cost_us, (0U == ret) ? 1U : 0U);
+    return ret;
+}
+
 uint8_t wifi_justfloat_Impl(uint8_t declared_num, uint8_t actual_num, ...)
 {
     uint8_t i;

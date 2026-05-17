@@ -1,7 +1,7 @@
 /*****************************************************************************
- * 文件: wifi_justfloat.h
- * 模块: WiFi JustFloat 遥测
- * 职责: 通过 wifi_cmd 提供的发送接口输出 VOFA JustFloat 二进制遥测
+ * File: wifi_justfloat.h
+ * Module: WiFi JustFloat telemetry
+ * Purpose: output VOFA JustFloat binary frames through wifi_cmd
  *****************************************************************************/
 
 #ifndef WIFI_JUSTFLOAT_H
@@ -9,95 +9,29 @@
 
 #include "zf_common_headfile.h"
 
-#define WIFI_JUSTFLOAT_MAX_FLOAT_NUM       (16U)  /* JustFloat 最大通道数 */
+#define WIFI_JUSTFLOAT_MAX_FLOAT_NUM       (40U)  /* JustFloat max channel count */
 
-/* JustFloat 发送耗时统计结构体 */
+/* JustFloat transmit time statistics */
 typedef struct
 {
-    uint32_t last_us;     /* 最近一次发送耗时，单位 us */
-    uint32_t min_us;      /* 最小发送耗时，单位 us */
-    uint32_t max_us;      /* 最大发送耗时，单位 us */
-    uint32_t avg_us;      /* 平均发送耗时，单位 us，仅统计成功发送 */
-    uint32_t ok_count;    /* 成功发送次数 */
-    uint32_t fail_count;  /* 发送失败次数 */
-    uint32_t skip_count;  /* 被待机态 stop 抑制的次数 */
+    uint32_t last_us;     /* Last transmit cost, unit: us */
+    uint32_t min_us;      /* Minimum transmit cost, unit: us */
+    uint32_t max_us;      /* Maximum transmit cost, unit: us */
+    uint32_t avg_us;      /* Average cost for successful transmissions, unit: us */
+    uint32_t ok_count;    /* Successful transmit count */
+    uint32_t fail_count;  /* Failed transmit count */
+    uint32_t skip_count;  /* Skip count while standby sending is disabled */
 } wifi_justfloat_tx_stats_t;
 
-/*
- * 函数名: wifi_justfloat_Init
- * 功能: 初始化 JustFloat 模块内部状态与统计信息
- * 输入参数: 无
- * 返回值: 无
- */
 void wifi_justfloat_Init(void);
-
-/*
- * 函数名: wifi_justfloat_IsReady
- * 功能: 查询当前 WiFi 遥测链路是否可发送
- * 输入参数: 无
- * 返回值:
- *   1 - 可发送
- *   0 - 不可发送
- */
 uint8_t wifi_justfloat_IsReady(void);
-
-/*
- * 函数名: wifi_justfloat_SetStandbyContext
- * 功能: 设置当前是否处于待机态上下文
- * 输入参数:
- *   is_standby - 1 表示待机态，0 表示非待机态
- * 返回值: 无
- */
 void wifi_justfloat_SetStandbyContext(uint8_t is_standby);
-
-/*
- * 函数名: wifi_justfloat_SetStandbyUserEnable
- * 功能: 设置用户是否允许待机态发送遥测
- * 输入参数:
- *   enable - 1 允许发送，0 禁止发送
- * 返回值: 无
- */
 void wifi_justfloat_SetStandbyUserEnable(uint8_t enable);
-
-/*
- * 函数名: wifi_justfloat_GetStandbyUserEnable
- * 功能: 查询用户当前是否允许待机态发送遥测
- * 输入参数: 无
- * 返回值:
- *   1 - 允许发送
- *   0 - 禁止发送
- */
 uint8_t wifi_justfloat_GetStandbyUserEnable(void);
-
-/*
- * 函数名: wifi_justfloat_ResetTxStats
- * 功能: 清空遥测发送耗时统计
- * 输入参数: 无
- * 返回值: 无
- */
 void wifi_justfloat_ResetTxStats(void);
-
-/*
- * 函数名: wifi_justfloat_GetTxStats
- * 功能: 读取遥测发送耗时统计
- * 输入参数:
- *   stats - 输出统计结构体指针
- * 返回值: 无
- */
 void wifi_justfloat_GetTxStats(wifi_justfloat_tx_stats_t *stats);
-
-/*
- * 函数名: wifi_justfloat_Impl
- * 功能: 实际发送 JustFloat 数据帧
- * 输入参数:
- *   declared_num - 调用者声明的通道数
- *   actual_num   - 宏展开后计算出的实际通道数
- *   ...          - 逐通道数据，按 double 传入
- * 返回值:
- *   0 - 发送成功
- *   1 - 发送失败
- */
 uint8_t wifi_justfloat_Impl(uint8_t declared_num, uint8_t actual_num, ...);
+uint8_t wifi_justfloat_Array(const float *data, uint8_t num);
 
 #define WIFI_JUSTFLOAT_CALL_1(a1) \
     wifi_justfloat_Impl(1U, 1U, (double)(a1))
@@ -131,13 +65,67 @@ uint8_t wifi_justfloat_Impl(uint8_t declared_num, uint8_t actual_num, ...);
     wifi_justfloat_Impl(15U, 15U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15))
 #define WIFI_JUSTFLOAT_CALL_16(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16) \
     wifi_justfloat_Impl(16U, 16U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16))
+#define WIFI_JUSTFLOAT_CALL_17(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17) \
+    wifi_justfloat_Impl(17U, 17U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17))
+#define WIFI_JUSTFLOAT_CALL_18(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18) \
+    wifi_justfloat_Impl(18U, 18U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18))
+#define WIFI_JUSTFLOAT_CALL_19(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19) \
+    wifi_justfloat_Impl(19U, 19U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19))
+#define WIFI_JUSTFLOAT_CALL_20(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20) \
+    wifi_justfloat_Impl(20U, 20U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20))
+#define WIFI_JUSTFLOAT_CALL_21(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21) \
+    wifi_justfloat_Impl(21U, 21U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20), (double)(a21))
+#define WIFI_JUSTFLOAT_CALL_22(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22) \
+    wifi_justfloat_Impl(22U, 22U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20), (double)(a21), (double)(a22))
+#define WIFI_JUSTFLOAT_CALL_23(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23) \
+    wifi_justfloat_Impl(23U, 23U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20), (double)(a21), (double)(a22), (double)(a23))
+#define WIFI_JUSTFLOAT_CALL_24(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24) \
+    wifi_justfloat_Impl(24U, 24U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20), (double)(a21), (double)(a22), (double)(a23), (double)(a24))
+#define WIFI_JUSTFLOAT_CALL_25(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24, a25) \
+    wifi_justfloat_Impl(25U, 25U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20), (double)(a21), (double)(a22), (double)(a23), (double)(a24), (double)(a25))
+#define WIFI_JUSTFLOAT_CALL_26(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24, a25, a26) \
+    wifi_justfloat_Impl(26U, 26U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20), (double)(a21), (double)(a22), (double)(a23), (double)(a24), (double)(a25), (double)(a26))
+#define WIFI_JUSTFLOAT_CALL_27(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27) \
+    wifi_justfloat_Impl(27U, 27U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20), (double)(a21), (double)(a22), (double)(a23), (double)(a24), (double)(a25), (double)(a26), (double)(a27))
+#define WIFI_JUSTFLOAT_CALL_28(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27, a28) \
+    wifi_justfloat_Impl(28U, 28U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20), (double)(a21), (double)(a22), (double)(a23), (double)(a24), (double)(a25), (double)(a26), (double)(a27), (double)(a28))
+#define WIFI_JUSTFLOAT_CALL_29(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29) \
+    wifi_justfloat_Impl(29U, 29U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20), (double)(a21), (double)(a22), (double)(a23), (double)(a24), (double)(a25), (double)(a26), (double)(a27), (double)(a28), (double)(a29))
+#define WIFI_JUSTFLOAT_CALL_30(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29, a30) \
+    wifi_justfloat_Impl(30U, 30U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20), (double)(a21), (double)(a22), (double)(a23), (double)(a24), (double)(a25), (double)(a26), (double)(a27), (double)(a28), (double)(a29), (double)(a30))
+#define WIFI_JUSTFLOAT_CALL_31(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29, a30, a31) \
+    wifi_justfloat_Impl(31U, 31U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20), (double)(a21), (double)(a22), (double)(a23), (double)(a24), (double)(a25), (double)(a26), (double)(a27), (double)(a28), (double)(a29), (double)(a30), (double)(a31))
+#define WIFI_JUSTFLOAT_CALL_32(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29, a30, a31, a32) \
+    wifi_justfloat_Impl(32U, 32U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20), (double)(a21), (double)(a22), (double)(a23), (double)(a24), (double)(a25), (double)(a26), (double)(a27), (double)(a28), (double)(a29), (double)(a30), (double)(a31), (double)(a32))
+#define WIFI_JUSTFLOAT_CALL_33(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29, a30, a31, a32, a33) \
+    wifi_justfloat_Impl(33U, 33U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20), (double)(a21), (double)(a22), (double)(a23), (double)(a24), (double)(a25), (double)(a26), (double)(a27), (double)(a28), (double)(a29), (double)(a30), (double)(a31), (double)(a32), (double)(a33))
+#define WIFI_JUSTFLOAT_CALL_34(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29, a30, a31, a32, a33, a34) \
+    wifi_justfloat_Impl(34U, 34U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20), (double)(a21), (double)(a22), (double)(a23), (double)(a24), (double)(a25), (double)(a26), (double)(a27), (double)(a28), (double)(a29), (double)(a30), (double)(a31), (double)(a32), (double)(a33), (double)(a34))
+#define WIFI_JUSTFLOAT_CALL_35(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29, a30, a31, a32, a33, a34, a35) \
+    wifi_justfloat_Impl(35U, 35U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20), (double)(a21), (double)(a22), (double)(a23), (double)(a24), (double)(a25), (double)(a26), (double)(a27), (double)(a28), (double)(a29), (double)(a30), (double)(a31), (double)(a32), (double)(a33), (double)(a34), (double)(a35))
+#define WIFI_JUSTFLOAT_CALL_36(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29, a30, a31, a32, a33, a34, a35, a36) \
+    wifi_justfloat_Impl(36U, 36U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20), (double)(a21), (double)(a22), (double)(a23), (double)(a24), (double)(a25), (double)(a26), (double)(a27), (double)(a28), (double)(a29), (double)(a30), (double)(a31), (double)(a32), (double)(a33), (double)(a34), (double)(a35), (double)(a36))
+#define WIFI_JUSTFLOAT_CALL_37(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29, a30, a31, a32, a33, a34, a35, a36, a37) \
+    wifi_justfloat_Impl(37U, 37U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20), (double)(a21), (double)(a22), (double)(a23), (double)(a24), (double)(a25), (double)(a26), (double)(a27), (double)(a28), (double)(a29), (double)(a30), (double)(a31), (double)(a32), (double)(a33), (double)(a34), (double)(a35), (double)(a36), (double)(a37))
+#define WIFI_JUSTFLOAT_CALL_38(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29, a30, a31, a32, a33, a34, a35, a36, a37, a38) \
+    wifi_justfloat_Impl(38U, 38U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20), (double)(a21), (double)(a22), (double)(a23), (double)(a24), (double)(a25), (double)(a26), (double)(a27), (double)(a28), (double)(a29), (double)(a30), (double)(a31), (double)(a32), (double)(a33), (double)(a34), (double)(a35), (double)(a36), (double)(a37), (double)(a38))
+#define WIFI_JUSTFLOAT_CALL_39(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29, a30, a31, a32, a33, a34, a35, a36, a37, a38, a39) \
+    wifi_justfloat_Impl(39U, 39U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20), (double)(a21), (double)(a22), (double)(a23), (double)(a24), (double)(a25), (double)(a26), (double)(a27), (double)(a28), (double)(a29), (double)(a30), (double)(a31), (double)(a32), (double)(a33), (double)(a34), (double)(a35), (double)(a36), (double)(a37), (double)(a38), (double)(a39))
+#define WIFI_JUSTFLOAT_CALL_40(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29, a30, a31, a32, a33, a34, a35, a36, a37, a38, a39, a40) \
+    wifi_justfloat_Impl(40U, 40U, (double)(a1), (double)(a2), (double)(a3), (double)(a4), (double)(a5), (double)(a6), (double)(a7), (double)(a8), (double)(a9), (double)(a10), (double)(a11), (double)(a12), (double)(a13), (double)(a14), (double)(a15), (double)(a16), (double)(a17), (double)(a18), (double)(a19), (double)(a20), (double)(a21), (double)(a22), (double)(a23), (double)(a24), (double)(a25), (double)(a26), (double)(a27), (double)(a28), (double)(a29), (double)(a30), (double)(a31), (double)(a32), (double)(a33), (double)(a34), (double)(a35), (double)(a36), (double)(a37), (double)(a38), (double)(a39), (double)(a40))
 
-#define WIFI_JUSTFLOAT_SELECT(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,_11,_12,_13,_14,_15,_16,NAME,...) NAME
+#define WIFI_JUSTFLOAT_SELECT(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,_11,_12,_13,_14,_15,_16,_17,_18,_19,_20,_21,_22,_23,_24,_25,_26,_27,_28,_29,_30,_31,_32,_33,_34,_35,_36,_37,_38,_39,_40,NAME,...) NAME
 
 
-// 每次调用wifi_justfloat差不多花费10us
+/* Each wifi_justfloat call costs about 10 us. */
 #define wifi_justfloat(...) \
     WIFI_JUSTFLOAT_SELECT(__VA_ARGS__, \
+                          WIFI_JUSTFLOAT_CALL_40, WIFI_JUSTFLOAT_CALL_39, WIFI_JUSTFLOAT_CALL_38, WIFI_JUSTFLOAT_CALL_37, \
+                          WIFI_JUSTFLOAT_CALL_36, WIFI_JUSTFLOAT_CALL_35, WIFI_JUSTFLOAT_CALL_34, WIFI_JUSTFLOAT_CALL_33, \
+                          WIFI_JUSTFLOAT_CALL_32, WIFI_JUSTFLOAT_CALL_31, WIFI_JUSTFLOAT_CALL_30, WIFI_JUSTFLOAT_CALL_29, \
+                          WIFI_JUSTFLOAT_CALL_28, WIFI_JUSTFLOAT_CALL_27, WIFI_JUSTFLOAT_CALL_26, WIFI_JUSTFLOAT_CALL_25, \
+                          WIFI_JUSTFLOAT_CALL_24, WIFI_JUSTFLOAT_CALL_23, WIFI_JUSTFLOAT_CALL_22, WIFI_JUSTFLOAT_CALL_21, \
+                          WIFI_JUSTFLOAT_CALL_20, WIFI_JUSTFLOAT_CALL_19, WIFI_JUSTFLOAT_CALL_18, WIFI_JUSTFLOAT_CALL_17, \
                           WIFI_JUSTFLOAT_CALL_16, WIFI_JUSTFLOAT_CALL_15, WIFI_JUSTFLOAT_CALL_14, WIFI_JUSTFLOAT_CALL_13, \
                           WIFI_JUSTFLOAT_CALL_12, WIFI_JUSTFLOAT_CALL_11, WIFI_JUSTFLOAT_CALL_10, WIFI_JUSTFLOAT_CALL_9, \
                           WIFI_JUSTFLOAT_CALL_8, WIFI_JUSTFLOAT_CALL_7, WIFI_JUSTFLOAT_CALL_6, WIFI_JUSTFLOAT_CALL_5, \

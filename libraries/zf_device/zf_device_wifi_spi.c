@@ -105,7 +105,8 @@ typedef enum
 /* ��ǰ������ѯ���� */
 static wifi_spi_tx_step_enum wifi_spi_tx_step = WIFI_SPI_TX_STEP_IDLE;
 /* WiFi SPI ��Ӧ SCB ����ַ��WIFI_SPI_INDEX �̶�Ϊ SPI_0����Ӧ SCB7�� */
-static volatile stc_SCB_t * const s_wifi_spi_scb = SCB7;
+static volatile stc_SCB_t * const s_wifi_spi_scb_lut[4] = {SCB7, SCB8, SCB9, SCB6};
+#define WIFI_SPI_SCB (s_wifi_spi_scb_lut[WIFI_SPI_INDEX])
 
 //-------------------------------------------------------------------------------------------------------------------
 // �������     ��ѯ WIFI SPI �����Ƿ����
@@ -116,7 +117,7 @@ static volatile stc_SCB_t * const s_wifi_spi_scb = SCB7;
 //-------------------------------------------------------------------------------------------------------------------
 static uint8 wifi_spi_tx_is_complete (void)
 {
-    return (0 != Cy_SCB_IsTxComplete(s_wifi_spi_scb)) ? 1 : 0;
+    return (0 != Cy_SCB_IsTxComplete(WIFI_SPI_SCB)) ? 1 : 0;
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -128,9 +129,9 @@ static uint8 wifi_spi_tx_is_complete (void)
 //-------------------------------------------------------------------------------------------------------------------
 static void wifi_spi_rx_fifo_drain (void)
 {
-    while(0 != Cy_SCB_GetNumInRxFifo(s_wifi_spi_scb))
+    while(0 != Cy_SCB_GetNumInRxFifo(WIFI_SPI_SCB))
     {
-        (void)Cy_SCB_ReadRxFifo(s_wifi_spi_scb);
+        (void)Cy_SCB_ReadRxFifo(WIFI_SPI_SCB);
     }
 }
 
@@ -223,7 +224,7 @@ static uint8 wifi_spi_tx_dma_start (const uint8 *data, uint16 len)
         tx_descr_config.destTxfrSize   = CY_PDMA_TXFR_SIZE_WORD;
         tx_descr_config.descrType      = CY_PDMA_1D_TRANSFER;
         tx_descr_config.srcAddr        = (void *)data;
-        tx_descr_config.destAddr       = (void *)&(s_wifi_spi_scb->unTX_FIFO_WR.u32Register);
+        tx_descr_config.destAddr       = (void *)&(WIFI_SPI_SCB->unTX_FIFO_WR.u32Register);
         tx_descr_config.srcXincr       = 1;
         tx_descr_config.destXincr      = 0;
         tx_descr_config.xCount         = len;

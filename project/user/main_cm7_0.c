@@ -178,13 +178,13 @@ int main(void)
             air_comm_air_update_100HZ();
 
             float air_data[15];
-            air_data[0] = g_tof1_height_mm;
-            air_data[1] = g_tof2_height_mm;
-            air_data[2] = g_tof3_height_mm;
-            air_data[3] = g_tof4_height_mm;
-            air_data[4] = g_imufilter_1000hz.accx;
-            air_data[5] = g_imufilter_1000hz.accy;
-            air_data[6] = g_imufilter_1000hz.accz;
+            air_data[0] = g_tof_fused_height_mm;
+            air_data[1] = g_euler.roll;
+            air_data[2] = g_euler.pitch;
+            air_data[3] = g_euler.yaw;
+            air_data[4] = Pos_Est_vel_x;
+            air_data[5] = Pos_Est_vel_y;
+            air_data[6] = (float)FC_START_CRSF_Get_State();
             air_data[7] = (float)CRSF_STD[0];
             air_data[8] = (float)CRSF_STD[1];
             air_data[9] = (float)CRSF_STD[2];
@@ -195,19 +195,13 @@ int main(void)
             air_data[14] = (float)CRSF_STD[7];
             air_comm_send_run_data(air_data, 15);
 
-            wifi_justfloat(g_car_encoder_left_front,
-                           g_car_encoder_right_front,
-                           g_car_encoder_left_rear,
-                           g_car_encoder_right_rear,
-                           g_car_imufilter_1000hz_accx,
-                           g_car_imufilter_1000hz_accy,
-                           g_car_imufilter_1000hz_accz,
-                           g_car_imufilter_1000hz_gyrox,
-                           g_car_imufilter_1000hz_gyroy,
-                           g_car_imufilter_1000hz_gyroz,
+            wifi_justfloat(g_tof_fused_height_mm,
                            g_euler.roll,
                            g_euler.pitch,
-                           g_euler.yaw);
+                           g_euler.yaw,
+                           Pos_Est_vel_x,
+                           Pos_Est_vel_y,
+                           (float)FC_START_CRSF_Get_State());
             wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
             {
                 uint8 flying = (FC_START_CRSF_STATE_FLYING == FC_START_CRSF_Get_State()) ? 1U : 0U;

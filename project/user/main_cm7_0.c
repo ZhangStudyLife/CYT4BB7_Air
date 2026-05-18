@@ -177,7 +177,7 @@ int main(void)
             FC_Loop_100Hz();
             air_comm_air_update_100HZ();
 
-            float air_data[10];
+            float air_data[15];
             air_data[0] = g_tof1_height_mm;
             air_data[1] = g_tof2_height_mm;
             air_data[2] = g_tof3_height_mm;
@@ -185,10 +185,15 @@ int main(void)
             air_data[4] = g_imufilter_1000hz.accx;
             air_data[5] = g_imufilter_1000hz.accy;
             air_data[6] = g_imufilter_1000hz.accz;
-            air_data[7] = g_imufilter_1000hz.gyrox;
-            air_data[8] = g_imufilter_1000hz.gyroy;
-            air_data[9] = g_imufilter_1000hz.gyroz;
-            air_comm_send_run_data(air_data, 10);
+            air_data[7] = (float)CRSF_STD[0];
+            air_data[8] = (float)CRSF_STD[1];
+            air_data[9] = (float)CRSF_STD[2];
+            air_data[10] = (float)CRSF_STD[3];
+            air_data[11] = (float)CRSF_STD[4];
+            air_data[12] = (float)CRSF_STD[5];
+            air_data[13] = (float)CRSF_STD[6];
+            air_data[14] = (float)CRSF_STD[7];
+            air_comm_send_run_data(air_data, 15);
 
             wifi_justfloat(g_car_encoder_left_front,
                            g_car_encoder_right_front,

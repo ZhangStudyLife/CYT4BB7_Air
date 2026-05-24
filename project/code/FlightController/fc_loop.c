@@ -33,15 +33,10 @@ extern volatile uint32 tick_1000us_cnt;
 
 /* 当前高度速度估计，仅供本文件高度速度环使用，单位 m/s */
 static float s_height_vz_mps = 0.0f;
-/* 目标高度斜坡限速器状态 */
-static float s_target_height_slew_m = 0.0f;
-static uint8_t s_height_slew_inited = 0U;
 /* Yaw 角度目标是否已经对齐当前机头方向 */
 static uint8_t s_yaw_target_inited = 0U;
-/* 目标高度上升斜坡限速，单位 m/s */
-#define FC_TARGET_H_RAMP_UP_MPS 0.15f
-/* 目标高度下降斜坡限速，单位 m/s */
-#define FC_TARGET_H_RAMP_DOWN_MPS 0.15f
+#define FC_TARGET_HEIGHT_M          1.0f
+#define FC_LANDING_TARGET_HEIGHT_M -0.5f
 /* 100Hz 锁存的飞行模式，50Hz 控制只消费该锁存值 */
 static FC_START_CRSF_flight_mode_e s_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
 /* 上一次锁存的飞行模式，用于检测模式切换边沿 */
@@ -146,21 +141,6 @@ static float FC_Apply_Tilt_Throttle_Compensation(float throttle_raw)
     cos_term = fc_clampf(cos_term, s_fc_tilt_cos_min, 1.0f);
 
     return fc_clampf(throttle_raw / cos_term, 0.0f, s_fc_tilt_comp_throttle_max);
-}
-
-/*
- * 函数名: FC_Map_TargetHeightFromCh2
- * 功能: 将遥控器 CH2 映射为目标高度
- * 输入参数:
- *   ch2_std - CRSF 标准化通道值，范围[-1000,1000]
- * 返回值:
- *   目标高度，单位 m
- * 0325 0129 : 修改映射关系,CH2 1000 对应1.2M,-1000 对应-0.2M(如果目标是0M,当前控制,会保持在0.1M,所以故意将-1000 映射到-0.2M,增加下行余量)
- * 0404 1944 : 修改映射关系,CH2 1000 对应1.2M,-1000 对应0M(安装了10cm的脚撑)
- */
-static float FC_Map_TargetHeightFromCh2(float ch2_std)
-{
-    return (ch2_std + 1000.0f) * 0.0006f;
 }
 
 /*
@@ -322,9 +302,7 @@ void FC_Loop_Reset(void)
     s_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
     s_prev_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
     s_prev_fc_state = FC_START_CRSF_STATE_INIT;
-    target_height_m = 1.0f;
-    s_height_slew_inited = 0U;
-    s_target_height_slew_m = 0.0f;
+    target_height_m = FC_TARGET_HEIGHT_M;
     s_yaw_target_inited = 0U;
     s_hover_throttle = (float)g_fc_params.base_throttle;
 }
@@ -350,7 +328,8 @@ void FC_Loop_50Hz(void)
         dt = 0.02f;
     }
 
-    if ((fc_state == FC_START_CRSF_STATE_FLYING) && (0U != g_tof_fused_valid))
+    if (((fc_state == FC_START_CRSF_STATE_FLYING) || (fc_state == FC_START_CRSF_STATE_LANDING)) &&
+        (0U != g_tof_fused_valid))
     {
         height_m = g_tof_fused_height_mm * 0.001f;
         height_pos_out = PID_Update(&height_pos_pid, target_height_m, height_m, dt);
@@ -416,10 +395,6 @@ void FC_Loop_100Hz(void)
 {
     static uint32 tick_1000us_cnt_last = 0;
     FC_START_CRSF_state_e fc_state;
-    float ch2;
-    float height_m;
-    float height_err_mm;
-    float throttle_z_cmd;
     uint32 tick_now = tick_1000us_cnt;
     uint32 diff = tick_now - tick_1000us_cnt_last;
     float dt = diff * 0.001f;
@@ -430,8 +405,6 @@ void FC_Loop_100Hz(void)
         dt = 0.01f;
     }
 
-    height_m = g_tof_fused_height_mm * 0.001f;
-
     // wifi_justfloat(tick_1000us_cnt,g_tof1_height_mm,g_tof4_height_mm,g_tof_fused_height_mm,height_vz_raw_mps,dt,
     // g_imufilter_1000hz.accx,g_imufilter_1000hz.accy,g_imufilter_1000hz.accz,g_euler.pitch,g_euler.roll,g_euler.yaw);
 
@@ -440,39 +413,9 @@ void FC_Loop_100Hz(void)
     s_flight_mode = FC_START_CRSF_Get_Flight_Mode(); /* 检测遥控器的模式 */
     FC_Handle_Mode_Transition_100Hz(s_flight_mode, fc_state);
 
-    if (fc_state == FC_START_CRSF_STATE_FLYING)
+    if ((fc_state == FC_START_CRSF_STATE_FLYING) || (fc_state == FC_START_CRSF_STATE_LANDING))
     {
-        /*定高的目标高度获取来源，模式5为固定高度模式，其他模式为CH2映射 */
-        if (s_flight_mode == FC_START_CRSF_FLIGHT_MODE_5)
-        {
-            target_height_m = FC_Mode5_Get_Fixed_Height_M();
-        }
-        else
-        {
-            ch2 = fc_clampf((float)CRSF_STD[2], -1000.0f, 1000.0f);
-            target_height_m = FC_Map_TargetHeightFromCh2(ch2);
-        }
-        /* 目标高度斜坡限速：首次进入FLYING时从当前实测高度开始 */
-        if (0U == s_height_slew_inited)
-        {
-            s_target_height_slew_m = height_m;
-            s_height_slew_inited = 1U;
-        }
-        {
-            float delta = target_height_m - s_target_height_slew_m;
-            float max_up = FC_TARGET_H_RAMP_UP_MPS * dt;
-            float max_down = -FC_TARGET_H_RAMP_DOWN_MPS * dt;
-            if (delta > max_up)
-            {
-                delta = max_up;
-            }
-            if (delta < max_down)
-            {
-                delta = max_down;
-            }
-            s_target_height_slew_m += delta;
-            target_height_m = s_target_height_slew_m;
-        }
+        target_height_m = (fc_state == FC_START_CRSF_STATE_LANDING) ? FC_LANDING_TARGET_HEIGHT_M : FC_TARGET_HEIGHT_M;
         if (0U == g_tof_fused_valid)
         {
             height_pos_out = 0.0f;
@@ -485,18 +428,15 @@ void FC_Loop_100Hz(void)
         s_height_vz_mps = 0.0f;
         height_pos_out = 0.0f;
         height_vel_out = 0.0f;
-        s_height_slew_inited = 0U;
     }
 
-    height_err_mm = target_height_m * 1000.0f - g_tof_fused_height_mm;
-    throttle_z_cmd = s_hover_throttle + height_vel_out;
     /* 悬停油门在线学习：仅在接近稳态悬停时更新 */
     if ((fc_state == FC_START_CRSF_STATE_FLYING) &&
         (s_height_vz_mps > -FC_HOVER_LEARN_VZ_MAX) && (s_height_vz_mps < FC_HOVER_LEARN_VZ_MAX) &&
         (height_pos_out > -FC_HOVER_LEARN_POS_MAX) && (height_pos_out < FC_HOVER_LEARN_POS_MAX))
     {
         float alpha = dt / (dt + FC_HOVER_THR_TC);
-        s_hover_throttle += alpha * (throttle_z_cmd - s_hover_throttle);
+        s_hover_throttle += alpha * height_vel_out;
         s_hover_throttle = fc_clampf(s_hover_throttle, FC_HOVER_THR_MIN, FC_HOVER_THR_MAX);
     }
     // // if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
@@ -514,6 +454,12 @@ void FC_Loop_100Hz(void)
     //                    g_tof_fused_valid
     //                    );
     // }
+
+    if (fc_state == FC_START_CRSF_STATE_LANDING)
+    {
+        FC_Mode0_100Hz();
+        return;
+    }
 
     switch (s_flight_mode)
     {
@@ -617,7 +563,8 @@ void FC_Loop_500Hz(void)
     float dt = diff * 0.001f; // 秒
 
     tick_1000us_cnt_last = tick_now;
-    if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
+    if ((FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING) ||
+        (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_LANDING))
     {
         float roll_angle_meas = g_euler.roll;
         float pitch_angle_meas = g_euler.pitch;
@@ -711,7 +658,8 @@ void FC_Loop_1000Hz(void)
     float dt = diff * 0.001f; // 秒
 
     tick_1000us_cnt_last = tick_now;
-    if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
+    if ((FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING) ||
+        (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_LANDING))
     {
         /* 读取当前角速度 */
         float roll_gyro_meas = g_imufilter_1000hz.gyrox;
@@ -744,14 +692,6 @@ void FC_Loop_1000Hz(void)
         g_motor_cmd.roll = roll_ctrl;
         g_motor_cmd.pitch = -pitch_ctrl;
         g_motor_cmd.yaw = yaw_ctrl;
-
-        // 测试固定的控制输出
-        // g_motor_cmd.roll = 0;
-        // g_motor_cmd.pitch = -0;
-        // g_motor_cmd.yaw = 0;
-        // g_motor_cmd.throttle = 3000;
-        // CRSF_STD[2] -1000~1000 映射到油门的 2600 ~ 5200
-        // g_motor_cmd.throttle = (int32_t)(CRSF_STD[2] * 1.3f + 3900.0f);
 
         Motor_Mixer(&g_motor_cmd);
     }

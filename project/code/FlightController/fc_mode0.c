@@ -39,7 +39,8 @@ void FC_Mode0_100Hz(void)
     float ch0;
     float ch1;
 
-    if (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING)
+    if ((FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING) &&
+        (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_LANDING))
     {
         return;
     }

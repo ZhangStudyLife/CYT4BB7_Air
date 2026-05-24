@@ -174,6 +174,7 @@ int main(void)
             g_tick_100HZ--;
             Height_Est_update_100HZ();
             CRSF_Update_100HZ();
+            FC_START_CRSF_UpdateLandingButton100Hz();
             FC_Loop_100Hz();
             air_comm_air_update_100HZ();
 

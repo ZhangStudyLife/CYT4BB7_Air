@@ -1,7 +1,10 @@
 #include "fc_start_crsf.h"
+#include "../Estimation/Height_Est/Height_Est.h"
 #include "zf_common_headfile.h"
 
 #define FC_START_CRSF_TASK_PERIOD_MS (100U)
+#define FC_START_CRSF_LANDING_HOLD_TICKS_100HZ (20U)
+#define FC_START_CRSF_LANDING_STOP_HEIGHT_MM (200.0f)
 #define FC_START_CRSF_TAKEOFF_PAIR1_RAMP_MS (800U)
 #define FC_START_CRSF_TAKEOFF_PAIR2_RAMP_MS (800U)
 #define FC_START_CRSF_TAKEOFF_TO_2500_RAMP_MS (800U)
@@ -14,8 +17,9 @@ static FC_START_CRSF_flight_mode_e s_fc_flight_mode = FC_START_CRSF_FLIGHT_MODE_
 
 static uint16_t s_unlock_timer_tick = 0U;
 static uint16_t s_takeoff_timer_tick = 0U;
+static uint8_t s_landing_button_tick = 0U;
+static uint8_t s_landing_low_tick = 0U;
 static uint8_t s_motor_armed = 0U;
-static uint8_t s_landing_request = 0U;
 /* 起飞前校准是否已完成：0=未执行，1=已执行（进入TAKEOFF状态时首次触发校准） */
 static uint8_t s_takeoff_calib_done = 0U;
 
@@ -66,7 +70,8 @@ static void FC_START_CRSF_ForceStopToStandby(void)
     s_motor_armed = 0U;
     s_takeoff_timer_tick = 0U;
     s_unlock_timer_tick = 0U;
-    s_landing_request = 0U;
+    s_landing_button_tick = 0U;
+    s_landing_low_tick = 0U;
     s_takeoff_calib_done = 0U;   /* 重置校准标志，下次起飞时重新执行校准 */
 
     Motor_EmergencyStop();
@@ -118,12 +123,6 @@ static uint8_t FC_START_CRSF_TakeoffState_Update(void)
     return (s_takeoff_timer_tick >= total_ticks) ? 1U : 0U;
 }
 
-static uint8_t FC_START_CRSF_LandingState_Update(void)
-{
-    /* TODO: add closed-loop landing behavior */
-    return 1U;
-}
-
 static void FC_START_CRSF_PrepareTakeoff(void)
 {
     /* Keep 100Hz task non-blocking, avoid tick backlog compressing takeoff timeline. */
@@ -142,7 +141,6 @@ static void FC_START_CRSF_StateMachine_Update(void)
         s_motor_armed = 0U;
         s_unlock_timer_tick = 0U;
         s_takeoff_timer_tick = 0U;
-        s_landing_request = 0U;
         Motor_Disable();
         s_fc_start_state = FC_START_CRSF_STATE_STANDBY;
         break;
@@ -193,17 +191,9 @@ static void FC_START_CRSF_StateMachine_Update(void)
 
     case FC_START_CRSF_STATE_FLYING:
         FC_START_CRSF_UpdateModeFromCH5CH6();
-        if (s_landing_request != 0U)
-        {
-            s_fc_start_state = FC_START_CRSF_STATE_LANDING;
-        }
         break;
 
     case FC_START_CRSF_STATE_LANDING:
-        if (FC_START_CRSF_LandingState_Update() != 0U)
-        {
-            FC_START_CRSF_ForceStopToStandby();
-        }
         break;
 
     default:
@@ -218,8 +208,9 @@ void FC_START_CRSF_Init(void)
     s_fc_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
     s_unlock_timer_tick = 0U;
     s_takeoff_timer_tick = 0U;
+    s_landing_button_tick = 0U;
+    s_landing_low_tick = 0U;
     s_motor_armed = 0U;
-    s_landing_request = 0U;
     s_takeoff_calib_done = 0U;
 
     Motor_Disable();
@@ -228,6 +219,44 @@ void FC_START_CRSF_Init(void)
 void FC_START_CRSF_Update(void)
 {
     FC_START_CRSF_StateMachine_Update();
+}
+
+void FC_START_CRSF_UpdateLandingButton100Hz(void)
+{
+    if ((s_fc_start_state == FC_START_CRSF_STATE_FLYING) && (CRSF_STD[8] == 1))
+    {
+        if (s_landing_button_tick < FC_START_CRSF_LANDING_HOLD_TICKS_100HZ)
+        {
+            s_landing_button_tick++;
+        }
+        if (s_landing_button_tick >= FC_START_CRSF_LANDING_HOLD_TICKS_100HZ)
+        {
+            FC_START_CRSF_Request_Landing();
+        }
+    }
+    else
+    {
+        s_landing_button_tick = 0U;
+    }
+
+    if (s_fc_start_state == FC_START_CRSF_STATE_LANDING)
+    {
+        if ((0U != g_tof_fused_valid) && (g_tof_fused_height_mm < FC_START_CRSF_LANDING_STOP_HEIGHT_MM))
+        {
+            if (s_landing_low_tick < FC_START_CRSF_LANDING_HOLD_TICKS_100HZ)
+            {
+                s_landing_low_tick++;
+            }
+            if (s_landing_low_tick >= FC_START_CRSF_LANDING_HOLD_TICKS_100HZ)
+            {
+                FC_START_CRSF_ForceStopToStandby();
+            }
+        }
+        else
+        {
+            s_landing_low_tick = 0U;
+        }
+    }
 }
 
 FC_START_CRSF_state_e FC_START_CRSF_Get_State(void)
@@ -254,7 +283,8 @@ void FC_START_CRSF_Request_Landing(void)
 {
     if (s_fc_start_state == FC_START_CRSF_STATE_FLYING)
     {
-        s_landing_request = 1U;
+        s_landing_low_tick = 0U;
+        s_fc_start_state = FC_START_CRSF_STATE_LANDING;
     }
 }
 

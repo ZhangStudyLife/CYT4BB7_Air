@@ -38,6 +38,7 @@ extern FC_START_CRSF_state_e s_fc_start_state;
 
 void FC_START_CRSF_Init(void);
 void FC_START_CRSF_Update(void);
+void FC_START_CRSF_UpdateLandingButton100Hz(void);
 
 FC_START_CRSF_state_e FC_START_CRSF_Get_State(void);
 FC_START_CRSF_flight_mode_e FC_START_CRSF_Get_Flight_Mode(void);

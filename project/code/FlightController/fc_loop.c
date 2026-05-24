@@ -62,10 +62,6 @@ static const float s_fc_height_vel_out_max = 1500.0f;
 /* 姿态角外环输出到角速度目标的限幅，单位 deg/s */
 static const float s_fc_angle_out_limit = 260.0f;
 static const float s_fc_yaw_out_limit = 900.0f;
-/* Yaw 摇杆死区，单位 CRSF_STD */
-static const float s_fc_yaw_stick_deadzone = 30.0f;
-/* Yaw 手动最大角速度，单位 deg/s */
-static const float s_fc_yaw_manual_rate_max_dps = 60.0f;
 /* Yaw 角度保持修正限幅，单位 deg/s */
 static const float s_fc_yaw_hold_rate_limit_dps = 45.0f;
 /* Yaw 最终角速度目标限幅，单位 deg/s */
@@ -126,27 +122,6 @@ static float FC_Wrap180Deg(float angle_deg)
         angle_deg += 360.0f;
     }
     return angle_deg;
-}
-
-/*
- * 函数名: FC_Apply_Yaw_Stick_Deadzone
- * 功能: 对 yaw 摇杆输入施加对称死区，死区外平移回零，保持输出连续
- * 输入参数:
- *   stick - CRSF 标准化 yaw 输入，范围约 [-1000, 1000]
- * 返回值:
- *   死区处理后的 yaw 输入
- */
-static float FC_Apply_Yaw_Stick_Deadzone(float stick)
-{
-    if (stick > s_fc_yaw_stick_deadzone)
-    {
-        return stick - s_fc_yaw_stick_deadzone;
-    }
-    if (stick < -s_fc_yaw_stick_deadzone)
-    {
-        return stick + s_fc_yaw_stick_deadzone;
-    }
-    return 0.0f;
 }
 
 /*
@@ -647,8 +622,6 @@ void FC_Loop_500Hz(void)
         float roll_angle_meas = g_euler.roll;
         float pitch_angle_meas = g_euler.pitch;
         float yaw_angle_meas = g_euler.yaw;
-        float yaw_stick;
-        float yaw_rate_cmd;
         float yaw_error_deg;
         float yaw_hold_rate;
 
@@ -674,26 +647,22 @@ void FC_Loop_500Hz(void)
         float roll_ctrl = fc_clampf(PID_Update(&roll_angle_pid, roll_angle_target, roll_angle_meas, dt), -limit, limit);
         float pitch_ctrl = fc_clampf(PID_Update(&pitch_angle_pid, pitch_angle_target, pitch_angle_meas, dt), -limit, limit);
 
-        /* 首次进入飞行态时锁住当前航向，避免 yaw 目标从 0 度硬拉飞机 */
+        /* 首次进入飞行态时复位 yaw 外环，后续 yaw 目标固定为 0 度 */
         if (0U == s_yaw_target_inited)
         {
-            yaw_angle_target = FC_Wrap180Deg(yaw_angle_meas);
+            yaw_angle_target = 0.0f;
             PID_Reset(&yaw_angle_pid);
             s_yaw_target_inited = 1U;
         }
 
-        /* 将遥控器第 4 路 yaw 输入映射为角速度目标，并积分成角度目标 */
-        yaw_stick = FC_Apply_Yaw_Stick_Deadzone(fc_clampf((float)CRSF_STD[3], -1000.0f, 1000.0f));
-        yaw_rate_cmd = (yaw_stick / (1000.0f - s_fc_yaw_stick_deadzone)) * s_fc_yaw_manual_rate_max_dps;
-        yaw_rate_cmd = fc_clampf(yaw_rate_cmd, -s_fc_yaw_manual_rate_max_dps, s_fc_yaw_manual_rate_max_dps);
-        yaw_angle_target = FC_Wrap180Deg(yaw_angle_target + yaw_rate_cmd * dt);
+        /* yaw 目标永远固定为 0 度，遥控器第 4 路不再参与 yaw 目标角速度 */
+        yaw_angle_target = 0.0f;
 
-        /* 限制角度目标相对当前航向的超前量，防止手动转向时目标跑飞太远 */
+        /* 限制目标相对当前航向的误差，处理线缆拉扯自旋和 +/-180 度跨界跳变 */
         yaw_error_deg = FC_Wrap180Deg(yaw_angle_target - yaw_angle_meas);
         yaw_error_deg = fc_clampf(yaw_error_deg,
                                   -s_fc_yaw_target_delta_limit_deg,
                                   s_fc_yaw_target_delta_limit_deg);
-        yaw_angle_target = FC_Wrap180Deg(yaw_angle_meas + yaw_error_deg);
 
         yaw_hold_rate = fc_clampf(PID_Update(&yaw_angle_pid, yaw_error_deg, 0.0f, dt),
                                   -s_fc_yaw_hold_rate_limit_dps,
@@ -701,7 +670,7 @@ void FC_Loop_500Hz(void)
 
         roll_gyro_target = roll_ctrl;
         pitch_gyro_target = pitch_ctrl;
-        yaw_gyro_target = fc_clampf(yaw_rate_cmd + yaw_hold_rate,
+        yaw_gyro_target = fc_clampf(yaw_hold_rate,
                                     -s_fc_yaw_rate_target_limit_dps,
                                     s_fc_yaw_rate_target_limit_dps);
 

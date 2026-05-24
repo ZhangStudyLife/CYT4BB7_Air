@@ -17,6 +17,21 @@ extern uint8 g_tof_fused_valid;      /* TOF 融合高度有效标志：1=有效�
 extern float g_tof_fused_vz_mps;     /* 高度融合速度，单位 m/s，上升为正 */
 extern float g_height_fused_vz_mps;  /* 控制环使用的高度速度，单位 m/s，上升为正 */
 
+extern float g_height_meas_mm;
+extern float g_height_meas_health;
+extern float g_height_tof_spread_mm;
+extern float g_height_acc_up_mps2;
+extern float g_height_acc_corr_mps2;
+extern float g_height_obs_z_m;
+extern float g_height_obs_vz_raw_mps;
+extern float g_height_obs_residual_m;
+extern float g_height_obs_weight;
+extern float g_height_obs_delta_v_mps;
+extern float g_height_state_mm;
+extern uint8 g_height_meas_valid;
+extern uint8 g_height_tof_accept_count;
+extern uint8 g_height_tof_valid_mask;
+
 /*
  * 函数功能：初始化 TOF 相关状态与驱动。
  * 输入参数：

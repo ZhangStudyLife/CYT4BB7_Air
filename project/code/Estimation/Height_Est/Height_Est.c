@@ -4,6 +4,21 @@
 #include "filter.h"
 #include <math.h>
 
+float g_height_meas_mm = (float)VL53L1X_VALID_RANGE_MAX;
+float g_height_meas_health = 0.0f;
+float g_height_tof_spread_mm = 0.0f;
+float g_height_acc_up_mps2 = 0.0f;
+float g_height_acc_corr_mps2 = 0.0f;
+float g_height_obs_z_m = 0.0f;
+float g_height_obs_vz_raw_mps = 0.0f;
+float g_height_obs_residual_m = 0.0f;
+float g_height_obs_weight = 0.0f;
+float g_height_obs_delta_v_mps = 0.0f;
+float g_height_state_mm = (float)VL53L1X_VALID_RANGE_MAX;
+uint8 g_height_meas_valid = 0U;
+uint8 g_height_tof_accept_count = 0U;
+uint8 g_height_tof_valid_mask = 0U;
+
 float g_tof_fused_height_mm = (float)VL53L1X_VALID_RANGE_MAX;  /* TOF 融合高度，单位 mm */
 float g_tof1_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;   /* 1 号 TOF 姿态补偿后高度，单位 mm */
 float g_tof2_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;   /* 2 号 TOF 姿态补偿后高度，单位 mm */
@@ -279,11 +294,16 @@ static uint8 HeightEst_BuildTofMeasure(const float *tof_height_mm, const uint8 *
     uint8 accept_count = 0U;
     uint8 index;
 
+    g_height_tof_spread_mm = 0.0f;
+    g_height_tof_accept_count = 0U;
+    g_height_tof_valid_mask = 0U;
+
     for (index = 0U; index < VL53L1X_SENSOR_COUNT; index++)
     {
         if (0U != tof_valid[index])
         {
             sample[sample_count++] = tof_height_mm[index] - s_tof_height_bias_mm[index];
+            g_height_tof_valid_mask |= (uint8)(1U << index);
         }
     }
 
@@ -295,6 +315,7 @@ static uint8 HeightEst_BuildTofMeasure(const float *tof_height_mm, const uint8 *
 
     center_mm = HeightEst_MedianMm(sample, sample_count);
     spread_mm = sample[sample_count - 1U] - sample[0U];
+    g_height_tof_spread_mm = spread_mm;
     if (spread_mm > HEIGHT_EST_TOF_SPREAD_OK_MM)
     {
         return 0U;
@@ -320,10 +341,12 @@ static uint8 HeightEst_BuildTofMeasure(const float *tof_height_mm, const uint8 *
     if (accept_count < 2U)
     {
         *meas_height_mm = center_mm;
+        g_height_tof_accept_count = accept_count;
         return 1U;
     }
 
     *meas_height_mm = sum_mm / (float)accept_count;
+    g_height_tof_accept_count = accept_count;
     return 1U;
 }
 
@@ -428,6 +451,13 @@ static float HeightEst_UpdateOutputVz(float meas_height_mm, float meas_health, u
         s_height_out_vz_mps = 0.0f;
         s_height_out_vz_ready = 0U;
         s_height_out_miss_cnt = 0U;
+        g_height_acc_up_mps2 = 0.0f;
+        g_height_acc_corr_mps2 = 0.0f;
+        g_height_obs_z_m = 0.0f;
+        g_height_obs_vz_raw_mps = 0.0f;
+        g_height_obs_residual_m = 0.0f;
+        g_height_obs_weight = 0.0f;
+        g_height_obs_delta_v_mps = 0.0f;
         return 0.0f;
     }
 
@@ -438,6 +468,11 @@ static float HeightEst_UpdateOutputVz(float meas_height_mm, float meas_health, u
         s_height_out_vz_ready = 1U;
         s_height_out_miss_cnt = 0U;
         LPF1_Reset(&s_height_out_vz_lpf);
+        g_height_obs_z_m = s_height_out_z_m;
+        g_height_obs_vz_raw_mps = s_height_out_vz_mps;
+        g_height_obs_residual_m = 0.0f;
+        g_height_obs_weight = 0.0f;
+        g_height_obs_delta_v_mps = 0.0f;
         return 0.0f;
     }
 
@@ -452,11 +487,16 @@ static float HeightEst_UpdateOutputVz(float meas_height_mm, float meas_health, u
         acc_up_mps2 = HeightEst_ClampFloat(acc_up_mps2, -HEIGHT_EST_VZ_OBS_ACC_CLIP, HEIGHT_EST_VZ_OBS_ACC_CLIP);
         acc_corr_mps2 = HeightEst_DeadbandFloat(acc_up_mps2, HEIGHT_EST_VZ_OBS_ACC_DEADBAND);
     }
+    g_height_acc_up_mps2 = acc_up_mps2;
+    g_height_acc_corr_mps2 = acc_corr_mps2;
 
     s_height_out_z_m += s_height_out_vz_mps * HEIGHT_EST_TOF_DT_S +
         0.5f * acc_corr_mps2 * HEIGHT_EST_TOF_DT_S * HEIGHT_EST_TOF_DT_S;
     s_height_out_vz_mps = HEIGHT_EST_VZ_OBS_LEAK_ALPHA *
         (s_height_out_vz_mps + acc_corr_mps2 * HEIGHT_EST_TOF_DT_S);
+    g_height_obs_residual_m = 0.0f;
+    g_height_obs_weight = 0.0f;
+    g_height_obs_delta_v_mps = 0.0f;
 
     if (0U != meas_valid)
     {
@@ -466,6 +506,9 @@ static float HeightEst_UpdateOutputVz(float meas_height_mm, float meas_health, u
         delta_v_mps = (HEIGHT_EST_VZ_OBS_BETA / HEIGHT_EST_TOF_DT_S) * weight * residual_m;
         delta_v_mps = HeightEst_ClampFloat(delta_v_mps, -HEIGHT_EST_VZ_OBS_DV_LIMIT, HEIGHT_EST_VZ_OBS_DV_LIMIT);
         s_height_out_vz_mps += delta_v_mps;
+        g_height_obs_residual_m = residual_m;
+        g_height_obs_weight = weight;
+        g_height_obs_delta_v_mps = delta_v_mps;
 
         if (weight > 0.0f)
         {
@@ -492,6 +535,8 @@ static float HeightEst_UpdateOutputVz(float meas_height_mm, float meas_health, u
 
     s_height_out_vz_mps = HeightEst_ClampFloat(s_height_out_vz_mps,
         -HEIGHT_EST_VZ_OBS_LIMIT_MPS, HEIGHT_EST_VZ_OBS_LIMIT_MPS);
+    g_height_obs_z_m = s_height_out_z_m;
+    g_height_obs_vz_raw_mps = s_height_out_vz_mps;
 
     return LPF1_Update(&s_height_out_vz_lpf, s_height_out_vz_mps);
 }
@@ -536,6 +581,20 @@ static void HeightEst_ResetAll(void)
     s_height_out_vz_mps = 0.0f;
     s_height_out_vz_ready = 0U;
     s_height_out_miss_cnt = 0U;
+    g_height_meas_mm = (float)VL53L1X_VALID_RANGE_MAX;
+    g_height_meas_health = 0.0f;
+    g_height_tof_spread_mm = 0.0f;
+    g_height_acc_up_mps2 = 0.0f;
+    g_height_acc_corr_mps2 = 0.0f;
+    g_height_obs_z_m = 0.0f;
+    g_height_obs_vz_raw_mps = 0.0f;
+    g_height_obs_residual_m = 0.0f;
+    g_height_obs_weight = 0.0f;
+    g_height_obs_delta_v_mps = 0.0f;
+    g_height_state_mm = (float)VL53L1X_VALID_RANGE_MAX;
+    g_height_meas_valid = 0U;
+    g_height_tof_accept_count = 0U;
+    g_height_tof_valid_mask = 0U;
 
     g_tof1_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
     g_tof2_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
@@ -678,7 +737,11 @@ void TOF_update_100HZ(void)
     g_tof4_height_mm = tof_height_mm[HEIGHT_EST_TOF4_INDEX];
 
     meas_valid = HeightEst_BuildTofMeasure(tof_height_mm, tof_valid, &meas_height_mm, &meas_health);
+    g_height_meas_mm = meas_height_mm;
+    g_height_meas_health = meas_health;
+    g_height_meas_valid = meas_valid;
     height_valid = HeightEst_UpdateHeight(meas_height_mm, meas_health, meas_valid);
+    g_height_state_mm = s_height_est_mm;
     g_tof_fused_valid = height_valid;
     if (0U != height_valid)
     {

@@ -35,6 +35,8 @@ extern volatile uint32 tick_1000us_cnt;
 
 /* 当前高度速度估计，仅供本文件高度速度环使用，单位 m/s */
 static float s_height_vz_mps = 0.0f;
+static float s_height_base_throttle = 0.0f;
+static float s_height_throttle_raw = 0.0f;
 /* Yaw 角度目标是否已经对齐当前机头方向 */
 static uint8_t s_yaw_target_inited = 0U;
 #define FC_TARGET_HEIGHT_M          1.0f
@@ -307,6 +309,8 @@ void FC_Loop_Reset(void)
     target_height_m = FC_TARGET_HEIGHT_M;
     s_yaw_target_inited = 0U;
     s_hover_throttle = (float)g_fc_params.base_throttle;
+    s_height_base_throttle = 0.0f;
+    s_height_throttle_raw = 0.0f;
 }
 
 /*
@@ -443,39 +447,58 @@ void FC_Loop_100Hz(void)
     }
     {
         const VL53L1X_data_struct *tof = VL53L1X_GetData();
+        float raw_tof1_mm = 0.0f;
+        float raw_tof2_mm = 0.0f;
+        float raw_tof3_mm = 0.0f;
+        float raw_tof4_mm = 0.0f;
+
+        if (0 != tof)
+        {
+            raw_tof1_mm = (float)tof->distance_mm[0];
+            raw_tof2_mm = (float)tof->distance_mm[1];
+            raw_tof3_mm = (float)tof->distance_mm[2];
+            raw_tof4_mm = (float)tof->distance_mm[3];
+        }
+
         wifi_justfloat((float)tick_1000us_cnt,
                        target_height_m * 1000.0f,
                        g_tof_fused_height_mm,
                        (float)g_tof_fused_valid,
-                       height_pos_out,
+                       g_height_meas_mm,
+                       (float)g_height_meas_valid,
+                       g_height_meas_health,
+                       g_height_tof_spread_mm,
+                       (float)g_height_tof_accept_count,
+                       (float)g_height_tof_valid_mask,
+                       g_height_state_mm,
+                       g_height_obs_z_m * 1000.0f,
                        s_height_vz_mps,
-                       g_tof_fused_vz_mps,
-                       height_vel_out,
+                       g_height_obs_vz_raw_mps,
+                       g_height_acc_up_mps2,
+                       g_height_acc_corr_mps2,
+                       g_height_obs_residual_m,
+                       g_height_obs_weight,
+                       g_height_obs_delta_v_mps,
                        height_pos_pid.p_term,
                        height_pos_pid.i_term,
-                       height_pos_pid.d_term,
                        height_vel_pid.p_term,
                        height_vel_pid.i_term,
                        height_vel_pid.d_term,
+                       height_pos_out,
+                       height_vel_out,
+                       height_pos_pid.d_term,
                        g_tof1_height_mm,
                        g_tof2_height_mm,
                        g_tof3_height_mm,
                        g_tof4_height_mm,
-                       (float)tof->distance_mm[0],
-                       (float)tof->distance_mm[1],
-                       (float)tof->distance_mm[2],
-                       (float)tof->distance_mm[3],
-                       (float)tof->valid[0],
-                       (float)tof->valid[1],
-                       (float)tof->valid[2],
-                       (float)tof->valid[3],
+                       raw_tof1_mm,
+                       raw_tof2_mm,
+                       raw_tof3_mm,
+                       raw_tof4_mm,
                        g_euler.roll,
                        g_euler.pitch,
-                       g_euler.yaw,
-                       Pos_Est_vel_x,
-                       Pos_Est_vel_y,
-                       opflow_vel_x,
-                       opflow_vel_y,
+                       s_height_base_throttle,
+                       s_height_throttle_raw,
                        (float)g_motor_cmd.throttle);
     }
     // // if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
@@ -728,6 +751,8 @@ void FC_Loop_1000Hz(void)
 
             float base_throttle = FC_Apply_Tilt_Throttle_Compensation(g_fc_params.base_throttle);
             float throttle_cmd_raw = base_throttle + height_vel_out;
+            s_height_base_throttle = base_throttle;
+            s_height_throttle_raw = throttle_cmd_raw;
             g_motor_cmd.throttle = (int32_t)fc_clampf((float)(int32_t)throttle_cmd_raw, 2500.0f, 6000.0f);
         }
         g_motor_cmd.roll = roll_ctrl;

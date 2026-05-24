@@ -66,6 +66,12 @@ float g_height_fused_vz_mps = 0.0f;                            /* 控制环使�
 #define HEIGHT_EST_TOF_MIN_COUNT        3U                  /* 高度融合最少 TOF 有效路数 */
 #define HEIGHT_EST_TOF_SPREAD_GOOD_MM   150.0f              /* TOF 样本离散良好门限，单位 mm */
 #define HEIGHT_EST_TOF_SPREAD_OK_MM     240.0f              /* TOF 样本离散可用门限，单位 mm */
+#define HEIGHT_EST_TOF_RANGE_HIGH_MM    VL53L1X_VALID_RANGE_MAX
+#define HEIGHT_EST_TOF_RANGE_HIGH_RAW_MM 1390.0f
+#define HEIGHT_EST_TOF_RANGE_HIGH_ENTER_MM 1320.0f
+#define HEIGHT_EST_TOF_RANGE_HIGH_EXIT_MM 1250.0f
+#define HEIGHT_EST_TOF_RANGE_HIGH_MIN_STATE_MM 900.0f
+#define HEIGHT_EST_TOF_RANGE_HIGH_CONFIRM_COUNT 3U
 #define HEIGHT_EST_STATE_MAX_MM         VL53L1X_VALID_RANGE_MAX /* 高度内部状态最大值，单位 mm */
 
 static Median_t s_tof_median[VL53L1X_SENSOR_COUNT];          /* 四路 TOF 中值滤波状态 */
@@ -80,6 +86,8 @@ static float s_height_out_z_m = 0.0f;                        /* 控制速度观�
 static float s_height_out_vz_mps = 0.0f;                     /* 控制速度观测器速度状态，单位 m/s */
 static uint8 s_height_out_vz_ready = 0U;                     /* 控制速度观测器是否已初始化 */
 static uint8 s_height_out_miss_cnt = 0U;                     /* 控制速度观测器 TOF 连续丢失计数 */
+static uint8 s_tof_range_high_latched[VL53L1X_SENSOR_COUNT];
+static uint8 s_tof_range_high_confirm_cnt = 0U;
 static const float s_tof_pitch_sign[VL53L1X_SENSOR_COUNT] = {1.0f, -1.0f, 1.0f, -1.0f}; /* 四路 TOF pitch 补偿极性 */
 static const float s_tof_roll_sign[VL53L1X_SENSOR_COUNT] = {1.0f, 1.0f, -1.0f, -1.0f};  /* 四路 TOF roll 补偿极性 */
 static const float s_tof_height_bias_mm[VL53L1X_SENSOR_COUNT] = {
@@ -189,6 +197,37 @@ static float HeightEst_DeadbandFloat(float value, float deadband)
     return 0.0f;
 }
 
+static uint8 HeightEst_IsTofRangeHighRaw(uint16 distance_mm)
+{
+    return ((distance_mm >= (uint16)HEIGHT_EST_TOF_RANGE_HIGH_RAW_MM) ||
+        (distance_mm >= (uint16)VL53L1X_INVALID_DISTANCE_MM)) ? 1U : 0U;
+}
+
+static uint8 HeightEst_IsLikelyRangeHigh(uint8 index, uint16 distance_mm, float height_mm, uint8 raw_valid)
+{
+    if ((0U != raw_valid) &&
+        ((distance_mm >= (uint16)HEIGHT_EST_TOF_RANGE_HIGH_RAW_MM) ||
+        (height_mm >= HEIGHT_EST_TOF_RANGE_HIGH_ENTER_MM)))
+    {
+        s_tof_range_high_latched[index] = 1U;
+        return 1U;
+    }
+
+    if ((0U != raw_valid) && (height_mm <= HEIGHT_EST_TOF_RANGE_HIGH_EXIT_MM))
+    {
+        s_tof_range_high_latched[index] = 0U;
+        return 0U;
+    }
+
+    if ((distance_mm >= (uint16)VL53L1X_INVALID_DISTANCE_MM) &&
+        (0U != s_tof_range_high_latched[index]))
+    {
+        return 1U;
+    }
+
+    return 0U;
+}
+
 /*
  * 函数功能：根据残差大小计算控制速度观测器的 TOF 校正权重。
  * 输入参数：
@@ -283,7 +322,7 @@ static float HeightEst_MedianMm(float *values, uint8 count)
  *   1=观测有效，0=观测无效。
  */
 static uint8 HeightEst_BuildTofMeasure(const float *tof_height_mm, const uint8 *tof_valid,
-    float *meas_height_mm, float *health)
+    const uint8 *tof_range_high, float *meas_height_mm, float *health, uint8 *range_high_active)
 {
     float sample[VL53L1X_SENSOR_COUNT];
     float center_mm;
@@ -292,15 +331,23 @@ static uint8 HeightEst_BuildTofMeasure(const float *tof_height_mm, const uint8 *
     float spread_weight;
     uint8 sample_count = 0U;
     uint8 accept_count = 0U;
+    uint8 range_high_count = 0U;
     uint8 index;
 
     g_height_tof_spread_mm = 0.0f;
     g_height_tof_accept_count = 0U;
     g_height_tof_valid_mask = 0U;
+    *range_high_active = 0U;
 
     for (index = 0U; index < VL53L1X_SENSOR_COUNT; index++)
     {
-        if (0U != tof_valid[index])
+        if (0U != tof_range_high[index])
+        {
+            sample[sample_count++] = HEIGHT_EST_TOF_RANGE_HIGH_MM - s_tof_height_bias_mm[index];
+            g_height_tof_valid_mask |= (uint8)(1U << index);
+            range_high_count++;
+        }
+        else if (0U != tof_valid[index])
         {
             sample[sample_count++] = tof_height_mm[index] - s_tof_height_bias_mm[index];
             g_height_tof_valid_mask |= (uint8)(1U << index);
@@ -311,6 +358,16 @@ static uint8 HeightEst_BuildTofMeasure(const float *tof_height_mm, const uint8 *
     if (sample_count < HEIGHT_EST_TOF_MIN_COUNT)
     {
         return 0U;
+    }
+
+    if (range_high_count >= HEIGHT_EST_TOF_MIN_COUNT)
+    {
+        *meas_height_mm = HEIGHT_EST_TOF_RANGE_HIGH_MM;
+        *health = 1.0f;
+        *range_high_active = 1U;
+        g_height_tof_spread_mm = 0.0f;
+        g_height_tof_accept_count = range_high_count;
+        return 1U;
     }
 
     center_mm = HeightEst_MedianMm(sample, sample_count);
@@ -359,7 +416,7 @@ static uint8 HeightEst_BuildTofMeasure(const float *tof_height_mm, const uint8 *
  * 返回值：
  *   1=高度估计有效，0=高度估计无效。
  */
-static uint8 HeightEst_UpdateHeight(float meas_height_mm, float meas_health, uint8 meas_valid)
+static uint8 HeightEst_UpdateHeight(float meas_height_mm, float meas_health, uint8 meas_valid, uint8 range_high_active)
 {
     float residual_m;
     float weight;
@@ -379,29 +436,40 @@ static uint8 HeightEst_UpdateHeight(float meas_height_mm, float meas_health, uin
 
     if (0U != meas_valid)
     {
-        residual_m = meas_height_mm * 0.001f - s_height_est_mm * 0.001f;
-        weight = meas_health * HeightEst_HeightResidualWeight(residual_m);
-
-        if (weight > HEIGHT_EST_WEIGHT_EPS)
+        if (0U != range_high_active)
         {
-            s_height_est_mm = HeightEst_ClampStateHeightMm(s_height_est_mm +
-                HEIGHT_EST_HEIGHT_ALPHA * weight * residual_m * 1000.0f);
+            if (s_height_est_mm < HEIGHT_EST_TOF_RANGE_HIGH_MM)
+            {
+                s_height_est_mm = HEIGHT_EST_TOF_RANGE_HIGH_MM;
+            }
             s_height_miss_cnt = 0U;
-        }
-        else if ((s_height_miss_cnt >= HEIGHT_EST_HEIGHT_MISS_MAX) && (meas_health >= 0.75f))
-        {
-            relock_step_mm = HeightEst_ClampFloat(residual_m * 1000.0f,
-                -HEIGHT_EST_HEIGHT_RELOCK_STEP_MM, HEIGHT_EST_HEIGHT_RELOCK_STEP_MM);
-            s_height_est_mm = HeightEst_ClampStateHeightMm(s_height_est_mm + relock_step_mm);
-            s_height_miss_cnt = 0U;
-        }
-        else if (s_height_miss_cnt < HEIGHT_EST_HEIGHT_MISS_MAX)
-        {
-            s_height_miss_cnt++;
         }
         else
         {
-            height_valid = 0U;
+            residual_m = meas_height_mm * 0.001f - s_height_est_mm * 0.001f;
+            weight = meas_health * HeightEst_HeightResidualWeight(residual_m);
+
+            if (weight > HEIGHT_EST_WEIGHT_EPS)
+            {
+                s_height_est_mm = HeightEst_ClampStateHeightMm(s_height_est_mm +
+                    HEIGHT_EST_HEIGHT_ALPHA * weight * residual_m * 1000.0f);
+                s_height_miss_cnt = 0U;
+            }
+            else if ((s_height_miss_cnt >= HEIGHT_EST_HEIGHT_MISS_MAX) && (meas_health >= 0.75f))
+            {
+                relock_step_mm = HeightEst_ClampFloat(residual_m * 1000.0f,
+                    -HEIGHT_EST_HEIGHT_RELOCK_STEP_MM, HEIGHT_EST_HEIGHT_RELOCK_STEP_MM);
+                s_height_est_mm = HeightEst_ClampStateHeightMm(s_height_est_mm + relock_step_mm);
+                s_height_miss_cnt = 0U;
+            }
+            else if (s_height_miss_cnt < HEIGHT_EST_HEIGHT_MISS_MAX)
+            {
+                s_height_miss_cnt++;
+            }
+            else
+            {
+                height_valid = 0U;
+            }
         }
     }
     else if (s_height_miss_cnt < HEIGHT_EST_HEIGHT_MISS_MAX)
@@ -435,7 +503,8 @@ static uint8 HeightEst_UpdateHeight(float meas_height_mm, float meas_health, uin
  * 返回值：
  *   控制环使用的高度速度，单位 m/s，上升为正。
  */
-static float HeightEst_UpdateOutputVz(float meas_height_mm, float meas_health, uint8 meas_valid, uint8 fused_valid)
+static float HeightEst_UpdateOutputVz(float meas_height_mm, float meas_health, uint8 meas_valid, uint8 fused_valid,
+    uint8 range_high_active)
 {
     float meas_height_m = meas_height_mm * 0.001f;
     float acc_up_mps2 = 0.0f;
@@ -501,7 +570,14 @@ static float HeightEst_UpdateOutputVz(float meas_height_mm, float meas_health, u
     if (0U != meas_valid)
     {
         residual_m = meas_height_m - s_height_out_z_m;
-        weight = meas_health * HeightEst_OutputVzResidualWeight(residual_m);
+        if (0U != range_high_active)
+        {
+            weight = meas_health;
+        }
+        else
+        {
+            weight = meas_health * HeightEst_OutputVzResidualWeight(residual_m);
+        }
         s_height_out_z_m += HEIGHT_EST_VZ_OBS_ALPHA * weight * residual_m;
         delta_v_mps = (HEIGHT_EST_VZ_OBS_BETA / HEIGHT_EST_TOF_DT_S) * weight * residual_m;
         delta_v_mps = HeightEst_ClampFloat(delta_v_mps, -HEIGHT_EST_VZ_OBS_DV_LIMIT, HEIGHT_EST_VZ_OBS_DV_LIMIT);
@@ -569,7 +645,9 @@ static void HeightEst_ResetAll(void)
     {
         Median_Init(&s_tof_median[index], HEIGHT_EST_MEDIAN_WIN);
         StepLim_Init(&s_tof_step[index], HEIGHT_EST_STEP_LIMIT_MM);
+        s_tof_range_high_latched[index] = 0U;
     }
+    s_tof_range_high_confirm_cnt = 0U;
 
     s_height_est_mm = (float)VL53L1X_VALID_RANGE_MAX;
     s_height_output_mm = (float)VL53L1X_VALID_RANGE_MAX;
@@ -662,6 +740,10 @@ void TOF_update_100HZ(void)
         (float)VL53L1X_INVALID_DISTANCE_MM
     };
     uint8 tof_valid[VL53L1X_SENSOR_COUNT] = {0U, 0U, 0U, 0U};
+    uint8 tof_range_high[VL53L1X_SENSOR_COUNT] = {0U, 0U, 0U, 0U};
+    uint8 range_high_active = 0U;
+    uint8 raw_range_high_count = 0U;
+    uint8 latched_range_high_count = 0U;
     float output_vz_mps = 0.0f;
 
     VL53L1X_Update();
@@ -680,11 +762,26 @@ void TOF_update_100HZ(void)
             ((float)tof_data->distance_mm[HEIGHT_EST_TOF1_INDEX] <= HEIGHT_EST_TOF_VALID_MAX_MM))
         {
             tof_height_mm[HEIGHT_EST_TOF1_INDEX] = HeightEst_ProcessChannel(HEIGHT_EST_TOF1_INDEX, tof_data->distance_mm[HEIGHT_EST_TOF1_INDEX]);
-            tof_valid[HEIGHT_EST_TOF1_INDEX] = 1U;
+            tof_range_high[HEIGHT_EST_TOF1_INDEX] = HeightEst_IsLikelyRangeHigh(HEIGHT_EST_TOF1_INDEX,
+                tof_data->distance_mm[HEIGHT_EST_TOF1_INDEX], tof_height_mm[HEIGHT_EST_TOF1_INDEX], 1U);
+            tof_valid[HEIGHT_EST_TOF1_INDEX] = (0U == tof_range_high[HEIGHT_EST_TOF1_INDEX]) ? 1U : 0U;
+            if (0U != tof_range_high[HEIGHT_EST_TOF1_INDEX])
+            {
+                tof_height_mm[HEIGHT_EST_TOF1_INDEX] = HEIGHT_EST_TOF_RANGE_HIGH_MM;
+            }
         }
         else
         {
-            HeightEst_ResetChannel(HEIGHT_EST_TOF1_INDEX);
+            tof_range_high[HEIGHT_EST_TOF1_INDEX] = HeightEst_IsLikelyRangeHigh(HEIGHT_EST_TOF1_INDEX,
+                tof_data->distance_mm[HEIGHT_EST_TOF1_INDEX], HEIGHT_EST_TOF_RANGE_HIGH_MM, 0U);
+            if (0U != tof_range_high[HEIGHT_EST_TOF1_INDEX])
+            {
+                tof_height_mm[HEIGHT_EST_TOF1_INDEX] = HEIGHT_EST_TOF_RANGE_HIGH_MM;
+            }
+            if (0U == tof_range_high[HEIGHT_EST_TOF1_INDEX])
+            {
+                HeightEst_ResetChannel(HEIGHT_EST_TOF1_INDEX);
+            }
         }
 
         if ((0U != tof_data->valid[HEIGHT_EST_TOF2_INDEX]) &&
@@ -692,11 +789,26 @@ void TOF_update_100HZ(void)
             ((float)tof_data->distance_mm[HEIGHT_EST_TOF2_INDEX] <= HEIGHT_EST_TOF_VALID_MAX_MM))
         {
             tof_height_mm[HEIGHT_EST_TOF2_INDEX] = HeightEst_ProcessChannel(HEIGHT_EST_TOF2_INDEX, tof_data->distance_mm[HEIGHT_EST_TOF2_INDEX]);
-            tof_valid[HEIGHT_EST_TOF2_INDEX] = 1U;
+            tof_range_high[HEIGHT_EST_TOF2_INDEX] = HeightEst_IsLikelyRangeHigh(HEIGHT_EST_TOF2_INDEX,
+                tof_data->distance_mm[HEIGHT_EST_TOF2_INDEX], tof_height_mm[HEIGHT_EST_TOF2_INDEX], 1U);
+            tof_valid[HEIGHT_EST_TOF2_INDEX] = (0U == tof_range_high[HEIGHT_EST_TOF2_INDEX]) ? 1U : 0U;
+            if (0U != tof_range_high[HEIGHT_EST_TOF2_INDEX])
+            {
+                tof_height_mm[HEIGHT_EST_TOF2_INDEX] = HEIGHT_EST_TOF_RANGE_HIGH_MM;
+            }
         }
         else
         {
-            HeightEst_ResetChannel(HEIGHT_EST_TOF2_INDEX);
+            tof_range_high[HEIGHT_EST_TOF2_INDEX] = HeightEst_IsLikelyRangeHigh(HEIGHT_EST_TOF2_INDEX,
+                tof_data->distance_mm[HEIGHT_EST_TOF2_INDEX], HEIGHT_EST_TOF_RANGE_HIGH_MM, 0U);
+            if (0U != tof_range_high[HEIGHT_EST_TOF2_INDEX])
+            {
+                tof_height_mm[HEIGHT_EST_TOF2_INDEX] = HEIGHT_EST_TOF_RANGE_HIGH_MM;
+            }
+            if (0U == tof_range_high[HEIGHT_EST_TOF2_INDEX])
+            {
+                HeightEst_ResetChannel(HEIGHT_EST_TOF2_INDEX);
+            }
         }
 
         if ((0U != tof_data->valid[HEIGHT_EST_TOF3_INDEX]) &&
@@ -704,11 +816,26 @@ void TOF_update_100HZ(void)
             ((float)tof_data->distance_mm[HEIGHT_EST_TOF3_INDEX] <= HEIGHT_EST_TOF_VALID_MAX_MM))
         {
             tof_height_mm[HEIGHT_EST_TOF3_INDEX] = HeightEst_ProcessChannel(HEIGHT_EST_TOF3_INDEX, tof_data->distance_mm[HEIGHT_EST_TOF3_INDEX]);
-            tof_valid[HEIGHT_EST_TOF3_INDEX] = 1U;
+            tof_range_high[HEIGHT_EST_TOF3_INDEX] = HeightEst_IsLikelyRangeHigh(HEIGHT_EST_TOF3_INDEX,
+                tof_data->distance_mm[HEIGHT_EST_TOF3_INDEX], tof_height_mm[HEIGHT_EST_TOF3_INDEX], 1U);
+            tof_valid[HEIGHT_EST_TOF3_INDEX] = (0U == tof_range_high[HEIGHT_EST_TOF3_INDEX]) ? 1U : 0U;
+            if (0U != tof_range_high[HEIGHT_EST_TOF3_INDEX])
+            {
+                tof_height_mm[HEIGHT_EST_TOF3_INDEX] = HEIGHT_EST_TOF_RANGE_HIGH_MM;
+            }
         }
         else
         {
-            HeightEst_ResetChannel(HEIGHT_EST_TOF3_INDEX);
+            tof_range_high[HEIGHT_EST_TOF3_INDEX] = HeightEst_IsLikelyRangeHigh(HEIGHT_EST_TOF3_INDEX,
+                tof_data->distance_mm[HEIGHT_EST_TOF3_INDEX], HEIGHT_EST_TOF_RANGE_HIGH_MM, 0U);
+            if (0U != tof_range_high[HEIGHT_EST_TOF3_INDEX])
+            {
+                tof_height_mm[HEIGHT_EST_TOF3_INDEX] = HEIGHT_EST_TOF_RANGE_HIGH_MM;
+            }
+            if (0U == tof_range_high[HEIGHT_EST_TOF3_INDEX])
+            {
+                HeightEst_ResetChannel(HEIGHT_EST_TOF3_INDEX);
+            }
         }
 
         if ((0U != tof_data->valid[HEIGHT_EST_TOF4_INDEX]) &&
@@ -716,11 +843,68 @@ void TOF_update_100HZ(void)
             ((float)tof_data->distance_mm[HEIGHT_EST_TOF4_INDEX] <= HEIGHT_EST_TOF_VALID_MAX_MM))
         {
             tof_height_mm[HEIGHT_EST_TOF4_INDEX] = HeightEst_ProcessChannel(HEIGHT_EST_TOF4_INDEX, tof_data->distance_mm[HEIGHT_EST_TOF4_INDEX]);
-            tof_valid[HEIGHT_EST_TOF4_INDEX] = 1U;
+            tof_range_high[HEIGHT_EST_TOF4_INDEX] = HeightEst_IsLikelyRangeHigh(HEIGHT_EST_TOF4_INDEX,
+                tof_data->distance_mm[HEIGHT_EST_TOF4_INDEX], tof_height_mm[HEIGHT_EST_TOF4_INDEX], 1U);
+            tof_valid[HEIGHT_EST_TOF4_INDEX] = (0U == tof_range_high[HEIGHT_EST_TOF4_INDEX]) ? 1U : 0U;
+            if (0U != tof_range_high[HEIGHT_EST_TOF4_INDEX])
+            {
+                tof_height_mm[HEIGHT_EST_TOF4_INDEX] = HEIGHT_EST_TOF_RANGE_HIGH_MM;
+            }
         }
         else
         {
-            HeightEst_ResetChannel(HEIGHT_EST_TOF4_INDEX);
+            tof_range_high[HEIGHT_EST_TOF4_INDEX] = HeightEst_IsLikelyRangeHigh(HEIGHT_EST_TOF4_INDEX,
+                tof_data->distance_mm[HEIGHT_EST_TOF4_INDEX], HEIGHT_EST_TOF_RANGE_HIGH_MM, 0U);
+            if (0U != tof_range_high[HEIGHT_EST_TOF4_INDEX])
+            {
+                tof_height_mm[HEIGHT_EST_TOF4_INDEX] = HEIGHT_EST_TOF_RANGE_HIGH_MM;
+            }
+            if (0U == tof_range_high[HEIGHT_EST_TOF4_INDEX])
+            {
+                HeightEst_ResetChannel(HEIGHT_EST_TOF4_INDEX);
+            }
+        }
+
+        raw_range_high_count += HeightEst_IsTofRangeHighRaw(tof_data->distance_mm[HEIGHT_EST_TOF1_INDEX]);
+        raw_range_high_count += HeightEst_IsTofRangeHighRaw(tof_data->distance_mm[HEIGHT_EST_TOF2_INDEX]);
+        raw_range_high_count += HeightEst_IsTofRangeHighRaw(tof_data->distance_mm[HEIGHT_EST_TOF3_INDEX]);
+        raw_range_high_count += HeightEst_IsTofRangeHighRaw(tof_data->distance_mm[HEIGHT_EST_TOF4_INDEX]);
+        latched_range_high_count += s_tof_range_high_latched[HEIGHT_EST_TOF1_INDEX];
+        latched_range_high_count += s_tof_range_high_latched[HEIGHT_EST_TOF2_INDEX];
+        latched_range_high_count += s_tof_range_high_latched[HEIGHT_EST_TOF3_INDEX];
+        latched_range_high_count += s_tof_range_high_latched[HEIGHT_EST_TOF4_INDEX];
+        if ((raw_range_high_count >= HEIGHT_EST_TOF_MIN_COUNT) &&
+            (0U != s_height_est_ready) &&
+            ((latched_range_high_count > 0U) ||
+            (s_height_est_mm >= HEIGHT_EST_TOF_RANGE_HIGH_MIN_STATE_MM)))
+        {
+            if (s_tof_range_high_confirm_cnt < HEIGHT_EST_TOF_RANGE_HIGH_CONFIRM_COUNT)
+            {
+                s_tof_range_high_confirm_cnt++;
+            }
+            if (s_tof_range_high_confirm_cnt >= HEIGHT_EST_TOF_RANGE_HIGH_CONFIRM_COUNT)
+            {
+                tof_range_high[HEIGHT_EST_TOF1_INDEX] = 1U;
+                tof_range_high[HEIGHT_EST_TOF2_INDEX] = 1U;
+                tof_range_high[HEIGHT_EST_TOF3_INDEX] = 1U;
+                tof_range_high[HEIGHT_EST_TOF4_INDEX] = 1U;
+                s_tof_range_high_latched[HEIGHT_EST_TOF1_INDEX] = 1U;
+                s_tof_range_high_latched[HEIGHT_EST_TOF2_INDEX] = 1U;
+                s_tof_range_high_latched[HEIGHT_EST_TOF3_INDEX] = 1U;
+                s_tof_range_high_latched[HEIGHT_EST_TOF4_INDEX] = 1U;
+                tof_height_mm[HEIGHT_EST_TOF1_INDEX] = HEIGHT_EST_TOF_RANGE_HIGH_MM;
+                tof_height_mm[HEIGHT_EST_TOF2_INDEX] = HEIGHT_EST_TOF_RANGE_HIGH_MM;
+                tof_height_mm[HEIGHT_EST_TOF3_INDEX] = HEIGHT_EST_TOF_RANGE_HIGH_MM;
+                tof_height_mm[HEIGHT_EST_TOF4_INDEX] = HEIGHT_EST_TOF_RANGE_HIGH_MM;
+                tof_valid[HEIGHT_EST_TOF1_INDEX] = 0U;
+                tof_valid[HEIGHT_EST_TOF2_INDEX] = 0U;
+                tof_valid[HEIGHT_EST_TOF3_INDEX] = 0U;
+                tof_valid[HEIGHT_EST_TOF4_INDEX] = 0U;
+            }
+        }
+        else
+        {
+            s_tof_range_high_confirm_cnt = 0U;
         }
     }
     else
@@ -736,11 +920,12 @@ void TOF_update_100HZ(void)
     g_tof3_height_mm = tof_height_mm[HEIGHT_EST_TOF3_INDEX];
     g_tof4_height_mm = tof_height_mm[HEIGHT_EST_TOF4_INDEX];
 
-    meas_valid = HeightEst_BuildTofMeasure(tof_height_mm, tof_valid, &meas_height_mm, &meas_health);
+    meas_valid = HeightEst_BuildTofMeasure(tof_height_mm, tof_valid, tof_range_high,
+        &meas_height_mm, &meas_health, &range_high_active);
     g_height_meas_mm = meas_height_mm;
     g_height_meas_health = meas_health;
     g_height_meas_valid = meas_valid;
-    height_valid = HeightEst_UpdateHeight(meas_height_mm, meas_health, meas_valid);
+    height_valid = HeightEst_UpdateHeight(meas_height_mm, meas_health, meas_valid, range_high_active);
     g_height_state_mm = s_height_est_mm;
     g_tof_fused_valid = height_valid;
     if (0U != height_valid)
@@ -759,7 +944,8 @@ void TOF_update_100HZ(void)
         }
     }
 
-    output_vz_mps = HeightEst_UpdateOutputVz(meas_height_mm, meas_health, meas_valid, g_tof_fused_valid);
+    output_vz_mps = HeightEst_UpdateOutputVz(meas_height_mm, meas_health, meas_valid, g_tof_fused_valid,
+        range_high_active);
     g_tof_fused_vz_mps = output_vz_mps;
     g_height_fused_vz_mps = output_vz_mps;
 }

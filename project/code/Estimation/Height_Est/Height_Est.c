@@ -34,22 +34,12 @@ float g_height_fused_vz_mps = 0.0f;                            /* 控制环使�
 #define HEIGHT_EST_TOF4_INDEX           3U                  /* 4 号 TOF 数据索引 */
 #define HEIGHT_EST_TOF_DT_S             0.01f               /* TOF 速度观测周期，单位 s */
 #define HEIGHT_EST_HEIGHT_LPF_ALPHA     0.22120f            /* 高度输出 4Hz 一阶低通系数 */
-#define HEIGHT_EST_HEIGHT_ALPHA         0.05f               /* 高度估计器 TOF 校正系数 */
-#define HEIGHT_EST_HEIGHT_RES_SOFT_M    0.08f               /* 高度估计器残差软门限，单位 m */
-#define HEIGHT_EST_HEIGHT_RES_HARD_M    0.28f               /* 高度估计器残差硬门限，单位 m */
+#define HEIGHT_EST_MEAS_STEP_LIMIT_MM   35.0f               /* 正常 TOF 高度每帧最大跟随量，单位 mm */
+#define HEIGHT_EST_MEAS_STEP_FAST_MM    90.0f               /* 大高度误差时每帧最大跟随量，单位 mm */
+#define HEIGHT_EST_MEAS_FAST_ERR_MM     250.0f              /* 进入快速跟随的高度误差，单位 mm */
 #define HEIGHT_EST_HEIGHT_MISS_MAX      15U                 /* 高度估计器允许 TOF 短时丢失的 100Hz 次数 */
-#define HEIGHT_EST_HEIGHT_RELOCK_STEP_MM 20.0f              /* 高度估计器长丢失后单次重捕获限幅，单位 mm */
-#define HEIGHT_EST_VZ_LPF_ALPHA         0.39508f            /* 控制速度输出 8Hz 一阶低通系数 */
-#define HEIGHT_EST_VZ_OBS_ALPHA         0.14f               /* 控制速度观测器高度校正系数 */
-#define HEIGHT_EST_VZ_OBS_BETA          0.018f              /* 控制速度观测器速度校正系数 */
-#define HEIGHT_EST_VZ_OBS_LEAK_ALPHA    0.97183f            /* 控制速度观测器 0.35s 速度泄漏系数 */
-#define HEIGHT_EST_VZ_OBS_ACC_DEADBAND  0.26f               /* 控制速度观测器加速度死区，单位 m/s^2 */
-#define HEIGHT_EST_VZ_OBS_ACC_CLIP      4.0f                /* 控制速度观测器加速度限幅，单位 m/s^2 */
-#define HEIGHT_EST_VZ_OBS_RES_SOFT_M    0.08f               /* 控制速度观测器残差软门限，单位 m */
-#define HEIGHT_EST_VZ_OBS_RES_HARD_M    0.26f               /* 控制速度观测器残差硬门限，单位 m */
-#define HEIGHT_EST_VZ_OBS_DV_LIMIT      0.025f              /* 控制速度观测器单次速度校正限幅，单位 m/s */
+#define HEIGHT_EST_VZ_LPF_ALPHA         0.22120f            /* 控制速度输出 4Hz 一阶低通系数 */
 #define HEIGHT_EST_VZ_OBS_LIMIT_MPS     1.5f                /* 控制速度观测器输出速度限幅，单位 m/s */
-#define HEIGHT_EST_VZ_OBS_MISS_MAX      15U                 /* 控制速度观测器允许 TOF 短时丢失的 100Hz 次数 */
 #define HEIGHT_EST_TOF_TRIM_GATE_MM     110.0f              /* 控制速度观测器 TOF 截尾门限，单位 mm */
 #define HEIGHT_EST_TOF1_BIAS_MM         (-14.18f)            /* 1 号 TOF 相对偏置，单位 mm */
 #define HEIGHT_EST_TOF2_BIAS_MM         (14.33f)             /* 2 号 TOF 相对偏置，单位 mm */
@@ -82,10 +72,8 @@ static uint8 s_height_output_ready = 0U;                     /* 高度输出低�
 static uint8 s_height_est_ready = 0U;                        /* 高度估计器是否已完成首帧初始化 */
 static uint8 s_height_miss_cnt = 0U;                         /* 高度估计器 TOF 连续丢失计数 */
 static LPF1_t s_height_out_vz_lpf;                          /* 控制速度输出低通滤波器，单位 m/s */
-static float s_height_out_z_m = 0.0f;                        /* 控制速度观测器高度状态，单位 m */
-static float s_height_out_vz_mps = 0.0f;                     /* 控制速度观测器速度状态，单位 m/s */
 static uint8 s_height_out_vz_ready = 0U;                     /* 控制速度观测器是否已初始化 */
-static uint8 s_height_out_miss_cnt = 0U;                     /* 控制速度观测器 TOF 连续丢失计数 */
+static float s_height_prev_output_mm = 0.0f;                 /* 上一帧高度输出，单位 mm */
 static uint8 s_tof_range_high_latched[VL53L1X_SENSOR_COUNT];
 static uint8 s_tof_range_high_confirm_cnt = 0U;
 static const float s_tof_pitch_sign[VL53L1X_SENSOR_COUNT] = {1.0f, -1.0f, 1.0f, -1.0f}; /* 四路 TOF pitch 补偿极性 */
@@ -183,20 +171,6 @@ static void HeightEst_InitHeightState(float height_mm)
  * 返回值：
  *   去除死区后的数值。
  */
-static float HeightEst_DeadbandFloat(float value, float deadband)
-{
-    if (value > deadband)
-    {
-        return value - deadband;
-    }
-    if (value < -deadband)
-    {
-        return value + deadband;
-    }
-
-    return 0.0f;
-}
-
 static uint8 HeightEst_IsTofRangeHighRaw(uint16 distance_mm)
 {
     return ((distance_mm >= (uint16)HEIGHT_EST_TOF_RANGE_HIGH_RAW_MM) ||
@@ -234,55 +208,6 @@ static uint8 HeightEst_IsLikelyRangeHigh(uint8 index, uint16 distance_mm, float 
  *   residual_m：TOF 高度观测减预测高度的残差，单位 m。
  * 返回值：
  *   残差权重，范围 0~1。
- */
-static float HeightEst_OutputVzResidualWeight(float residual_m)
-{
-    float abs_residual_m = fabsf(residual_m);
-
-    if (abs_residual_m >= HEIGHT_EST_VZ_OBS_RES_HARD_M)
-    {
-        return 0.0f;
-    }
-    if (abs_residual_m > HEIGHT_EST_VZ_OBS_RES_SOFT_M)
-    {
-        return (HEIGHT_EST_VZ_OBS_RES_HARD_M - abs_residual_m) /
-            (HEIGHT_EST_VZ_OBS_RES_HARD_M - HEIGHT_EST_VZ_OBS_RES_SOFT_M);
-    }
-
-    return 1.0f;
-}
-
-/*
- * 函数功能：根据高度估计器残差计算 TOF 校正权重。
- * 输入参数：
- *   residual_m：TOF 高度观测减预测高度的残差，单位 m。
- * 返回值：
- *   残差权重，范围 0~1。
- */
-static float HeightEst_HeightResidualWeight(float residual_m)
-{
-    float abs_residual_m = fabsf(residual_m);
-
-    if (abs_residual_m >= HEIGHT_EST_HEIGHT_RES_HARD_M)
-    {
-        return 0.0f;
-    }
-    if (abs_residual_m > HEIGHT_EST_HEIGHT_RES_SOFT_M)
-    {
-        return (HEIGHT_EST_HEIGHT_RES_HARD_M - abs_residual_m) /
-            (HEIGHT_EST_HEIGHT_RES_HARD_M - HEIGHT_EST_HEIGHT_RES_SOFT_M);
-    }
-
-    return 1.0f;
-}
-
-/*
- * 函数功能：计算短数组的中位数，并会原地排序输入数组。
- * 输入参数：
- *   values：待排序的高度数组，单位 mm。
- *   count：数组有效元素数量。
- * 返回值：
- *   中位数高度，单位 mm。
  */
 static float HeightEst_MedianMm(float *values, uint8 count)
 {
@@ -418,10 +343,11 @@ static uint8 HeightEst_BuildTofMeasure(const float *tof_height_mm, const uint8 *
  */
 static uint8 HeightEst_UpdateHeight(float meas_height_mm, float meas_health, uint8 meas_valid, uint8 range_high_active)
 {
-    float residual_m;
-    float weight;
-    float relock_step_mm;
+    float residual_mm;
+    float step_limit_mm;
     uint8 height_valid = 1U;
+
+    (void)meas_health;
 
     if (0U == s_height_est_ready)
     {
@@ -438,38 +364,17 @@ static uint8 HeightEst_UpdateHeight(float meas_height_mm, float meas_health, uin
     {
         if (0U != range_high_active)
         {
-            if (s_height_est_mm < HEIGHT_EST_TOF_RANGE_HIGH_MM)
-            {
-                s_height_est_mm = HEIGHT_EST_TOF_RANGE_HIGH_MM;
-            }
+            s_height_est_mm = HEIGHT_EST_TOF_RANGE_HIGH_MM;
             s_height_miss_cnt = 0U;
         }
         else
         {
-            residual_m = meas_height_mm * 0.001f - s_height_est_mm * 0.001f;
-            weight = meas_health * HeightEst_HeightResidualWeight(residual_m);
-
-            if (weight > HEIGHT_EST_WEIGHT_EPS)
-            {
-                s_height_est_mm = HeightEst_ClampStateHeightMm(s_height_est_mm +
-                    HEIGHT_EST_HEIGHT_ALPHA * weight * residual_m * 1000.0f);
-                s_height_miss_cnt = 0U;
-            }
-            else if ((s_height_miss_cnt >= HEIGHT_EST_HEIGHT_MISS_MAX) && (meas_health >= 0.75f))
-            {
-                relock_step_mm = HeightEst_ClampFloat(residual_m * 1000.0f,
-                    -HEIGHT_EST_HEIGHT_RELOCK_STEP_MM, HEIGHT_EST_HEIGHT_RELOCK_STEP_MM);
-                s_height_est_mm = HeightEst_ClampStateHeightMm(s_height_est_mm + relock_step_mm);
-                s_height_miss_cnt = 0U;
-            }
-            else if (s_height_miss_cnt < HEIGHT_EST_HEIGHT_MISS_MAX)
-            {
-                s_height_miss_cnt++;
-            }
-            else
-            {
-                height_valid = 0U;
-            }
+            residual_mm = meas_height_mm - s_height_est_mm;
+            step_limit_mm = (fabsf(residual_mm) > HEIGHT_EST_MEAS_FAST_ERR_MM) ?
+                HEIGHT_EST_MEAS_STEP_FAST_MM : HEIGHT_EST_MEAS_STEP_LIMIT_MM;
+            s_height_est_mm = HeightEst_ClampStateHeightMm(s_height_est_mm +
+                HeightEst_ClampFloat(residual_mm, -step_limit_mm, step_limit_mm));
+            s_height_miss_cnt = 0U;
         }
     }
     else if (s_height_miss_cnt < HEIGHT_EST_HEIGHT_MISS_MAX)
@@ -494,136 +399,47 @@ static uint8 HeightEst_UpdateHeight(float meas_height_mm, float meas_health, uin
     return height_valid;
 }
 
-/*
- * 函数功能：更新控制环使用的高度速度观测器，保持高度输出不受加速度接管。
- * 输入参数：
- *   tof_height_mm：四路姿态补偿后的 TOF 高度，单位 mm。
- *   tof_valid：四路 TOF 有效标志。
- *   fused_valid：高度融合有效标志，1=有效，0=无效。
- * 返回值：
- *   控制环使用的高度速度，单位 m/s，上升为正。
- */
-static float HeightEst_UpdateOutputVz(float meas_height_mm, float meas_health, uint8 meas_valid, uint8 fused_valid,
-    uint8 range_high_active)
+static float HeightEst_UpdateOutputVz(uint8 fused_valid)
 {
-    float meas_height_m = meas_height_mm * 0.001f;
-    float acc_up_mps2 = 0.0f;
-    float acc_corr_mps2 = 0.0f;
-    float residual_m = 0.0f;
-    float weight = 0.0f;
-    float delta_v_mps = 0.0f;
+    float vz_raw_mps = 0.0f;
+    float vz_lpf_mps;
+
+    g_height_acc_up_mps2 = 0.0f;
+    g_height_acc_corr_mps2 = 0.0f;
+    g_height_obs_residual_m = 0.0f;
+    g_height_obs_weight = (0U != fused_valid) ? 1.0f : 0.0f;
+    g_height_obs_delta_v_mps = 0.0f;
 
     if (0U == fused_valid)
     {
         LPF1_Reset(&s_height_out_vz_lpf);
-        s_height_out_z_m = 0.0f;
-        s_height_out_vz_mps = 0.0f;
         s_height_out_vz_ready = 0U;
-        s_height_out_miss_cnt = 0U;
-        g_height_acc_up_mps2 = 0.0f;
-        g_height_acc_corr_mps2 = 0.0f;
         g_height_obs_z_m = 0.0f;
         g_height_obs_vz_raw_mps = 0.0f;
-        g_height_obs_residual_m = 0.0f;
-        g_height_obs_weight = 0.0f;
-        g_height_obs_delta_v_mps = 0.0f;
-        return 0.0f;
-    }
-
-    if ((0U == s_height_out_vz_ready) && (0U != meas_valid))
-    {
-        s_height_out_z_m = meas_height_m;
-        s_height_out_vz_mps = 0.0f;
-        s_height_out_vz_ready = 1U;
-        s_height_out_miss_cnt = 0U;
-        LPF1_Reset(&s_height_out_vz_lpf);
-        g_height_obs_z_m = s_height_out_z_m;
-        g_height_obs_vz_raw_mps = s_height_out_vz_mps;
-        g_height_obs_residual_m = 0.0f;
-        g_height_obs_weight = 0.0f;
-        g_height_obs_delta_v_mps = 0.0f;
         return 0.0f;
     }
 
     if (0U == s_height_out_vz_ready)
     {
+        s_height_prev_output_mm = s_height_output_mm;
+        s_height_out_vz_ready = 1U;
+        LPF1_Reset(&s_height_out_vz_lpf);
+        g_height_obs_z_m = s_height_output_mm * 0.001f;
+        g_height_obs_vz_raw_mps = 0.0f;
         return 0.0f;
     }
 
-    if (0U != AccelCalibration_IsRealtimeDataValid())
-    {
-        acc_up_mps2 = AccelCalibration_GetVerticalAccelUpMps2();
-        acc_up_mps2 = HeightEst_ClampFloat(acc_up_mps2, -HEIGHT_EST_VZ_OBS_ACC_CLIP, HEIGHT_EST_VZ_OBS_ACC_CLIP);
-        acc_corr_mps2 = HeightEst_DeadbandFloat(acc_up_mps2, HEIGHT_EST_VZ_OBS_ACC_DEADBAND);
-    }
-    g_height_acc_up_mps2 = acc_up_mps2;
-    g_height_acc_corr_mps2 = acc_corr_mps2;
-
-    s_height_out_z_m += s_height_out_vz_mps * HEIGHT_EST_TOF_DT_S +
-        0.5f * acc_corr_mps2 * HEIGHT_EST_TOF_DT_S * HEIGHT_EST_TOF_DT_S;
-    s_height_out_vz_mps = HEIGHT_EST_VZ_OBS_LEAK_ALPHA *
-        (s_height_out_vz_mps + acc_corr_mps2 * HEIGHT_EST_TOF_DT_S);
-    g_height_obs_residual_m = 0.0f;
-    g_height_obs_weight = 0.0f;
-    g_height_obs_delta_v_mps = 0.0f;
-
-    if (0U != meas_valid)
-    {
-        residual_m = meas_height_m - s_height_out_z_m;
-        if (0U != range_high_active)
-        {
-            weight = meas_health;
-        }
-        else
-        {
-            weight = meas_health * HeightEst_OutputVzResidualWeight(residual_m);
-        }
-        s_height_out_z_m += HEIGHT_EST_VZ_OBS_ALPHA * weight * residual_m;
-        delta_v_mps = (HEIGHT_EST_VZ_OBS_BETA / HEIGHT_EST_TOF_DT_S) * weight * residual_m;
-        delta_v_mps = HeightEst_ClampFloat(delta_v_mps, -HEIGHT_EST_VZ_OBS_DV_LIMIT, HEIGHT_EST_VZ_OBS_DV_LIMIT);
-        s_height_out_vz_mps += delta_v_mps;
-        g_height_obs_residual_m = residual_m;
-        g_height_obs_weight = weight;
-        g_height_obs_delta_v_mps = delta_v_mps;
-
-        if (weight > 0.0f)
-        {
-            s_height_out_miss_cnt = 0U;
-        }
-        else if (s_height_out_miss_cnt < HEIGHT_EST_VZ_OBS_MISS_MAX)
-        {
-            s_height_out_miss_cnt++;
-        }
-        else
-        {
-            s_height_out_z_m = meas_height_m;
-            s_height_out_vz_mps *= HEIGHT_EST_VEL_DECAY;
-        }
-    }
-    else if (s_height_out_miss_cnt < HEIGHT_EST_VZ_OBS_MISS_MAX)
-    {
-        s_height_out_miss_cnt++;
-    }
-    else
-    {
-        s_height_out_vz_mps *= HEIGHT_EST_VEL_DECAY;
-    }
-
-    s_height_out_vz_mps = HeightEst_ClampFloat(s_height_out_vz_mps,
+    vz_raw_mps = (s_height_output_mm - s_height_prev_output_mm) * 0.001f / HEIGHT_EST_TOF_DT_S;
+    s_height_prev_output_mm = s_height_output_mm;
+    vz_raw_mps = HeightEst_ClampFloat(vz_raw_mps,
         -HEIGHT_EST_VZ_OBS_LIMIT_MPS, HEIGHT_EST_VZ_OBS_LIMIT_MPS);
-    g_height_obs_z_m = s_height_out_z_m;
-    g_height_obs_vz_raw_mps = s_height_out_vz_mps;
+    vz_lpf_mps = LPF1_Update(&s_height_out_vz_lpf, vz_raw_mps);
+    g_height_obs_z_m = s_height_output_mm * 0.001f;
+    g_height_obs_vz_raw_mps = vz_raw_mps;
 
-    return LPF1_Update(&s_height_out_vz_lpf, s_height_out_vz_mps);
+    return vz_lpf_mps;
 }
 
-/*
- * 函数功能：复位指定 TOF 通道的中值滤波与步进限幅状态。
- * 输入参数：
- *   index：TOF 通道索引，范围 0~3。
- * 返回值：
- *   无
- */
 static void HeightEst_ResetChannel(uint8 index)
 {
     Median_Reset(&s_tof_median[index]);
@@ -655,10 +471,8 @@ static void HeightEst_ResetAll(void)
     s_height_est_ready = 0U;
     s_height_miss_cnt = 0U;
     LPF1_Init(&s_height_out_vz_lpf, HEIGHT_EST_VZ_LPF_ALPHA);
-    s_height_out_z_m = 0.0f;
-    s_height_out_vz_mps = 0.0f;
+    s_height_prev_output_mm = 0.0f;
     s_height_out_vz_ready = 0U;
-    s_height_out_miss_cnt = 0U;
     g_height_meas_mm = (float)VL53L1X_VALID_RANGE_MAX;
     g_height_meas_health = 0.0f;
     g_height_tof_spread_mm = 0.0f;
@@ -944,8 +758,7 @@ void TOF_update_100HZ(void)
         }
     }
 
-    output_vz_mps = HeightEst_UpdateOutputVz(meas_height_mm, meas_health, meas_valid, g_tof_fused_valid,
-        range_high_active);
+    output_vz_mps = HeightEst_UpdateOutputVz(g_tof_fused_valid);
     g_tof_fused_vz_mps = output_vz_mps;
     g_height_fused_vz_mps = output_vz_mps;
 }

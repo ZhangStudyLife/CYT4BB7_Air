@@ -339,7 +339,7 @@ void FC_Loop_50Hz(void)
     {
         height_m = g_tof_fused_height_mm * 0.001f;
         height_pos_out = PID_Update(&height_pos_pid, target_height_m, height_m, dt);
-        height_pos_out = fc_clampf(height_pos_out, -0.45f, 0.30f);
+        height_pos_out = fc_clampf(height_pos_out, -0.45f, 0.40f);
     }
     else
     {

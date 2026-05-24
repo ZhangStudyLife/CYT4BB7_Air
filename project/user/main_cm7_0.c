@@ -196,13 +196,7 @@ int main(void)
             air_data[14] = (float)CRSF_STD[7];
             air_comm_send_run_data(air_data, 15);
 
-            wifi_justfloat(g_tof_fused_height_mm,
-                           g_euler.roll,
-                           g_euler.pitch,
-                           g_euler.yaw,
-                           Pos_Est_vel_x,
-                           Pos_Est_vel_y,
-                           (float)FC_START_CRSF_Get_State());
+           
             wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
             {
                 uint8 flying = (FC_START_CRSF_STATE_FLYING == FC_START_CRSF_Get_State()) ? 1U : 0U;

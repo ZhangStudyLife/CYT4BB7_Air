@@ -2,6 +2,8 @@
 #include "fc_mode.h"
 #include "../Estimation/Attitude/IMU_TOP.h"
 #include "../Estimation/Height_Est/Height_Est.h"
+#include "../Estimation/Pos_Est/Pos_Est.h"
+#include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
 
 pid_t roll_gyro_pid;
 pid_t pitch_gyro_pid;
@@ -439,6 +441,43 @@ void FC_Loop_100Hz(void)
         s_hover_throttle += alpha * height_vel_out;
         s_hover_throttle = fc_clampf(s_hover_throttle, FC_HOVER_THR_MIN, FC_HOVER_THR_MAX);
     }
+    {
+        const VL53L1X_data_struct *tof = VL53L1X_GetData();
+        wifi_justfloat((float)tick_1000us_cnt,
+                       target_height_m * 1000.0f,
+                       g_tof_fused_height_mm,
+                       (float)g_tof_fused_valid,
+                       height_pos_out,
+                       s_height_vz_mps,
+                       g_tof_fused_vz_mps,
+                       height_vel_out,
+                       height_pos_pid.p_term,
+                       height_pos_pid.i_term,
+                       height_pos_pid.d_term,
+                       height_vel_pid.p_term,
+                       height_vel_pid.i_term,
+                       height_vel_pid.d_term,
+                       g_tof1_height_mm,
+                       g_tof2_height_mm,
+                       g_tof3_height_mm,
+                       g_tof4_height_mm,
+                       (float)tof->distance_mm[0],
+                       (float)tof->distance_mm[1],
+                       (float)tof->distance_mm[2],
+                       (float)tof->distance_mm[3],
+                       (float)tof->valid[0],
+                       (float)tof->valid[1],
+                       (float)tof->valid[2],
+                       (float)tof->valid[3],
+                       g_euler.roll,
+                       g_euler.pitch,
+                       g_euler.yaw,
+                       Pos_Est_vel_x,
+                       Pos_Est_vel_y,
+                       opflow_vel_x,
+                       opflow_vel_y,
+                       (float)g_motor_cmd.throttle);
+    }
     // // if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
     // {
     //     wifi_justfloat(tick_1000us_cnt,
@@ -454,6 +493,8 @@ void FC_Loop_100Hz(void)
     //                    g_tof_fused_valid
     //                    );
     // }
+
+
 
     if (fc_state == FC_START_CRSF_STATE_LANDING)
     {

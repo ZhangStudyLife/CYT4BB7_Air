@@ -570,6 +570,12 @@ void FC_Loop_100Hz(void)
         FC_Mode0_100Hz();
         break;
     }
+
+
+
+
+
+
     // {
         // air_comm_air_stats_t air_stats;
 

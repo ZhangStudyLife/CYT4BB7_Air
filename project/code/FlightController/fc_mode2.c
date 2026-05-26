@@ -1,5 +1,14 @@
 #include "fc_mode.h"
 #include "../Estimation/Pos_Est/Pos_Est.h"
+#include "../Estimation/Height_Est/Height_Est.h"
+#include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
+
+extern volatile uint32 tick_1000us_cnt;
+extern volatile float g_car_velocity_strafe_mps;
+extern volatile float g_car_velocity_forward_mps;
+extern volatile float g_car_image_target_x;
+extern volatile float g_car_image_target_y;
+extern volatile float g_car_image_target_valid;
 
 /* 模式2 X 轴速度环 PID */
 pid_t g_mode2_velx_pid;
@@ -128,5 +137,17 @@ void FC_Mode2_50Hz(float dt)
     roll_angle_target = FC_Mode_Clamp(velx_out+ FC_Mode_Get_Roll_Mech_Trim_Deg(), -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
     pitch_angle_target = FC_Mode_Clamp(vely_out+ FC_Mode_Get_Pitch_Mech_Trim_Deg(), -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
 
-
+    wifi_justfloat(tick_1000us_cnt,
+                   target_height_m * 1000.0f,
+                   g_tof_fused_height_mm,
+                   g_mode2_velx_target,
+                   -Pos_Est_vel_x,
+                   g_mode2_vely_target,
+                     -Pos_Est_vel_y,
+                     g_car_velocity_strafe_mps,
+                        g_car_velocity_forward_mps,
+                   g_car_image_target_x,
+                        g_car_image_target_y,
+                   g_car_image_target_valid
+                   );
 }

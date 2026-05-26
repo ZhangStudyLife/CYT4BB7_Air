@@ -1,5 +1,6 @@
 #include "fc_mode.h"
 #include "../Estimation/Pos_Est/Pos_Est.h"
+#include "../Estimation/Height_Est/Height_Est.h"
 
 extern volatile float g_car_image_target_x;
 extern volatile float g_car_image_target_y;
@@ -17,7 +18,7 @@ static pid_t s_mode8_vely_pid;
 /* 图像X轴目标像素坐标 */
 static const float s_mode8_img_x_target = 94.0f;
 /* 图像Y轴目标像素坐标 */
-static const float s_mode8_img_y_target = 90.0f;
+static const float s_mode8_img_y_target = 70.0f;
 /* 图像环输出速度目标限幅，单位cm/s，与模式2速度目标保持一致 */
 static const float s_mode8_vel_limit_cmps = 200.0f;
 /* 速度环输出姿态角限幅，单位deg */
@@ -71,7 +72,9 @@ void FC_Mode8_50Hz(float dt)
         return;
     }
 
-    if (g_car_image_target_valid > 0.5f)
+    if ((g_car_image_target_valid > 0.5f) &&
+        (0U != g_tof_fused_valid) &&
+        (g_tof_fused_height_mm > 500.0f))
     {
         velx_target = -PID_Update(&s_mode8_imgx_pid, s_mode8_img_x_target, g_car_image_target_x, dt);
         vely_target = -PID_Update(&s_mode8_imgy_pid, s_mode8_img_y_target, g_car_image_target_y, dt);

@@ -12,7 +12,7 @@
 /* 飞控参数 Flash 魔数：用于识别有效参数块 */
 #define FC_PARAMS_FLASH_MAGIC   (0x46504346UL)
 /* 飞控参数 Flash 版本号：结构变化时递增 */
-#define FC_PARAMS_FLASH_VERSION (7U)
+#define FC_PARAMS_FLASH_VERSION (8U)
 /* 飞控参数 Flash 可兼容读取的最小版本号 */
 #define FC_PARAMS_FLASH_MIN_COMPAT_VERSION (5U)
 
@@ -187,13 +187,13 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pos_est_k_flow = 0.04f;
 
     /* ===== 模式 8 图像位置环参数 ===== */
-    params->mode8_img_x_kp = 0.7f;
+    params->mode8_img_x_kp = 1.5f;
     params->mode8_img_x_ki = 0.0f;
     params->mode8_img_x_kd = 0.0f;
     params->mode8_img_x_kff = 0.0f;
     params->mode8_img_x_i_limit = 0.0f;
     params->mode8_img_x_d_lpf = 0.0f;
-    params->mode8_img_y_kp = 0.7f;
+    params->mode8_img_y_kp = 1.1f;
     params->mode8_img_y_ki = 0.0f;
     params->mode8_img_y_kd = 0.0f;
     params->mode8_img_y_kff = 0.0f;
@@ -266,15 +266,15 @@ static void fc_params_migrate_loaded(fc_params_t *params, uint16 version)
         params->yaw_angle_d_lpf = 0.0f;
     }
 
-    if (version < 7U)
+    if (version < 8U)
     {
-        params->mode8_img_x_kp = 0.7f;
+        params->mode8_img_x_kp = 1.1f;
         params->mode8_img_x_ki = 0.0f;
         params->mode8_img_x_kd = 0.0f;
         params->mode8_img_x_kff = 0.0f;
         params->mode8_img_x_i_limit = 0.0f;
         params->mode8_img_x_d_lpf = 0.0f;
-        params->mode8_img_y_kp = 0.7f;
+        params->mode8_img_y_kp = 0.75f;
         params->mode8_img_y_ki = 0.0f;
         params->mode8_img_y_kd = 0.0f;
         params->mode8_img_y_kff = 0.0f;

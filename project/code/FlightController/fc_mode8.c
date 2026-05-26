@@ -5,23 +5,23 @@
 extern volatile float g_car_image_target_x;
 extern volatile float g_car_image_target_y;
 extern volatile float g_car_image_target_valid;
+extern volatile float g_car_velocity_strafe_mps;
+extern volatile float g_car_velocity_forward_mps;
 
-/* 模式8图像X位置环PID，输出X轴目标速度，单位cm/s */
 static pid_t s_mode8_imgx_pid;
-/* 模式8图像Y位置环PID，输出Y轴目标速度，单位cm/s */
 static pid_t s_mode8_imgy_pid;
-/* 模式8 X轴速度环PID，参数与模式2速度环一致 */
 static pid_t s_mode8_velx_pid;
-/* 模式8 Y轴速度环PID，参数与模式2速度环一致 */
 static pid_t s_mode8_vely_pid;
+static float s_mode8_img_err_x_lpf = 0.0f;
+static float s_mode8_img_err_y_lpf = 0.0f;
+static uint8 s_mode8_img_lpf_inited = 0U;
 
-/* 图像X轴目标像素坐标 */
 static const float s_mode8_img_x_target = 94.0f;
-/* 图像Y轴目标像素坐标 */
 static const float s_mode8_img_y_target = 70.0f;
-/* 图像环输出速度目标限幅，单位cm/s，与模式2速度目标保持一致 */
+static const float s_mode8_img_lpf_alpha = 0.45f;
+static const float s_mode8_img_fb_limit_cmps = 80.0f;
+static const float s_mode8_car_vel_ff = 1.0f;
 static const float s_mode8_vel_limit_cmps = 200.0f;
-/* 速度环输出姿态角限幅，单位deg */
 static const float s_mode8_angle_limit_deg = 8.0f;
 
 void FC_Mode8_Init(void)
@@ -51,6 +51,9 @@ void FC_Mode8_Reset(void)
     PID_Reset(&s_mode8_imgy_pid);
     PID_Reset(&s_mode8_velx_pid);
     PID_Reset(&s_mode8_vely_pid);
+    s_mode8_img_err_x_lpf = 0.0f;
+    s_mode8_img_err_y_lpf = 0.0f;
+    s_mode8_img_lpf_inited = 0U;
     roll_angle_target = FC_Mode_Get_Roll_Mech_Trim_Deg();
     pitch_angle_target = FC_Mode_Get_Pitch_Mech_Trim_Deg();
 }
@@ -65,6 +68,8 @@ void FC_Mode8_50Hz(float dt)
     float vely_target;
     float velx_out;
     float vely_out;
+    float img_fb_x;
+    float img_fb_y;
 
     if (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING)
     {
@@ -76,8 +81,27 @@ void FC_Mode8_50Hz(float dt)
         (0U != g_tof_fused_valid) &&
         (g_tof_fused_height_mm > 500.0f))
     {
-        velx_target = -PID_Update(&s_mode8_imgx_pid, s_mode8_img_x_target, g_car_image_target_x, dt);
-        vely_target = -PID_Update(&s_mode8_imgy_pid, s_mode8_img_y_target, g_car_image_target_y, dt);
+        if (0U == s_mode8_img_lpf_inited)
+        {
+            s_mode8_img_err_x_lpf = g_car_image_target_x - s_mode8_img_x_target;
+            s_mode8_img_err_y_lpf = g_car_image_target_y - s_mode8_img_y_target;
+            s_mode8_img_lpf_inited = 1U;
+            PID_Reset(&s_mode8_imgx_pid);
+            PID_Reset(&s_mode8_imgy_pid);
+        }
+
+        s_mode8_img_err_x_lpf += s_mode8_img_lpf_alpha *
+                                  ((g_car_image_target_x - s_mode8_img_x_target) - s_mode8_img_err_x_lpf);
+        s_mode8_img_err_y_lpf += s_mode8_img_lpf_alpha *
+                                  ((g_car_image_target_y - s_mode8_img_y_target) - s_mode8_img_err_y_lpf);
+
+        img_fb_x = PID_Update(&s_mode8_imgx_pid, 0.0f, -s_mode8_img_err_x_lpf, dt);
+        img_fb_y = PID_Update(&s_mode8_imgy_pid, 0.0f, -s_mode8_img_err_y_lpf, dt);
+        img_fb_x = FC_Mode_Clamp(img_fb_x, -s_mode8_img_fb_limit_cmps, s_mode8_img_fb_limit_cmps);
+        img_fb_y = FC_Mode_Clamp(img_fb_y, -s_mode8_img_fb_limit_cmps, s_mode8_img_fb_limit_cmps);
+
+        velx_target = s_mode8_car_vel_ff * g_car_velocity_strafe_mps * 100.0f + img_fb_x;
+        vely_target = -s_mode8_car_vel_ff * g_car_velocity_forward_mps * 100.0f + img_fb_y;
         velx_target = FC_Mode_Clamp(velx_target, -s_mode8_vel_limit_cmps, s_mode8_vel_limit_cmps);
         vely_target = FC_Mode_Clamp(vely_target, -s_mode8_vel_limit_cmps, s_mode8_vel_limit_cmps);
     }
@@ -85,6 +109,9 @@ void FC_Mode8_50Hz(float dt)
     {
         PID_Reset(&s_mode8_imgx_pid);
         PID_Reset(&s_mode8_imgy_pid);
+        s_mode8_img_err_x_lpf = 0.0f;
+        s_mode8_img_err_y_lpf = 0.0f;
+        s_mode8_img_lpf_inited = 0U;
         velx_target = 0.0f;
         vely_target = 0.0f;
     }

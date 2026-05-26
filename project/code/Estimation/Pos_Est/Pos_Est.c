@@ -440,21 +440,21 @@ void Pos_Est_Update_1000HZ(void)
         vely_pid = &zero_pid;
     }
     
-    wifi_justfloat(tick_1000us_cnt,
-                   acc_x_temp, acc_y_temp,
-                   ICM42688.acc_x, ICM42688.acc_y, ICM42688.acc_z,
-                   acc_x_lp, acc_y_lp,
-                   g_tof_fused_height_mm * 0.001f,
-                   lc302_data.flow_x_integral, lc302_data.flow_y_integral,
-                   dec_x, dec_y,
-                   opflow_vel_x, opflow_vel_y,
-                   Pos_Est_vel_x, Pos_Est_vel_y,
-                   velx_target, vely_target,
-                   velx_pid->p_term, velx_pid->i_term, velx_pid->d_term, velx_pid->output,
-                   vely_pid->p_term, vely_pid->i_term, vely_pid->d_term, vely_pid->output,
-                   //    opflow_vel_x_lpf, opflow_vel_y_lpf,
-                   pitch_angle_target, roll_angle_target,
-                   g_euler.pitch, g_euler.roll, g_euler.yaw);
+    // wifi_justfloat(tick_1000us_cnt,
+    //                acc_x_temp, acc_y_temp,
+    //                ICM42688.acc_x, ICM42688.acc_y, ICM42688.acc_z,
+    //                acc_x_lp, acc_y_lp,
+    //                g_tof_fused_height_mm * 0.001f,
+    //                lc302_data.flow_x_integral, lc302_data.flow_y_integral,
+    //                dec_x, dec_y,
+    //                opflow_vel_x, opflow_vel_y,
+    //                Pos_Est_vel_x, Pos_Est_vel_y,
+    //                velx_target, vely_target,
+    //                velx_pid->p_term, velx_pid->i_term, velx_pid->d_term, velx_pid->output,
+    //                vely_pid->p_term, vely_pid->i_term, vely_pid->d_term, vely_pid->output,
+    //                //    opflow_vel_x_lpf, opflow_vel_y_lpf,
+    //                pitch_angle_target, roll_angle_target,
+    //                g_euler.pitch, g_euler.roll, g_euler.yaw);
 }
 
 /*

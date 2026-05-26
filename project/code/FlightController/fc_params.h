@@ -144,6 +144,9 @@ typedef struct
     float mode8_img_y_kff;             /* 模式8图像Y位置环前馈增益 */
     float mode8_img_y_i_limit;         /* 模式8图像Y位置环积分限幅 */
     float mode8_img_y_d_lpf;           /* 模式8图像Y位置环D项低通截止频率，单位Hz */
+    /* ===== Mode 2 tunable params ===== */
+    float mode2_vel_x_ff_deg_per_cmps; /* Mode 2 X velocity feedforward, deg/(cm/s) */
+    float mode2_vel_y_ff_deg_per_cmps; /* Mode 2 Y velocity feedforward, deg/(cm/s) */
 } fc_params_t;
 
 /* 飞控参数全局实例：运行时调参只会修改这份 RAM 变量 */

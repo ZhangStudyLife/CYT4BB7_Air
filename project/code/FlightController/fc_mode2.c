@@ -130,6 +130,8 @@ void FC_Mode2_50Hz(float dt)
     velx_out = PID_Update(&g_mode2_velx_pid, g_mode2_velx_target, -Pos_Est_vel_x, dt);
     vely_out = PID_Update(&g_mode2_vely_pid, g_mode2_vely_target, -Pos_Est_vel_y, dt);
 
+    velx_out += g_fc_params.mode2_vel_x_ff_deg_per_cmps * g_mode2_velx_target;
+    vely_out += g_fc_params.mode2_vel_y_ff_deg_per_cmps * g_mode2_vely_target;
 
     // velx_out = PID_Update(&g_mode2_velx_pid, g_mode2_velx_target, -opflow_vel_x_lpf, dt);
     // vely_out = PID_Update(&g_mode2_vely_pid, g_mode2_vely_target, -opflow_vel_y_lpf, dt);    

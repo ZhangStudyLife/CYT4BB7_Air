@@ -1201,6 +1201,8 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(mode1_track_ff_deg_per_cmps, 0.0f, 1.0f);
     AIR_COMM_REGISTER_FLOAT(mode1_brake_kp, 0.0f, 50.0f);
     AIR_COMM_REGISTER_FLOAT(mode1_brake_exit_vel_cmps, 0.0f, 300.0f);
+    AIR_COMM_REGISTER_FLOAT(mode2_vel_x_ff_deg_per_cmps, -1.0f, 1.0f);
+    AIR_COMM_REGISTER_FLOAT(mode2_vel_y_ff_deg_per_cmps, -1.0f, 1.0f);
     AIR_COMM_REGISTER_FLOAT(pos_est_k_flow, 0.0f, 1.0f);
 
     AIR_COMM_REGISTER_FLOAT(mode8_img_x_kp, 0.0f, 3000.0f);

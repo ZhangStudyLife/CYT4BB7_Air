@@ -172,6 +172,7 @@
 
 #include "Pos_Est.h"
 #include "FlowGyroDecoupler_LC302.h"
+#include "../Attitude/Accel_Calibration.h"
 #include "../Attitude/IMU_Filtter.h"
 #include "../Height_Est/Height_Est.h"
 // #include "HW_Drivers/PMW3901/PMW3901.h"
@@ -190,7 +191,7 @@ extern volatile uint32 tick_1000us_cnt;
 #define POS_EST_OPFLOW_VEL_LPF_ALPHA (0.84816420f)
 
 /* 1000Hz 水平加速度相位补偿低通 alpha，截止频率 fc≈5.00Hz */
-#define POS_EST_ACC_LPF_ALPHA (0.1012f)
+#define POS_EST_RAW_ACC_LPF_ALPHA (0.11163521f)
 /* 1000Hz 加速度速度预测积分步长，单位 s */
 #define POS_EST_ACC_DT_S (0.001f)
 /* 前后轴水平加速度限幅，单位 cm/s^2 */
@@ -231,6 +232,8 @@ static LPF1_t s_opflow_vel_lp_y;
 static float s_vel_pred_x = 0.0f;
 /* Y 轴速度预测状态，单位 cm/s */
 static float s_vel_pred_y = 0.0f;
+static float s_raw_acc_lp_x = 0.0f;
+static float s_raw_acc_lp_y = 0.0f;
 
 /* X 轴加速度 单位 cm/s^2，飞机往前加速为正，往后加速为负 */
 float acc_x_temp = 0.0f;
@@ -269,6 +272,8 @@ void Pos_Est_Init(void)
     Pos_Est_pos_y_last = 0.0f;
     s_vel_pred_x = 0.0f;
     s_vel_pred_y = 0.0f;
+    s_raw_acc_lp_x = 0.0f;
+    s_raw_acc_lp_y = 0.0f;
 }
 
 /*
@@ -300,6 +305,8 @@ void Pos_Est_Reinit(void)
     Pos_Est_pos_y_last = 0.0f;
     s_vel_pred_x = 0.0f;
     s_vel_pred_y = 0.0f;
+    s_raw_acc_lp_x = 0.0f;
+    s_raw_acc_lp_y = 0.0f;
 }
 
 /*
@@ -327,10 +334,11 @@ void Pos_Est_Update_1000HZ(void)
     // FlowGyroDecoupler_Push1000Hz(tick_1000us_cnt, g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy);
     FlowGyroDecoupler_LC302_Push1000Hz(tick_1000us_cnt, g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy);
 
-    /* 取陷波+低通滤波后的传感器系加速度（单位 g，已校准零偏/尺度） */
-    acc_sensor[0] = g_imufilter_1000hz.accx;
-    acc_sensor[1] = g_imufilter_1000hz.accy;
-    acc_sensor[2] = g_imufilter_1000hz.accz;
+    /* Use calibrated raw accel, then rotate to body frame and apply 20Hz level-accel LPF. */
+    acc_sensor[0] = ICM42688.acc_x;
+    acc_sensor[1] = ICM42688.acc_y;
+    acc_sensor[2] = ICM42688.acc_z;
+    AccelCalibration_ApplySensorCorrection(&acc_sensor[0], &acc_sensor[1], &acc_sensor[2]);
     AccelCalibration_RotateImuToBody(acc_sensor, acc_body);
 
     sp = g_euler.sin_pitch;
@@ -344,36 +352,44 @@ void Pos_Est_Update_1000HZ(void)
      * 单位 g → cm/s^2 */
     acc_x_temp = (cp * acc_body[0] + sp * sr * acc_body[1] + sp * cr * acc_body[2]) * 9.80665f * 100.0f;
     acc_y_temp = (cr * acc_body[1] - sr * acc_body[2]) * 9.80665f * 100.0f;
+    s_raw_acc_lp_x += POS_EST_RAW_ACC_LPF_ALPHA * (acc_x_temp - s_raw_acc_lp_x);
+    s_raw_acc_lp_y += POS_EST_RAW_ACC_LPF_ALPHA * (acc_y_temp - s_raw_acc_lp_y);
+    acc_x_lp = s_raw_acc_lp_x;
+    acc_y_lp = s_raw_acc_lp_y;
 
     /* IMU 冲击窗口内不让水平加速度污染后续速度积分 */
     if (g_imu_shock_flag != 0U)
     {
         acc_x_temp = 0.0f;
         acc_y_temp = 0.0f;
+        acc_x_lp = 0.0f;
+        acc_y_lp = 0.0f;
+        s_raw_acc_lp_x = 0.0f;
+        s_raw_acc_lp_y = 0.0f;
     }
 
-    if (acc_x_temp > POS_EST_ACC_FWD_LIMIT_CMSS)
+    if (acc_x_lp > POS_EST_ACC_FWD_LIMIT_CMSS)
     {
-        acc_x_temp = POS_EST_ACC_FWD_LIMIT_CMSS;
+        acc_x_lp = POS_EST_ACC_FWD_LIMIT_CMSS;
     }
-    else if (acc_x_temp < -POS_EST_ACC_FWD_LIMIT_CMSS)
+    else if (acc_x_lp < -POS_EST_ACC_FWD_LIMIT_CMSS)
     {
-        acc_x_temp = -POS_EST_ACC_FWD_LIMIT_CMSS;
+        acc_x_lp = -POS_EST_ACC_FWD_LIMIT_CMSS;
     }
 
-    if (acc_y_temp > POS_EST_ACC_RIGHT_LIMIT_CMSS)
+    if (acc_y_lp > POS_EST_ACC_RIGHT_LIMIT_CMSS)
     {
-        acc_y_temp = POS_EST_ACC_RIGHT_LIMIT_CMSS;
+        acc_y_lp = POS_EST_ACC_RIGHT_LIMIT_CMSS;
     }
-    else if (acc_y_temp < -POS_EST_ACC_RIGHT_LIMIT_CMSS)
+    else if (acc_y_lp < -POS_EST_ACC_RIGHT_LIMIT_CMSS)
     {
-        acc_y_temp = -POS_EST_ACC_RIGHT_LIMIT_CMSS;
+        acc_y_lp = -POS_EST_ACC_RIGHT_LIMIT_CMSS;
     }
 
     if (g_imu_shock_flag == 0U)
     {
-        s_vel_pred_x -= acc_y_temp * POS_EST_ACC_DT_S;
-        s_vel_pred_y += acc_x_temp * POS_EST_ACC_DT_S;
+        s_vel_pred_x -= acc_y_lp * POS_EST_ACC_DT_S;
+        s_vel_pred_y += acc_x_lp * POS_EST_ACC_DT_S;
     }
 
     // float dec_x_pmw3901 = FlowGyroDecoupler_GetDecX();

@@ -12,7 +12,7 @@
 /* 飞控参数 Flash 魔数：用于识别有效参数块 */
 #define FC_PARAMS_FLASH_MAGIC   (0x46504346UL)
 /* 飞控参数 Flash 版本号：结构变化时递增 */
-#define FC_PARAMS_FLASH_VERSION (9U)
+#define FC_PARAMS_FLASH_VERSION (10U)
 /* 飞控参数 Flash 可兼容读取的最小版本号 */
 #define FC_PARAMS_FLASH_MIN_COMPAT_VERSION (5U)
 
@@ -79,8 +79,8 @@ static void fc_params_fill_defaults(fc_params_t *params)
 
     /* ===== 油门与机械配平参数 ===== */
     params->base_throttle = 4200;         /* 悬停油门 */
-    params->roll_mech_trim_deg = 0.33f;   /* Roll 机械配平角 */
-    params->pitch_mech_trim_deg = -0.40f; /* Pitch 机械配平角 */
+    params->roll_mech_trim_deg = 0.22f;    /* Roll 机械配平角 */
+    params->pitch_mech_trim_deg = -1.80f;  /* Pitch 机械配平角 */
 
     /* ===== Roll 轴角速度环参数 ===== */
     params->roll_gyro_kp = 5.0f;
@@ -107,18 +107,18 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->yaw_gyro_d_lpf = 30.0f;
 
     /* ===== Roll 轴角度环参数 ===== */
-    params->roll_angle_kp = 6.0f;
+    params->roll_angle_kp = 6.5f;
     params->roll_angle_ki = 0.0f;
     params->roll_angle_kd = 0.0f;
-    params->roll_angle_kff = 0.10f;
+    params->roll_angle_kff = 0.12f;
     params->roll_angle_i_limit = 80.0f;
     params->roll_angle_d_lpf = 15.0f;
 
     /* ===== Pitch 轴角度环参数 ===== */
-    params->pitch_angle_kp = 6.0f;
+    params->pitch_angle_kp = 6.4f;
     params->pitch_angle_ki = 0.0f;
     params->pitch_angle_kd = 0.0f;
-    params->pitch_angle_kff = 0.10f;
+    params->pitch_angle_kff = 0.12f;
     params->pitch_angle_i_limit = 80.0f;
     params->pitch_angle_d_lpf = 15.0f;
 
@@ -155,7 +155,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pos_z_d_lpf = 0.0f;
 
     /* ===== X 轴速度环参数 ===== */
-    params->vel_x_kp = 0.13f;
+    params->vel_x_kp = 0.16f;
     params->vel_x_ki = 0.024f;
     params->vel_x_kd = 0.0f;
     params->vel_x_kff = 0.0f;
@@ -163,7 +163,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->vel_x_d_lpf = 0.0f;
 
     /* ===== Y 轴速度环参数 ===== */
-    params->vel_y_kp = 0.13f;
+    params->vel_y_kp = 0.16f;
     params->vel_y_ki = 0.024f;
     params->vel_y_kd = 0.0f;
     params->vel_y_kff = 0.0f;
@@ -182,6 +182,10 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode1_track_ff_deg_per_cmps = 0.06f;
     params->mode1_brake_kp = 0.18f;
     params->mode1_brake_exit_vel_cmps = 10.0f;
+
+    /* ===== 模式 2 速度环前馈参数 ===== */
+    params->mode2_vel_x_ff_deg_per_cmps = 0.015f;
+    params->mode2_vel_y_ff_deg_per_cmps = 0.015f;
 
     /* ===== 位置估计参数 ===== */
     params->pos_est_k_flow = 0.04f;
@@ -280,6 +284,20 @@ static void fc_params_migrate_loaded(fc_params_t *params, uint16 version)
         params->mode8_img_y_kff = 0.0f;
         params->mode8_img_y_i_limit = 0.0f;
         params->mode8_img_y_d_lpf = 0.0f;
+    }
+
+    if (version < 10U)
+    {
+        params->roll_mech_trim_deg = 0.22f;
+        params->pitch_mech_trim_deg = -1.80f;
+        params->roll_angle_kp = 6.5f;
+        params->roll_angle_kff = 0.12f;
+        params->pitch_angle_kp = 6.4f;
+        params->pitch_angle_kff = 0.12f;
+        params->vel_x_kp = 0.16f;
+        params->vel_y_kp = 0.16f;
+        params->mode2_vel_x_ff_deg_per_cmps = 0.015f;
+        params->mode2_vel_y_ff_deg_per_cmps = 0.015f;
     }
 }
 

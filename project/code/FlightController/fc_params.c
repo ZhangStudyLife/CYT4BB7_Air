@@ -190,17 +190,17 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode2_adrc_log_enable = 1.0f;
     params->mode2_adrc_b0_x = 17.0f;
     params->mode2_adrc_b0_y = 17.0f;
-    params->mode2_adrc_td_acc_limit_cmss = 120.0f;
-    params->mode2_adrc_td_jerk_limit_cmsss = 600.0f;
-    params->mode2_adrc_eso_beta1 = 16.0f;
-    params->mode2_adrc_eso_beta2 = 64.0f;
+    params->mode2_adrc_td_acc_limit_cmss = 90.0f;
+    params->mode2_adrc_td_jerk_limit_cmsss = 400.0f;
+    params->mode2_adrc_eso_beta1 = 12.0f;
+    params->mode2_adrc_eso_beta2 = 36.0f;
     params->mode2_adrc_eso_alpha1 = 0.50f;
     params->mode2_adrc_eso_alpha2 = 0.25f;
-    params->mode2_adrc_eso_delta_cmps = 10.0f;
+    params->mode2_adrc_eso_delta_cmps = 15.0f;
     params->mode2_adrc_nl_kp = 4.0f;
     params->mode2_adrc_nl_alpha = 0.75f;
     params->mode2_adrc_nl_delta_cmps = 12.0f;
-    params->mode2_adrc_comp_limit_cmss = 80.0f;
+    params->mode2_adrc_comp_limit_cmss = 50.0f;
     params->mode2_adrc_angle_limit_deg = 10.0f;
 
     /* ===== 位置估计参数 ===== */
@@ -338,17 +338,17 @@ static void fc_params_migrate_loaded(fc_params_t *params, uint16 version)
         params->mode2_adrc_log_enable = 1.0f;
         params->mode2_adrc_b0_x = 17.0f;
         params->mode2_adrc_b0_y = 17.0f;
-        params->mode2_adrc_td_acc_limit_cmss = 120.0f;
-        params->mode2_adrc_td_jerk_limit_cmsss = 600.0f;
-        params->mode2_adrc_eso_beta1 = 16.0f;
-        params->mode2_adrc_eso_beta2 = 64.0f;
+        params->mode2_adrc_td_acc_limit_cmss = 90.0f;
+        params->mode2_adrc_td_jerk_limit_cmsss = 400.0f;
+        params->mode2_adrc_eso_beta1 = 12.0f;
+        params->mode2_adrc_eso_beta2 = 36.0f;
         params->mode2_adrc_eso_alpha1 = 0.50f;
         params->mode2_adrc_eso_alpha2 = 0.25f;
-        params->mode2_adrc_eso_delta_cmps = 10.0f;
+        params->mode2_adrc_eso_delta_cmps = 15.0f;
         params->mode2_adrc_nl_kp = 4.0f;
         params->mode2_adrc_nl_alpha = 0.75f;
         params->mode2_adrc_nl_delta_cmps = 12.0f;
-        params->mode2_adrc_comp_limit_cmss = 80.0f;
+        params->mode2_adrc_comp_limit_cmss = 50.0f;
         params->mode2_adrc_angle_limit_deg = 10.0f;
     }
 }

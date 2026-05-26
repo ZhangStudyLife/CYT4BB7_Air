@@ -71,31 +71,23 @@ void ips114_show_debug(void)
     ips114_show_string(0U, 96U, buf);
 }
 
-volatile float g_car_encoder_left_front;
-volatile float g_car_encoder_right_front;
-volatile float g_car_encoder_left_rear;
-volatile float g_car_encoder_right_rear;
-volatile float g_car_imufilter_1000hz_accx;
-volatile float g_car_imufilter_1000hz_accy;
-volatile float g_car_imufilter_1000hz_accz;
-volatile float g_car_imufilter_1000hz_gyrox;
-volatile float g_car_imufilter_1000hz_gyroy;
-volatile float g_car_imufilter_1000hz_gyroz;
+volatile float g_car_velocity_strafe_mps;
+volatile float g_car_velocity_forward_mps;
+volatile float g_car_image_target_x;
+volatile float g_car_image_target_y;
+volatile float g_car_image_target_radius;
+volatile float g_car_image_target_valid;
 
 static void on_car_data(const float *data, uint8 count)
 {
-    if (count >= 10)
+    if (count >= 6U)
     {
-        g_car_encoder_left_front = data[0];
-        g_car_encoder_right_front = data[1];
-        g_car_encoder_left_rear = data[2];
-        g_car_encoder_right_rear = data[3];
-        g_car_imufilter_1000hz_accx = data[4];
-        g_car_imufilter_1000hz_accy = data[5];
-        g_car_imufilter_1000hz_accz = data[6];
-        g_car_imufilter_1000hz_gyrox = data[7];
-        g_car_imufilter_1000hz_gyroy = data[8];
-        g_car_imufilter_1000hz_gyroz = data[9];
+        g_car_velocity_strafe_mps = data[0];
+        g_car_velocity_forward_mps = data[1];
+        g_car_image_target_x = data[2];
+        g_car_image_target_y = data[3];
+        g_car_image_target_radius = data[4];
+        g_car_image_target_valid = data[5];
     }
 }
 

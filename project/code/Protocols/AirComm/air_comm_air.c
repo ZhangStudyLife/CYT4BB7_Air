@@ -1219,6 +1219,7 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(mode2_adrc_nl_delta_cmps, 0.1f, 100.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_adrc_comp_limit_cmss, 0.0f, 500.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_adrc_angle_limit_deg, 1.0f, 30.0f);
+    AIR_COMM_REGISTER_FLOAT(mode2_adrc_output_rate_limit_degps, 1.0f, 200.0f);
     AIR_COMM_REGISTER_FLOAT(pos_est_k_flow, 0.0f, 1.0f);
 
     AIR_COMM_REGISTER_FLOAT(mode8_img_x_kp, 0.0f, 3000.0f);

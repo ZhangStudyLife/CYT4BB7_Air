@@ -163,6 +163,7 @@ typedef struct
     float mode2_adrc_nl_delta_cmps;
     float mode2_adrc_comp_limit_cmss;
     float mode2_adrc_angle_limit_deg;
+    float mode2_adrc_output_rate_limit_degps;
 } fc_params_t;
 
 /* 飞控参数全局实例：运行时调参只会修改这份 RAM 变量 */

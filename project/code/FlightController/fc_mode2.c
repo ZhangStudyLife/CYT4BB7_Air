@@ -135,10 +135,13 @@ static float FC_Mode2_ADRC_UpdateAxis(mode2_adrc_axis_t *axis,
     float acc_limit;
     float jerk_limit;
     float angle_limit;
+    float rate_limit;
+    float output_step_limit;
     float desired_acc;
     float acc_step_limit;
     float z1_dot;
     float z2_dot;
+    float u_deg_limited;
 
     if (axis == NULL)
     {
@@ -147,9 +150,10 @@ static float FC_Mode2_ADRC_UpdateAxis(mode2_adrc_axis_t *axis,
 
     safe_dt = FC_Mode2_SafeDt(dt);
     safe_b0 = FC_Mode2_SafePositive(b0, 17.0f);
-    acc_limit = FC_Mode2_SafePositive(g_fc_params.mode2_adrc_td_acc_limit_cmss, 120.0f);
-    jerk_limit = FC_Mode2_SafePositive(g_fc_params.mode2_adrc_td_jerk_limit_cmsss, 600.0f);
+    acc_limit = FC_Mode2_SafePositive(g_fc_params.mode2_adrc_td_acc_limit_cmss, 100.0f);
+    jerk_limit = FC_Mode2_SafePositive(g_fc_params.mode2_adrc_td_jerk_limit_cmsss, 450.0f);
     angle_limit = FC_Mode2_SafePositive(g_fc_params.mode2_adrc_angle_limit_deg, 10.0f);
+    rate_limit = FC_Mode2_SafePositive(g_fc_params.mode2_adrc_output_rate_limit_degps, 35.0f);
 
     if (axis->inited == 0U)
     {
@@ -192,7 +196,13 @@ static float FC_Mode2_ADRC_UpdateAxis(mode2_adrc_axis_t *axis,
                                    g_fc_params.mode2_adrc_comp_limit_cmss);
     axis->u_acc = axis->td_a + axis->fb_acc - axis->comp_acc;
     axis->u_deg = axis->u_acc / safe_b0;
-    axis->u_deg_sat = FC_Mode_Clamp(axis->u_deg, -angle_limit, angle_limit);
+    u_deg_limited = FC_Mode_Clamp(axis->u_deg, -angle_limit, angle_limit);
+    output_step_limit = rate_limit * safe_dt;
+    axis->u_deg_sat = axis->u_last +
+                      FC_Mode_Clamp(u_deg_limited - axis->u_last,
+                                    -output_step_limit,
+                                    output_step_limit);
+    axis->u_deg_sat = FC_Mode_Clamp(axis->u_deg_sat, -angle_limit, angle_limit);
     axis->sat_flag = (FC_Mode2_Abs(axis->u_deg - axis->u_deg_sat) > 0.001f) ? 1.0f : 0.0f;
     axis->u_last = axis->u_deg_sat;
 

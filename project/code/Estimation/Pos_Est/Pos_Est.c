@@ -177,6 +177,7 @@
 // #include "HW_Drivers/PMW3901/PMW3901.h"
 #include "HW_Drivers/LC302/LC302.h"
 #include "HW_Drivers/LC302/LC302_Aux.h"
+#include "HW_Drivers/ICM42688/ICM42688.h"
 #include "filter.h"
 #include "FlightController/fc_mode.h"
 #include "FlightController/fc_params.h"
@@ -393,8 +394,10 @@ void Pos_Est_Update_1000HZ(void)
     float dec_y;
     dec_x = FlowGyroDecoupler_LC302_GetDecX();
     dec_y = FlowGyroDecoupler_LC302_GetDecY();
+    
     wifi_justfloat(tick_1000us_cnt,
                    acc_x_temp, acc_y_temp,
+                   ICM42688.acc_x, ICM42688.acc_y, ICM42688.acc_z,
                    acc_x_lp, acc_y_lp,
                    g_tof_fused_height_mm * 0.001f,
                    lc302_data.flow_x_integral, lc302_data.flow_y_integral,

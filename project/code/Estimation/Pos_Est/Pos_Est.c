@@ -334,11 +334,10 @@ void Pos_Est_Update_1000HZ(void)
     // FlowGyroDecoupler_Push1000Hz(tick_1000us_cnt, g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy);
     FlowGyroDecoupler_LC302_Push1000Hz(tick_1000us_cnt, g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy);
 
-    /* Use calibrated raw accel, then rotate to body frame and apply 20Hz level-accel LPF. */
-    acc_sensor[0] = ICM42688.acc_x;
-    acc_sensor[1] = ICM42688.acc_y;
-    acc_sensor[2] = ICM42688.acc_z;
-    AccelCalibration_ApplySensorCorrection(&acc_sensor[0], &acc_sensor[1], &acc_sensor[2]);
+    /* Use filtered IMU accel, then rotate to body frame and apply level-accel LPF. */
+    acc_sensor[0] = g_imufilter_1000hz.accx;
+    acc_sensor[1] = g_imufilter_1000hz.accy;
+    acc_sensor[2] = g_imufilter_1000hz.accz;
     AccelCalibration_RotateImuToBody(acc_sensor, acc_body);
 
     sp = g_euler.sin_pitch;

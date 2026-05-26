@@ -10,8 +10,10 @@ extern volatile float g_car_velocity_forward_mps;
 
 static pid_t s_mode8_imgx_pid;
 static pid_t s_mode8_imgy_pid;
-static pid_t s_mode8_velx_pid;
-static pid_t s_mode8_vely_pid;
+pid_t g_mode8_velx_pid;
+pid_t g_mode8_vely_pid;
+float g_mode8_velx_target = 0.0f;
+float g_mode8_vely_target = 0.0f;
 static float s_mode8_img_err_x_lpf = 0.0f;
 static float s_mode8_img_err_y_lpf = 0.0f;
 static uint8 s_mode8_img_lpf_inited = 0U;
@@ -34,11 +36,11 @@ void FC_Mode8_Init(void)
              g_fc_params.mode8_img_y_kp, g_fc_params.mode8_img_y_ki, g_fc_params.mode8_img_y_kd,
              g_fc_params.mode8_img_y_kff, g_fc_params.vel_xy_dt,
              g_fc_params.mode8_img_y_i_limit, g_fc_params.mode8_img_y_d_lpf);
-    PID_Init(&s_mode8_velx_pid,
+    PID_Init(&g_mode8_velx_pid,
              g_fc_params.vel_x_kp, g_fc_params.vel_x_ki, g_fc_params.vel_x_kd,
              g_fc_params.vel_x_kff, g_fc_params.vel_xy_dt,
              g_fc_params.vel_x_i_limit, g_fc_params.vel_x_d_lpf);
-    PID_Init(&s_mode8_vely_pid,
+    PID_Init(&g_mode8_vely_pid,
              g_fc_params.vel_y_kp, g_fc_params.vel_y_ki, g_fc_params.vel_y_kd,
              g_fc_params.vel_y_kff, g_fc_params.vel_xy_dt,
              g_fc_params.vel_y_i_limit, g_fc_params.vel_y_d_lpf);
@@ -49,8 +51,10 @@ void FC_Mode8_Reset(void)
 {
     PID_Reset(&s_mode8_imgx_pid);
     PID_Reset(&s_mode8_imgy_pid);
-    PID_Reset(&s_mode8_velx_pid);
-    PID_Reset(&s_mode8_vely_pid);
+    PID_Reset(&g_mode8_velx_pid);
+    PID_Reset(&g_mode8_vely_pid);
+    g_mode8_velx_target = 0.0f;
+    g_mode8_vely_target = 0.0f;
     s_mode8_img_err_x_lpf = 0.0f;
     s_mode8_img_err_y_lpf = 0.0f;
     s_mode8_img_lpf_inited = 0U;
@@ -64,8 +68,6 @@ void FC_Mode8_100Hz(void)
 
 void FC_Mode8_50Hz(float dt)
 {
-    float velx_target;
-    float vely_target;
     float velx_out;
     float vely_out;
     float img_fb_x;
@@ -100,10 +102,10 @@ void FC_Mode8_50Hz(float dt)
         img_fb_x = FC_Mode_Clamp(img_fb_x, -s_mode8_img_fb_limit_cmps, s_mode8_img_fb_limit_cmps);
         img_fb_y = FC_Mode_Clamp(img_fb_y, -s_mode8_img_fb_limit_cmps, s_mode8_img_fb_limit_cmps);
 
-        velx_target = s_mode8_car_vel_ff * g_car_velocity_strafe_mps * 100.0f + img_fb_x;
-        vely_target = -s_mode8_car_vel_ff * g_car_velocity_forward_mps * 100.0f + img_fb_y;
-        velx_target = FC_Mode_Clamp(velx_target, -s_mode8_vel_limit_cmps, s_mode8_vel_limit_cmps);
-        vely_target = FC_Mode_Clamp(vely_target, -s_mode8_vel_limit_cmps, s_mode8_vel_limit_cmps);
+        g_mode8_velx_target = s_mode8_car_vel_ff * g_car_velocity_strafe_mps * 100.0f + img_fb_x;
+        g_mode8_vely_target = -s_mode8_car_vel_ff * g_car_velocity_forward_mps * 100.0f + img_fb_y;
+        g_mode8_velx_target = FC_Mode_Clamp(g_mode8_velx_target, -s_mode8_vel_limit_cmps, s_mode8_vel_limit_cmps);
+        g_mode8_vely_target = FC_Mode_Clamp(g_mode8_vely_target, -s_mode8_vel_limit_cmps, s_mode8_vel_limit_cmps);
     }
     else
     {
@@ -112,12 +114,12 @@ void FC_Mode8_50Hz(float dt)
         s_mode8_img_err_x_lpf = 0.0f;
         s_mode8_img_err_y_lpf = 0.0f;
         s_mode8_img_lpf_inited = 0U;
-        velx_target = 0.0f;
-        vely_target = 0.0f;
+        g_mode8_velx_target = 0.0f;
+        g_mode8_vely_target = 0.0f;
     }
 
-    velx_out = PID_Update(&s_mode8_velx_pid, velx_target, -Pos_Est_vel_x, dt);
-    vely_out = PID_Update(&s_mode8_vely_pid, vely_target, -Pos_Est_vel_y, dt);
+    velx_out = PID_Update(&g_mode8_velx_pid, g_mode8_velx_target, -Pos_Est_vel_x, dt);
+    vely_out = PID_Update(&g_mode8_vely_pid, g_mode8_vely_target, -Pos_Est_vel_y, dt);
 
     roll_angle_target = FC_Mode_Clamp(velx_out + FC_Mode_Get_Roll_Mech_Trim_Deg(),
                                       -s_mode8_angle_limit_deg, s_mode8_angle_limit_deg);

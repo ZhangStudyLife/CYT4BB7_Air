@@ -191,7 +191,7 @@ extern volatile uint32 tick_1000us_cnt;
 #define POS_EST_OPFLOW_VEL_LPF_ALPHA (0.84816420f)
 
 /* 1000Hz 水平加速度相位补偿低通 alpha，截止频率 fc≈5.00Hz */
-#define POS_EST_RAW_ACC_LPF_ALPHA (0.11163521f)
+#define POS_EST_RAW_ACC_LPF_ALPHA (0.06089863f)
 /* 1000Hz 加速度速度预测积分步长，单位 s */
 #define POS_EST_ACC_DT_S (0.001f)
 /* 前后轴水平加速度限幅，单位 cm/s^2 */
@@ -409,6 +409,36 @@ void Pos_Est_Update_1000HZ(void)
     float dec_y;
     dec_x = FlowGyroDecoupler_LC302_GetDecX();
     dec_y = FlowGyroDecoupler_LC302_GetDecY();
+
+    FC_START_CRSF_flight_mode_e s_flight_mode = FC_START_CRSF_Get_Flight_Mode(); /* 检测遥控器的模式 */
+
+    float velx_target = 0.0f;
+    float vely_target = 0.0f;
+    pid_t zero_pid = {0};
+    pid_t *velx_pid = NULL;
+    pid_t *vely_pid = NULL;
+
+    if (s_flight_mode == FC_START_CRSF_FLIGHT_MODE_2){
+        velx_target = g_mode2_velx_target;
+        vely_target = g_mode2_vely_target;
+        velx_pid = &g_mode2_velx_pid;
+        vely_pid = &g_mode2_vely_pid;
+    }
+    else if (s_flight_mode == FC_START_CRSF_FLIGHT_MODE_8){
+        velx_target = g_mode8_velx_target;
+        vely_target = g_mode8_vely_target;
+        velx_pid = &g_mode8_velx_pid;
+        vely_pid = &g_mode8_vely_pid;
+    }
+
+    if (velx_pid == NULL)
+    {
+        velx_pid = &zero_pid;
+    }
+    if (vely_pid == NULL)
+    {
+        vely_pid = &zero_pid;
+    }
     
     wifi_justfloat(tick_1000us_cnt,
                    acc_x_temp, acc_y_temp,
@@ -419,8 +449,9 @@ void Pos_Est_Update_1000HZ(void)
                    dec_x, dec_y,
                    opflow_vel_x, opflow_vel_y,
                    Pos_Est_vel_x, Pos_Est_vel_y,
-                   g_mode2_velx_target, g_mode2_vely_target,
-                   g_mode2_velx_pid.p_term, g_mode2_velx_pid.i_term, g_mode2_velx_pid.d_term, g_mode2_velx_pid.output,
+                   velx_target, vely_target,
+                   velx_pid->p_term, velx_pid->i_term, velx_pid->d_term, velx_pid->output,
+                   vely_pid->p_term, vely_pid->i_term, vely_pid->d_term, vely_pid->output,
                    //    opflow_vel_x_lpf, opflow_vel_y_lpf,
                    pitch_angle_target, roll_angle_target,
                    g_euler.pitch, g_euler.roll, g_euler.yaw);

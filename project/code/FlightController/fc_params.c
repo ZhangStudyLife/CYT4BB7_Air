@@ -12,7 +12,7 @@
 /* 飞控参数 Flash 魔数：用于识别有效参数块 */
 #define FC_PARAMS_FLASH_MAGIC   (0x46504346UL)
 /* 飞控参数 Flash 版本号：结构变化时递增 */
-#define FC_PARAMS_FLASH_VERSION (11U)
+#define FC_PARAMS_FLASH_VERSION (12U)
 /* 飞控参数 Flash 可兼容读取的最小版本号 */
 #define FC_PARAMS_FLASH_MIN_COMPAT_VERSION (5U)
 
@@ -156,7 +156,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
 
     /* ===== X 轴速度环参数 ===== */
     params->vel_x_kp = 0.14f;
-    params->vel_x_ki = 0.015f;
+    params->vel_x_ki = 0.010f;
     params->vel_x_kd = 0.0f;
     params->vel_x_kff = 0.0f;
     params->vel_x_i_limit = 3.0f;
@@ -164,7 +164,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
 
     /* ===== Y 轴速度环参数 ===== */
     params->vel_y_kp = 0.14f;
-    params->vel_y_ki = 0.015f;
+    params->vel_y_ki = 0.010f;
     params->vel_y_kd = 0.0f;
     params->vel_y_kff = 0.0f;
     params->vel_y_i_limit = 3.0f;
@@ -308,6 +308,12 @@ static void fc_params_migrate_loaded(fc_params_t *params, uint16 version)
         params->vel_y_ki = 0.015f;
         params->mode2_vel_x_ff_deg_per_cmps = 0.010f;
         params->mode2_vel_y_ff_deg_per_cmps = 0.010f;
+    }
+
+    if (version < 12U)
+    {
+        params->vel_x_ki = 0.010f;
+        params->vel_y_ki = 0.010f;
     }
 }
 

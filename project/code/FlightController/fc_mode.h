@@ -267,6 +267,11 @@ void FC_Mode4_100Hz(void);
  */
 void FC_Mode4_50Hz(float dt);
 
+extern pid_t g_mode4_velx_pid;
+extern pid_t g_mode4_vely_pid;
+extern float g_mode4_velx_target;
+extern float g_mode4_vely_target;
+
 /*
  * 函数名: FC_Mode5_Init
  * 功能: 初始化模式5控制所需资源

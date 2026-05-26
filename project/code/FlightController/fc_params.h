@@ -167,6 +167,18 @@ typedef struct
     float mode2_adrc_td_brake_acc_limit_cmss;
     float mode2_adrc_td_brake_jerk_limit_cmsss;
     float mode2_adrc_zero_quiet_cmps;
+    float mode4_vel_x_kp;
+    float mode4_vel_x_ki;
+    float mode4_vel_x_kd;
+    float mode4_vel_x_kff;
+    float mode4_vel_x_i_limit;
+    float mode4_vel_x_d_lpf;
+    float mode4_vel_y_kp;
+    float mode4_vel_y_ki;
+    float mode4_vel_y_kd;
+    float mode4_vel_y_kff;
+    float mode4_vel_y_i_limit;
+    float mode4_vel_y_d_lpf;
 } fc_params_t;
 
 /* 飞控参数全局实例：运行时调参只会修改这份 RAM 变量 */

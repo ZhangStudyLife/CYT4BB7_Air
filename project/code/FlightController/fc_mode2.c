@@ -95,6 +95,29 @@ static float FC_Mode2_Fal(float e, float alpha, float delta)
     return FC_Mode2_Sign(e) * powf(abs_e, safe_alpha);
 }
 
+static uint8 FC_Mode2_ADRC_NeedBrakeTd(float target, float td_v, float zero_quiet)
+{
+    float target_abs;
+    float td_abs;
+
+    target_abs = FC_Mode2_Abs(target);
+    td_abs = FC_Mode2_Abs(td_v);
+
+    if ((target_abs < zero_quiet) && (td_abs > target_abs))
+    {
+        return 1U;
+    }
+    if ((target * td_v) < 0.0f)
+    {
+        return 1U;
+    }
+    if (target_abs < td_abs)
+    {
+        return 1U;
+    }
+    return 0U;
+}
+
 static void FC_Mode2_ADRC_ResetAxis(mode2_adrc_axis_t *axis)
 {
     if (axis == NULL)
@@ -136,6 +159,7 @@ static float FC_Mode2_ADRC_UpdateAxis(mode2_adrc_axis_t *axis,
     float jerk_limit;
     float angle_limit;
     float rate_limit;
+    float zero_quiet;
     float output_step_limit;
     float desired_acc;
     float acc_step_limit;
@@ -154,6 +178,7 @@ static float FC_Mode2_ADRC_UpdateAxis(mode2_adrc_axis_t *axis,
     jerk_limit = FC_Mode2_SafePositive(g_fc_params.mode2_adrc_td_jerk_limit_cmsss, 450.0f);
     angle_limit = FC_Mode2_SafePositive(g_fc_params.mode2_adrc_angle_limit_deg, 10.0f);
     rate_limit = FC_Mode2_SafePositive(g_fc_params.mode2_adrc_output_rate_limit_degps, 35.0f);
+    zero_quiet = FC_Mode2_SafePositive(g_fc_params.mode2_adrc_zero_quiet_cmps, 8.0f);
 
     if (axis->inited == 0U)
     {
@@ -165,12 +190,25 @@ static float FC_Mode2_ADRC_UpdateAxis(mode2_adrc_axis_t *axis,
         axis->inited = 1U;
     }
 
+    if (FC_Mode2_ADRC_NeedBrakeTd(target, axis->td_v, zero_quiet) != 0U)
+    {
+        acc_limit = FC_Mode2_SafePositive(g_fc_params.mode2_adrc_td_brake_acc_limit_cmss, 160.0f);
+        jerk_limit = FC_Mode2_SafePositive(g_fc_params.mode2_adrc_td_brake_jerk_limit_cmsss, 900.0f);
+    }
+
     desired_acc = (target - axis->td_v) / safe_dt;
     desired_acc = FC_Mode_Clamp(desired_acc, -acc_limit, acc_limit);
     acc_step_limit = jerk_limit * safe_dt;
     axis->td_a += FC_Mode_Clamp(desired_acc - axis->td_a, -acc_step_limit, acc_step_limit);
     axis->td_a = FC_Mode_Clamp(axis->td_a, -acc_limit, acc_limit);
     axis->td_v += axis->td_a * safe_dt;
+    if ((FC_Mode2_Abs(target) < zero_quiet) &&
+        (FC_Mode2_Abs(axis->td_v) < zero_quiet) &&
+        (FC_Mode2_Abs(measurement) < zero_quiet))
+    {
+        axis->td_v = 0.0f;
+        axis->td_a = 0.0f;
+    }
 
     axis->obs_error = axis->z1 - measurement;
     z1_dot = axis->z2 -

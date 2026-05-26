@@ -12,7 +12,7 @@
 /* 飞控参数 Flash 魔数：用于识别有效参数块 */
 #define FC_PARAMS_FLASH_MAGIC   (0x46504346UL)
 /* 飞控参数 Flash 版本号：结构变化时递增 */
-#define FC_PARAMS_FLASH_VERSION (14U)
+#define FC_PARAMS_FLASH_VERSION (15U)
 /* 飞控参数 Flash 可兼容读取的最小版本号 */
 #define FC_PARAMS_FLASH_MIN_COMPAT_VERSION (5U)
 
@@ -188,10 +188,12 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode2_vel_y_ff_deg_per_cmps = 0.010f;
     params->mode2_adrc_enable = 1.0f;
     params->mode2_adrc_log_enable = 1.0f;
-    params->mode2_adrc_b0_x = 17.0f;
-    params->mode2_adrc_b0_y = 17.0f;
+    params->mode2_adrc_b0_x = 16.0f;
+    params->mode2_adrc_b0_y = 14.5f;
     params->mode2_adrc_td_acc_limit_cmss = 100.0f;
     params->mode2_adrc_td_jerk_limit_cmsss = 450.0f;
+    params->mode2_adrc_td_brake_acc_limit_cmss = 160.0f;
+    params->mode2_adrc_td_brake_jerk_limit_cmsss = 900.0f;
     params->mode2_adrc_eso_beta1 = 12.0f;
     params->mode2_adrc_eso_beta2 = 36.0f;
     params->mode2_adrc_eso_alpha1 = 0.50f;
@@ -203,6 +205,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode2_adrc_comp_limit_cmss = 45.0f;
     params->mode2_adrc_angle_limit_deg = 10.0f;
     params->mode2_adrc_output_rate_limit_degps = 35.0f;
+    params->mode2_adrc_zero_quiet_cmps = 8.0f;
 
     /* ===== 位置估计参数 ===== */
     params->pos_est_k_flow = 0.04f;
@@ -337,10 +340,12 @@ static void fc_params_migrate_loaded(fc_params_t *params, uint16 version)
     {
         params->mode2_adrc_enable = 1.0f;
         params->mode2_adrc_log_enable = 1.0f;
-        params->mode2_adrc_b0_x = 17.0f;
-        params->mode2_adrc_b0_y = 17.0f;
+        params->mode2_adrc_b0_x = 16.0f;
+        params->mode2_adrc_b0_y = 14.5f;
         params->mode2_adrc_td_acc_limit_cmss = 100.0f;
         params->mode2_adrc_td_jerk_limit_cmsss = 450.0f;
+        params->mode2_adrc_td_brake_acc_limit_cmss = 160.0f;
+        params->mode2_adrc_td_brake_jerk_limit_cmsss = 900.0f;
         params->mode2_adrc_eso_beta1 = 12.0f;
         params->mode2_adrc_eso_beta2 = 36.0f;
         params->mode2_adrc_eso_alpha1 = 0.50f;
@@ -360,6 +365,15 @@ static void fc_params_migrate_loaded(fc_params_t *params, uint16 version)
         params->mode2_adrc_td_jerk_limit_cmsss = 450.0f;
         params->mode2_adrc_nl_kp = 4.2f;
         params->mode2_adrc_comp_limit_cmss = 45.0f;
+    }
+
+    if (version < 15U)
+    {
+        params->mode2_adrc_b0_x = 16.0f;
+        params->mode2_adrc_b0_y = 14.5f;
+        params->mode2_adrc_td_brake_acc_limit_cmss = 160.0f;
+        params->mode2_adrc_td_brake_jerk_limit_cmsss = 900.0f;
+        params->mode2_adrc_zero_quiet_cmps = 8.0f;
     }
 }
 

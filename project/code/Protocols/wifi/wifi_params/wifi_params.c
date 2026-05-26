@@ -155,6 +155,8 @@ static const wifi_params_entry_t s_wifi_params_table[] =
     WIFI_PARAMS_FLOAT_ITEM("mode2_adrc_b0_y", mode2_adrc_b0_y, 1.0f, 100.0f),
     WIFI_PARAMS_FLOAT_ITEM("mode2_adrc_td_acc_limit_cmss", mode2_adrc_td_acc_limit_cmss, 0.0f, 500.0f),
     WIFI_PARAMS_FLOAT_ITEM("mode2_adrc_td_jerk_limit_cmsss", mode2_adrc_td_jerk_limit_cmsss, 0.0f, 5000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode2_adrc_td_brake_acc_limit_cmss", mode2_adrc_td_brake_acc_limit_cmss, 0.0f, 500.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode2_adrc_td_brake_jerk_limit_cmsss", mode2_adrc_td_brake_jerk_limit_cmsss, 0.0f, 5000.0f),
     WIFI_PARAMS_FLOAT_ITEM("mode2_adrc_eso_beta1", mode2_adrc_eso_beta1, 0.0f, 300.0f),
     WIFI_PARAMS_FLOAT_ITEM("mode2_adrc_eso_beta2", mode2_adrc_eso_beta2, 0.0f, 3000.0f),
     WIFI_PARAMS_FLOAT_ITEM("mode2_adrc_eso_alpha1", mode2_adrc_eso_alpha1, 0.01f, 0.99f),
@@ -166,6 +168,7 @@ static const wifi_params_entry_t s_wifi_params_table[] =
     WIFI_PARAMS_FLOAT_ITEM("mode2_adrc_comp_limit_cmss", mode2_adrc_comp_limit_cmss, 0.0f, 500.0f),
     WIFI_PARAMS_FLOAT_ITEM("mode2_adrc_angle_limit_deg", mode2_adrc_angle_limit_deg, 1.0f, 30.0f),
     WIFI_PARAMS_FLOAT_ITEM("mode2_adrc_output_rate_limit_degps", mode2_adrc_output_rate_limit_degps, 1.0f, 200.0f),
+    WIFI_PARAMS_FLOAT_ITEM("mode2_adrc_zero_quiet_cmps", mode2_adrc_zero_quiet_cmps, 0.1f, 50.0f),
     WIFI_PARAMS_FLOAT_ITEM("pos_est_k_flow", pos_est_k_flow, 0.0f, 1.0f),
 
     WIFI_PARAMS_FLOAT_ITEM("mode8_img_x_kp", mode8_img_x_kp, 0.0f, 3000.0f),

@@ -129,28 +129,4 @@ void FC_Mode2_50Hz(float dt)
     pitch_angle_target = FC_Mode_Clamp(vely_out+ FC_Mode_Get_Pitch_Mech_Trim_Deg(), -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
 
 
-    
-        
-
-    // wifi_justfloat(
-    //                g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY, g_pmw3901_raw.squal,
-    //                opflow_vel_x, opflow_vel_y,
-    //                acc_x_lp, acc_y_lp,
-    //                -Pos_Est_vel_x_kf,-Pos_Est_vel_y_kf,velx_target,vely_target,
-    //                roll_angle_target, pitch_angle_target,
-    //                g_euler.roll, g_euler.pitch);
-    // wifi_justfloat(
-    //     g_pmw3901_raw.deltaX, g_pmw3901_raw.squal,
-    //     opflow_vel_x,
-    //     acc_y_lp,
-    //     -Pos_Est_vel_x , g_mode2_velx_pid.p_term, g_mode2_velx_pid.i_term, velx_target,
-    //     roll_angle_target,
-    //     g_euler.roll, g_tof_fused_height_mm * 0.001f);
-    // wifi_justfloat(
-    //     g_pmw3901_raw.deltaY, g_pmw3901_raw.squal,
-    //     opflow_vel_y,
-    //     acc_x_lp,
-    //     -Pos_Est_vel_y ,-Pos_Est_vel_y_kf, g_mode2_vely_pid.p_term, g_mode2_vely_pid.i_term, vely_target,
-    //     pitch_angle_target,
-    //     g_euler.pitch, g_tof_fused_height_mm / 1000.0f);
 }

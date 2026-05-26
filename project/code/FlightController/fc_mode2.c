@@ -137,17 +137,17 @@ void FC_Mode2_50Hz(float dt)
     roll_angle_target = FC_Mode_Clamp(velx_out+ FC_Mode_Get_Roll_Mech_Trim_Deg(), -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
     pitch_angle_target = FC_Mode_Clamp(vely_out+ FC_Mode_Get_Pitch_Mech_Trim_Deg(), -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
 
-    wifi_justfloat(tick_1000us_cnt,
-                   target_height_m * 1000.0f,
-                   g_tof_fused_height_mm,
-                   g_mode2_velx_target,
-                   -Pos_Est_vel_x,
-                   g_mode2_vely_target,
-                     -Pos_Est_vel_y,
-                     g_car_velocity_strafe_mps,
-                        g_car_velocity_forward_mps,
-                   g_car_image_target_x,
-                        g_car_image_target_y,
-                   g_car_image_target_valid
-                   );
+    // wifi_justfloat(tick_1000us_cnt,
+    //                target_height_m * 1000.0f,
+    //                g_tof_fused_height_mm,
+    //                g_mode2_velx_target,
+    //                -Pos_Est_vel_x,
+    //                g_mode2_vely_target,
+    //                  -Pos_Est_vel_y,
+    //                  g_car_velocity_strafe_mps,
+    //                     g_car_velocity_forward_mps,
+    //                g_car_image_target_x,
+    //                     g_car_image_target_y,
+    //                g_car_image_target_valid
+    //                );
 }

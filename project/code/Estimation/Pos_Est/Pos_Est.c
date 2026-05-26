@@ -178,6 +178,7 @@
 #include "HW_Drivers/LC302/LC302.h"
 #include "HW_Drivers/LC302/LC302_Aux.h"
 #include "filter.h"
+#include "FlightController/fc_mode.h"
 #include "FlightController/fc_params.h"
 
 extern volatile uint32 tick_1000us_cnt;
@@ -234,6 +235,8 @@ static float s_vel_pred_y = 0.0f;
 float acc_x_temp = 0.0f;
 /* Y 轴加速度 单位 cm/s^2，飞机往右加速为正，往左加速为负 */
 float acc_y_temp = 0.0f;
+float acc_x_lp = 0.0f;
+float acc_y_lp = 0.0f;
 
 /*
  * 函数名: Pos_Est_Init
@@ -366,7 +369,6 @@ void Pos_Est_Update_1000HZ(void)
         acc_y_temp = -POS_EST_ACC_RIGHT_LIMIT_CMSS;
     }
 
-
     if (g_imu_shock_flag == 0U)
     {
         s_vel_pred_x -= acc_y_temp * POS_EST_ACC_DT_S;
@@ -391,17 +393,19 @@ void Pos_Est_Update_1000HZ(void)
     float dec_y;
     dec_x = FlowGyroDecoupler_LC302_GetDecX();
     dec_y = FlowGyroDecoupler_LC302_GetDecY();
-    // wifi_justfloat(tick_1000us_cnt,
-    //                acc_x_temp, acc_y_temp,
-    //                acc_x_lp, acc_y_lp,
-    //                g_tof_fused_height_mm * 0.001f,
-    //                lc302_data.flow_x_integral, lc302_data.flow_y_integral,
-    //                lc302_data_Aux.flow_x_integral, lc302_data_Aux.flow_y_integral,
-    //             //    dec_x, dec_y,
-    //             //    opflow_vel_x, opflow_vel_y,
-    //             //    opflow_vel_x_lpf, opflow_vel_y_lpf,
-    //                s_vel_pred_x, s_vel_pred_y,
-    //                g_euler.pitch, g_euler.roll, g_euler.yaw);
+    wifi_justfloat(tick_1000us_cnt,
+                   acc_x_temp, acc_y_temp,
+                   acc_x_lp, acc_y_lp,
+                   g_tof_fused_height_mm * 0.001f,
+                   lc302_data.flow_x_integral, lc302_data.flow_y_integral,
+                   dec_x, dec_y,
+                   opflow_vel_x, opflow_vel_y,
+                   Pos_Est_vel_x, Pos_Est_vel_y,
+                   g_mode2_velx_target, g_mode2_vely_target,
+                   g_mode2_velx_pid.p_term, g_mode2_velx_pid.i_term, g_mode2_velx_pid.d_term, g_mode2_velx_pid.output,
+                   //    opflow_vel_x_lpf, opflow_vel_y_lpf,
+                   pitch_angle_target, roll_angle_target,
+                   g_euler.pitch, g_euler.roll, g_euler.yaw);
 }
 
 /*

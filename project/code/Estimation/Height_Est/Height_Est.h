@@ -28,9 +28,12 @@ extern float g_height_obs_residual_m;
 extern float g_height_obs_weight;
 extern float g_height_obs_delta_v_mps;
 extern float g_height_state_mm;
+extern float g_height_gate_residual_mm;
 extern uint8 g_height_meas_valid;
 extern uint8 g_height_tof_accept_count;
 extern uint8 g_height_tof_valid_mask;
+extern uint8 g_height_beacon_polluted;
+extern uint8 g_height_gate_reason;
 
 /*
  * 函数功能：初始化 TOF 相关状态与驱动。

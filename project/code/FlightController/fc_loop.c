@@ -338,11 +338,16 @@ void FC_Loop_50Hz(void)
     }
 
     if (((fc_state == FC_START_CRSF_STATE_FLYING) || (fc_state == FC_START_CRSF_STATE_LANDING)) &&
-        (0U != g_tof_fused_valid))
+        (0U != g_tof_fused_valid) &&
+        (0U == g_height_beacon_polluted))
     {
         height_m = g_tof_fused_height_mm * 0.001f;
         height_pos_out = PID_Update(&height_pos_pid, target_height_m, height_m, dt);
         height_pos_out = fc_clampf(height_pos_out, -0.45f, 0.40f);
+    }
+    else if ((fc_state == FC_START_CRSF_STATE_FLYING) && (0U != g_height_beacon_polluted))
+    {
+        height_pos_out = fc_clampf(height_pos_out, -0.10f, 0.10f);
     }
     else
     {
@@ -425,7 +430,7 @@ void FC_Loop_100Hz(void)
     if ((fc_state == FC_START_CRSF_STATE_FLYING) || (fc_state == FC_START_CRSF_STATE_LANDING))
     {
         target_height_m = (fc_state == FC_START_CRSF_STATE_LANDING) ? FC_LANDING_TARGET_HEIGHT_M : FC_TARGET_HEIGHT_M;
-        if (0U == g_tof_fused_valid)
+        if ((0U == g_tof_fused_valid) || (0U != g_height_beacon_polluted))
         {
             height_pos_out = 0.0f;
         }
@@ -441,6 +446,7 @@ void FC_Loop_100Hz(void)
 
     /* 悬停油门在线学习：仅在接近稳态悬停时更新 */
     if ((fc_state == FC_START_CRSF_STATE_FLYING) &&
+        (0U == g_height_beacon_polluted) &&
         (s_height_vz_mps > -FC_HOVER_LEARN_VZ_MAX) && (s_height_vz_mps < FC_HOVER_LEARN_VZ_MAX) &&
         (height_pos_out > -FC_HOVER_LEARN_POS_MAX) && (height_pos_out < FC_HOVER_LEARN_POS_MAX))
     {
@@ -479,7 +485,14 @@ void FC_Loop_100Hz(void)
                        height_pos_out,               // 位置环输出(速度目标) m/s
                        s_height_vz_mps,              // 速度反馈 m/s
                        height_vel_out,               // 速度环输出(油门增量)
-                       (float)g_motor_cmd.throttle); // 总油门输出
+                       (float)g_motor_cmd.throttle,   // 总油门输出
+                       (float)g_height_meas_valid,
+                       (float)g_height_tof_valid_mask,
+                       (float)g_height_tof_accept_count,
+                       g_height_tof_spread_mm,
+                       (float)g_height_beacon_polluted,
+                       g_height_gate_residual_mm,
+                       (float)g_height_gate_reason);
     // }
     // // if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
     // {

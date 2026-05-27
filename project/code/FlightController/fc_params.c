@@ -12,7 +12,7 @@
 /* 飞控参数 Flash 魔数：用于识别有效参数块 */
 #define FC_PARAMS_FLASH_MAGIC   (0x46504346UL)
 /* 飞控参数 Flash 版本号：结构变化时递增 */
-#define FC_PARAMS_FLASH_VERSION (16U)
+#define FC_PARAMS_FLASH_VERSION (17U)
 /* 飞控参数 Flash 可兼容读取的最小版本号 */
 #define FC_PARAMS_FLASH_MIN_COMPAT_VERSION (5U)
 
@@ -184,41 +184,41 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode1_brake_exit_vel_cmps = 10.0f;
 
     /* ===== 模式 2 速度环前馈参数 ===== */
-    params->mode2_vel_x_ff_deg_per_cmps = 0.010f;
-    params->mode2_vel_y_ff_deg_per_cmps = 0.010f;
-    params->mode2_adrc_enable = 1.0f;
-    params->mode2_adrc_log_enable = 1.0f;
-    params->mode2_adrc_b0_x = 16.0f;
-    params->mode2_adrc_b0_y = 14.5f;
-    params->mode2_adrc_td_acc_limit_cmss = 100.0f;
-    params->mode2_adrc_td_jerk_limit_cmsss = 450.0f;
-    params->mode2_adrc_td_brake_acc_limit_cmss = 160.0f;
-    params->mode2_adrc_td_brake_jerk_limit_cmsss = 900.0f;
-    params->mode2_adrc_eso_beta1 = 12.0f;
-    params->mode2_adrc_eso_beta2 = 36.0f;
-    params->mode2_adrc_eso_alpha1 = 0.50f;
-    params->mode2_adrc_eso_alpha2 = 0.25f;
-    params->mode2_adrc_eso_delta_cmps = 15.0f;
-    params->mode2_adrc_nl_kp = 4.2f;
-    params->mode2_adrc_nl_alpha = 0.75f;
-    params->mode2_adrc_nl_delta_cmps = 12.0f;
-    params->mode2_adrc_comp_limit_cmss = 45.0f;
-    params->mode2_adrc_angle_limit_deg = 10.0f;
-    params->mode2_adrc_output_rate_limit_degps = 35.0f;
-    params->mode2_adrc_zero_quiet_cmps = 8.0f;
+    params->reserved_vel_x_ff_deg_per_cmps = 0.010f;
+    params->reserved_vel_y_ff_deg_per_cmps = 0.010f;
+    params->mode4_adrc_enable = 1.0f;
+    params->mode4_adrc_log_enable = 1.0f;
+    params->mode4_adrc_b0_x = 16.0f;
+    params->mode4_adrc_b0_y = 14.5f;
+    params->mode4_adrc_td_acc_limit_cmss = 100.0f;
+    params->mode4_adrc_td_jerk_limit_cmsss = 450.0f;
+    params->mode4_adrc_td_brake_acc_limit_cmss = 160.0f;
+    params->mode4_adrc_td_brake_jerk_limit_cmsss = 900.0f;
+    params->mode4_adrc_eso_beta1 = 12.0f;
+    params->mode4_adrc_eso_beta2 = 36.0f;
+    params->mode4_adrc_eso_alpha1 = 0.50f;
+    params->mode4_adrc_eso_alpha2 = 0.25f;
+    params->mode4_adrc_eso_delta_cmps = 15.0f;
+    params->mode4_adrc_nl_kp = 4.2f;
+    params->mode4_adrc_nl_alpha = 0.75f;
+    params->mode4_adrc_nl_delta_cmps = 12.0f;
+    params->mode4_adrc_comp_limit_cmss = 45.0f;
+    params->mode4_adrc_angle_limit_deg = 10.0f;
+    params->mode4_adrc_output_rate_limit_degps = 35.0f;
+    params->mode4_adrc_zero_quiet_cmps = 8.0f;
 
-    params->mode4_vel_x_kp = 0.14f;
-    params->mode4_vel_x_ki = 0.010f;
-    params->mode4_vel_x_kd = 0.0f;
-    params->mode4_vel_x_kff = 0.0f;
-    params->mode4_vel_x_i_limit = 3.0f;
-    params->mode4_vel_x_d_lpf = 0.0f;
-    params->mode4_vel_y_kp = 0.14f;
-    params->mode4_vel_y_ki = 0.010f;
-    params->mode4_vel_y_kd = 0.0f;
-    params->mode4_vel_y_kff = 0.0f;
-    params->mode4_vel_y_i_limit = 3.0f;
-    params->mode4_vel_y_d_lpf = 0.0f;
+    params->mode2_vel_x_kp = 0.14f;
+    params->mode2_vel_x_ki = 0.010f;
+    params->mode2_vel_x_kd = 0.0f;
+    params->mode2_vel_x_kff = 0.0f;
+    params->mode2_vel_x_i_limit = 3.0f;
+    params->mode2_vel_x_d_lpf = 0.0f;
+    params->mode2_vel_y_kp = 0.14f;
+    params->mode2_vel_y_ki = 0.010f;
+    params->mode2_vel_y_kd = 0.0f;
+    params->mode2_vel_y_kff = 0.0f;
+    params->mode2_vel_y_i_limit = 3.0f;
+    params->mode2_vel_y_d_lpf = 0.0f;
 
     /* ===== 位置估计参数 ===== */
     params->pos_est_k_flow = 0.04f;
@@ -329,8 +329,8 @@ static void fc_params_migrate_loaded(fc_params_t *params, uint16 version)
         params->pitch_angle_kff = 0.12f;
         params->vel_x_kp = 0.16f;
         params->vel_y_kp = 0.16f;
-        params->mode2_vel_x_ff_deg_per_cmps = 0.015f;
-        params->mode2_vel_y_ff_deg_per_cmps = 0.015f;
+        params->reserved_vel_x_ff_deg_per_cmps = 0.015f;
+        params->reserved_vel_y_ff_deg_per_cmps = 0.015f;
     }
 
     if (version < 11U)
@@ -339,8 +339,8 @@ static void fc_params_migrate_loaded(fc_params_t *params, uint16 version)
         params->vel_x_ki = 0.015f;
         params->vel_y_kp = 0.14f;
         params->vel_y_ki = 0.015f;
-        params->mode2_vel_x_ff_deg_per_cmps = 0.010f;
-        params->mode2_vel_y_ff_deg_per_cmps = 0.010f;
+        params->reserved_vel_x_ff_deg_per_cmps = 0.010f;
+        params->reserved_vel_y_ff_deg_per_cmps = 0.010f;
     }
 
     if (version < 12U)
@@ -351,58 +351,58 @@ static void fc_params_migrate_loaded(fc_params_t *params, uint16 version)
 
     if (version < 13U)
     {
-        params->mode2_adrc_enable = 1.0f;
-        params->mode2_adrc_log_enable = 1.0f;
-        params->mode2_adrc_b0_x = 16.0f;
-        params->mode2_adrc_b0_y = 14.5f;
-        params->mode2_adrc_td_acc_limit_cmss = 100.0f;
-        params->mode2_adrc_td_jerk_limit_cmsss = 450.0f;
-        params->mode2_adrc_td_brake_acc_limit_cmss = 160.0f;
-        params->mode2_adrc_td_brake_jerk_limit_cmsss = 900.0f;
-        params->mode2_adrc_eso_beta1 = 12.0f;
-        params->mode2_adrc_eso_beta2 = 36.0f;
-        params->mode2_adrc_eso_alpha1 = 0.50f;
-        params->mode2_adrc_eso_alpha2 = 0.25f;
-        params->mode2_adrc_eso_delta_cmps = 15.0f;
-        params->mode2_adrc_nl_kp = 4.2f;
-        params->mode2_adrc_nl_alpha = 0.75f;
-        params->mode2_adrc_nl_delta_cmps = 12.0f;
-        params->mode2_adrc_comp_limit_cmss = 45.0f;
-        params->mode2_adrc_angle_limit_deg = 10.0f;
+        params->mode4_adrc_enable = 1.0f;
+        params->mode4_adrc_log_enable = 1.0f;
+        params->mode4_adrc_b0_x = 16.0f;
+        params->mode4_adrc_b0_y = 14.5f;
+        params->mode4_adrc_td_acc_limit_cmss = 100.0f;
+        params->mode4_adrc_td_jerk_limit_cmsss = 450.0f;
+        params->mode4_adrc_td_brake_acc_limit_cmss = 160.0f;
+        params->mode4_adrc_td_brake_jerk_limit_cmsss = 900.0f;
+        params->mode4_adrc_eso_beta1 = 12.0f;
+        params->mode4_adrc_eso_beta2 = 36.0f;
+        params->mode4_adrc_eso_alpha1 = 0.50f;
+        params->mode4_adrc_eso_alpha2 = 0.25f;
+        params->mode4_adrc_eso_delta_cmps = 15.0f;
+        params->mode4_adrc_nl_kp = 4.2f;
+        params->mode4_adrc_nl_alpha = 0.75f;
+        params->mode4_adrc_nl_delta_cmps = 12.0f;
+        params->mode4_adrc_comp_limit_cmss = 45.0f;
+        params->mode4_adrc_angle_limit_deg = 10.0f;
     }
 
     if (version < 14U)
     {
-        params->mode2_adrc_output_rate_limit_degps = 35.0f;
-        params->mode2_adrc_td_acc_limit_cmss = 100.0f;
-        params->mode2_adrc_td_jerk_limit_cmsss = 450.0f;
-        params->mode2_adrc_nl_kp = 4.2f;
-        params->mode2_adrc_comp_limit_cmss = 45.0f;
+        params->mode4_adrc_output_rate_limit_degps = 35.0f;
+        params->mode4_adrc_td_acc_limit_cmss = 100.0f;
+        params->mode4_adrc_td_jerk_limit_cmsss = 450.0f;
+        params->mode4_adrc_nl_kp = 4.2f;
+        params->mode4_adrc_comp_limit_cmss = 45.0f;
     }
 
     if (version < 15U)
     {
-        params->mode2_adrc_b0_x = 16.0f;
-        params->mode2_adrc_b0_y = 14.5f;
-        params->mode2_adrc_td_brake_acc_limit_cmss = 160.0f;
-        params->mode2_adrc_td_brake_jerk_limit_cmsss = 900.0f;
-        params->mode2_adrc_zero_quiet_cmps = 8.0f;
+        params->mode4_adrc_b0_x = 16.0f;
+        params->mode4_adrc_b0_y = 14.5f;
+        params->mode4_adrc_td_brake_acc_limit_cmss = 160.0f;
+        params->mode4_adrc_td_brake_jerk_limit_cmsss = 900.0f;
+        params->mode4_adrc_zero_quiet_cmps = 8.0f;
     }
 
     if (version < 16U)
     {
-        params->mode4_vel_x_kp = 0.14f;
-        params->mode4_vel_x_ki = 0.010f;
-        params->mode4_vel_x_kd = 0.0f;
-        params->mode4_vel_x_kff = 0.0f;
-        params->mode4_vel_x_i_limit = 3.0f;
-        params->mode4_vel_x_d_lpf = 0.0f;
-        params->mode4_vel_y_kp = 0.14f;
-        params->mode4_vel_y_ki = 0.010f;
-        params->mode4_vel_y_kd = 0.0f;
-        params->mode4_vel_y_kff = 0.0f;
-        params->mode4_vel_y_i_limit = 3.0f;
-        params->mode4_vel_y_d_lpf = 0.0f;
+        params->mode2_vel_x_kp = 0.14f;
+        params->mode2_vel_x_ki = 0.010f;
+        params->mode2_vel_x_kd = 0.0f;
+        params->mode2_vel_x_kff = 0.0f;
+        params->mode2_vel_x_i_limit = 3.0f;
+        params->mode2_vel_x_d_lpf = 0.0f;
+        params->mode2_vel_y_kp = 0.14f;
+        params->mode2_vel_y_ki = 0.010f;
+        params->mode2_vel_y_kd = 0.0f;
+        params->mode2_vel_y_kff = 0.0f;
+        params->mode2_vel_y_i_limit = 3.0f;
+        params->mode2_vel_y_d_lpf = 0.0f;
     }
 }
 

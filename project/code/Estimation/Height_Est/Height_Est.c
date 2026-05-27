@@ -75,7 +75,6 @@ float g_height_fused_vz_mps = 0.0f;                            /* 控制环使�
 #define HEIGHT_EST_DESCENT_RECOVER_MM   30.0f
 #define HEIGHT_EST_DESCENT_FORCED_MM    55.0f
 #define HEIGHT_EST_POLLUTE_DROP_MM      160.0f
-#define HEIGHT_EST_POLLUTE_STATE_MIN_MM 650.0f
 #define HEIGHT_EST_POLLUTE_MEAS_MAX_MM  850.0f
 #define HEIGHT_EST_POLLUTE_EXIT_RESIDUAL_MM 140.0f
 #define HEIGHT_EST_POLLUTE_EXIT_LOW_RESIDUAL_MM (-220.0f)
@@ -88,6 +87,8 @@ float g_height_fused_vz_mps = 0.0f;                            /* 控制环使�
 #define HEIGHT_EST_POLLUTE_VZ_DECAY     0.94f
 #define HEIGHT_EST_POLLUTE_ACC_GAIN     0.08f
 #define HEIGHT_EST_STATE_VZ_BLEND       0.20f
+#define HEIGHT_EST_RANGE_HIGH_OBS_COUNT 50U
+#define HEIGHT_EST_RANGE_HIGH_STEP_MM   8.0f
 #define HEIGHT_EST_STATE_MAX_MM         VL53L1X_VALID_RANGE_MAX /* 高度内部状态最大值，单位 mm */
 
 static Median_t s_tof_median[VL53L1X_SENSOR_COUNT];          /* 四路 TOF 中值滤波状态 */
@@ -105,6 +106,7 @@ static uint8 s_tof_range_high_latched[VL53L1X_SENSOR_COUNT];
 static uint8 s_tof_range_high_confirm_cnt = 0U;
 static uint8 s_height_beacon_exit_cnt = 0U;
 static uint8 s_height_soft_rejoin_cnt = 0U;
+static uint8 s_height_range_high_cnt = 0U;
 static const float s_tof_pitch_sign[VL53L1X_SENSOR_COUNT] = {1.0f, -1.0f, 1.0f, -1.0f}; /* 四路 TOF pitch 补偿极性 */
 static const float s_tof_roll_sign[VL53L1X_SENSOR_COUNT] = {1.0f, 1.0f, -1.0f, -1.0f};  /* 四路 TOF roll 补偿极性 */
 static const float s_tof_height_bias_mm[VL53L1X_SENSOR_COUNT] = {
@@ -192,6 +194,7 @@ static void HeightEst_InitHeightState(float height_mm)
     s_height_miss_cnt = 0U;
     s_height_beacon_exit_cnt = 0U;
     s_height_soft_rejoin_cnt = 0U;
+    s_height_range_high_cnt = 0U;
     s_height_state_vz_mps = 0.0f;
     g_height_beacon_polluted = 0U;
     g_height_gate_reason = HEIGHT_EST_GATE_REASON_NONE;
@@ -289,21 +292,19 @@ static uint8 HeightEst_IsRealDescentLikely(void)
 
 static uint8 HeightEst_IsLowPollution(float meas_height_mm, float residual_mm)
 {
+    float reference_mm = s_height_est_mm;
     uint8 low_consensus =
         ((g_height_tof_accept_count >= HEIGHT_EST_TOF_MIN_COUNT) &&
         (g_height_tof_spread_mm <= HEIGHT_EST_BEACON_SPREAD_MAX_MM)) ? 1U : 0U;
-    uint8 low_against_state =
-        ((s_height_est_mm >= HEIGHT_EST_POLLUTE_STATE_MIN_MM) &&
-        (residual_mm < -HEIGHT_EST_POLLUTE_DROP_MM)) ? 1U : 0U;
-    uint8 low_against_target =
-        ((target_height_m > 0.5f) &&
-        (meas_height_mm < ((target_height_m * 1000.0f) - 180.0f))) ? 1U : 0U;
-    uint8 strong_low =
-        ((meas_height_mm < HEIGHT_EST_POLLUTE_MEAS_MAX_MM) &&
-        ((0U != low_against_state) || (0U != low_against_target))) ? 1U : 0U;
+
+    if ((target_height_m > 0.5f) && ((target_height_m * 1000.0f) < reference_mm))
+    {
+        reference_mm = target_height_m * 1000.0f;
+    }
 
     if ((0U != low_consensus) &&
-        (0U != strong_low) &&
+        (meas_height_mm < HEIGHT_EST_POLLUTE_MEAS_MAX_MM) &&
+        ((meas_height_mm - reference_mm) < -HEIGHT_EST_POLLUTE_DROP_MM) &&
         (0U == HeightEst_IsRealDescentLikely()))
     {
         return 1U;
@@ -481,12 +482,32 @@ static uint8 HeightEst_UpdateHeight(float meas_height_mm, float meas_health, uin
         if (0U != range_high_active)
         {
             residual_mm = HEIGHT_EST_TOF_RANGE_HIGH_MM - s_height_est_mm;
-            /* 8192/高量程只说明 TOF 此刻不可校正，不能当 1400mm 观测硬拉状态。 */
+            if (s_height_range_high_cnt < HEIGHT_EST_RANGE_HIGH_OBS_COUNT)
+            {
+                s_height_range_high_cnt++;
+            }
+            /* 高量程只是 h>=量程上界。只有持续成立时，才慢慢承认已经超过量程。 */
+            if ((s_height_range_high_cnt >= HEIGHT_EST_RANGE_HIGH_OBS_COUNT) &&
+                (0U == g_height_beacon_polluted) &&
+                (0U == s_height_soft_rejoin_cnt) &&
+                (s_height_est_mm < HEIGHT_EST_TOF_RANGE_HIGH_MM))
+            {
+                state_before_update_mm = s_height_est_mm;
+                s_height_est_mm = HeightEst_ClampStateHeightMm(s_height_est_mm +
+                    HeightEst_ClampFloat(HEIGHT_EST_TOF_RANGE_HIGH_MM - s_height_est_mm,
+                    0.0f, HEIGHT_EST_RANGE_HIGH_STEP_MM));
+                s_height_state_vz_mps += HEIGHT_EST_STATE_VZ_BLEND *
+                    (s_height_est_mm - state_before_update_mm) * 0.001f / HEIGHT_EST_TOF_DT_S;
+                s_height_state_vz_mps = HeightEst_ClampFloat(s_height_state_vz_mps,
+                    -HEIGHT_EST_STATE_VZ_LIMIT_MPS, HEIGHT_EST_STATE_VZ_LIMIT_MPS);
+                g_height_gate_reason = HEIGHT_EST_GATE_REASON_SLEW;
+            }
             s_height_miss_cnt = 0U;
             g_height_gate_residual_mm = residual_mm;
         }
         else
         {
+            s_height_range_high_cnt = 0U;
             residual_mm = meas_height_mm - s_height_est_mm;
             g_height_gate_residual_mm = residual_mm;
             low_polluted = HeightEst_IsLowPollution(meas_height_mm, residual_mm);
@@ -711,6 +732,7 @@ static void HeightEst_ResetAll(void)
     g_height_fused_vz_mps = 0.0f;
     s_height_beacon_exit_cnt = 0U;
     s_height_soft_rejoin_cnt = 0U;
+    s_height_range_high_cnt = 0U;
 }
 
 /*

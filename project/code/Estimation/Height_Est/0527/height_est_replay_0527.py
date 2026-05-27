@@ -1,5 +1,6 @@
 import csv
 import math
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -8,7 +9,7 @@ import pandas as pd
 
 
 ROOT = Path(__file__).resolve().parent
-LOG_PATH = next(ROOT.glob("*-2.csv"))
+LOG_PATH = next(ROOT.glob(os.environ.get("HEIGHT_EST_LOG_GLOB", "*-2.csv")))
 
 DT_S = 0.01
 TOF_BIAS_MM = np.array([-14.18, 14.33, -37.02, 55.94], dtype=float)
@@ -417,11 +418,24 @@ def replay_ported_c_logic(df, obs, spread):
     exit_cnt = 0
     soft_rejoin = 0
     miss_cnt = 0
+    range_high_latched = np.zeros(4, dtype=bool)
+    range_high_cnt = 0
 
     for i, meas in enumerate(obs):
         raw = df.iloc[i][["I3", "I4", "I5", "I6"]].to_numpy(dtype=float)
+        comp = df.iloc[i][["I7", "I8", "I9", "I10"]].to_numpy(dtype=float)
+        raw_valid = (raw >= 50.0) & (raw <= 1400.0)
+        enter_high = raw_valid & ((raw >= 1390.0) | (comp >= 1320.0))
+        exit_high = raw_valid & (comp <= 1250.0)
+        range_high_latched[enter_high] = True
+        range_high_latched[exit_high] = False
+        tof_range_high = enter_high | ((raw >= 8192.0) & range_high_latched)
         raw_high_count = int(np.sum((raw >= 1390.0) | (raw >= 8192.0)))
-        range_high_active = bool(ready and raw_high_count >= 3 and est >= 900.0)
+        latched_high_count = int(np.sum(range_high_latched))
+        if ready and raw_high_count >= 3 and (latched_high_count > 0 or est >= 900.0):
+            tof_range_high[:] = True
+            range_high_latched[:] = True
+        range_high_active = bool(np.sum(tof_range_high) >= 3)
         meas_valid = bool(np.isfinite(meas) or range_high_active)
         if range_high_active:
             meas = 1400.0
@@ -452,9 +466,16 @@ def replay_ported_c_logic(df, obs, spread):
         if meas_valid:
             if range_high_active:
                 residual = 1400.0 - est
-                # C 移植版：高量程不作为 1400mm 观测，只保持短时预测。
+                if range_high_cnt < 50:
+                    range_high_cnt += 1
+                # 高量程只是 h>=量程上界。只有持续成立时，才慢慢承认已经超过量程。
+                if range_high_cnt >= 50 and (not polluted) and soft_rejoin == 0 and est < 1400.0:
+                    before = est
+                    est = clamp(est + clamp(1400.0 - est, 0.0, 8.0), 0.0, 1400.0)
+                    state_v = clamp(state_v + 0.20 * (est - before) * 0.001 / DT_S, -1.2, 1.2)
                 accepted[i] = False
             else:
+                range_high_cnt = 0
                 residual = float(meas) - est
                 real_descent = (
                     target < 500.0
@@ -462,12 +483,11 @@ def replay_ported_c_logic(df, obs, spread):
                     or (pos_out < -0.35 and acc < -1.4 and state_v < -0.35)
                 )
                 low_consensus = np.isfinite(spread[i]) and spread[i] <= 240.0
-                low_state = est >= 650.0 and residual < -160.0
-                low_target = target > 500.0 and meas < target - 180.0
+                ref = min(est, target) if target > 500.0 else est
                 low_polluted = (
                     low_consensus
                     and meas < 850.0
-                    and (low_state or low_target)
+                    and meas - ref < -160.0
                     and (not real_descent)
                 )
 

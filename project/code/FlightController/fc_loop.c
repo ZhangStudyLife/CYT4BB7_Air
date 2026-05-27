@@ -449,60 +449,37 @@ void FC_Loop_100Hz(void)
         s_hover_throttle = fc_clampf(s_hover_throttle, FC_HOVER_THR_MIN, FC_HOVER_THR_MAX);
     }
 
-        // const VL53L1X_data_struct *tof = VL53L1X_GetData();
-        // float raw_tof1_mm = 0.0f;
-        // float raw_tof2_mm = 0.0f;
-        // float raw_tof3_mm = 0.0f;
-        // float raw_tof4_mm = 0.0f;
+        const VL53L1X_data_struct *tof = VL53L1X_GetData();
+        float raw_tof1_mm = 0.0f;
+        float raw_tof2_mm = 0.0f;
+        float raw_tof3_mm = 0.0f;
+        float raw_tof4_mm = 0.0f;
 
-        // if (0 != tof)
-        // {
-        //     raw_tof1_mm = (float)tof->distance_mm[0];
-        //     raw_tof2_mm = (float)tof->distance_mm[1];
-        //     raw_tof3_mm = (float)tof->distance_mm[2];
-        //     raw_tof4_mm = (float)tof->distance_mm[3];
-        // }
+        if (0 != tof)
+        {
+            raw_tof1_mm = (float)tof->distance_mm[0];
+            raw_tof2_mm = (float)tof->distance_mm[1];
+            raw_tof3_mm = (float)tof->distance_mm[2];
+            raw_tof4_mm = (float)tof->distance_mm[3];
+        }
 
-    //     wifi_justfloat((float)tick_1000us_cnt,
-    //                    target_height_m * 1000.0f,
-    //                    g_tof_fused_height_mm,
-    //                    (float)g_tof_fused_valid,
-    //                    g_height_meas_mm,
-    //                    (float)g_height_meas_valid,
-    //                    g_height_meas_health,
-    //                    g_height_tof_spread_mm,
-    //                    (float)g_height_tof_accept_count,
-    //                    (float)g_height_tof_valid_mask,
-    //                    g_height_state_mm,
-    //                    g_height_obs_z_m * 1000.0f,
-    //                    s_height_vz_mps,
-    //                    g_height_obs_vz_raw_mps,
-    //                    g_height_acc_up_mps2,
-    //                    g_height_acc_corr_mps2,
-    //                    g_height_obs_residual_m,
-    //                    g_height_obs_weight,
-    //                    g_height_obs_delta_v_mps,
-    //                    height_pos_pid.p_term,
-    //                    height_pos_pid.i_term,
-    //                    height_vel_pid.p_term,
-    //                    height_vel_pid.i_term,
-    //                    height_vel_pid.d_term,
-    //                    height_pos_out,
-    //                    height_vel_out,
-    //                    height_pos_pid.d_term,
-    //                    g_tof1_height_mm,
-    //                    g_tof2_height_mm,
-    //                    g_tof3_height_mm,
-    //                    g_tof4_height_mm,
-    //                    raw_tof1_mm,
-    //                    raw_tof2_mm,
-    //                    raw_tof3_mm,
-    //                    raw_tof4_mm,
-    //                    g_euler.roll,
-    //                    g_euler.pitch,
-    //                    s_height_base_throttle,
-    //                    s_height_throttle_raw,
-    //                    (float)g_motor_cmd.throttle);
+        wifi_justfloat((float)tick_1000us_cnt,
+                       target_height_m * 1000.0f,   // 目标高度 mm
+                       g_tof_fused_height_mm,        // 融合高度 mm
+                       raw_tof1_mm,                  // TOF1原始 mm
+                       raw_tof2_mm,                  // TOF2原始 mm
+                       raw_tof3_mm,                  // TOF3原始 mm
+                       raw_tof4_mm,                  // TOF4原始 mm
+                       g_tof1_height_mm,             // TOF1姿态解耦 mm
+                       g_tof2_height_mm,             // TOF2姿态解耦 mm
+                       g_tof3_height_mm,             // TOF3姿态解耦 mm
+                       g_tof4_height_mm,             // TOF4姿态解耦 mm
+                       g_imufilter_1000hz.accz,      // 机体系Z轴加速度 m/s²
+                       g_height_acc_up_mps2,         // 大地系Z轴加速度 m/s²
+                       height_pos_out,               // 位置环输出(速度目标) m/s
+                       s_height_vz_mps,              // 速度反馈 m/s
+                       height_vel_out,               // 速度环输出(油门增量)
+                       (float)g_motor_cmd.throttle); // 总油门输出
     // }
     // // if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
     // {

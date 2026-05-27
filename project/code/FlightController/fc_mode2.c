@@ -3,6 +3,7 @@
 #include "../Estimation/Height_Est/Height_Est.h"
 #include "../Estimation/Attitude/IMU_TOP.h"
 #include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
+#include <math.h>
 
 extern volatile uint32 tick_1000us_cnt;
 
@@ -12,22 +13,23 @@ float g_mode2_velx_target = 0.0f;
 float g_mode2_vely_target = 0.0f;
 
 /* Mode2 uses an independent PI velocity loop. */
-static const float s_mode2_rc_to_speed_scale = 0.2f;
 static const float s_mode2_vel_limit_cmps = 200.0f;
 static const float s_mode2_vel_deadzone_cmps = 6.0f;
+static const float s_mode2_vel_expo = 0.60f;
+static const float s_mode2_vel_accel_cmps2 = 400.0f;
 static const float s_mode2_angle_limit_deg = 15.0f;
 
-static float FC_Mode2_ApplyDeadzone(float v, float dz)
+static float FC_Mode2_StickToSpeed(float v)
 {
-    if (v > dz)
+    float dz = s_mode2_vel_deadzone_cmps / s_mode2_vel_limit_cmps;
+    float a = (v >= 0.0f) ? v : -v;
+    if (a <= dz)
     {
-        return v - dz;
+        return 0.0f;
     }
-    if (v < -dz)
-    {
-        return v + dz;
-    }
-    return 0.0f;
+    a = (a - dz) / (1.0f - dz);
+    a = ((1.0f - s_mode2_vel_expo) * a + s_mode2_vel_expo * a * a * a) * s_mode2_vel_limit_cmps;
+    return (v >= 0.0f) ? a : -a;
 }
 
 void FC_Mode2_Init(void)
@@ -61,6 +63,10 @@ void FC_Mode2_50Hz(float dt)
 {
     float ch0;
     float ch1;
+    float velx_raw;
+    float vely_raw;
+    float mag;
+    float step;
     float velx_out;
     float vely_out;
 
@@ -70,17 +76,29 @@ void FC_Mode2_50Hz(float dt)
         return;
     }
 
-    ch0 = FC_Mode_Clamp((float)CRSF_STD[0], -1000.0f, 1000.0f);
-    ch1 = FC_Mode_Clamp((float)CRSF_STD[1], -1000.0f, 1000.0f);
+    ch0 = FC_Mode_Clamp((float)CRSF_STD[0] * 0.001f, -1.0f, 1.0f);
+    ch1 = FC_Mode_Clamp((float)CRSF_STD[1] * -0.001f, -1.0f, 1.0f);
 
-    g_mode2_velx_target = FC_Mode2_ApplyDeadzone(
-        FC_Mode_Clamp(ch0 * s_mode2_rc_to_speed_scale,
-                      -s_mode2_vel_limit_cmps, s_mode2_vel_limit_cmps),
-        s_mode2_vel_deadzone_cmps);
-    g_mode2_vely_target = FC_Mode2_ApplyDeadzone(
-        FC_Mode_Clamp(-ch1 * s_mode2_rc_to_speed_scale,
-                      -s_mode2_vel_limit_cmps, s_mode2_vel_limit_cmps),
-        s_mode2_vel_deadzone_cmps);
+    velx_raw = FC_Mode2_StickToSpeed(ch0);
+    vely_raw = FC_Mode2_StickToSpeed(ch1);
+    mag = sqrtf(velx_raw * velx_raw + vely_raw * vely_raw);
+    if (mag > s_mode2_vel_limit_cmps)
+    {
+        velx_raw *= s_mode2_vel_limit_cmps / mag;
+        vely_raw *= s_mode2_vel_limit_cmps / mag;
+    }
+
+    velx_raw -= g_mode2_velx_target;
+    vely_raw -= g_mode2_vely_target;
+    step = FC_Mode_Clamp(s_mode2_vel_accel_cmps2 * dt, 0.0f, s_mode2_vel_limit_cmps);
+    mag = sqrtf(velx_raw * velx_raw + vely_raw * vely_raw);
+    if (mag > step)
+    {
+        velx_raw *= step / mag;
+        vely_raw *= step / mag;
+    }
+    g_mode2_velx_target += velx_raw;
+    g_mode2_vely_target += vely_raw;
 
     velx_out = PID_Update(&g_mode2_velx_pid, g_mode2_velx_target, -Pos_Est_vel_x, dt);
     vely_out = PID_Update(&g_mode2_vely_pid, g_mode2_vely_target, -Pos_Est_vel_y, dt);

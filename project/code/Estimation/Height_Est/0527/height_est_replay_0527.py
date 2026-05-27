@@ -462,6 +462,16 @@ def replay_ported_c_logic(df, obs, spread):
         else:
             state_v = clamp(0.985 * state_v + 0.15 * acc * DT_S, -1.2, 1.2)
         est = clamp(est + state_v * DT_S * 1000.0, 0.0, 1400.0)
+        real_descent = (
+            target < 500.0
+            or (acc < -2.8 and state_v < -0.55)
+            or (pos_out < -0.35 and acc < -1.4 and state_v < -0.35)
+        )
+        if miss_cnt >= 5 and target > 500.0 and not real_descent:
+            lower = target - 160.0
+            if est < lower:
+                est = lower
+                state_v = max(state_v, 0.0)
 
         if meas_valid:
             if range_high_active:
@@ -477,11 +487,6 @@ def replay_ported_c_logic(df, obs, spread):
             else:
                 range_high_cnt = 0
                 residual = float(meas) - est
-                real_descent = (
-                    target < 500.0
-                    or (acc < -2.8 and state_v < -0.55)
-                    or (pos_out < -0.35 and acc < -1.4 and state_v < -0.35)
-                )
                 low_consensus = np.isfinite(spread[i]) and spread[i] <= 240.0
                 ref = min(est, target) if target > 500.0 else est
                 low_polluted = (

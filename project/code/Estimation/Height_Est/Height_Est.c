@@ -89,6 +89,8 @@ float g_height_fused_vz_mps = 0.0f;                            /* 控制环使�
 #define HEIGHT_EST_STATE_VZ_BLEND       0.20f
 #define HEIGHT_EST_RANGE_HIGH_OBS_COUNT 50U
 #define HEIGHT_EST_RANGE_HIGH_STEP_MM   8.0f
+#define HEIGHT_EST_MISS_TARGET_HOLD_COUNT 5U
+#define HEIGHT_EST_MISS_TARGET_MARGIN_MM 160.0f
 #define HEIGHT_EST_STATE_MAX_MM         VL53L1X_VALID_RANGE_MAX /* 高度内部状态最大值，单位 mm */
 
 static Median_t s_tof_median[VL53L1X_SENSOR_COUNT];          /* 四路 TOF 中值滤波状态 */
@@ -316,6 +318,8 @@ static uint8 HeightEst_IsLowPollution(float meas_height_mm, float residual_mm)
 static void HeightEst_PredictState(void)
 {
     float acc_mps2 = HeightEst_ClampFloat(g_height_acc_up_mps2, -4.0f, 4.0f);
+    float target_mm;
+    float lower_hold_mm;
 
     if (0U != g_height_beacon_polluted)
     {
@@ -344,6 +348,23 @@ static void HeightEst_PredictState(void)
 
     s_height_est_mm = HeightEst_ClampStateHeightMm(s_height_est_mm +
         (s_height_state_vz_mps * HEIGHT_EST_TOF_DT_S * 1000.0f));
+
+    if ((s_height_miss_cnt >= HEIGHT_EST_MISS_TARGET_HOLD_COUNT) &&
+        (target_height_m > 0.5f) &&
+        (0U == HeightEst_IsRealDescentLikely()))
+    {
+        target_mm = target_height_m * 1000.0f;
+        lower_hold_mm = target_mm - HEIGHT_EST_MISS_TARGET_MARGIN_MM;
+
+        if (s_height_est_mm < lower_hold_mm)
+        {
+            s_height_est_mm = lower_hold_mm;
+            if (s_height_state_vz_mps < 0.0f)
+            {
+                s_height_state_vz_mps = 0.0f;
+            }
+        }
+    }
 }
 
 /*

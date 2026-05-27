@@ -484,7 +484,10 @@ void FC_Loop_100Hz(void)
                    g_tof4_height_mm,         // TOF4姿态解耦 mm
                    g_imufilter_1000hz.accz,  // 机体系Z轴加速度 m/s²
                    g_height_acc_up_mps2,     // 大地系Z轴加速度 m/s²
-                   target_height_m * 1000.0f // 目标高度 mm
+                   g_motor_cmd.throttle, // 目标高度 mm
+                   g_motor_cmd.roll,     // Roll 电调输入
+                   g_motor_cmd.pitch,    // Pitch 电调输入
+                     g_motor_cmd.yaw      // Yaw 电调输入
     );
     // }
     // // if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)

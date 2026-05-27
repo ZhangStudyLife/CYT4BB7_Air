@@ -44,7 +44,7 @@ extern volatile float g_car_image_target_valid;
 static float s_height_vz_mps = 0.0f;
 /* Yaw 角度目标是否已经对齐当前机头方向 */
 static uint8_t s_yaw_target_inited = 0U;
-#define FC_TARGET_HEIGHT_M          1.0f
+#define FC_TARGET_HEIGHT_M 1.0f
 #define FC_LANDING_TARGET_HEIGHT_M -0.5f
 /* 100Hz 锁存的飞行模式，50Hz 控制只消费该锁存值 */
 static FC_START_CRSF_flight_mode_e s_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
@@ -455,44 +455,37 @@ void FC_Loop_100Hz(void)
         s_hover_throttle = fc_clampf(s_hover_throttle, FC_HOVER_THR_MIN, FC_HOVER_THR_MAX);
     }
 
-        const VL53L1X_data_struct *tof = VL53L1X_GetData();
-        float raw_tof1_mm = 0.0f;
-        float raw_tof2_mm = 0.0f;
-        float raw_tof3_mm = 0.0f;
-        float raw_tof4_mm = 0.0f;
+    const VL53L1X_data_struct *tof = VL53L1X_GetData();
+    float raw_tof1_mm = 0.0f;
+    float raw_tof2_mm = 0.0f;
+    float raw_tof3_mm = 0.0f;
+    float raw_tof4_mm = 0.0f;
 
-        if (0 != tof)
-        {
-            raw_tof1_mm = (float)tof->distance_mm[0];
-            raw_tof2_mm = (float)tof->distance_mm[1];
-            raw_tof3_mm = (float)tof->distance_mm[2];
-            raw_tof4_mm = (float)tof->distance_mm[3];
-        }
+    if (0 != tof)
+    {
+        raw_tof1_mm = (float)tof->distance_mm[0];
+        raw_tof2_mm = (float)tof->distance_mm[1];
+        raw_tof3_mm = (float)tof->distance_mm[2];
+        raw_tof4_mm = (float)tof->distance_mm[3];
+    }
 
-        wifi_justfloat((float)tick_1000us_cnt,
-                       target_height_m * 1000.0f,   // 目标高度 mm
-                       g_tof_fused_height_mm,        // 融合高度 mm
-                       raw_tof1_mm,                  // TOF1原始 mm
-                       raw_tof2_mm,                  // TOF2原始 mm
-                       raw_tof3_mm,                  // TOF3原始 mm
-                       raw_tof4_mm,                  // TOF4原始 mm
-                       g_tof1_height_mm,             // TOF1姿态解耦 mm
-                       g_tof2_height_mm,             // TOF2姿态解耦 mm
-                       g_tof3_height_mm,             // TOF3姿态解耦 mm
-                       g_tof4_height_mm,             // TOF4姿态解耦 mm
-                       g_imufilter_1000hz.accz,      // 机体系Z轴加速度 m/s²
-                       g_height_acc_up_mps2,         // 大地系Z轴加速度 m/s²
-                       height_pos_out,               // 位置环输出(速度目标) m/s
-                       s_height_vz_mps,              // 速度反馈 m/s
-                       height_vel_out,               // 速度环输出(油门增量)
-                       (float)g_motor_cmd.throttle,   // 总油门输出
-                       (float)g_height_meas_valid,
-                       (float)g_height_tof_valid_mask,
-                       (float)g_height_tof_accept_count,
-                       g_height_tof_spread_mm,
-                       (float)g_height_beacon_polluted,
-                       g_height_gate_residual_mm,
-                       (float)g_height_gate_reason);
+    wifi_justfloat((float)tick_1000us_cnt,
+                   g_tof_fused_height_mm,    // 融合高度 mm
+                   raw_tof1_mm,              // TOF1原始 mm
+                   raw_tof2_mm,              // TOF2原始 mm
+                   raw_tof3_mm,              // TOF3原始 mm
+                   raw_tof4_mm,              // TOF4原始 mm
+                   g_euler.roll,             // Roll 姿态角 deg
+                   g_euler.pitch,            // Pitch 姿态角 deg
+                   g_euler.yaw,              // Yaw 姿态角 deg
+                   g_tof1_height_mm,         // TOF1姿态解耦 mm
+                   g_tof2_height_mm,         // TOF2姿态解耦 mm
+                   g_tof3_height_mm,         // TOF3姿态解耦 mm
+                   g_tof4_height_mm,         // TOF4姿态解耦 mm
+                   g_imufilter_1000hz.accz,  // 机体系Z轴加速度 m/s²
+                   g_height_acc_up_mps2,     // 大地系Z轴加速度 m/s²
+                   target_height_m * 1000.0f // 目标高度 mm
+    );
     // }
     // // if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
     // {
@@ -509,8 +502,6 @@ void FC_Loop_100Hz(void)
     //                    g_tof_fused_valid
     //                    );
     // }
-
-
 
     if (fc_state == FC_START_CRSF_STATE_LANDING)
     {
@@ -561,32 +552,27 @@ void FC_Loop_100Hz(void)
         break;
     }
 
-
-
-
-
-
     // {
-        // air_comm_air_stats_t air_stats;
+    // air_comm_air_stats_t air_stats;
 
-        // memset(&air_stats, 0, sizeof(air_stats));
-        // air_comm_air_get_stats(&air_stats);
-        // wifi_justfloat((float)tick_1000us_cnt,
-        //                (float)air_stats.online_status,
-        //                (float)air_stats.heartbeat_rx_count,
-        //                (float)air_stats.heartbeat_tx_count,
-        //                (float)air_stats.rx_frame_count,
-        //                (float)air_stats.tx_frame_count,
-        //                (float)air_stats.set_param_ok_count,
-        //                (float)air_stats.set_param_fail_count,
-        //                (float)air_stats.command_ok_count,
-        //                (float)air_stats.command_fail_count,
-        //                (float)air_stats.crc_error_count,
-        //                (float)air_stats.rx_queue_overflow_count,
-        //                air_min_area,
-        //                air_hold_ms,
-        //                air_x_bias,
-        //                air_y_bias);
+    // memset(&air_stats, 0, sizeof(air_stats));
+    // air_comm_air_get_stats(&air_stats);
+    // wifi_justfloat((float)tick_1000us_cnt,
+    //                (float)air_stats.online_status,
+    //                (float)air_stats.heartbeat_rx_count,
+    //                (float)air_stats.heartbeat_tx_count,
+    //                (float)air_stats.rx_frame_count,
+    //                (float)air_stats.tx_frame_count,
+    //                (float)air_stats.set_param_ok_count,
+    //                (float)air_stats.set_param_fail_count,
+    //                (float)air_stats.command_ok_count,
+    //                (float)air_stats.command_fail_count,
+    //                (float)air_stats.crc_error_count,
+    //                (float)air_stats.rx_queue_overflow_count,
+    //                air_min_area,
+    //                air_hold_ms,
+    //                air_x_bias,
+    //                air_y_bias);
     // }
 
     // 依托这个确认了车端的flash确实有效以及确实可以修改飞机的参数
@@ -683,8 +669,6 @@ void FC_Loop_500Hz(void)
         yaw_gyro_target = fc_clampf(yaw_hold_rate,
                                     -s_fc_yaw_rate_target_limit_dps,
                                     s_fc_yaw_rate_target_limit_dps);
-
-
     }
     else
     {
@@ -692,25 +676,24 @@ void FC_Loop_500Hz(void)
         yaw_gyro_target = 0.0f;
     }
 
-
     // wifi_justfloat(g_tof_fused_height_mm/1000.0f,lc302_data.flow_x_integral, lc302_data.flow_y_integral,
     //                opflow_vel_x, opflow_vel_y,
     //                acc_x_temp, acc_y_temp,
     //                Pos_Est_vel_x, g_mode2_velx_target,
     //                Pos_Est_vel_y, g_mode2_vely_target,
     //                roll_angle_target, g_euler.roll, pitch_angle_target, g_euler.pitch);
-            // wifi_justfloat(tick_1000us_cnt,
-            //            pitch_angle_target,
-            //            g_euler.pitch,
-            //            pitch_gyro_target,
-            //            g_imufilter_1000hz.gyroy,
-            //            ICM42688.gyro_y,
-            //            pitch_gyro_pid.p_term,
-            //            pitch_gyro_pid.i_term,
-            //            pitch_gyro_pid.d_term,
-            //            pitch_gyro_pid.output,
-            //            g_motor_cmd.pitch,
-            //            g_motor_cmd.throttle);
+    // wifi_justfloat(tick_1000us_cnt,
+    //            pitch_angle_target,
+    //            g_euler.pitch,
+    //            pitch_gyro_target,
+    //            g_imufilter_1000hz.gyroy,
+    //            ICM42688.gyro_y,
+    //            pitch_gyro_pid.p_term,
+    //            pitch_gyro_pid.i_term,
+    //            pitch_gyro_pid.d_term,
+    //            pitch_gyro_pid.output,
+    //            g_motor_cmd.pitch,
+    //            g_motor_cmd.throttle);
 }
 
 void FC_Loop_1000Hz(void)
@@ -751,6 +734,9 @@ void FC_Loop_1000Hz(void)
             float base_throttle = FC_Apply_Tilt_Throttle_Compensation(g_fc_params.base_throttle);
             float throttle_cmd_raw = base_throttle + height_vel_out;
             g_motor_cmd.throttle = (int32_t)fc_clampf((float)(int32_t)throttle_cmd_raw, 2500.0f, 6000.0f);
+            static float rc_throttle_lpf = 3000.0f;
+            float rc_throttle_raw = fc_clampf(3000.0f + ((float)CRSF_CH[2] - 172.0f) * 2500.0f / 1638.0f, 3000.0f, 5500.0f);
+            g_motor_cmd.throttle = (int32_t)(rc_throttle_lpf += fc_clampf(dt * 188.5f, 0.0f, 1.0f) * (rc_throttle_raw - rc_throttle_lpf));
         }
         g_motor_cmd.roll = roll_ctrl;
         g_motor_cmd.pitch = -pitch_ctrl;
@@ -776,7 +762,6 @@ void FC_Loop_1000Hz(void)
     //     g_euler.yaw
     //     );
 
-
     // wifi_justfloat(tick_1000us_cnt,
     //     target_height_m * 1000.0f,
     //     g_tof_fused_height_mm,
@@ -791,7 +776,6 @@ void FC_Loop_1000Hz(void)
     //     g_euler.roll,
     //     g_euler.yaw
     //     );
-
 
     // wifi_justfloat(tick_1000us_cnt,
     //     g_imufilter_1000hz.gyrox,roll_gyro_target,roll_gyro_pid.p_term,roll_gyro_pid.i_term,roll_gyro_pid.d_term,

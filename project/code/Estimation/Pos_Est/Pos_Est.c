@@ -182,6 +182,7 @@
 #include "filter.h"
 #include "FlightController/fc_mode.h"
 #include "FlightController/fc_params.h"
+#include <math.h>
 
 extern volatile uint32 tick_1000us_cnt;
 
@@ -198,6 +199,7 @@ extern volatile uint32 tick_1000us_cnt;
 #define POS_EST_ACC_FWD_LIMIT_CMSS (600.0f)
 /* 左右轴水平加速度限幅，单位 cm/s^2 */
 #define POS_EST_ACC_RIGHT_LIMIT_CMSS (600.0f)
+#define POS_EST_DEG_TO_RAD (0.017453292519943295f)
 /* 光流解算得到的 X 轴速度，单位 cm/s，往左飞为正，往右飞为负 */
 float opflow_vel_x = 0.0f;
 /* 光流解算得到的 Y 轴速度，单位 cm/s，往前飞为正，往后飞为负 */
@@ -212,6 +214,8 @@ float Pos_Est_vel_x = 0.0f;
 float Pos_Est_vel_x_last = 0.0f;
 /* 位置估计的 Y 轴速度，单位 cm/s */
 float Pos_Est_vel_y = 0.0f;
+float Pos_Est_vel_x_level = 0.0f;
+float Pos_Est_vel_y_level = 0.0f;
 /* 位置估计的上一拍 Y 轴速度，单位 cm/s */
 float Pos_Est_vel_y_last = 0.0f;
 
@@ -264,6 +268,8 @@ void Pos_Est_Init(void)
     opflow_vel_y_lpf = 0.0f;
     Pos_Est_vel_x = 0.0f;
     Pos_Est_vel_y = 0.0f;
+    Pos_Est_vel_x_level = 0.0f;
+    Pos_Est_vel_y_level = 0.0f;
     Pos_Est_vel_x_last = 0.0f;
     Pos_Est_vel_y_last = 0.0f;
     Pos_Est_pos_x = 0.0f;
@@ -297,6 +303,8 @@ void Pos_Est_Reinit(void)
     opflow_vel_y_lpf = 0.0f;
     Pos_Est_vel_x = 0.0f;
     Pos_Est_vel_y = 0.0f;
+    Pos_Est_vel_x_level = 0.0f;
+    Pos_Est_vel_y_level = 0.0f;
     Pos_Est_vel_x_last = 0.0f;
     Pos_Est_vel_y_last = 0.0f;
     Pos_Est_pos_x = 0.0f;
@@ -572,6 +580,13 @@ void Pos_Est_Update_50HZ(void)
 
     s_vel_pred_x = Pos_Est_vel_x;
     s_vel_pred_y = Pos_Est_vel_y;
+    {
+        float yaw_sin = sinf(g_euler.yaw * POS_EST_DEG_TO_RAD);
+        float yaw_cos = cosf(g_euler.yaw * POS_EST_DEG_TO_RAD);
+
+        Pos_Est_vel_x_level = yaw_cos * Pos_Est_vel_x - yaw_sin * Pos_Est_vel_y;
+        Pos_Est_vel_y_level = yaw_sin * Pos_Est_vel_x + yaw_cos * Pos_Est_vel_y;
+    }
 
     Pos_Est_pos_x_last = Pos_Est_pos_x;
     Pos_Est_pos_y_last = Pos_Est_pos_y;

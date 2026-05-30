@@ -24,6 +24,8 @@ extern float opflow_vel_x_lpf;
 extern float opflow_vel_y_lpf;
 extern float Pos_Est_vel_x;
 extern float Pos_Est_vel_y;
+extern float Pos_Est_vel_x_level;
+extern float Pos_Est_vel_y_level;
 extern float acc_x_lp;
 extern float acc_y_lp;
 extern float acc_x_temp;

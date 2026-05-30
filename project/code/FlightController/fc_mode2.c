@@ -100,8 +100,8 @@ void FC_Mode2_50Hz(float dt)
     g_mode2_velx_target += velx_raw;
     g_mode2_vely_target += vely_raw;
 
-    velx_out = PID_Update(&g_mode2_velx_pid, g_mode2_velx_target, -Pos_Est_vel_x, dt);
-    vely_out = PID_Update(&g_mode2_vely_pid, g_mode2_vely_target, -Pos_Est_vel_y, dt);
+    velx_out = PID_Update(&g_mode2_velx_pid, g_mode2_velx_target, -Pos_Est_vel_x_level, dt);
+    vely_out = PID_Update(&g_mode2_vely_pid, g_mode2_vely_target, -Pos_Est_vel_y_level, dt);
 
     roll_angle_target = FC_Mode_Clamp(velx_out + FC_Mode_Get_Roll_Mech_Trim_Deg(),
                                       -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);

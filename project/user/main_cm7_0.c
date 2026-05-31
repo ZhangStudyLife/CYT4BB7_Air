@@ -246,9 +246,6 @@ int main(void)
                 }
             }
         }
-#if (0U == WIFI_IMAGE_ENABLE)
-        wifi_cmd_Poll();
-#endif
-        air_comm_air_poll();
+
     }
 }

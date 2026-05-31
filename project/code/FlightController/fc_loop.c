@@ -451,17 +451,17 @@ void FC_Loop_100Hz(void)
         raw_tof4_mm = (float)tof->distance_mm[3];
     }
 
-    wifi_justfloat(tick_1000us_cnt,
-        ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,
-        ICM42688.acc_x, ICM42688.acc_y, ICM42688.acc_z,
-        g_euler.roll, g_euler.pitch, g_euler.yaw,
-        raw_tof1_mm, raw_tof2_mm, raw_tof3_mm, raw_tof4_mm,
-        lc302_data.flow_x_integral,lc302_data.flow_y_integral,
-        g_height_fused_vz_mps, height_pos_out, height_vel_out,g_motor_cmd.throttle,g_tof_fused_height_mm,g_motor_cmd.throttle,
-        g_height_acc_up_mps2
+    // wifi_justfloat(tick_1000us_cnt,
+    //     ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,
+    //     ICM42688.acc_x, ICM42688.acc_y, ICM42688.acc_z,
+    //     g_euler.roll, g_euler.pitch, g_euler.yaw,
+    //     raw_tof1_mm, raw_tof2_mm, raw_tof3_mm, raw_tof4_mm,
+    //     lc302_data.flow_x_integral,lc302_data.flow_y_integral,
+    //     g_height_fused_vz_mps, height_pos_out, height_vel_out,g_motor_cmd.throttle,g_tof_fused_height_mm,g_motor_cmd.throttle,
+    //     g_height_acc_up_mps2
 
 
-    );
+    // );
 
     // wifi_justfloat((float)tick_1000us_cnt,
     //                g_tof_fused_height_mm,    // 融合高度 mm
@@ -709,13 +709,21 @@ void FC_Loop_1000Hz(void)
         Motor_Mixer(&g_motor_cmd);
     }
 
-    // float dec_x;
-    // float dec_y;
-    // dec_x = FlowGyroDecoupler_GetDecX();
-    // dec_y = FlowGyroDecoupler_GetDecY();
-    // wifi_justfloat(tick_1000us_cnt,
-    //     g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY,g_pmw3901_raw.squal,
-    //     g_imudata_250hz.gyrox, g_imudata_250hz.gyroy, g_imudata_250hz.gyroz,
-    //     g_imudata_250hz.accx, g_imudata_250hz.accy, g_imudata_250hz.accz,
-    //     g_euler.pitch, g_euler.roll, g_euler.yaw,dec_x, dec_y);
+    float dec_x;
+    float dec_y;
+    dec_x = FlowGyroDecoupler_LC302_GetDecX();
+    dec_y = FlowGyroDecoupler_LC302_GetDecY();
+    wifi_justfloat(tick_1000us_cnt,
+        ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,
+        ICM42688.acc_x, ICM42688.acc_y, ICM42688.acc_z,
+        g_euler.roll, g_euler.pitch, g_euler.yaw,
+        roll_gyro_target, pitch_gyro_target, yaw_gyro_target,
+        roll_angle_target, pitch_angle_target, yaw_angle_target,
+        lc302_data.flow_x_integral,lc302_data.flow_y_integral,
+        dec_x, dec_y);
+
+#if (0U == WIFI_IMAGE_ENABLE)
+        wifi_cmd_Poll();
+#endif
+        air_comm_air_poll();
 }

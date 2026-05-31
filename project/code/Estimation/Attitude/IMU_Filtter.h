@@ -37,7 +37,7 @@ extern "C" {
 /* 陀螺仪主低通二阶 Butterworth 截止频率，单位 Hz */
 #define IMU_GYRO_LPF_HZ            (50.0f)
 /* 加速度计主低通二阶 Butterworth 截止频率，单位 Hz */
-#define IMU_ACCEL_LPF_HZ           (12.0f)
+#define IMU_ACCEL_LPF_HZ           (10.0f)
 
 /* IMU 三轴数量 */
 #define IMU_AXIS_NUM               (3U)
@@ -62,6 +62,13 @@ typedef struct
     float d1;
     float d2;
 } IMUBiquad_t;
+
+typedef struct
+{
+    float state;
+    float state1;
+    float k;
+} IMUPt2_t;
 
 /* IMU 六轴输出数据，陀螺仪单位 dps，加速度计单位 g */
 typedef struct

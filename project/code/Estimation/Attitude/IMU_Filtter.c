@@ -3,6 +3,7 @@
 #include <math.h>
 
 #define IMU_FILTER_PI  (3.14159265359f)
+#define IMU_FILTER_PT2_CUTOFF_CORRECTION (1.553773974f)
 
 /* 1000Hz 控制器输入链路滤波输出 */
 imudata_t g_imufilter_1000hz;
@@ -25,7 +26,7 @@ static struct
 
     IMUBiquad_t accel_notch0[IMU_AXIS_NUM]; /* 加速度计第一级陷波 */
     IMUBiquad_t accel_notch1[IMU_AXIS_NUM]; /* 加速度计第二级陷波 */
-    IMUBiquad_t accel_lpf[IMU_AXIS_NUM];    /* 加速度计主低通 */
+    IMUPt2_t accel_lpf[IMU_AXIS_NUM];       /* 加速度计主低通 */
 
     uint8_t initialized; /* 首帧直通标志 */
     uint16_t shock_hold_count; /* IMU 冲击保持计数，单位 1kHz 采样点 */
@@ -45,6 +46,34 @@ static float IMUBiquad_Apply(IMUBiquad_t *f, float in)
     f->d1 = f->b1 * in - f->a1 * out + f->d2;
     f->d2 = f->b2 * in - f->a2 * out;
     return out;
+}
+
+static float IMUPt1_Gain(float f_cut, float dt)
+{
+    float omega = 2.0f * IMU_FILTER_PI * f_cut * dt;
+    return omega / (omega + 1.0f);
+}
+
+static void IMUPt2_InitLPF(IMUPt2_t *f, float fs, float fc)
+{
+    float dt;
+
+    if ((f == NULL) || (fs <= 0.0f) || (fc <= 0.0f))
+    {
+        return;
+    }
+
+    dt = 1.0f / fs;
+    f->state = 0.0f;
+    f->state1 = 0.0f;
+    f->k = IMUPt1_Gain(fc * IMU_FILTER_PT2_CUTOFF_CORRECTION, dt);
+}
+
+static float IMUPt2_Apply(IMUPt2_t *f, float in)
+{
+    f->state1 = f->state1 + f->k * (in - f->state1);
+    f->state = f->state + f->k * (f->state1 - f->state);
+    return f->state;
 }
 
 /**
@@ -134,7 +163,7 @@ void IMUFilter_Init(void)
 #if (IMU_NOTCH1_ENABLE != 0U)
         IMUBiquad_InitNotch(&s_filt.accel_notch1[axis], IMU_SAMPLE_RATE_HZ, IMU_NOTCH1_HZ, IMU_NOTCH1_Q);
 #endif
-        IMUBiquad_InitLPF(&s_filt.accel_lpf[axis], IMU_SAMPLE_RATE_HZ, IMU_ACCEL_LPF_HZ);
+        IMUPt2_InitLPF(&s_filt.accel_lpf[axis], IMU_SAMPLE_RATE_HZ, IMU_ACCEL_LPF_HZ);
     }
 
     s_filt.initialized = 0U;
@@ -245,7 +274,7 @@ void IMUFilter_Update(float gx, float gy, float gz,
 #else
         accel_stage1 = accel_stage0;
 #endif
-        accel_out[axis] = IMUBiquad_Apply(&s_filt.accel_lpf[axis], accel_stage1);
+        accel_out[axis] = IMUPt2_Apply(&s_filt.accel_lpf[axis], accel_stage1);
     }
 
     g_imufilter_1000hz.gyrox = gyro_out[0];

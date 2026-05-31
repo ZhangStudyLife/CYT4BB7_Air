@@ -11,7 +11,7 @@ import pandas as pd
 
 
 BASE_DIR = Path(__file__).resolve().parent
-OUT_DIR = BASE_DIR / "analysis_0531_pid"
+OUT_DIR = BASE_DIR / "analysis_0531_pid_12"
 
 TRIM = {
     "roll": -1.8,
@@ -25,6 +25,16 @@ FLIGHT_ORDER = {
     "\u56db": 4,
     "\u4e94": 5,
     "\u516d": 6,
+    "\u4e03": 7,
+    "\u516b": 8,
+    "\u4e5d": 9,
+    "\u5341": 10,
+}
+
+FLIGHT_NAME_ORDER = {
+    "\u7b2c\u5341\u4e00\u6b21": 11,
+    "\u7b2c\u5341\u4e8c\u6b21": 12,
+    "\u7b2c\u5341\u6b21": 10,
 }
 
 PARAMS = {
@@ -69,6 +79,48 @@ PARAMS = {
         "pitch_angle_kp": 6.1, "pitch_angle_ki": 0.0, "pitch_angle_kd": 0.0, "pitch_angle_kff": 0.04,
         "roll_gyro_kp": 4.3, "roll_gyro_ki": 0.08, "roll_gyro_kd": 0.008, "roll_gyro_kff": 0.0,
         "pitch_gyro_kp": 5.1, "pitch_gyro_ki": 0.14, "pitch_gyro_kd": 0.010, "pitch_gyro_kff": 0.0,
+    },
+    7: {
+        "name": "seventh_balanced_candidate",
+        "roll_angle_kp": 6.5, "roll_angle_ki": 0.0, "roll_angle_kd": 0.0, "roll_angle_kff": 0.05,
+        "pitch_angle_kp": 6.7, "pitch_angle_ki": 0.0, "pitch_angle_kd": 0.0, "pitch_angle_kff": 0.05,
+        "roll_gyro_kp": 4.2, "roll_gyro_ki": 0.07, "roll_gyro_kd": 0.007, "roll_gyro_kff": 0.0,
+        "pitch_gyro_kp": 4.9, "pitch_gyro_ki": 0.12, "pitch_gyro_kd": 0.008, "pitch_gyro_kff": 0.0,
+    },
+    8: {
+        "name": "eighth_more_i_less_ff",
+        "roll_angle_kp": 6.4, "roll_angle_ki": 0.0, "roll_angle_kd": 0.0, "roll_angle_kff": 0.04,
+        "pitch_angle_kp": 6.6, "pitch_angle_ki": 0.0, "pitch_angle_kd": 0.0, "pitch_angle_kff": 0.04,
+        "roll_gyro_kp": 4.2, "roll_gyro_ki": 0.10, "roll_gyro_kd": 0.007, "roll_gyro_kff": 0.0,
+        "pitch_gyro_kp": 4.9, "pitch_gyro_ki": 0.15, "pitch_gyro_kd": 0.008, "pitch_gyro_kff": 0.0,
+    },
+    9: {
+        "name": "ninth_soft_undertuned",
+        "roll_angle_kp": 5.0, "roll_angle_ki": 0.0, "roll_angle_kd": 0.0, "roll_angle_kff": 0.0,
+        "pitch_angle_kp": 5.2, "pitch_angle_ki": 0.0, "pitch_angle_kd": 0.0, "pitch_angle_kff": 0.0,
+        "roll_gyro_kp": 3.2, "roll_gyro_ki": 0.04, "roll_gyro_kd": 0.003, "roll_gyro_kff": 0.0,
+        "pitch_gyro_kp": 3.8, "pitch_gyro_ki": 0.06, "pitch_gyro_kd": 0.004, "pitch_gyro_kff": 0.0,
+    },
+    10: {
+        "name": "tenth_strong_angle_ff",
+        "roll_angle_kp": 8.2, "roll_angle_ki": 0.0, "roll_angle_kd": 0.0, "roll_angle_kff": 0.14,
+        "pitch_angle_kp": 8.0, "pitch_angle_ki": 0.0, "pitch_angle_kd": 0.0, "pitch_angle_kff": 0.14,
+        "roll_gyro_kp": 4.2, "roll_gyro_ki": 0.08, "roll_gyro_kd": 0.006, "roll_gyro_kff": 0.0,
+        "pitch_gyro_kp": 4.9, "pitch_gyro_ki": 0.12, "pitch_gyro_kd": 0.007, "pitch_gyro_kff": 0.0,
+    },
+    11: {
+        "name": "eleventh_strong_inner_low_ff",
+        "roll_angle_kp": 6.0, "roll_angle_ki": 0.0, "roll_angle_kd": 0.0, "roll_angle_kff": 0.02,
+        "pitch_angle_kp": 6.2, "pitch_angle_ki": 0.0, "pitch_angle_kd": 0.0, "pitch_angle_kff": 0.02,
+        "roll_gyro_kp": 5.4, "roll_gyro_ki": 0.18, "roll_gyro_kd": 0.010, "roll_gyro_kff": 0.0,
+        "pitch_gyro_kp": 6.0, "pitch_gyro_ki": 0.24, "pitch_gyro_kd": 0.012, "pitch_gyro_kff": 0.0,
+    },
+    12: {
+        "name": "twelfth_strong_d_damping",
+        "roll_angle_kp": 5.8, "roll_angle_ki": 0.0, "roll_angle_kd": 0.0, "roll_angle_kff": 0.03,
+        "pitch_angle_kp": 6.0, "pitch_angle_ki": 0.0, "pitch_angle_kd": 0.0, "pitch_angle_kff": 0.03,
+        "roll_gyro_kp": 4.6, "roll_gyro_ki": 0.10, "roll_gyro_kd": 0.014, "roll_gyro_kff": 0.0,
+        "pitch_gyro_kp": 5.3, "pitch_gyro_ki": 0.15, "pitch_gyro_kd": 0.016, "pitch_gyro_kff": 0.0,
     },
 }
 
@@ -139,6 +191,9 @@ AXES = {
 
 
 def flight_no_from_name(path: Path) -> int:
+    for prefix, flight in FLIGHT_NAME_ORDER.items():
+        if path.name.startswith(prefix):
+            return flight
     if len(path.name) < 2 or path.name[1] not in FLIGHT_ORDER:
         raise ValueError(f"Cannot infer flight number from {path.name}")
     return FLIGHT_ORDER[path.name[1]]

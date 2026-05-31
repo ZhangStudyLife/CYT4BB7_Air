@@ -73,6 +73,8 @@ uint8_t wifi_cmd_IsReady(void);
 
 /* Query whether text replies are queued or in flight. */
 uint8_t wifi_cmd_IsTextBusy(void);
+/* Query whether the raw WiFi SPI transmit path is busy. */
+uint8_t wifi_cmd_IsRawBusy(void);
 
 /*
  * 函数名: wifi_cmd_SendBuffer

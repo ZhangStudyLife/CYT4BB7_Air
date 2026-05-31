@@ -14,6 +14,7 @@
 #include "FlightController/fc_start_crsf.h"
 #include "../../HW_Drivers/Beep/Beep.h"
 #include "../wifi_cal_imu/wifi_cal_imu.h"
+#include "../wifi_justfloat/wifi_justfloat.h"
 #include "../wifi_params/wifi_params.h"
 
 #define WIFI_CMD_TEXT_SEND_POLL_LIMIT   (20000U)
@@ -287,8 +288,12 @@ void wifi_cmd_Poll(void)
     {
         if ((0U != s_wifi_cmd_flush_pending) && (0U == wifi_spi_is_busy()))
         {
-            s_wifi_cmd_flush_pending = 0U;
+            if (0U != wifi_cmd_FlushNow())
+            {
+                s_wifi_cmd_flush_pending = 0U;
+            }
         }
+        (void)wifi_justfloat_Poll();
         return;
     }
 
@@ -302,6 +307,8 @@ void wifi_cmd_Poll(void)
     }
 
     /* 仅在非飞行状态下轮询 */
+    (void)wifi_justfloat_Poll();
+
     read_len = wifi_spi_read_buffer(rx_buffer, (uint32)sizeof(rx_buffer));
     for (i = 0U; i < read_len; i++)
     {
@@ -317,6 +324,11 @@ uint8 wifi_cmd_IsReady(void)
 uint8 wifi_cmd_IsTextBusy(void)
 {
     return s_wifi_cmd_text_tx_active;
+}
+
+uint8 wifi_cmd_IsRawBusy(void)
+{
+    return ((0U != wifi_spi_is_busy()) || (0U != s_wifi_cmd_flush_pending)) ? 1U : 0U;
 }
 
 /*

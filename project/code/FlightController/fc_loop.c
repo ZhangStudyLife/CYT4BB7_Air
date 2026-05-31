@@ -709,21 +709,12 @@ void FC_Loop_1000Hz(void)
         Motor_Mixer(&g_motor_cmd);
     }
 
-    float dec_x;
-    float dec_y;
-    dec_x = FlowGyroDecoupler_LC302_GetDecX();
-    dec_y = FlowGyroDecoupler_LC302_GetDecY();
-    wifi_justfloat(tick_1000us_cnt,
-        ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,
+    wifi_justfloat(diff,ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,
         ICM42688.acc_x, ICM42688.acc_y, ICM42688.acc_z,
         g_euler.roll, g_euler.pitch, g_euler.yaw,
         roll_gyro_target, pitch_gyro_target, yaw_gyro_target,
         roll_angle_target, pitch_angle_target, yaw_angle_target,
-        lc302_data.flow_x_integral,lc302_data.flow_y_integral,
-        dec_x, dec_y);
+        lc302_data.flow_x_integral,lc302_data.flow_y_integral);
 
-#if (0U == WIFI_IMAGE_ENABLE)
-        wifi_cmd_Poll();
-#endif
         air_comm_air_poll();
 }

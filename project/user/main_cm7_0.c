@@ -160,6 +160,10 @@ int main(void)
             guard++;
         }
 
+#if (0U == WIFI_IMAGE_ENABLE)
+        wifi_cmd_Poll();
+#endif
+
         if (g_tick_100HZ > 0U)
         {
             g_tick_100HZ--;

@@ -19,12 +19,12 @@
 #define RADIANS_TO_DEGREES                    (180.0f / 3.14159265359f)   /* 弧度转角度系数 */
 
 /* ======================== INAV 对齐参数 ======================== */
-#define MAHONY_KP_DEFAULT                     0.25f    /* Betaflight imu_dcm_kp=2500 对应 0.25 */
-#define MAHONY_KI_DEFAULT                     0.0f     /* Betaflight imu_dcm_ki 默认值 */
+#define MAHONY_KP_DEFAULT                     0.6f     /* 0531 离线 6轴对比: 全局最贴近 EKF/Madgwick 的姿态拉回力度 */
+#define MAHONY_KI_DEFAULT                     0.02f    /* 0531 离线 6轴对比: 静止/低动态时慢速学习 bias */
 #define MAHONY_INPUT_ACCEL_IS_SPECIFIC_FORCE  (1U)     /* 1=输入为比力，静止时约 -1g */
-#define MAHONY_ACCEL_MIN_MAGNITUDE            0.90f    /* Betaflight 姿态修正加速度模长下限，单位 g */
-#define MAHONY_ACCEL_MAX_MAGNITUDE            1.10f    /* Betaflight 姿态修正加速度模长上限，单位 g */
-#define MAHONY_ACCEL_TRUST_BAND_G             0.10f    /* 0.9g~1.1g 窗口内的线性信任带宽 */
+#define MAHONY_ACCEL_MIN_MAGNITUDE            0.30f    /* 0531 离线 6轴对比: 放宽飞行段加计修正下限，单位 g */
+#define MAHONY_ACCEL_MAX_MAGNITUDE            3.00f    /* 0531 离线 6轴对比: 放宽飞行段加计修正上限，单位 g */
+#define MAHONY_ACCEL_TRUST_BAND_G             0.70f    /* 0531 离线 6轴对比: 全局最优 |acc|-1g 连续降权带宽 */
 #define MAHONY_ACCEL_WEIGHT_MIN               0.0f     /* 第一阶段不再额外抬高加计参与门限 */
 #define MAHONY_ACCEL_IGNORE_RATE_DPS          12.0f    /* 角速度低于该阈值时加计全权参与 */
 #define MAHONY_ACCEL_IGNORE_SLOPE_DPS         18.0f    /* 从全权重退到 0 的角速度过渡带宽 */

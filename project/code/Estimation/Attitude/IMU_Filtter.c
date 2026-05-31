@@ -1,6 +1,7 @@
 #include "IMU_Filtter.h"
 
 #include <math.h>
+#include <stddef.h>
 
 #define IMU_FILTER_PI  (3.14159265359f)
 #define IMU_FILTER_PT2_CUTOFF_CORRECTION (1.553773974f)

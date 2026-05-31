@@ -709,12 +709,19 @@ void FC_Loop_1000Hz(void)
         Motor_Mixer(&g_motor_cmd);
     }
 
-    wifi_justfloat(diff,ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,
+    wifi_justfloat(ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,
         ICM42688.acc_x, ICM42688.acc_y, ICM42688.acc_z,
-        g_euler.roll, g_euler.pitch, g_euler.yaw,
-        roll_gyro_target, pitch_gyro_target, yaw_gyro_target,
-        roll_angle_target, pitch_angle_target, yaw_angle_target,
-        lc302_data.flow_x_integral,lc302_data.flow_y_integral);
+        g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
+        g_imufilter_1000hz.accx, g_imufilter_1000hz.accy, g_imufilter_1000hz.accz,
+        g_euler.roll, g_euler.pitch,
+        roll_angle_target, g_euler.roll, roll_angle_pid.output,
+        roll_angle_pid.p_term, roll_angle_pid.i_term, roll_angle_pid.d_term, roll_angle_pid.error,
+        pitch_angle_target, g_euler.pitch, pitch_angle_pid.output,
+        pitch_angle_pid.p_term, pitch_angle_pid.i_term, pitch_angle_pid.d_term, pitch_angle_pid.error,
+        roll_gyro_target, g_imufilter_1000hz.gyrox, roll_gyro_pid.output,
+        roll_gyro_pid.p_term, roll_gyro_pid.i_term, roll_gyro_pid.d_term,
+        pitch_gyro_target, g_imufilter_1000hz.gyroy, pitch_gyro_pid.output,
+        pitch_gyro_pid.p_term, pitch_gyro_pid.i_term, pitch_gyro_pid.d_term);
 
         air_comm_air_poll();
 }

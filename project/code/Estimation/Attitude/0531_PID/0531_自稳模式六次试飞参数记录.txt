@@ -254,6 +254,174 @@ set pitch_gyro_kff 0.0
 set pitch_gyro_i_limit 140.0
 set pitch_gyro_d_lpf 25.0
 
+第七次飞行: 均衡候选参数
+目的:
+在第 4 次和第 6 次之间取折中点，角度 FF 适中，内环 P/I/D 小幅增强，用来验证新姿态解算参数下的均衡基准。
+set roll_angle_kp 6.5
+set roll_angle_ki 0.0
+set roll_angle_kd 0.0
+set roll_angle_kff 0.05
+set roll_angle_i_limit 80.0
+set roll_angle_d_lpf 15.0
+set pitch_angle_kp 6.7
+set pitch_angle_ki 0.0
+set pitch_angle_kd 0.0
+set pitch_angle_kff 0.05
+set pitch_angle_i_limit 80.0
+set pitch_angle_d_lpf 15.0
+set roll_gyro_kp 4.2
+set roll_gyro_ki 0.07
+set roll_gyro_kd 0.007
+set roll_gyro_kff 0.0
+set roll_gyro_i_limit 180.0
+set roll_gyro_d_lpf 30.0
+set pitch_gyro_kp 4.9
+set pitch_gyro_ki 0.12
+set pitch_gyro_kd 0.008
+set pitch_gyro_kff 0.0
+set pitch_gyro_i_limit 140.0
+set pitch_gyro_d_lpf 30.0
+
+第八次飞行: 加强抗偏置参数
+目的:
+降低角度 FF，适当提高角速度 I，并降低 D 低通到 25 Hz，用来验证飞行中单侧倾斜或持续外力是否主要由内环 I 不足导致。
+set roll_angle_kp 6.4
+set roll_angle_ki 0.0
+set roll_angle_kd 0.0
+set roll_angle_kff 0.04
+set roll_angle_i_limit 80.0
+set roll_angle_d_lpf 15.0
+set pitch_angle_kp 6.6
+set pitch_angle_ki 0.0
+set pitch_angle_kd 0.0
+set pitch_angle_kff 0.04
+set pitch_angle_i_limit 80.0
+set pitch_angle_d_lpf 15.0
+set roll_gyro_kp 4.2
+set roll_gyro_ki 0.10
+set roll_gyro_kd 0.007
+set roll_gyro_kff 0.0
+set roll_gyro_i_limit 180.0
+set roll_gyro_d_lpf 25.0
+set pitch_gyro_kp 4.9
+set pitch_gyro_ki 0.15
+set pitch_gyro_kd 0.008
+set pitch_gyro_kff 0.0
+set pitch_gyro_i_limit 140.0
+set pitch_gyro_d_lpf 25.0
+
+第九次飞行: 明显偏软/欠调参数
+目的:
+大幅降低角度环 P/FF 和角速度环 P/I/D，用来观察欠调时的滞后、抗扰不足、角度误差 RMS 和手感变化。
+set roll_angle_kp 5.0
+set roll_angle_ki 0.0
+set roll_angle_kd 0.0
+set roll_angle_kff 0.00
+set roll_angle_i_limit 80.0
+set roll_angle_d_lpf 15.0
+set pitch_angle_kp 5.2
+set pitch_angle_ki 0.0
+set pitch_angle_kd 0.0
+set pitch_angle_kff 0.00
+set pitch_angle_i_limit 80.0
+set pitch_angle_d_lpf 15.0
+set roll_gyro_kp 3.2
+set roll_gyro_ki 0.04
+set roll_gyro_kd 0.003
+set roll_gyro_kff 0.0
+set roll_gyro_i_limit 180.0
+set roll_gyro_d_lpf 30.0
+set pitch_gyro_kp 3.8
+set pitch_gyro_ki 0.06
+set pitch_gyro_kd 0.004
+set pitch_gyro_kff 0.0
+set pitch_gyro_i_limit 140.0
+set pitch_gyro_d_lpf 30.0
+
+第十次飞行: 强角度环/强 FF 参数
+目的:
+大幅提高角度环 P 和 FF，内环维持中等强度，用来观察跟手性是否提升，以及是否出现明显过冲、回弹或发散。
+set roll_angle_kp 8.2
+set roll_angle_ki 0.0
+set roll_angle_kd 0.0
+set roll_angle_kff 0.14
+set roll_angle_i_limit 80.0
+set roll_angle_d_lpf 15.0
+set pitch_angle_kp 8.0
+set pitch_angle_ki 0.0
+set pitch_angle_kd 0.0
+set pitch_angle_kff 0.14
+set pitch_angle_i_limit 80.0
+set pitch_angle_d_lpf 15.0
+set roll_gyro_kp 4.2
+set roll_gyro_ki 0.08
+set roll_gyro_kd 0.006
+set roll_gyro_kff 0.0
+set roll_gyro_i_limit 180.0
+set roll_gyro_d_lpf 30.0
+set pitch_gyro_kp 4.9
+set pitch_gyro_ki 0.12
+set pitch_gyro_kd 0.007
+set pitch_gyro_kff 0.0
+set pitch_gyro_i_limit 140.0
+set pitch_gyro_d_lpf 30.0
+
+第十一次飞行: 强内环/低 FF 参数
+目的:
+角度环保持偏保守，明显增强角速度环 P/I/D，用来观察内环强度上限、抗偏置能力和高频噪声/电机温度风险。
+set roll_angle_kp 6.0
+set roll_angle_ki 0.0
+set roll_angle_kd 0.0
+set roll_angle_kff 0.02
+set roll_angle_i_limit 80.0
+set roll_angle_d_lpf 15.0
+set pitch_angle_kp 6.2
+set pitch_angle_ki 0.0
+set pitch_angle_kd 0.0
+set pitch_angle_kff 0.02
+set pitch_angle_i_limit 80.0
+set pitch_angle_d_lpf 15.0
+set roll_gyro_kp 5.4
+set roll_gyro_ki 0.18
+set roll_gyro_kd 0.010
+set roll_gyro_kff 0.0
+set roll_gyro_i_limit 180.0
+set roll_gyro_d_lpf 25.0
+set pitch_gyro_kp 6.0
+set pitch_gyro_ki 0.24
+set pitch_gyro_kd 0.012
+set pitch_gyro_kff 0.0
+set pitch_gyro_i_limit 140.0
+set pitch_gyro_d_lpf 25.0
+
+第十二次飞行: 强 D 阻尼/保守角度环参数
+目的:
+角度环偏保守，角速度环 D 明显提高并降低 D 低通到 20 Hz，用来验证更强阻尼是否能压住回弹和过冲。
+set roll_angle_kp 5.8
+set roll_angle_ki 0.0
+set roll_angle_kd 0.0
+set roll_angle_kff 0.03
+set roll_angle_i_limit 80.0
+set roll_angle_d_lpf 15.0
+set pitch_angle_kp 6.0
+set pitch_angle_ki 0.0
+set pitch_angle_kd 0.0
+set pitch_angle_kff 0.03
+set pitch_angle_i_limit 80.0
+set pitch_angle_d_lpf 15.0
+set roll_gyro_kp 4.6
+set roll_gyro_ki 0.10
+set roll_gyro_kd 0.014
+set roll_gyro_kff 0.0
+set roll_gyro_i_limit 180.0
+set roll_gyro_d_lpf 20.0
+set pitch_gyro_kp 5.3
+set pitch_gyro_ki 0.15
+set pitch_gyro_kd 0.016
+set pitch_gyro_kff 0.0
+set pitch_gyro_i_limit 140.0
+set pitch_gyro_d_lpf 20.0
+
 后续 6 次日志分析时优先比较:
 1. I21/I28 angle error 的 RMS、峰值和是否有持续偏置。
 2. I29/I30、I35/I36 的目标角速度和实测角速度相位差。

@@ -68,7 +68,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->roll_angle_kp = 6.5f;
     params->roll_angle_ki = 0.0f;
     params->roll_angle_kd = 0.0f;
-    params->roll_angle_kff = 0.12f;
+    params->roll_angle_kff = 0.0f;
     params->roll_angle_i_limit = 80.0f;
     params->roll_angle_d_lpf = 15.0f;
 
@@ -76,7 +76,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pitch_angle_kp = 6.4f;
     params->pitch_angle_ki = 0.0f;
     params->pitch_angle_kd = 0.0f;
-    params->pitch_angle_kff = 0.12f;
+    params->pitch_angle_kff = 0.0f;
     params->pitch_angle_i_limit = 80.0f;
     params->pitch_angle_d_lpf = 15.0f;
 

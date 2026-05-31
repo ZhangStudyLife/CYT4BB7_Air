@@ -1,0 +1,262 @@
+0531 自稳模式六次试飞参数记录
+
+目标:
+用第一次飞行作为基线, 后续再连续飞 5 次不同参数, 之后统一比较 6 份日志, 找 Roll/Pitch 自稳模式角度环和角速度环的更优组合。
+
+重要假设:
+1. 第一次飞行使用的是当前代码默认参数。如果第一次飞行前通过 WiFi set 改过参数, 以实际 set 值为准。
+2. 本文只覆盖自稳模式 Roll/Pitch 的角度环和角速度环参数。
+3. Yaw、高度、位置、姿态解算和滤波参数本轮不改。
+4. 当前代码中角度环 FF smoothing = 80 ms, angle output PT3 LPF = 50 Hz, angle output limit = +/-260 deg/s, 这几个是 fc_loop.c 里的 const, 不是 WiFi 参数。
+
+BF 参考原则:
+1. Betaflight FeedForward 是按 setpoint 变化率生成的前馈, 主要减少输入到响应的延迟; 太多 FF 可能在动作开始处造成 overshoot。
+2. BF 文档建议做误差/相位分析时可以先把 FF 关掉, 这样更容易看 P/I/D 本身的作用。
+3. P 提高会让跟随更紧, 过高会快速振荡; I 负责长期偏差和抗外力, 过高会慢振/拖; D 用来抑制过冲和增加阻尼, 但要小步增加并检查电机温度。
+4. 对挂 GoPro/O3、电池较重的五寸/六寸机, 参数方向一般不是盲目加 FF, 而是内环 P/I 稍强、少量 D 阻尼、FF 适中或偏低。
+
+参考链接:
+https://www.betaflight.com/docs/wiki/guides/current/Feed-Forward-2-0
+https://www.betaflight.com/docs/development/PID-tuning
+https://betaflight.com/docs/wiki/guides/current/PID-Tuning-Guide
+https://betaflight.com/docs/wiki/getting-started/setup-guide
+
+遥测通道说明:
+I0  = 自动时间戳
+I1  = raw gyro x
+I2  = raw gyro y
+I3  = raw gyro z
+I4  = raw acc x
+I5  = raw acc y
+I6  = raw acc z
+I7  = filtered gyro x
+I8  = filtered gyro y
+I9  = filtered gyro z
+I10 = filtered acc x
+I11 = filtered acc y
+I12 = filtered acc z
+I13 = euler roll
+I14 = euler pitch
+I15 = roll angle target
+I16 = roll angle measured
+I17 = roll angle PID output, unit deg/s
+I18 = roll angle PID P
+I19 = roll angle PID I
+I20 = roll angle PID D
+I21 = roll angle PID error, unit deg
+I22 = pitch angle target
+I23 = pitch angle measured
+I24 = pitch angle PID output, unit deg/s
+I25 = pitch angle PID P
+I26 = pitch angle PID I
+I27 = pitch angle PID D
+I28 = pitch angle PID error, unit deg
+I29 = roll gyro target, unit deg/s
+I30 = roll gyro measured filtered, unit deg/s
+I31 = roll gyro PID output
+I32 = roll gyro PID P
+I33 = roll gyro PID I
+I34 = roll gyro PID D
+I35 = pitch gyro target, unit deg/s
+I36 = pitch gyro measured filtered, unit deg/s
+I37 = pitch gyro PID output
+I38 = pitch gyro PID P
+I39 = pitch gyro PID I
+I40 = pitch gyro PID D
+
+注意:
+当前遥测没有单独发送 ff_term。因为 PID output = P + I + D + FF, 所以后续分析可用 output - P - I - D 反推出 FF。
+
+第一次飞行: 第一次飞行.csv
+参数记录:
+roll_angle_kp  = 6.5
+roll_angle_ki  = 0.0
+roll_angle_kd  = 0.0
+roll_angle_kff = 0.12
+roll_angle_i_limit = 80.0
+roll_angle_d_lpf   = 15.0
+
+pitch_angle_kp  = 6.4
+pitch_angle_ki  = 0.0
+pitch_angle_kd  = 0.0
+pitch_angle_kff = 0.12
+pitch_angle_i_limit = 80.0
+pitch_angle_d_lpf   = 15.0
+
+roll_gyro_kp  = 3.8
+roll_gyro_ki  = 0.0
+roll_gyro_kd  = 0.0
+roll_gyro_kff = 0.0
+roll_gyro_i_limit = 180.0
+roll_gyro_d_lpf   = 30.0
+
+pitch_gyro_kp  = 4.6
+pitch_gyro_ki  = 0.08
+pitch_gyro_kd  = 0.0
+pitch_gyro_kff = 0.0
+pitch_gyro_i_limit = 100.0
+pitch_gyro_d_lpf   = 30.0
+
+第一次日志快速摘要:
+样本数 70182。
+Roll angle target 范围约 -20.0 ~ 20.0 deg, measured 范围约 -22.21 ~ 22.88 deg, error RMS 约 3.66 deg。
+Pitch angle target 范围约 -20.0 ~ 20.0 deg, measured 范围约 -20.37 ~ 19.24 deg, error RMS 约 3.09 deg。
+Roll gyro target RMS 约 24.38 deg/s, measured RMS 约 24.61 deg/s, gyro output RMS 约 82.88。
+Pitch gyro target RMS 约 20.53 deg/s, measured RMS 约 21.99 deg/s, gyro output RMS 约 75.86。
+第一次飞行里 Roll 角速度环 I/D 为 0, Pitch 角速度环有少量 I, 所有 D 都为 0。
+
+后续 5 次试飞参数:
+每次试飞前把对应整组参数都 set 一遍, 避免上一组残留。未列出的参数保持第一次飞行值。
+如果出现高频抖动、明显啸叫、电机快速发热或姿态发散, 立即降落, 不继续飞下一组。
+
+第二次飞行: 关闭角度环 FF, 用来隔离 P/I/D 本体
+目的:
+参考 BF 做误差分析时先关 FF 的思路, 看没有 angle FF 时自稳响应是否更干净、是否少过冲。
+
+set roll_angle_kp 6.5
+set roll_angle_ki 0.0
+set roll_angle_kd 0.0
+set roll_angle_kff 0.0
+set roll_angle_i_limit 80.0
+set roll_angle_d_lpf 15.0
+set pitch_angle_kp 6.4
+set pitch_angle_ki 0.0
+set pitch_angle_kd 0.0
+set pitch_angle_kff 0.0
+set pitch_angle_i_limit 80.0
+set pitch_angle_d_lpf 15.0
+set roll_gyro_kp 3.8
+set roll_gyro_ki 0.0
+set roll_gyro_kd 0.0
+set roll_gyro_kff 0.0
+set roll_gyro_i_limit 180.0
+set roll_gyro_d_lpf 30.0
+set pitch_gyro_kp 4.6
+set pitch_gyro_ki 0.08
+set pitch_gyro_kd 0.0
+set pitch_gyro_kff 0.0
+set pitch_gyro_i_limit 100.0
+set pitch_gyro_d_lpf 30.0
+
+第三次飞行: 提高角度环 P, 降低 FF, 内环小幅增强
+目的:
+让自稳回正更紧, 但 FF 低于第一次, 避免靠前馈制造过冲。
+
+set roll_angle_kp 7.1
+set roll_angle_ki 0.0
+set roll_angle_kd 0.0
+set roll_angle_kff 0.08
+set roll_angle_i_limit 80.0
+set roll_angle_d_lpf 15.0
+set pitch_angle_kp 7.0
+set pitch_angle_ki 0.0
+set pitch_angle_kd 0.0
+set pitch_angle_kff 0.08
+set pitch_angle_i_limit 80.0
+set pitch_angle_d_lpf 15.0
+set roll_gyro_kp 4.1
+set roll_gyro_ki 0.05
+set roll_gyro_kd 0.0
+set roll_gyro_kff 0.0
+set roll_gyro_i_limit 180.0
+set roll_gyro_d_lpf 30.0
+set pitch_gyro_kp 4.9
+set pitch_gyro_ki 0.10
+set pitch_gyro_kd 0.0
+set pitch_gyro_kff 0.0
+set pitch_gyro_i_limit 120.0
+set pitch_gyro_d_lpf 30.0
+
+第四次飞行: 加少量角速度 D 阻尼
+目的:
+验证少量 D 是否能降低过冲和相位滞后后的回弹。重点检查电机温度和高频噪声。
+
+set roll_angle_kp 6.8
+set roll_angle_ki 0.0
+set roll_angle_kd 0.0
+set roll_angle_kff 0.06
+set roll_angle_i_limit 80.0
+set roll_angle_d_lpf 15.0
+set pitch_angle_kp 6.7
+set pitch_angle_ki 0.0
+set pitch_angle_kd 0.0
+set pitch_angle_kff 0.06
+set pitch_angle_i_limit 80.0
+set pitch_angle_d_lpf 15.0
+set roll_gyro_kp 4.0
+set roll_gyro_ki 0.06
+set roll_gyro_kd 0.006
+set roll_gyro_kff 0.0
+set roll_gyro_i_limit 180.0
+set roll_gyro_d_lpf 30.0
+set pitch_gyro_kp 4.8
+set pitch_gyro_ki 0.11
+set pitch_gyro_kd 0.007
+set pitch_gyro_kff 0.0
+set pitch_gyro_i_limit 120.0
+set pitch_gyro_d_lpf 30.0
+
+第五次飞行: 强自稳响应
+目的:
+给一组更强角度 P 和更强内环, 看能否明显降低 angle error RMS, 同时观察是否开始过冲或振荡。
+
+set roll_angle_kp 7.6
+set roll_angle_ki 0.0
+set roll_angle_kd 0.0
+set roll_angle_kff 0.10
+set roll_angle_i_limit 80.0
+set roll_angle_d_lpf 15.0
+set pitch_angle_kp 7.4
+set pitch_angle_ki 0.0
+set pitch_angle_kd 0.0
+set pitch_angle_kff 0.10
+set pitch_angle_i_limit 80.0
+set pitch_angle_d_lpf 15.0
+set roll_gyro_kp 4.2
+set roll_gyro_ki 0.06
+set roll_gyro_kd 0.006
+set roll_gyro_kff 0.0
+set roll_gyro_i_limit 180.0
+set roll_gyro_d_lpf 30.0
+set pitch_gyro_kp 5.0
+set pitch_gyro_ki 0.12
+set pitch_gyro_kd 0.008
+set pitch_gyro_kff 0.0
+set pitch_gyro_i_limit 120.0
+set pitch_gyro_d_lpf 30.0
+
+第六次飞行: 重载平滑/GoPro 倾向
+目的:
+降低角度 FF, 角度 P 不激进, 内环 P/I/D 稍强, 看重载时是否更稳、更少晃动和过冲。
+
+set roll_angle_kp 6.2
+set roll_angle_ki 0.0
+set roll_angle_kd 0.0
+set roll_angle_kff 0.04
+set roll_angle_i_limit 80.0
+set roll_angle_d_lpf 15.0
+set pitch_angle_kp 6.1
+set pitch_angle_ki 0.0
+set pitch_angle_kd 0.0
+set pitch_angle_kff 0.04
+set pitch_angle_i_limit 80.0
+set pitch_angle_d_lpf 15.0
+set roll_gyro_kp 4.3
+set roll_gyro_ki 0.08
+set roll_gyro_kd 0.008
+set roll_gyro_kff 0.0
+set roll_gyro_i_limit 180.0
+set roll_gyro_d_lpf 25.0
+set pitch_gyro_kp 5.1
+set pitch_gyro_ki 0.14
+set pitch_gyro_kd 0.010
+set pitch_gyro_kff 0.0
+set pitch_gyro_i_limit 140.0
+set pitch_gyro_d_lpf 25.0
+
+后续 6 次日志分析时优先比较:
+1. I21/I28 angle error 的 RMS、峰值和是否有持续偏置。
+2. I29/I30、I35/I36 的目标角速度和实测角速度相位差。
+3. I31/I37 output 与 P/I/D/反推 FF 的方向是否一致。
+4. D 加入后 I34/I40 是否明显高频抖动, 电机是否发热。
+5. FF 降低后 target 变化初段是否变钝, 以及 overshoot 是否下降。

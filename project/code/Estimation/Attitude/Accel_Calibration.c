@@ -58,10 +58,10 @@
 
 #define IMU_CALIB_GYRO_TARGET_VALID_SAMPLES      (60000U) /* �����Ǿ�ֹ�궨Ŀ����Ч��������Լ60�� */
 #define IMU_CALIB_GYRO_TIMEOUT_SAMPLES           (300000U) /* �����Ǿ�ֹ�궨��ʱ������ */
-#define IMU_CALIB_GYRO_STATIC_MAX_DPS            (1.5f)
+#define IMU_CALIB_GYRO_STATIC_MAX_DPS            (6.0f)
 #define IMU_CALIB_GYRO_STATIC_ACC_ERR_G          (0.06f)
 #define IMU_CALIB_GYRO_STD_MAX_DPS               (0.20f)
-#define IMU_CALIB_GYRO_BIAS_MAX_DPS              (3.0f)
+#define IMU_CALIB_GYRO_BIAS_MAX_DPS              (8.0f)
 #define IMU_CALIB_GYRO_PRE_STABLE_SAMPLES        (1500U) /* �����Ǳ궨Ԥ���ȶ������� */
 
 #define IMU_CALIB_ACC6_FACE_TARGET_SAMPLES       (2500U) /* 6��궨����Ŀ������� */
@@ -3571,24 +3571,24 @@ static void imu_calib_apply_default_accel_calibration(void)
 {
     AccelCalibrationParams_t params;
 
-    /* 由29点椭球拟合得到的最优校准参数, max_norm_err=0.0005g */
-    params.accel_bias_g[0] = 0.00231217f;
-    params.accel_bias_g[1] = -0.00166184f;
-    params.accel_bias_g[2] = -0.01358864f;
+    /* 由25点椭球拟合得到的最优校准参数, max_norm_err=0.0006g */
+    params.accel_bias_g[0] = 0.00110100f;
+    params.accel_bias_g[1] = 0.00112800f;
+    params.accel_bias_g[2] = 0.00480400f;
 
-    params.accel_corr_matrix[0][0] = 1.00377779f;
-    params.accel_corr_matrix[0][1] = 0.00727085f;
-    params.accel_corr_matrix[0][2] = -0.00097577f;
+    params.accel_corr_matrix[0][0] = 0.99930200f;
+    params.accel_corr_matrix[0][1] = 0.00370700f;
+    params.accel_corr_matrix[0][2] = -0.00138100f;
     params.accel_corr_matrix[1][0] = 0.00000000f;
-    params.accel_corr_matrix[1][1] = 0.99980692f;
-    params.accel_corr_matrix[1][2] = 0.00038574f;
+    params.accel_corr_matrix[1][1] = 0.99960100f;
+    params.accel_corr_matrix[1][2] = -0.00053700f;
     params.accel_corr_matrix[2][0] = 0.00000000f;
     params.accel_corr_matrix[2][1] = 0.00000000f;
-    params.accel_corr_matrix[2][2] = 0.99999515f;
+    params.accel_corr_matrix[2][2] = 0.99878000f;
 
-    params.accel_scale[0] = 1.00377779f;
-    params.accel_scale[1] = 0.99980692f;
-    params.accel_scale[2] = 0.99999515f;
+    params.accel_scale[0] = 0.99930200f;
+    params.accel_scale[1] = 0.99960100f;
+    params.accel_scale[2] = 0.99878000f;
 
     params.use_full_matrix = 1U;
     params.gravity_mps2 = 9.80665f;
@@ -3597,7 +3597,7 @@ static void imu_calib_apply_default_accel_calibration(void)
     AccelCalibration_LoadParams(&params);
     IMUCalib_SaveCurrentToFlash();
 
-    printf("cal,default,optimal,max_err=0.0005g\r\n");
+    printf("cal,default,optimal,max_err=0.0006g\r\n");
 }
 
 void IMUCalib_Init(void)

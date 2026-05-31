@@ -12,7 +12,7 @@
 /* 飞控参数 Flash 魔数：用于识别有效参数块 */
 #define FC_PARAMS_FLASH_MAGIC   (0x46504346UL)
 /* 飞控参数 Flash 版本号：结构变化时递增 */
-#define FC_PARAMS_FLASH_VERSION (17U)
+#define FC_PARAMS_FLASH_VERSION (19U)
 /* 飞控参数 Flash 可兼容读取的最小版本号 */
 #define FC_PARAMS_FLASH_MIN_COMPAT_VERSION (5U)
 
@@ -78,12 +78,12 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->vel_z_dt = 0.01f;   /* 100Hz */
 
     /* ===== 油门与机械配平参数 ===== */
-    params->base_throttle = 4200;         /* 悬停油门 */
-    params->roll_mech_trim_deg = 0.22f;    /* Roll 机械配平角 */
-    params->pitch_mech_trim_deg = -1.80f;  /* Pitch 机械配平角 */
+    params->base_throttle = 2700;         /* 悬停油门 */
+    params->roll_mech_trim_deg = -3.0f;    /* Roll 机械配平角 */
+    params->pitch_mech_trim_deg = 3.5f;  /* Pitch 机械配平角 */
 
     /* ===== Roll 轴角速度环参数 ===== */
-    params->roll_gyro_kp = 5.0f;
+    params->roll_gyro_kp = 3.8f;
     params->roll_gyro_ki = 0.0f;
     params->roll_gyro_kd = 0.0f;
     params->roll_gyro_kff = 0.0f;
@@ -91,16 +91,16 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->roll_gyro_d_lpf = 30.0f;
 
     /* ===== Pitch 轴角速度环参数 ===== */
-    params->pitch_gyro_kp = 6.0f;
-    params->pitch_gyro_ki = 0.10f;
+    params->pitch_gyro_kp = 4.6f;
+    params->pitch_gyro_ki = 0.08f;
     params->pitch_gyro_kd = 0.0f;
     params->pitch_gyro_kff = 0.0f;
     params->pitch_gyro_i_limit = 100.0f;
     params->pitch_gyro_d_lpf = 30.0f;
 
     /* ===== Yaw 轴角速度环参数 ===== */
-    params->yaw_gyro_kp = 14.0f;
-    params->yaw_gyro_ki = 4.0f;
+    params->yaw_gyro_kp = 11.0f;
+    params->yaw_gyro_ki = 3.0f;
     params->yaw_gyro_kd = 0.0f;
     params->yaw_gyro_kff = 0.0f;
     params->yaw_gyro_i_limit = 700.0f;
@@ -172,7 +172,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
 
     /* ===== Z 轴速度环参数 ===== */
     params->vel_z_kp = 700.0f;
-    params->vel_z_ki = 55.0f;
+    params->vel_z_ki = 65.0f;
     params->vel_z_kd = 0.0f;
     params->vel_z_kff = 0.0f;
     params->vel_z_i_limit = 380.0f;
@@ -403,6 +403,23 @@ static void fc_params_migrate_loaded(fc_params_t *params, uint16 version)
         params->mode2_vel_y_kff = 0.0f;
         params->mode2_vel_y_i_limit = 3.0f;
         params->mode2_vel_y_d_lpf = 0.0f;
+    }
+
+    if (version < 18U)
+    {
+        params->base_throttle = 2700;
+        params->roll_gyro_kp = 3.8f;
+        params->pitch_gyro_kp = 4.6f;
+        params->pitch_gyro_ki = 0.08f;
+        params->yaw_gyro_kp = 11.0f;
+        params->yaw_gyro_ki = 3.0f;
+    }
+
+    if (version < 19U)
+    {
+        params->base_throttle = 2700;
+        params->roll_mech_trim_deg = -3.0f;
+        params->pitch_mech_trim_deg = 3.5f;
     }
 }
 

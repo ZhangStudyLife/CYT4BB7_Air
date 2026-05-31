@@ -42,18 +42,18 @@ static FC_START_CRSF_flight_mode_e s_prev_flight_mode = FC_START_CRSF_FLIGHT_MOD
 /* 上一次飞控状态，用于检测飞行态切换边沿 */
 static FC_START_CRSF_state_e s_prev_fc_state = FC_START_CRSF_STATE_INIT;
 /* 悬停油门在线学习（借鉴 ArduPilot MOT_THST_HOVER） */
-#define FC_HOVER_THR_INIT 4070.0f
+#define FC_HOVER_THR_INIT 2700.0f
 #define FC_HOVER_THR_TC 6.0f
-#define FC_HOVER_THR_MIN 3600.0f
-#define FC_HOVER_THR_MAX 4550.0f
+#define FC_HOVER_THR_MIN 1700.0f
+#define FC_HOVER_THR_MAX 4300.0f
 #define FC_HOVER_LEARN_VZ_MAX 0.18f
 #define FC_HOVER_LEARN_POS_MAX 0.08f
-#define FC_THRUST_ACC_MPS2_PER_PWM 0.00278f
-#define FC_HEIGHT_VEL_KP_ACC 2.00f
-#define FC_HEIGHT_VEL_KD_ACC 0.050f
-#define FC_HEIGHT_VEL_TARGET_LIMIT 0.80f
-#define FC_HEIGHT_VEL_OUT_MIN (-900.0f)
-#define FC_HEIGHT_VEL_OUT_MAX 900.0f
+#define FC_THRUST_ACC_MPS2_PER_PWM 0.00360f
+#define FC_HEIGHT_VEL_KP_ACC 1.50f
+#define FC_HEIGHT_VEL_KD_ACC 0.035f
+#define FC_HEIGHT_VEL_TARGET_LIMIT 0.60f
+#define FC_HEIGHT_VEL_OUT_MIN (-650.0f)
+#define FC_HEIGHT_VEL_OUT_MAX 650.0f
 #define FC_HEIGHT_VEL_KP_PWM (FC_HEIGHT_VEL_KP_ACC / FC_THRUST_ACC_MPS2_PER_PWM)
 #define FC_HEIGHT_VEL_KD_PWM (FC_HEIGHT_VEL_KD_ACC / FC_THRUST_ACC_MPS2_PER_PWM)
 static float s_hover_throttle = FC_HOVER_THR_INIT;
@@ -249,8 +249,14 @@ void FC_Loop_Init(void)
              g_fc_params.yaw_gyro_i_limit, g_fc_params.yaw_gyro_d_lpf);
     PID_Init(&height_pos_pid, 1.40f, 0.0f, 0.0f, 0.0f,
              g_fc_params.pos_z_dt, 0.0f, 0.0f);
-    PID_Init(&height_vel_pid, FC_HEIGHT_VEL_KP_PWM, 0.0f, FC_HEIGHT_VEL_KD_PWM, 0.0f,
-             g_fc_params.vel_z_dt, 0.0f, 12.0f);
+    PID_Init(&height_vel_pid, FC_HEIGHT_VEL_KP_PWM, g_fc_params.vel_z_ki, FC_HEIGHT_VEL_KD_PWM, 0.0f,
+             g_fc_params.vel_z_dt, g_fc_params.vel_z_i_limit, 12.0f);
+    height_pos_pid.aw_enable = 1U;
+    height_pos_pid.output_min = -FC_HEIGHT_VEL_TARGET_LIMIT;
+    height_pos_pid.output_max = FC_HEIGHT_VEL_TARGET_LIMIT;
+    height_vel_pid.aw_enable = 1U;
+    height_vel_pid.output_min = FC_HEIGHT_VEL_OUT_MIN;
+    height_vel_pid.output_max = FC_HEIGHT_VEL_OUT_MAX;
 
     FC_Mode0_Init();
     FC_Mode1_Init();
@@ -445,26 +451,38 @@ void FC_Loop_100Hz(void)
         raw_tof4_mm = (float)tof->distance_mm[3];
     }
 
-    wifi_justfloat((float)tick_1000us_cnt,
-                   g_tof_fused_height_mm,    // 融合高度 mm
-                   raw_tof1_mm,              // TOF1原始 mm
-                   raw_tof2_mm,              // TOF2原始 mm
-                   raw_tof3_mm,              // TOF3原始 mm
-                   raw_tof4_mm,              // TOF4原始 mm
-                   g_euler.roll,             // Roll 姿态角 deg
-                   g_euler.pitch,            // Pitch 姿态角 deg
-                   g_euler.yaw,              // Yaw 姿态角 deg
-                   g_tof1_height_mm,         // TOF1姿态解耦 mm
-                   g_tof2_height_mm,         // TOF2姿态解耦 mm
-                   g_tof3_height_mm,         // TOF3姿态解耦 mm
-                   g_tof4_height_mm,         // TOF4姿态解耦 mm
-                   g_imufilter_1000hz.accz,  // 机体系Z轴加速度 m/s²
-                   g_height_acc_up_mps2,     // 大地系Z轴加速度 m/s²
-                   g_motor_cmd.throttle, // 目标高度 mm
-                   g_motor_cmd.roll,     // Roll 电调输入
-                   g_motor_cmd.pitch,    // Pitch 电调输入
-                     g_motor_cmd.yaw      // Yaw 电调输入
+    wifi_justfloat(tick_1000us_cnt,
+        ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,
+        ICM42688.acc_x, ICM42688.acc_y, ICM42688.acc_z,
+        g_euler.roll, g_euler.pitch, g_euler.yaw,
+        raw_tof1_mm, raw_tof2_mm, raw_tof3_mm, raw_tof4_mm,
+        lc302_data.flow_x_integral,lc302_data.flow_y_integral,
+        g_height_fused_vz_mps, height_pos_out, height_vel_out,g_motor_cmd.throttle,g_tof_fused_height_mm,g_motor_cmd.throttle,
+        g_height_acc_up_mps2
+
+
     );
+
+    // wifi_justfloat((float)tick_1000us_cnt,
+    //                g_tof_fused_height_mm,    // 融合高度 mm
+    //                raw_tof1_mm,              // TOF1原始 mm
+    //                raw_tof2_mm,              // TOF2原始 mm
+    //                raw_tof3_mm,              // TOF3原始 mm
+    //                raw_tof4_mm,              // TOF4原始 mm
+    //                g_euler.roll,             // Roll 姿态角 deg
+    //                g_euler.pitch,            // Pitch 姿态角 deg
+    //                g_euler.yaw,              // Yaw 姿态角 deg
+    //                g_tof1_height_mm,         // TOF1姿态解耦 mm
+    //                g_tof2_height_mm,         // TOF2姿态解耦 mm
+    //                g_tof3_height_mm,         // TOF3姿态解耦 mm
+    //                g_tof4_height_mm,         // TOF4姿态解耦 mm
+    //                g_imufilter_1000hz.accz,  // 机体系Z轴加速度 m/s²
+    //                g_height_acc_up_mps2,     // 大地系Z轴加速度 m/s²
+    //                g_motor_cmd.throttle, // 目标高度 mm
+    //                g_motor_cmd.roll,     // Roll 电调输入
+    //                g_motor_cmd.pitch,    // Pitch 电调输入
+    //                  g_motor_cmd.yaw      // Yaw 电调输入
+    // );
     if (fc_state == FC_START_CRSF_STATE_LANDING)
     {
         FC_Mode0_100Hz();
@@ -683,7 +701,7 @@ void FC_Loop_1000Hz(void)
         //                         8u);
         g_motor_cmd.throttle = (int32_t)fc_clampf(
             FC_Apply_Tilt_Throttle_Compensation(s_hover_throttle) + height_vel_out,
-            3000.0f, 5500.0f);
+            1700.0f, 5000.0f);
         g_motor_cmd.roll = roll_ctrl;
         g_motor_cmd.pitch = -pitch_ctrl;
         g_motor_cmd.yaw = yaw_ctrl;

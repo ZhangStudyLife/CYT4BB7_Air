@@ -11,14 +11,14 @@ extern "C" {
 #define IMU_SAMPLE_RATE_HZ         (1000.0f)
 
 /* 第一级陷波中心频率，单位 Hz */
-#define IMU_NOTCH0_HZ              (160.0f)
+#define IMU_NOTCH0_HZ              (185.0f)
 /* 第一级陷波带宽，单位 Hz */
-#define IMU_NOTCH0_BW_HZ           (65.0f)
+#define IMU_NOTCH0_BW_HZ           (70.0f)
 /* 第一级陷波品质因数，按 Q=f/BW 定义 */
 #define IMU_NOTCH0_Q               (IMU_NOTCH0_HZ / IMU_NOTCH0_BW_HZ)
 
 /* 加速度计第一级陷波带宽，单位 Hz */
-#define IMU_ACCEL_NOTCH0_BW_HZ     (45.0f)
+#define IMU_ACCEL_NOTCH0_BW_HZ     (70.0f)
 /* 加速度计第一级陷波品质因数，按 Q=f/BW 定义 */
 #define IMU_ACCEL_NOTCH0_Q         (IMU_NOTCH0_HZ / IMU_ACCEL_NOTCH0_BW_HZ)
 
@@ -35,7 +35,7 @@ extern "C" {
 /* 陀螺仪抗混叠二阶 Butterworth 低通截止频率，单位 Hz */
 #define IMU_GYRO_ANTI_ALIAS_LPF_HZ (250.0f)
 /* 陀螺仪主低通二阶 Butterworth 截止频率，单位 Hz */
-#define IMU_GYRO_LPF_HZ            (60.0f)
+#define IMU_GYRO_LPF_HZ            (50.0f)
 /* 加速度计主低通二阶 Butterworth 截止频率，单位 Hz */
 #define IMU_ACCEL_LPF_HZ           (12.0f)
 

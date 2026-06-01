@@ -27,14 +27,23 @@ float g_height_acc_up_mps2 = 0.0f;
 #define HEIGHT_LOW_OUTLIER_MAX_MM   320.0f
 #define HEIGHT_CONF_MIN             0.12f
 #define HEIGHT_MISS_MAX             300U
-#define HEIGHT_POS_GAIN             0.055f
-#define HEIGHT_VEL_GAIN             0.42f
-#define HEIGHT_VEL_LPF              0.012f
+#define HEIGHT_TOF_ALPHA            0.18f
+#define HEIGHT_TOF_ALPHA_STRONG     0.32f
+#define HEIGHT_TOF_ALPHA_MEDIUM     0.18f
+#define HEIGHT_TOF_ALPHA_WEAK       0.06f
+#define HEIGHT_VEL_TOF_ALPHA        0.18f
+#define HEIGHT_VEL_LPF              0.018f
 #define HEIGHT_ACC_LPF              0.08f
-#define HEIGHT_ACC_LIMIT_MPS2       6.0f
-#define HEIGHT_VEL_LEAK             0.9998f
-#define HEIGHT_NO_MEAS_VEL_LEAK     0.9980f
+#define HEIGHT_ACC_LIMIT_MPS2       5.0f
+#define HEIGHT_ACC_VEL_GAIN         0.35f
+#define HEIGHT_TRUSTED_TOF_CAP_M    0.015f
+#define HEIGHT_SOFT_TOF_CAP_M       0.080f
+#define HEIGHT_SOFT_TOF_CAP_GAIN    0.25f
+#define HEIGHT_VEL_LEAK             0.9990f
+#define HEIGHT_NO_MEAS_VEL_LEAK     0.9960f
 #define HEIGHT_DEG_TO_RAD           0.017453293f
+#define HEIGHT_HISTORY_GATE_MIN_MM  120.0f
+#define HEIGHT_HISTORY_GATE_MAX_MM  260.0f
 
 static float s_h_m = 0.0f;
 static float s_v_mps = 0.0f;
@@ -107,7 +116,7 @@ static float Height_ChannelMm(const VL53L1X_data_struct *tof, uint8 i, float rol
     return Height_Clamp(h, HEIGHT_MIN_MM, HEIGHT_STATE_MAX_MM);
 }
 
-static uint8 Height_BuildMeasure(const VL53L1X_data_struct *tof, float *meas_mm, float *health)
+static uint8 Height_BuildMeasure(const VL53L1X_data_struct *tof, float *meas_mm, float *health, uint8 *inlier_count)
 {
     float h[VL53L1X_SENSOR_COUNT];
     float s[VL53L1X_SENSOR_COUNT];
@@ -121,9 +130,21 @@ static uint8 Height_BuildMeasure(const VL53L1X_data_struct *tof, float *meas_mm,
     float inlier_spread = 0.0f;
     float sum_h = 0.0f;
     float sum_w = 0.0f;
+    float hist_sum = 0.0f;
+    float hist_min = (float)VL53L1X_INVALID_DISTANCE_MM;
+    float hist_max = 0.0f;
+    float hist_gate = HEIGHT_HISTORY_GATE_MIN_MM;
+    float hist_ref_mm = s_h_m * 1000.0f;
+    float best_sum = 0.0f;
+    float best_min = (float)VL53L1X_INVALID_DISTANCE_MM;
+    float best_max = 0.0f;
+    float best_spread;
+    uint8 best_n = 0U;
+    uint8 hist_n = 0U;
     uint8 n = 0U;
     uint8 inlier_n = 0U;
     uint8 i;
+    uint8 j;
 
     for (i = 0U; i < VL53L1X_SENSOR_COUNT; i++)
     {
@@ -144,6 +165,7 @@ static uint8 Height_BuildMeasure(const VL53L1X_data_struct *tof, float *meas_mm,
     g_tof3_height_mm = h[2];
     g_tof4_height_mm = h[3];
     *health = 0.0f;
+    *inlier_count = 0U;
 
     if (n < 2U)
     {
@@ -152,6 +174,96 @@ static uint8 Height_BuildMeasure(const VL53L1X_data_struct *tof, float *meas_mm,
 
     center = Height_Median(s, n);
     gate = Height_Clamp(0.10f * center, HEIGHT_MEDIAN_GATE_MIN_MM, HEIGHT_MEDIAN_GATE_MAX_MM);
+
+    if (0U != s_ready)
+    {
+        hist_gate = Height_Clamp(0.15f * hist_ref_mm, HEIGHT_HISTORY_GATE_MIN_MM, HEIGHT_HISTORY_GATE_MAX_MM);
+    }
+
+    for (i = 0U; i < n; i++)
+    {
+        float local_sum = 0.0f;
+        float local_min = (float)VL53L1X_INVALID_DISTANCE_MM;
+        float local_max = 0.0f;
+        uint8 local_n = 0U;
+
+        for (j = 0U; j < n; j++)
+        {
+            if (fabsf(s[j] - s[i]) <= gate)
+            {
+                local_sum += s[j];
+                if (s[j] < local_min)
+                {
+                    local_min = s[j];
+                }
+                if (s[j] > local_max)
+                {
+                    local_max = s[j];
+                }
+                local_n++;
+            }
+        }
+
+        if ((local_n > best_n) ||
+            ((local_n == best_n) && ((local_max - local_min) < (best_max - best_min))))
+        {
+            best_n = local_n;
+            best_sum = local_sum;
+            best_min = local_min;
+            best_max = local_max;
+        }
+    }
+
+    if (0U != s_ready)
+    {
+        for (i = 0U; i < n; i++)
+        {
+            if (fabsf(s[i] - hist_ref_mm) <= hist_gate)
+            {
+                hist_sum += s[i];
+                if (s[i] < hist_min)
+                {
+                    hist_min = s[i];
+                }
+                if (s[i] > hist_max)
+                {
+                    hist_max = s[i];
+                }
+                hist_n++;
+            }
+        }
+    }
+
+    if ((best_n < 3U) && (hist_n > 0U))
+    {
+        best_n = hist_n;
+        best_sum = hist_sum;
+        best_min = hist_min;
+        best_max = hist_max;
+    }
+
+    if (best_n > 0U)
+    {
+        best_spread = best_max - best_min;
+        if ((best_n >= 2U) || (0U != s_ready))
+        {
+            *meas_mm = best_sum / (float)best_n;
+            *inlier_count = best_n;
+            if (best_n >= 3U)
+            {
+                *health = Height_Clamp(((float)best_n / 3.0f) * Height_Clamp(1.0f - best_spread / 260.0f, 0.20f, 1.0f), 0.0f, 1.0f);
+            }
+            else if (2U == best_n)
+            {
+                *health = Height_Clamp(0.55f * Height_Clamp(1.0f - best_spread / 260.0f, 0.20f, 1.0f), 0.12f, 0.65f);
+            }
+            else
+            {
+                *health = 0.16f;
+            }
+            return 1U;
+        }
+    }
 
     for (i = 0U; i < VL53L1X_SENSOR_COUNT; i++)
     {
@@ -201,6 +313,7 @@ static uint8 Height_BuildMeasure(const VL53L1X_data_struct *tof, float *meas_mm,
     {
         inlier_spread = inlier_max - inlier_min;
         *health = Height_Clamp((sum_w / 3.0f) * Height_Clamp(1.0f - inlier_spread / 260.0f, 0.10f, 1.0f), 0.0f, 1.0f);
+        *inlier_count = inlier_n;
     }
     else
     {
@@ -209,9 +322,12 @@ static uint8 Height_BuildMeasure(const VL53L1X_data_struct *tof, float *meas_mm,
     return 1U;
 }
 
-static void Height_CorrectObserver(float meas_mm, float health, uint8 meas_valid)
+static void Height_CorrectObserver(float meas_mm, float health, uint8 meas_valid, uint8 inlier_count)
 {
     float residual_m = 0.0f;
+    float old_h_m;
+    float inst_v_mps;
+    float tof_alpha;
 
     g_height_meas_health = health;
 
@@ -231,10 +347,42 @@ static void Height_CorrectObserver(float meas_mm, float health, uint8 meas_valid
 
     if ((0U != meas_valid) && (health >= HEIGHT_CONF_MIN))
     {
+        old_h_m = s_h_m;
         residual_m = (meas_mm * 0.001f) - s_h_m;
-        residual_m = Height_Clamp(residual_m, -0.35f, 0.35f);
-        s_h_m += (HEIGHT_POS_GAIN * health) * residual_m;
-        s_v_mps += (HEIGHT_VEL_GAIN * health) * residual_m;
+        residual_m = Height_Clamp(residual_m, -0.45f, 0.45f);
+        if (inlier_count >= 3U)
+        {
+            tof_alpha = HEIGHT_TOF_ALPHA_STRONG * Height_Clamp(health, 0.40f, 1.0f);
+        }
+        else if (2U == inlier_count)
+        {
+            tof_alpha = HEIGHT_TOF_ALPHA_MEDIUM * Height_Clamp(health, 0.20f, 0.70f);
+        }
+        else
+        {
+            tof_alpha = HEIGHT_TOF_ALPHA_WEAK * Height_Clamp(health, 0.10f, 0.30f);
+        }
+        s_h_m += tof_alpha * residual_m;
+
+        if ((inlier_count >= 3U) && (health > 0.45f) && (s_h_m > ((meas_mm * 0.001f) + HEIGHT_TRUSTED_TOF_CAP_M)))
+        {
+            s_h_m = (meas_mm * 0.001f) + HEIGHT_TRUSTED_TOF_CAP_M;
+            if (s_v_mps > 0.0f)
+            {
+                s_v_mps *= 0.20f;
+            }
+        }
+        else if ((2U == inlier_count) && (health > 0.35f) && (s_h_m > ((meas_mm * 0.001f) + HEIGHT_SOFT_TOF_CAP_M)))
+        {
+            s_h_m += HEIGHT_SOFT_TOF_CAP_GAIN * (((meas_mm * 0.001f) + HEIGHT_SOFT_TOF_CAP_M) - s_h_m);
+            if (s_v_mps > 0.0f)
+            {
+                s_v_mps *= 0.50f;
+            }
+        }
+
+        inst_v_mps = (s_h_m - old_h_m) * 100.0f;
+        s_v_mps += HEIGHT_VEL_TOF_ALPHA * (inst_v_mps - s_v_mps);
         s_miss = 0U;
     }
     else if (s_miss < HEIGHT_MISS_MAX)
@@ -292,9 +440,7 @@ void Height_Est_predict_1000HZ(void)
 
     if (0U != s_ready)
     {
-        s_h_m += (s_v_mps * HEIGHT_PREDICT_DT_S) +
-            (0.5f * s_acc_lpf_mps2 * HEIGHT_PREDICT_DT_S * HEIGHT_PREDICT_DT_S);
-        s_v_mps += s_acc_lpf_mps2 * HEIGHT_PREDICT_DT_S;
+        s_v_mps += HEIGHT_ACC_VEL_GAIN * s_acc_lpf_mps2 * HEIGHT_PREDICT_DT_S;
         s_v_mps *= HEIGHT_VEL_LEAK;
 
         s_h_m = Height_Clamp(s_h_m, HEIGHT_MIN_MM * 0.001f, HEIGHT_STATE_MAX_MM * 0.001f);
@@ -311,10 +457,11 @@ void Height_Est_update_100HZ(void)
     const VL53L1X_data_struct *tof;
     float meas_mm = (float)VL53L1X_VALID_RANGE_MAX;
     float health = 0.0f;
+    uint8 inlier_count = 0U;
     uint8 meas_valid;
 
     VL53L1X_Update();
     tof = VL53L1X_GetData();
-    meas_valid = Height_BuildMeasure(tof, &meas_mm, &health);
-    Height_CorrectObserver(meas_mm, health, meas_valid);
+    meas_valid = Height_BuildMeasure(tof, &meas_mm, &health, &inlier_count);
+    Height_CorrectObserver(meas_mm, health, meas_valid, inlier_count);
 }

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <math.h>
 #include "../code/HW_Drivers/ICM42688_Aux/ICM42688_Aux.h"
+#include "../Height_Est/Height_Est.h"
 /* ======================== IMU 全局状�?======================== */
 /* IMU滤波数据通过 g_imufilter_1000hz (IMU_Filtter.h) 访问 */
 MahonyAhrs_t g_mahony_ahrs;					   /* Mahony 姿态解算器状�?*/
@@ -229,6 +230,7 @@ void IMU_Update_1000HZ(void)
 	/* 步骤5: 计算欧拉角（单位: 度）并缓�?*/
 	g_euler = MahonyAhrs_GetEulerDegrees(&g_mahony_ahrs);
 	AccelCalibration_Update_1000HZ();
+	Height_Est_predict_1000HZ();
 
 	// wifi_justfloat(tick_1000us_cnt,
 	// 			   ICM42688.gyro_x,

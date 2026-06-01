@@ -715,7 +715,8 @@ void FC_Loop_1000Hz(void)
                     g_imufilter_1000hz.accx, g_imufilter_1000hz.accy, g_imufilter_1000hz.accz,
                     g_euler.roll, g_euler.pitch, g_euler.yaw,
                     raw_tof1_mm, raw_tof2_mm, raw_tof3_mm, raw_tof4_mm,
-                    g_tof1_height_mm, g_tof2_height_mm, g_tof3_height_mm, g_tof4_height_mm
+                    g_tof1_height_mm, g_tof2_height_mm, g_tof3_height_mm, g_tof4_height_mm,
+                    g_height_fused_vz_mps,g_tof_fused_height_mm
                     );
 
     // wifi_justfloat(ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,

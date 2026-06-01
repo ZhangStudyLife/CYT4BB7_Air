@@ -19,6 +19,7 @@ extern float g_height_meas_health;
 extern float g_height_acc_up_mps2;
 
 void TOF_Init(void);
+void Height_Est_predict_1000HZ(void);
 void Height_Est_update_100HZ(void);
 
 #ifdef __cplusplus

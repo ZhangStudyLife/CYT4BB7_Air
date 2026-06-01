@@ -37,8 +37,8 @@ static void fc_params_fill_defaults(fc_params_t *params)
 
     /* ===== 油门与机械配平参数 ===== */
     params->base_throttle = 2700;         /* 悬停油门 */
-    params->roll_mech_trim_deg = -1.8f;    /* Roll 机械配平角 */
-    params->pitch_mech_trim_deg = 3.5f;  /* Pitch 机械配平角 */
+    params->roll_mech_trim_deg = 1.8f;    /* Roll 机械配平角 */
+    params->pitch_mech_trim_deg = 1.8f;  /* Pitch 机械配平角 */
 
     /* ===== Roll 轴角速度环参数 ===== */
     params->roll_gyro_kp = 5.4f;
@@ -114,7 +114,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
 
     /* ===== X 轴速度环参数 ===== */
     params->vel_x_kp = 0.14f;
-    params->vel_x_ki = 0.010f;
+    params->vel_x_ki = 0.02f;
     params->vel_x_kd = 0.0f;
     params->vel_x_kff = 0.0f;
     params->vel_x_i_limit = 3.0f;
@@ -122,7 +122,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
 
     /* ===== Y 轴速度环参数 ===== */
     params->vel_y_kp = 0.14f;
-    params->vel_y_ki = 0.010f;
+    params->vel_y_ki = 0.02f;
     params->vel_y_kd = 0.0f;
     params->vel_y_kff = 0.0f;
     params->vel_y_i_limit = 3.0f;
@@ -165,14 +165,14 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode4_adrc_output_rate_limit_degps = 35.0f;
     params->mode4_adrc_zero_quiet_cmps = 8.0f;
 
-    params->mode2_vel_x_kp = 0.14f;
-    params->mode2_vel_x_ki = 0.010f;
+    params->mode2_vel_x_kp = 0.12f;
+    params->mode2_vel_x_ki = 0.02f;
     params->mode2_vel_x_kd = 0.0f;
     params->mode2_vel_x_kff = 0.0f;
     params->mode2_vel_x_i_limit = 3.0f;
     params->mode2_vel_x_d_lpf = 0.0f;
-    params->mode2_vel_y_kp = 0.14f;
-    params->mode2_vel_y_ki = 0.010f;
+    params->mode2_vel_y_kp = 0.12f;
+    params->mode2_vel_y_ki = 0.02f;
     params->mode2_vel_y_kd = 0.0f;
     params->mode2_vel_y_kff = 0.0f;
     params->mode2_vel_y_i_limit = 3.0f;

@@ -18,7 +18,7 @@ float g_height_acc_up_mps2 = 0.0f;
 #define HEIGHT_TOF_MAX_MM           2200.0f
 #define HEIGHT_STATE_MAX_MM         2200.0f
 #define HEIGHT_MIN_MM               50.0f
-#define HEIGHT_TILT_DEG_LIMIT       32.0f
+#define HEIGHT_TILT_DEG_LIMIT       50.0f
 #define HEIGHT_RATE_BAD_MM          40.0f
 #define HEIGHT_LOW_DROP_MM          180.0f
 #define HEIGHT_CONF_MIN             0.12f
@@ -36,13 +36,13 @@ static uint8 s_ready = 0U;
 static uint8 s_miss = HEIGHT_MISS_MAX;
 
 static const float s_roll_corr_m[VL53L1X_SENSOR_COUNT] = {
-    0.136494f, 0.060642f, -0.206869f, -0.105007f
+    -0.008643f, -0.033776f, 0.009535f, 0.032884f
 };
 static const float s_pitch_corr_m[VL53L1X_SENSOR_COUNT] = {
-    -0.129093f, 0.097325f, -0.100678f, 0.067483f
+    -0.012797f, 0.057124f, -0.048306f, 0.003979f
 };
 static const float s_bias_corr_m[VL53L1X_SENSOR_COUNT] = {
-    -0.013321f, 0.006684f, -0.015490f, 0.026124f
+    -0.002834f, -0.014415f, 0.020698f, -0.003449f
 };
 
 static float Height_Clamp(float x, float min_x, float max_x)

@@ -101,3 +101,23 @@ Z轴位置环参数:
     pos_z_d_lpf = 0.0f
 
 注: 第五次飞行后段由于电线拉扯导致线绷紧，飞机开始自旋，后续只分析正常自稳情况下的高度环数据。
+
+第六次飞行
+日志: 第六次飞行.csv
+(基于第五次修改: pos_z_kp 1→1.3)
+
+Z轴速度环参数:
+    vel_z_kp = 30.0f
+    vel_z_ki = 50.0f
+    vel_z_kd = 0.0f
+    vel_z_kff = 0.0f
+    vel_z_i_limit = 450.0f
+    vel_z_d_lpf = 0.0f
+
+Z轴位置环参数:
+    pos_z_kp = 1.3f
+    pos_z_ki = 0.0f
+    pos_z_kd = 0.0f
+    pos_z_kff = 0.0f
+    pos_z_i_limit = 0.0f
+    pos_z_d_lpf = 0.0f

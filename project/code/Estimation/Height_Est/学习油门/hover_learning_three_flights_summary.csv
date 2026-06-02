@@ -1,0 +1,4 @@
+flight,rows,duration_s,flight_rows,stable_rows,stable_pct,height_abs_mean,height_abs_p95,vz_abs_p95,pos_abs_p95,velout_abs_p95,throttle_mean,throttle_p95,hover_start,hover_end,hover_delta,learn_gate_pct,learn_step_abs_p95,raw_velout_abs_p95,pull_rows,pull_height_min,pull_height_abs_p95,pull_vz_abs_p95,pull_gate_rows,pull_hover_delta
+no_learning_no_pull,246714,317.146,233917,89054,38.0708,54.0394,184.361,0.18188,0.26196,344.106,3204.96,3352,0,0,0,0,0,0,16158,400.168,518.69,0.513631,0,0
+learning_no_pull,244248,316.241,226228,64725,28.6105,60.2871,188.268,0.159662,0.243286,282.13,3243.61,3392,2800,3310.87,510.875,28.8899,0.117347,282.186,14408,400.116,443.205,0.382707,16,510.868
+learning_pull,142396,187.524,133516,34357,25.7325,60.8795,192.759,0.227195,0.273866,262.12,3121.2,3273,2800,3111.41,311.406,25.9475,0.151367,262.17,11160,401.245,468.725,0.432379,0,311.403

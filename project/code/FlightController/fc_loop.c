@@ -1,5 +1,6 @@
 #include "fc_loop.h"
 #include "fc_mode.h"
+#include <math.h>
 #include "../Estimation/Attitude/IMU_TOP.h"
 #include "../Estimation/Height_Est/Height_Est.h"
 #include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
@@ -42,12 +43,15 @@ static FC_START_CRSF_flight_mode_e s_prev_flight_mode = FC_START_CRSF_FLIGHT_MOD
 /* 上一次飞控状态，用于检测飞行态切换边沿 */
 static FC_START_CRSF_state_e s_prev_fc_state = FC_START_CRSF_STATE_INIT;
 /* 悬停油门在线学习（借鉴 ArduPilot MOT_THST_HOVER） */
-#define FC_HOVER_THR_INIT 2700.0f
-#define FC_HOVER_THR_TC 6.0f
-#define FC_HOVER_THR_MIN 1700.0f
-#define FC_HOVER_THR_MAX 4300.0f
+#define FC_HOVER_THR_TC 8.0f
+#define FC_HOVER_LEARN_MIN_DELTA (-300.0f)
+#define FC_HOVER_LEARN_MAX_DELTA 900.0f
 #define FC_HOVER_LEARN_VZ_MAX 0.18f
 #define FC_HOVER_LEARN_POS_MAX 0.08f
+#define FC_HOVER_LEARN_TILT_MAX 7.0f
+#define FC_HOVER_LEARN_ACC_MAX 0.20f
+#define FC_HOVER_LEARN_TOF_SPREAD_MAX 250.0f
+#define FC_HOVER_LEARN_RATE_MAX 150.0f
 #define FC_THRUST_ACC_MPS2_PER_PWM 0.00360f
 #define FC_HEIGHT_VEL_KP_ACC 1.50f
 #define FC_HEIGHT_VEL_KD_ACC 0.035f
@@ -56,7 +60,9 @@ static FC_START_CRSF_state_e s_prev_fc_state = FC_START_CRSF_STATE_INIT;
 #define FC_HEIGHT_VEL_OUT_MAX 650.0f
 #define FC_HEIGHT_VEL_KP_PWM (FC_HEIGHT_VEL_KP_ACC / FC_THRUST_ACC_MPS2_PER_PWM)
 #define FC_HEIGHT_VEL_KD_PWM (FC_HEIGHT_VEL_KD_ACC / FC_THRUST_ACC_MPS2_PER_PWM)
-static float s_hover_throttle = FC_HOVER_THR_INIT;
+static float s_hover_throttle = 2800.0f;
+static float s_hover_learn_step = 0.0f;
+static float s_hover_learn_gate = 0.0f;
 /* 姿态角外环输出到角速度目标的限幅，单位 deg/s */
 static const float s_fc_angle_out_limit = 260.0f;
 static const float s_fc_yaw_out_limit = 900.0f;
@@ -299,7 +305,7 @@ void FC_Loop_Reset(void)
     s_prev_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
     s_prev_fc_state = FC_START_CRSF_STATE_INIT;
     s_yaw_target_inited = 0U;
-    s_hover_throttle = FC_HOVER_THR_INIT;
+    s_hover_throttle = (float)g_fc_params.base_throttle;
 }
 
 /*
@@ -427,14 +433,26 @@ void FC_Loop_100Hz(void)
     }
 
     /* 悬停油门在线学习：仅在接近稳态悬停时更新 */
+    s_hover_learn_step = 0.0f;
+    s_hover_learn_gate = 0.0f;
     if ((fc_state == FC_START_CRSF_STATE_FLYING) &&
         (g_height_meas_health > 0.65f) &&
         (g_height_fused_vz_mps > -FC_HOVER_LEARN_VZ_MAX) && (g_height_fused_vz_mps < FC_HOVER_LEARN_VZ_MAX) &&
-        (height_pos_out > -FC_HOVER_LEARN_POS_MAX) && (height_pos_out < FC_HOVER_LEARN_POS_MAX))
+        (height_pos_out > -FC_HOVER_LEARN_POS_MAX) && (height_pos_out < FC_HOVER_LEARN_POS_MAX) &&
+        (g_euler.roll > -FC_HOVER_LEARN_TILT_MAX) && (g_euler.roll < FC_HOVER_LEARN_TILT_MAX) &&
+        (g_euler.pitch > -FC_HOVER_LEARN_TILT_MAX) && (g_euler.pitch < FC_HOVER_LEARN_TILT_MAX) &&
+        (fabsf(sqrtf((g_imufilter_1000hz.accx * g_imufilter_1000hz.accx) + (g_imufilter_1000hz.accy * g_imufilter_1000hz.accy) + (g_imufilter_1000hz.accz * g_imufilter_1000hz.accz)) - 1.0f) < FC_HOVER_LEARN_ACC_MAX) &&
+        ((fmaxf(fmaxf(g_tof1_height_mm, g_tof2_height_mm), fmaxf(g_tof3_height_mm, g_tof4_height_mm)) -
+          fminf(fminf(g_tof1_height_mm, g_tof2_height_mm), fminf(g_tof3_height_mm, g_tof4_height_mm))) < FC_HOVER_LEARN_TOF_SPREAD_MAX))
     {
-        float alpha = dt / (dt + FC_HOVER_THR_TC);
-        s_hover_throttle += alpha * height_vel_out;
-        s_hover_throttle = fc_clampf(s_hover_throttle, FC_HOVER_THR_MIN, FC_HOVER_THR_MAX);
+        s_hover_learn_gate = 1.0f;
+        s_hover_learn_step = fc_clampf((dt / (dt + FC_HOVER_THR_TC)) * height_vel_out,
+            -FC_HOVER_LEARN_RATE_MAX * dt, FC_HOVER_LEARN_RATE_MAX * dt);
+        s_hover_learn_step = fc_clampf(s_hover_throttle + s_hover_learn_step,
+            (float)g_fc_params.base_throttle + FC_HOVER_LEARN_MIN_DELTA,
+            (float)g_fc_params.base_throttle + FC_HOVER_LEARN_MAX_DELTA) - s_hover_throttle;
+        s_hover_throttle += s_hover_learn_step;
+        height_vel_out -= s_hover_learn_step;
     }
 
 
@@ -718,7 +736,8 @@ void FC_Loop_1000Hz(void)
                     g_height_fused_vz_mps,g_tof_fused_height_mm,
                     height_pos_out,height_vel_pid.p_term,height_vel_pid.i_term,height_vel_pid.d_term,
                     height_vel_out,height_vel_pid.p_term, height_vel_pid.i_term, height_vel_pid.d_term,
-                    g_motor_cmd.throttle
+                    g_motor_cmd.throttle,
+                    s_hover_throttle, s_hover_learn_step, s_hover_learn_gate, height_vel_out + s_hover_learn_step
                     );
 
     // wifi_justfloat(ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,

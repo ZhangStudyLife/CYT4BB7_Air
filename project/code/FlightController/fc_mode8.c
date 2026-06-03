@@ -2,9 +2,9 @@
 #include "../Estimation/Pos_Est/Pos_Est.h"
 #include "../Estimation/Height_Est/Height_Est.h"
 
-extern volatile float g_car_image_target_x;
-extern volatile float g_car_image_target_y;
-extern volatile float g_car_image_target_valid;
+extern volatile float g_car_image_car_lamp_x;
+extern volatile float g_car_image_car_lamp_y;
+extern volatile float g_car_image_car_lamp_valid;
 extern volatile float g_car_velocity_strafe_mps;
 extern volatile float g_car_velocity_forward_mps;
 
@@ -18,8 +18,8 @@ static float s_mode8_img_err_x_lpf = 0.0f;
 static float s_mode8_img_err_y_lpf = 0.0f;
 static uint8 s_mode8_img_lpf_inited = 0U;
 
-static const float s_mode8_img_x_target = 94.0f;
-static const float s_mode8_img_y_target = 70.0f;
+static const float s_mode8_img_x_dir = -1.0f; /* 车灯cx左正右负，该极性需实机确认 */
+static const float s_mode8_img_y_dir = 1.0f;  /* 车灯cy下正上负，该极性需实机确认 */
 static const float s_mode8_img_lpf_alpha = 0.45f;
 static const float s_mode8_img_fb_limit_cmps = 80.0f;
 static const float s_mode8_car_vel_ff = 1.0f;
@@ -79,23 +79,23 @@ void FC_Mode8_50Hz(float dt)
         return;
     }
 
-    if ((g_car_image_target_valid > 0.5f) &&
+    if ((g_car_image_car_lamp_valid > 0.5f) &&
         (0U != g_tof_fused_valid) &&
         (g_tof_fused_height_mm > 500.0f))
     {
         if (0U == s_mode8_img_lpf_inited)
         {
-            s_mode8_img_err_x_lpf = g_car_image_target_x - s_mode8_img_x_target;
-            s_mode8_img_err_y_lpf = g_car_image_target_y - s_mode8_img_y_target;
+            s_mode8_img_err_x_lpf = s_mode8_img_x_dir * g_car_image_car_lamp_x;
+            s_mode8_img_err_y_lpf = s_mode8_img_y_dir * g_car_image_car_lamp_y;
             s_mode8_img_lpf_inited = 1U;
             PID_Reset(&s_mode8_imgx_pid);
             PID_Reset(&s_mode8_imgy_pid);
         }
 
         s_mode8_img_err_x_lpf += s_mode8_img_lpf_alpha *
-                                  ((g_car_image_target_x - s_mode8_img_x_target) - s_mode8_img_err_x_lpf);
+                                  ((s_mode8_img_x_dir * g_car_image_car_lamp_x) - s_mode8_img_err_x_lpf);
         s_mode8_img_err_y_lpf += s_mode8_img_lpf_alpha *
-                                  ((g_car_image_target_y - s_mode8_img_y_target) - s_mode8_img_err_y_lpf);
+                                  ((s_mode8_img_y_dir * g_car_image_car_lamp_y) - s_mode8_img_err_y_lpf);
 
         img_fb_x = PID_Update(&s_mode8_imgx_pid, 0.0f, -s_mode8_img_err_x_lpf, dt);
         img_fb_y = PID_Update(&s_mode8_imgy_pid, 0.0f, -s_mode8_img_err_y_lpf, dt);

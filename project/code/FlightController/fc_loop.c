@@ -590,17 +590,7 @@ void FC_Loop_100Hz(void)
     // wifi_justfloat(g_tof1_height_mm, g_tof2_height_mm, g_tof3_height_mm, g_tof4_height_mm);
 
 
-    wifi_justfloat(g_car_velocity_strafe_mps,
-        g_car_velocity_forward_mps,
-        g_car_image_car_lamp_x,
-        g_car_image_car_lamp_y,
-        g_car_image_car_lamp_width,
-        g_car_image_car_lamp_length,
-        g_car_image_car_lamp_angle,
-        g_car_image_car_lamp_valid,
-        g_car_image_beacon_x,
-        g_car_image_beacon_y
-    );
+
 }
 
 void FC_Loop_500Hz(void)
@@ -675,6 +665,22 @@ void FC_Loop_500Hz(void)
         yaw_gyro_target = 0.0f;
     }
 
+    wifi_justfloat(g_car_velocity_strafe_mps,
+        g_car_velocity_forward_mps,
+        g_car_image_car_lamp_x,
+        g_car_image_car_lamp_y,
+        g_car_image_car_lamp_width,
+        g_car_image_car_lamp_length,
+        g_car_image_car_lamp_angle,
+        g_car_image_car_lamp_valid,
+        g_car_image_beacon_x,
+        g_car_image_beacon_y,
+        g_euler.roll,
+        g_euler.pitch,
+        g_euler.yaw,
+        Pos_Est_vel_x,
+        Pos_Est_vel_y
+    );
 
     // wifi_justfloat(g_tof_fused_height_mm/1000.0f,lc302_data.flow_x_integral, lc302_data.flow_y_integral,
     //                opflow_vel_x, opflow_vel_y,

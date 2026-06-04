@@ -18,11 +18,11 @@ static float s_mode8_img_err_x_lpf = 0.0f;
 static float s_mode8_img_err_y_lpf = 0.0f;
 static uint8 s_mode8_img_lpf_inited = 0U;
 
-static const float s_mode8_img_x_dir = 1.0f;  /* CX右正左负，目标速度X左正右负 */
-static const float s_mode8_img_y_dir = -1.0f; /* CY前正后负，目标速度Y前正后负 */
+static const float s_mode8_img_x_dir = -1.0f; /* image x: right positive, left negative; target x: right positive */
+static const float s_mode8_img_y_dir = 1.0f;  /* image y: front positive, rear negative; target y: rear positive */
 static const float s_mode8_img_lpf_alpha = 0.45f;
 static const float s_mode8_img_fb_limit_cmps = 80.0f;
-static const float s_mode8_car_vel_ff = 1.0f;
+static const float s_mode8_car_vel_ff = 1.5f;
 static const float s_mode8_vel_limit_cmps = 200.0f;
 static const float s_mode8_angle_limit_deg = 8.0f;
 
@@ -75,8 +75,18 @@ void FC_Mode8_50Hz(float dt)
 
     if (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING)
     {
+        Beep_Disable();
         FC_Mode8_Reset();
         return;
+    }
+
+    if (g_car_image_car_lamp_valid > 0.5f)
+    {
+        Beep_Disable();
+    }
+    else
+    {
+        Beep_Enable();
     }
 
     if ((g_car_image_car_lamp_valid > 0.5f) &&

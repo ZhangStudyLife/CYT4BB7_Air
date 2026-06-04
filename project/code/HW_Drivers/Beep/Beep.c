@@ -51,6 +51,28 @@ void Beep_Stop(void)
     gpio_low(BUZZER_PIN);
 }
 
+void Beep_Enable(void)
+{
+    s_beep_active = 0U;
+    s_beep_duty_percent = 0U;
+    s_beep_cycle_ticks = 0U;
+    s_beep_tick_in_cycle = 0U;
+    s_beep_cycle_count = 0U;
+    s_beep_cycle_done = 0U;
+    gpio_high(BUZZER_PIN);
+}
+
+void Beep_Disable(void)
+{
+    s_beep_active = 0U;
+    s_beep_duty_percent = 0U;
+    s_beep_cycle_ticks = 0U;
+    s_beep_tick_in_cycle = 0U;
+    s_beep_cycle_count = 0U;
+    s_beep_cycle_done = 0U;
+    gpio_low(BUZZER_PIN);
+}
+
 void Beep_Play(uint8 duty_percent, float cycle_time_s, uint16 cycle_count)
 {
     /* 参数保护：限制最大播放时长与次数，防止异常长任务 */

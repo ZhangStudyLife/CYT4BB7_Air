@@ -17,6 +17,12 @@ void Beep_Update_100HZ(void);
 /* 立即停止鸣叫并清空播放状态 */
 void Beep_Stop(void);
 
+/* 使能蜂鸣器（持续响） */
+void Beep_Enable(void);
+
+/* 失能蜂鸣器（立即停） */
+void Beep_Disable(void);
+
 /*
  * 触发鸣叫
  * duty_percent : 占空比(0~100)

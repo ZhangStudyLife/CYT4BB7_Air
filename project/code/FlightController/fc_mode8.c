@@ -18,8 +18,8 @@ static float s_mode8_img_err_x_lpf = 0.0f;
 static float s_mode8_img_err_y_lpf = 0.0f;
 static uint8 s_mode8_img_lpf_inited = 0U;
 
-static const float s_mode8_img_x_dir = -1.0f; /* 车灯cx左正右负，该极性需实机确认 */
-static const float s_mode8_img_y_dir = 1.0f;  /* 车灯cy下正上负，该极性需实机确认 */
+static const float s_mode8_img_x_dir = 1.0f;  /* CX右正左负，目标速度X左正右负 */
+static const float s_mode8_img_y_dir = -1.0f; /* CY前正后负，目标速度Y前正后负 */
 static const float s_mode8_img_lpf_alpha = 0.45f;
 static const float s_mode8_img_fb_limit_cmps = 80.0f;
 static const float s_mode8_car_vel_ff = 1.0f;

@@ -5,6 +5,17 @@
 #include "../Estimation/Height_Est/Height_Est.h"
 #include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
 
+extern volatile float g_car_velocity_strafe_mps;
+extern volatile float g_car_velocity_forward_mps;
+extern volatile float g_car_image_car_lamp_x;
+extern volatile float g_car_image_car_lamp_y;
+extern volatile float g_car_image_car_lamp_width;
+extern volatile float g_car_image_car_lamp_length;
+extern volatile float g_car_image_car_lamp_angle;
+extern volatile float g_car_image_car_lamp_valid;
+extern volatile float g_car_image_beacon_x;
+extern volatile float g_car_image_beacon_y;
+
 pid_t roll_gyro_pid;
 pid_t pitch_gyro_pid;
 pid_t yaw_gyro_pid;
@@ -457,17 +468,15 @@ void FC_Loop_100Hz(void)
 
 
 
-    // wifi_justfloat(tick_1000us_cnt,
-    //     ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,
-    //     ICM42688.acc_x, ICM42688.acc_y, ICM42688.acc_z,
-    //     g_euler.roll, g_euler.pitch, g_euler.yaw,
-    //     raw_tof1_mm, raw_tof2_mm, raw_tof3_mm, raw_tof4_mm,
-    //     lc302_data.flow_x_integral,lc302_data.flow_y_integral,
-    //     g_height_fused_vz_mps, height_pos_out, height_vel_out,g_motor_cmd.throttle,g_tof_fused_height_mm,g_motor_cmd.throttle,
-    //     g_height_acc_up_mps2
-
-
-    // );
+    wifi_justfloat(
+        g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
+        g_imufilter_1000hz.accx, g_imufilter_1000hz.accy, g_imufilter_1000hz.accz,
+        g_euler.roll, g_euler.pitch, g_euler.yaw,
+        lc302_data.flow_x_integral,lc302_data.flow_y_integral,
+        Pos_Est_vel_x,Pos_Est_vel_y,
+        g_height_fused_vz_mps, height_pos_out, height_vel_out,g_motor_cmd.throttle,g_tof_fused_height_mm,g_motor_cmd.throttle,
+        g_height_acc_up_mps2
+    );
 
     // wifi_justfloat((float)tick_1000us_cnt,
     //                g_tof_fused_height_mm,    // 融合高度 mm
@@ -579,6 +588,19 @@ void FC_Loop_100Hz(void)
     //                g_tof3_height_mm,
     //                g_tof4_height_mm);
     // wifi_justfloat(g_tof1_height_mm, g_tof2_height_mm, g_tof3_height_mm, g_tof4_height_mm);
+
+
+    // wifi_justfloat(g_car_velocity_strafe_mps,
+    //     g_car_velocity_forward_mps,
+    //     g_car_image_car_lamp_x,
+    //     g_car_image_car_lamp_y,
+    //     g_car_image_car_lamp_width,
+    //     g_car_image_car_lamp_length,
+    //     g_car_image_car_lamp_angle,
+    //     g_car_image_car_lamp_valid,
+    //     g_car_image_beacon_x,
+    //     g_car_image_beacon_y
+    // );
 }
 
 void FC_Loop_500Hz(void)
@@ -729,16 +751,16 @@ void FC_Loop_1000Hz(void)
         raw_tof4_mm = (float)tof->distance_mm[3];
     }
 
-    wifi_justfloat(g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
-                    g_imufilter_1000hz.accx, g_imufilter_1000hz.accy, g_imufilter_1000hz.accz,
-                    g_euler.roll, g_euler.pitch, g_euler.yaw,
-                    g_tof1_height_mm, g_tof2_height_mm, g_tof3_height_mm, g_tof4_height_mm,
-                    g_height_fused_vz_mps,g_tof_fused_height_mm,
-                    height_pos_out,height_vel_pid.p_term,height_vel_pid.i_term,height_vel_pid.d_term,
-                    height_vel_out,height_vel_pid.p_term, height_vel_pid.i_term, height_vel_pid.d_term,
-                    g_motor_cmd.throttle,
-                    s_hover_throttle, s_hover_learn_step, s_hover_learn_gate, height_vel_out + s_hover_learn_step
-                    );
+    // wifi_justfloat(g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
+    //                 g_imufilter_1000hz.accx, g_imufilter_1000hz.accy, g_imufilter_1000hz.accz,
+    //                 g_euler.roll, g_euler.pitch, g_euler.yaw,
+    //                 g_tof1_height_mm, g_tof2_height_mm, g_tof3_height_mm, g_tof4_height_mm,
+    //                 g_height_fused_vz_mps,g_tof_fused_height_mm,
+    //                 height_pos_out,height_vel_pid.p_term,height_vel_pid.i_term,height_vel_pid.d_term,
+    //                 height_vel_out,height_vel_pid.p_term, height_vel_pid.i_term, height_vel_pid.d_term,
+    //                 g_motor_cmd.throttle,
+    //                 s_hover_throttle, s_hover_learn_step, s_hover_learn_gate, height_vel_out + s_hover_learn_step
+    //                 );
 
     // wifi_justfloat(ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,
     //     ICM42688.acc_x, ICM42688.acc_y, ICM42688.acc_z,

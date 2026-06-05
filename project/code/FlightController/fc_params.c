@@ -38,7 +38,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     /* ===== 油门与机械配平参数 ===== */
     params->base_throttle = 2800;         /* 悬停油门 */
     params->roll_mech_trim_deg = 2.3f;    /* Roll 机械配平角 */
-    params->pitch_mech_trim_deg = 2.6f;   /* Pitch 机械配平角 */
+    params->pitch_mech_trim_deg = 0.0f;   /* Pitch 机械配平角 */
 
     /* ===== Roll 轴角速度环参数 ===== */
     params->roll_gyro_kp = 5.4f;
@@ -182,13 +182,13 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pos_est_k_flow = 0.04f;
 
     /* ===== 模式 8 图像位置环参数 ===== */
-    params->mode8_img_x_kp = 1.1f;
+    params->mode8_img_x_kp = 1.2f;
     params->mode8_img_x_ki = 0.0f;
     params->mode8_img_x_kd = 0.10f;
     params->mode8_img_x_kff = 0.0f;
     params->mode8_img_x_i_limit = 0.0f;
     params->mode8_img_x_d_lpf = 0.0f;
-    params->mode8_img_y_kp = 0.9f;
+    params->mode8_img_y_kp = 1.2f;
     params->mode8_img_y_ki = 0.0f;
     params->mode8_img_y_kd = 0.10f;
     params->mode8_img_y_kff = 0.0f;

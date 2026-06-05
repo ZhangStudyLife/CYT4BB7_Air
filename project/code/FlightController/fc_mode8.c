@@ -22,7 +22,7 @@ static const float s_mode8_img_x_dir = -1.0f; /* image x: right positive, left n
 static const float s_mode8_img_y_dir = 1.0f;  /* image y: front positive, rear negative; target y: rear positive */
 static const float s_mode8_img_lpf_alpha = 0.45f;
 static const float s_mode8_img_fb_limit_cmps = 80.0f;
-static const float s_mode8_car_vel_ff = 1.5f;
+static const float s_mode8_car_vel_ff = 0.0f;
 static const float s_mode8_vel_limit_cmps = 200.0f;
 static const float s_mode8_angle_limit_deg = 8.0f;
 

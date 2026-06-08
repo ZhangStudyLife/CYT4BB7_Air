@@ -3,15 +3,19 @@
 int main(void)
 {
     clock_init(SYSTEM_CLOCK_250M);
-    debug_init();
     SCB_DisableDCache();
 
-    /* CM7_1 不再承载图像处理和 IPS114 刷屏，只保留 IPC 基础通道接收飞控状态。 */
     ipc_communicate_init(IPC_PORT_2, ipc_image_callback);
-
+    image_init();
+    /* mt9v03x_init() re-enables DCache; keep camera/IPC shared RAM coherent. */
+    SCB_DisableDCache();
 
     while(true)
     {
-        system_delay_ms(1000);
+        if(mt9v03x_finish_flag)
+        {
+            image_update();
+            ipc_image_send();
+        }
     }
 }

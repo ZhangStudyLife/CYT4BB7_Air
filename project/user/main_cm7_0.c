@@ -11,66 +11,6 @@ static uint8 div10 = 0U;
 static uint8 s_ipc_last_flying = 0U;      /* 上一次成功通知给核1的飞行状态 */
 static uint8 s_ipc_flying_retry_div = 0U; /* 飞行状态 IPC 通知失败后的 100Hz 重试分频 */
 
-/*
- * 函数功能: 在 IPS114 上显示飞控调试信息。
- * 输入参数: 无。
- * 返回值: 无。
- * 说明: 采用 8x16 字体显示7行数据，分别按类别分行。
- *       使用 sprintf 定宽带符号格式化，避免正负号导致数值跳动。
- */
-void ips114_show_debug(void)
-{
-    const VL53L1X_data_struct *tof = VL53L1X_GetData();
-    static uint8 screen_ready = 0U;
-    char buf[64];
-
-    ips114_set_font(IPS114_8X16_FONT);
-
-    if (0U == screen_ready)
-    {
-        screen_ready = 1U;
-        ips114_set_color(RGB565_WHITE, RGB565_BLACK);
-        ips114_clear(); // 首次进入清屏并填充满黑色背景
-    }
-
-    ips114_set_color(RGB565_GREEN, RGB565_BLACK);
-
-    // R1: ACC (X, Y, Z)
-    snprintf(buf, sizeof(buf), "ACC % 7.2f% 7.2f% 7.2f",
-             (double)g_imufilter_1000hz.accx, (double)g_imufilter_1000hz.accy, (double)g_imufilter_1000hz.accz);
-    ips114_show_string(0U, 0U, buf);
-
-    // R2: GYRO (X, Y, Z)
-    snprintf(buf, sizeof(buf), "GYR % 6.1f % 6.1f % 6.1f",
-             (double)g_imufilter_1000hz.gyrox, (double)g_imufilter_1000hz.gyroy, (double)g_imufilter_1000hz.gyroz);
-    ips114_show_string(0U, 16U, buf);
-
-    // R3: EULER (Roll, Pitch, Yaw)
-    snprintf(buf, sizeof(buf), "EUL % 6.1f % 6.1f % 6.1f",
-             (double)g_euler.roll, (double)g_euler.pitch, (double)g_euler.yaw);
-    ips114_show_string(0U, 32U, buf);
-
-    // R4: TOF 1-4 (Height_1, Height_2, Height_3, Height_4)
-    snprintf(buf, sizeof(buf), "TOF %4u %4u %4u %4u       ",
-             tof->distance_mm[0], tof->distance_mm[1], tof->distance_mm[2], tof->distance_mm[3]);
-    ips114_show_string(0U, 48U, buf);
-
-    // R5: Fused Height & Fused Vz
-    snprintf(buf, sizeof(buf), "FUS H:% 6.1f Vz:% 7.3f  ",
-             (double)g_tof_fused_height_mm, (double)g_height_fused_vz_mps);
-    ips114_show_string(0U, 64U, buf);
-
-    // R6: RC Status & CH1-CH4 (STD)
-    snprintf(buf, sizeof(buf), "RC %1d % 5d % 5d % 5d % 5d",
-             FC_START_CRSF_Get_State(), CRSF_STD[0], CRSF_STD[1], CRSF_STD[2], CRSF_STD[3]);
-    ips114_show_string(0U, 80U, buf);
-
-    // R7: Horizontal XY velocity (LC302 flow_x/y)
-    snprintf(buf, sizeof(buf), "FLO % 5d % 5d          ",
-             lc302_data.flow_x_integral, lc302_data.flow_y_integral);
-    ips114_show_string(0U, 96U, buf);
-}
-
 static void on_car_data(const float *data, uint8 count)
 {
     (void)data;
@@ -81,7 +21,6 @@ int main(void)
 {
     clock_init(SYSTEM_CLOCK_250M);
     SCB_DisableDCache();
-    ips114_init();
     Beep_Init();
     pit_ms_init(PIT_CH2, 10);
     /* 副 IMU 初始化日志走 WiFi 文本链路，所以 wifi_cmd_Init 必须早于 ICM42688_Aux_Init。 */
@@ -201,10 +140,6 @@ int main(void)
                 {
                     s_ipc_flying_retry_div = 0U;
                 }
-            }
-            if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_STANDBY)
-            {
-                // ips114_show_debug();
             }
             slot50 = div50;
             if (slot50 == 0U)

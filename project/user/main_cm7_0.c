@@ -71,32 +71,10 @@ void ips114_show_debug(void)
     ips114_show_string(0U, 96U, buf);
 }
 
-volatile float g_car_velocity_strafe_mps;
-volatile float g_car_velocity_forward_mps;
-volatile float g_car_image_car_lamp_x;
-volatile float g_car_image_car_lamp_y;
-volatile float g_car_image_car_lamp_width;
-volatile float g_car_image_car_lamp_length;
-volatile float g_car_image_car_lamp_angle;
-volatile float g_car_image_car_lamp_valid;
-volatile float g_car_image_beacon_x;
-volatile float g_car_image_beacon_y;
-
 static void on_car_data(const float *data, uint8 count)
 {
-    if (count >= 10U)
-    {
-        g_car_velocity_strafe_mps = data[0];
-        g_car_velocity_forward_mps = data[1];
-        g_car_image_car_lamp_x = data[2];
-        g_car_image_car_lamp_y = data[3];
-        g_car_image_car_lamp_width = data[4];
-        g_car_image_car_lamp_length = data[5];
-        g_car_image_car_lamp_angle = data[6];
-        g_car_image_car_lamp_valid = data[7];
-        g_car_image_beacon_x = data[8];
-        g_car_image_beacon_y = data[9];
-    }
+    (void)data;
+    (void)count;
 }
 
 int main(void)

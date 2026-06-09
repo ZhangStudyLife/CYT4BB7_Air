@@ -2,11 +2,9 @@
 #include "../Estimation/Pos_Est/Pos_Est.h"
 #include "../Estimation/Height_Est/Height_Est.h"
 
-extern volatile float g_car_image_car_lamp_x;
-extern volatile float g_car_image_car_lamp_y;
-extern volatile float g_car_image_car_lamp_valid;
-extern volatile float g_car_velocity_strafe_mps;
-extern volatile float g_car_velocity_forward_mps;
+extern volatile float g_down_camera_lamp_x;
+extern volatile float g_down_camera_lamp_y;
+extern volatile float g_down_camera_lamp_valid;
 
 static pid_t s_mode8_imgx_pid;
 static pid_t s_mode8_imgy_pid;
@@ -22,7 +20,6 @@ static const float s_mode8_img_x_dir = -1.0f; /* image x: right positive, left n
 static const float s_mode8_img_y_dir = 1.0f;  /* image y: front positive, rear negative; target y: rear positive */
 static const float s_mode8_img_lpf_alpha = 0.45f;
 static const float s_mode8_img_fb_limit_cmps = 80.0f;
-static const float s_mode8_car_vel_ff = 0.0f;
 static const float s_mode8_vel_limit_cmps = 200.0f;
 static const float s_mode8_angle_limit_deg = 8.0f;
 
@@ -80,7 +77,7 @@ void FC_Mode8_50Hz(float dt)
         return;
     }
 
-    if (g_car_image_car_lamp_valid > 0.5f)
+    if (g_down_camera_lamp_valid > 0.5f)
     {
         Beep_Disable();
     }
@@ -89,31 +86,31 @@ void FC_Mode8_50Hz(float dt)
         Beep_Enable();
     }
 
-    if ((g_car_image_car_lamp_valid > 0.5f) &&
+    if ((g_down_camera_lamp_valid > 0.5f) &&
         (0U != g_tof_fused_valid) &&
         (g_tof_fused_height_mm > 500.0f))
     {
         if (0U == s_mode8_img_lpf_inited)
         {
-            s_mode8_img_err_x_lpf = s_mode8_img_x_dir * g_car_image_car_lamp_x;
-            s_mode8_img_err_y_lpf = s_mode8_img_y_dir * g_car_image_car_lamp_y;
+            s_mode8_img_err_x_lpf = s_mode8_img_x_dir * g_down_camera_lamp_x;
+            s_mode8_img_err_y_lpf = s_mode8_img_y_dir * g_down_camera_lamp_y;
             s_mode8_img_lpf_inited = 1U;
             PID_Reset(&s_mode8_imgx_pid);
             PID_Reset(&s_mode8_imgy_pid);
         }
 
         s_mode8_img_err_x_lpf += s_mode8_img_lpf_alpha *
-                                  ((s_mode8_img_x_dir * g_car_image_car_lamp_x) - s_mode8_img_err_x_lpf);
+                                  ((s_mode8_img_x_dir * g_down_camera_lamp_x) - s_mode8_img_err_x_lpf);
         s_mode8_img_err_y_lpf += s_mode8_img_lpf_alpha *
-                                  ((s_mode8_img_y_dir * g_car_image_car_lamp_y) - s_mode8_img_err_y_lpf);
+                                  ((s_mode8_img_y_dir * g_down_camera_lamp_y) - s_mode8_img_err_y_lpf);
 
         img_fb_x = PID_Update(&s_mode8_imgx_pid, 0.0f, -s_mode8_img_err_x_lpf, dt);
         img_fb_y = PID_Update(&s_mode8_imgy_pid, 0.0f, -s_mode8_img_err_y_lpf, dt);
         img_fb_x = FC_Mode_Clamp(img_fb_x, -s_mode8_img_fb_limit_cmps, s_mode8_img_fb_limit_cmps);
         img_fb_y = FC_Mode_Clamp(img_fb_y, -s_mode8_img_fb_limit_cmps, s_mode8_img_fb_limit_cmps);
 
-        g_mode8_velx_target = s_mode8_car_vel_ff * g_car_velocity_strafe_mps * 100.0f + img_fb_x;
-        g_mode8_vely_target = -s_mode8_car_vel_ff * g_car_velocity_forward_mps * 100.0f + img_fb_y;
+        g_mode8_velx_target = img_fb_x;
+        g_mode8_vely_target = img_fb_y;
         g_mode8_velx_target = FC_Mode_Clamp(g_mode8_velx_target, -s_mode8_vel_limit_cmps, s_mode8_vel_limit_cmps);
         g_mode8_vely_target = FC_Mode_Clamp(g_mode8_vely_target, -s_mode8_vel_limit_cmps, s_mode8_vel_limit_cmps);
     }

@@ -99,6 +99,12 @@ volatile uint8 g_air_image_beacon_count = 0U;
 volatile uint8 g_air_image_car_lamp_count = 0U;
 volatile ipc_image_beacon_t g_air_image_beacons[IPC_IMAGE_MAX_BEACONS] = {0};
 volatile ipc_image_car_lamp_t g_air_image_car_lamps[IPC_IMAGE_MAX_CAR_LAMPS] = {0};
+volatile float g_down_camera_lamp_x = 0.0f;
+volatile float g_down_camera_lamp_y = 0.0f;
+volatile float g_down_camera_lamp_width = 0.0f;
+volatile float g_down_camera_lamp_length = 0.0f;
+volatile float g_down_camera_lamp_angle = 0.0f;
+volatile float g_down_camera_lamp_valid = 0.0f;
 
 static void ipc_image_publish_latest(void)
 {
@@ -124,6 +130,26 @@ static void ipc_image_publish_latest(void)
         g_air_image_car_lamps[i].length = s_latest_image.car_lamps[i].length;
         g_air_image_car_lamps[i].angle = s_latest_image.car_lamps[i].angle;
         g_air_image_car_lamps[i].valid = s_latest_image.car_lamps[i].valid;
+    }
+
+    if ((s_latest_image.car_lamp_count > 0U) &&
+        (0U != s_latest_image.car_lamps[0].valid))
+    {
+        g_down_camera_lamp_x = s_latest_image.car_lamps[0].cx;
+        g_down_camera_lamp_y = s_latest_image.car_lamps[0].cy;
+        g_down_camera_lamp_width = s_latest_image.car_lamps[0].width;
+        g_down_camera_lamp_length = s_latest_image.car_lamps[0].length;
+        g_down_camera_lamp_angle = s_latest_image.car_lamps[0].angle;
+        g_down_camera_lamp_valid = 1.0f;
+    }
+    else
+    {
+        g_down_camera_lamp_x = 0.0f;
+        g_down_camera_lamp_y = 0.0f;
+        g_down_camera_lamp_width = 0.0f;
+        g_down_camera_lamp_length = 0.0f;
+        g_down_camera_lamp_angle = 0.0f;
+        g_down_camera_lamp_valid = 0.0f;
     }
 }
 

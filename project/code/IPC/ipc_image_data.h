@@ -46,6 +46,12 @@ extern volatile uint8 g_air_image_beacon_count;
 extern volatile uint8 g_air_image_car_lamp_count;
 extern volatile ipc_image_beacon_t g_air_image_beacons[IPC_IMAGE_MAX_BEACONS];
 extern volatile ipc_image_car_lamp_t g_air_image_car_lamps[IPC_IMAGE_MAX_CAR_LAMPS];
+extern volatile float g_down_camera_lamp_x;
+extern volatile float g_down_camera_lamp_y;
+extern volatile float g_down_camera_lamp_width;
+extern volatile float g_down_camera_lamp_length;
+extern volatile float g_down_camera_lamp_angle;
+extern volatile float g_down_camera_lamp_valid;
 #endif
 
 void ipc_image_send(void);

@@ -3,18 +3,8 @@
 #include <math.h>
 #include "../Estimation/Attitude/IMU_TOP.h"
 #include "../Estimation/Height_Est/Height_Est.h"
+#include "../IPC/ipc_image_data.h"
 #include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
-
-extern volatile float g_car_velocity_strafe_mps;
-extern volatile float g_car_velocity_forward_mps;
-extern volatile float g_car_image_car_lamp_x;
-extern volatile float g_car_image_car_lamp_y;
-extern volatile float g_car_image_car_lamp_width;
-extern volatile float g_car_image_car_lamp_length;
-extern volatile float g_car_image_car_lamp_angle;
-extern volatile float g_car_image_car_lamp_valid;
-extern volatile float g_car_image_beacon_x;
-extern volatile float g_car_image_beacon_y;
 
 pid_t roll_gyro_pid;
 pid_t pitch_gyro_pid;
@@ -665,16 +655,16 @@ void FC_Loop_500Hz(void)
         yaw_gyro_target = 0.0f;
     }
 
-    wifi_justfloat(g_car_velocity_strafe_mps,
-        g_car_velocity_forward_mps,
-        g_car_image_car_lamp_x,
-        g_car_image_car_lamp_y,
-        g_car_image_car_lamp_width,
-        g_car_image_car_lamp_length,
-        g_car_image_car_lamp_angle,
-        g_car_image_car_lamp_valid,
-        g_car_image_beacon_x,
-        g_car_image_beacon_y,
+    wifi_justfloat(g_down_camera_lamp_x,
+        g_down_camera_lamp_y,
+        g_down_camera_lamp_width,
+        g_down_camera_lamp_length,
+        g_down_camera_lamp_angle,
+        g_down_camera_lamp_valid,
+        g_air_image_car_lamp_count,
+        g_air_image_beacon_count,
+        g_air_image_seq,
+        0.0f,
         g_euler.roll,
         g_euler.pitch,
         g_euler.yaw,

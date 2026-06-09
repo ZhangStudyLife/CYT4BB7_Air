@@ -190,6 +190,7 @@ int main(void)
     SCB_DisableDCache();
 
     ipc_communicate_init(IPC_PORT_2, ipc_image_callback);
+    CameraSpi_Init();
     ips114_init();
     ips114_set_color(RGB565_WHITE, RGB565_BLACK);
     ips114_clear();
@@ -200,6 +201,8 @@ int main(void)
 
     while(true)
     {
+        CameraSpi_Poll();
+
         if(mt9v03x_finish_flag)
         {
             image_update();
@@ -209,5 +212,7 @@ int main(void)
                 image_show_debug_frame();
             }
         }
+
+        CameraSpi_Poll();
     }
 }

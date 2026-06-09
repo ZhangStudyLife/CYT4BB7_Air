@@ -26,7 +26,6 @@ int main(void)
     /* 副 IMU 初始化日志走 WiFi 文本链路，所以 wifi_cmd_Init 必须早于 ICM42688_Aux_Init。 */
     wifi_cmd_Init();
     TOF_Init();
-    // PMW3901_Init();
     // LC302_Init();
     IMU_Init_All();
     // (void)ICM42688_Aux_Init();           //对比用的陀螺仪关掉
@@ -78,7 +77,6 @@ int main(void)
             {
                 div500 = 0U;
                 FC_Loop_500Hz();
-                // wifi_justfloat(tick_1000us_cnt, lc302_data.flow_x_integral, lc302_data.flow_y_integral, lc302_data.integration_timespan, g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY,g_pmw3901_raw.squal);
             }
 
             FC_Loop_1000Hz();

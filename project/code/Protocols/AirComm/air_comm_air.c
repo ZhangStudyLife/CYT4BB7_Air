@@ -19,8 +19,6 @@
 #define AIR_COMM_RX_QUEUE_SIZE               (512U)  /* 接收环形队列大小（字节） */
 #define AIR_COMM_PARAM_TABLE_MAX             (100U)  /* 最多注册参数个数 */
 #define AIR_COMM_COMMAND_TABLE_MAX           (8U)    /* 最多注册远程命令个数 */
-#define AIR_COMM_SCREEN_LINE_COUNT           (8U)
-#define AIR_COMM_SCREEN_LINE_LEN             (30U)   /* IPS114横屏8x16字体最多30列，避免越界断言 */
 
 /* 消息类型定义 */
 #define AIR_COMM_MSG_SET_PARAM               (0x01U) /* 小车→无人机：设置参数 */
@@ -106,7 +104,6 @@ static air_comm_run_data_fn s_air_comm_run_data_callback;
 static air_comm_air_command_t s_air_comm_commands[AIR_COMM_COMMAND_TABLE_MAX];
 static const air_comm_air_command_t *s_air_comm_active_command;
 static float s_air_comm_last_run_data[AIR_COMM_AIR_RUN_DATA_MAX_FLOATS];
-static char s_air_comm_screen_cache[AIR_COMM_SCREEN_LINE_COUNT][AIR_COMM_SCREEN_LINE_LEN + 1U];
 static char s_air_comm_last_done_name[AIR_COMM_AIR_COMMAND_NAME_MAX + 1U];
 static uint8 s_air_comm_last_run_data_count;
 static uint8 s_air_comm_last_run_data_valid;
@@ -213,123 +210,12 @@ static const air_comm_air_command_t *air_comm_find_command(const char *name)
 
 static void air_comm_screen_reset(void)
 {
-    uint8 index;
-
-    ips114_set_font(IPS114_8X16_FONT);
-    ips114_set_color(RGB565_GREEN, RGB565_BLACK);
-    ips114_clear();
-    for(index = 0U; index < AIR_COMM_SCREEN_LINE_COUNT; index++)
-    {
-        s_air_comm_screen_cache[index][0] = '\0';
-    }
     s_air_comm_screen_ready = 1U;
-}
-
-static void air_comm_screen_line(uint8 line, const char *text)
-{
-    char padded[AIR_COMM_SCREEN_LINE_LEN + 1U];
-    uint8 len;
-    uint8 index;
-
-    if((line >= AIR_COMM_SCREEN_LINE_COUNT) || (text == NULL))
-    {
-        return;
-    }
-
-    len = (uint8)strlen(text);
-    if(len > AIR_COMM_SCREEN_LINE_LEN)
-    {
-        len = AIR_COMM_SCREEN_LINE_LEN;
-    }
-
-    for(index = 0U; index < AIR_COMM_SCREEN_LINE_LEN; index++)
-    {
-        padded[index] = (index < len) ? text[index] : ' ';
-    }
-    padded[AIR_COMM_SCREEN_LINE_LEN] = '\0';
-
-    if(strcmp(s_air_comm_screen_cache[line], padded) != 0)
-    {
-        strcpy(s_air_comm_screen_cache[line], padded);
-        ips114_show_string(0U, (uint16)(line * 16U), padded);
-    }
 }
 
 static void air_comm_screen_stop(void)
 {
     s_air_comm_screen_ready = 0U;
-    ips114_set_color(RGB565_WHITE, RGB565_BLACK);
-    ips114_clear();
-}
-
-static void air_comm_show_imu_data(void)
-{
-    char line[40];
-
-    air_comm_screen_line(0U, "IMU RAW");
-    snprintf(line, sizeof(line), "ACC X:%6d Y:%6d",
-             (int)ICM42688_RAW.acc_x_lsb,
-             (int)ICM42688_RAW.acc_y_lsb);
-    air_comm_screen_line(1U, line);
-    snprintf(line, sizeof(line), "ACC Z:%6d T:%6d",
-             (int)ICM42688_RAW.acc_z_lsb,
-             (int)ICM42688_RAW.temp_lsb);
-    air_comm_screen_line(2U, line);
-    snprintf(line, sizeof(line), "GYR X:%6d Y:%6d",
-             (int)ICM42688_RAW.gyro_x_lsb,
-             (int)ICM42688_RAW.gyro_y_lsb);
-    air_comm_screen_line(3U, line);
-    snprintf(line, sizeof(line), "GYR Z:%6d", (int)ICM42688_RAW.gyro_z_lsb);
-    air_comm_screen_line(4U, line);
-    snprintf(line, sizeof(line), "ACCg %5.2f %5.2f",
-             (double)g_imufilter_1000hz.accx,
-             (double)g_imufilter_1000hz.accy);
-    air_comm_screen_line(5U, line);
-    snprintf(line, sizeof(line), "GYRd %5.1f %5.1f",
-             (double)g_imufilter_1000hz.gyrox,
-             (double)g_imufilter_1000hz.gyroy);
-    air_comm_screen_line(6U, line);
-    snprintf(line, sizeof(line), "RPY %4.1f %4.1f %4.1f",
-             (double)g_euler.roll,
-             (double)g_euler.pitch,
-             (double)g_euler.yaw);
-    air_comm_screen_line(7U, line);
-}
-
-static void air_comm_show_optical_flow_data(void)
-{
-    char line[40];
-
-    air_comm_screen_line(0U, "OPTICAL FLOW");
-    snprintf(line, sizeof(line), "LC X:%6d Y:%6d",
-             (int)lc302_data.flow_x_integral,
-             (int)lc302_data.flow_y_integral);
-    air_comm_screen_line(1U, line);
-    snprintf(line, sizeof(line), "DT:%6u DIS:%5u",
-             (unsigned int)lc302_data.integration_timespan,
-             (unsigned int)lc302_data.ground_distance);
-    air_comm_screen_line(2U, line);
-    snprintf(line, sizeof(line), "VALID:%u VER:%u",
-             (unsigned int)lc302_data.valid,
-             (unsigned int)lc302_data.version);
-    air_comm_screen_line(3U, line);
-    snprintf(line, sizeof(line), "PMW dX:%5d dY:%5d",
-             (int)g_pmw3901_raw.deltaX,
-             (int)g_pmw3901_raw.deltaY);
-    air_comm_screen_line(4U, line);
-    snprintf(line, sizeof(line), "SQUAL:%3u OBS:%3u",
-             (unsigned int)g_pmw3901_raw.squal,
-             (unsigned int)g_pmw3901_raw.observation);
-    air_comm_screen_line(5U, line);
-    snprintf(line, sizeof(line), "RAW %3u %3u %3u",
-             (unsigned int)g_pmw3901_raw.rawDataSum,
-             (unsigned int)g_pmw3901_raw.maxRawData,
-             (unsigned int)g_pmw3901_raw.minRawData);
-    air_comm_screen_line(6U, line);
-    snprintf(line, sizeof(line), "SHUT:%5u MOT:%3u",
-             (unsigned int)g_pmw3901_raw.shutter,
-             (unsigned int)g_pmw3901_raw.motion);
-    air_comm_screen_line(7U, line);
 }
 
 static void air_comm_stop_active_command(void)
@@ -352,10 +238,6 @@ static void air_comm_beep(void)
 
 static void air_comm_register_default_commands(void)
 {
-    (void)air_comm_air_register_polling_command("show_imu_data",
-                                                air_comm_show_imu_data);
-    (void)air_comm_air_register_polling_command("show_optical_flow_data",
-                                                air_comm_show_optical_flow_data);
     (void)air_comm_air_register_instant_command("beep", air_comm_beep);
 }
 
@@ -1093,7 +975,6 @@ void air_comm_air_init(void)
     memset(s_air_comm_params, 0, sizeof(s_air_comm_params));
     memset(s_air_comm_commands, 0, sizeof(s_air_comm_commands));
     memset(s_air_comm_last_run_data, 0, sizeof(s_air_comm_last_run_data));
-    memset(s_air_comm_screen_cache, 0, sizeof(s_air_comm_screen_cache));
     memset(s_air_comm_last_done_name, 0, sizeof(s_air_comm_last_done_name));
 
     s_air_comm_initialized = 0U;

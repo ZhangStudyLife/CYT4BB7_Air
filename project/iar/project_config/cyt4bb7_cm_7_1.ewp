@@ -375,6 +375,7 @@
                     <state>$PROJ_DIR$\..\..\user</state>
                     <state>$PROJ_DIR$\..\..\code</state>
                     <state>$PROJ_DIR$\..\..\code\IPC</state>
+                    <state>$PROJ_DIR$\..\..\code\Protocols\CameraSpi</state>
                 </option>
                 <option>
                     <name>CCStdIncCheck</name>
@@ -1117,9 +1118,6 @@
     <group>
         <name>code</name>
         <file>
-            <name>$PROJ_DIR$\..\..\code\本文件夹作用.txt</name>
-        </file>
-        <file>
             <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\image.c</name>
         </file>
         <file>
@@ -1131,6 +1129,15 @@
         <file>
             <name>$PROJ_DIR$\..\..\code\IPC\ipc_image_data.h</name>
         </file>
+        <group>
+            <name>CameraSpi</name>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Protocols\CameraSpi\camera_spi.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Protocols\CameraSpi\camera_spi.h</name>
+            </file>
+        </group>
     </group>
     <group>
         <name>doc</name>
@@ -1426,7 +1433,7 @@
                         <name>$PROJ_DIR$\..\..\..\libraries\sdk\common\src\drivers\flash\cy_flash.c</name>
                     </file>
                     <file>
-                        <name>$PROJ_DIR$\..\..\..\libraries\sdk\tviibh4m\src\drivers\flash\cy_flash.h</name>
+                        <name>$PROJ_DIR$\..\..\..\libraries\sdk\common\src\drivers\flash\cy_flash.h</name>
                     </file>
                 </group>
                 <group>

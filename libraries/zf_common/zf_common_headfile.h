@@ -49,7 +49,9 @@
 #include "zf_device_imu660ra.h"
 #include "zf_device_imu660rb.h"
 #include "zf_device_imu963ra.h"
+#if defined(CY_CORE_CM7_1)
 #include "zf_device_ips114.h"
+#endif
 #include "zf_device_ips200.h"
 #include "zf_device_ips200pro.h"
 #include "zf_device_key.h"
@@ -74,7 +76,6 @@
 
 
 #include "../code/HW_Drivers/ICM42688/ICM42688.h"
-#include "../code/HW_Drivers/PMW3901/PMW3901.h"
 #include "../code/Estimation/Pos_Est/Pos_Est.h"
 #include "../code/Estimation/Attitude/IMU_TOP.h"
 #include "../code/Protocols/crsf/crsf.h"
@@ -100,4 +101,7 @@
 #include "../code/HW_Drivers/LC302/LC302.h"
 #include "../code/HW_Drivers/LC302/LC302_Aux.h"
 #include "../code/IPC/ipc_image_data.h"
+#if defined(CY_CORE_CM7_1)
+#include "../code/Protocols/CameraSpi/camera_spi.h"
+#endif
 #endif

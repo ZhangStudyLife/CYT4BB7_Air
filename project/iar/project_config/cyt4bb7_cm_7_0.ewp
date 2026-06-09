@@ -2238,7 +2238,6 @@
                                 <state>$PROJ_DIR$\..\..\user</state>
                                 <state>$PROJ_DIR$\..\..\code</state>
                                 <state>$PROJ_DIR$\..\..\code\HW_Drivers\ICM42688</state>
-                                <state>$PROJ_DIR$\..\..\code\HW_Drivers\PMW3901</state>
                                 <state>$PROJ_DIR$\..\..\code\HW_Drivers\VL53L1X</state>
                                 <state>$PROJ_DIR$\..\..\code\HW_Drivers\Beep</state>
                             </option>
@@ -2526,7 +2525,6 @@
                                 <state>$PROJ_DIR$\..\..\user</state>
                                 <state>$PROJ_DIR$\..\..\code</state>
                                 <state>$PROJ_DIR$\..\..\code\HW_Drivers\ICM42688</state>
-                                <state>$PROJ_DIR$\..\..\code\HW_Drivers\PMW3901</state>
                                 <state>$PROJ_DIR$\..\..\code\HW_Drivers\VL53L1X</state>
                                 <state>$PROJ_DIR$\..\..\code\HW_Drivers\BMP388</state>
                             </option>
@@ -2847,7 +2845,6 @@
                                 <state>$PROJ_DIR$\..\..\user</state>
                                 <state>$PROJ_DIR$\..\..\code</state>
                                 <state>$PROJ_DIR$\..\..\code\HW_Drivers\ICM42688</state>
-                                <state>$PROJ_DIR$\..\..\code\HW_Drivers\PMW3901</state>
                                 <state>$PROJ_DIR$\..\..\code\HW_Drivers\VL53L1X</state>
                                 <state>$PROJ_DIR$\..\..\code\HW_Drivers\LC302</state>
                             </option>
@@ -3141,7 +3138,6 @@
                                 <state>$PROJ_DIR$\..\..\user</state>
                                 <state>$PROJ_DIR$\..\..\code</state>
                                 <state>$PROJ_DIR$\..\..\code\HW_Drivers\ICM42688</state>
-                                <state>$PROJ_DIR$\..\..\code\HW_Drivers\PMW3901</state>
                                 <state>$PROJ_DIR$\..\..\code\HW_Drivers\VL53L1X</state>
                                 <state>$PROJ_DIR$\..\..\code\HW_Drivers\Motor</state>
                             </option>
@@ -3262,15 +3258,6 @@
                         </data>
                     </settings>
                 </configuration>
-            </group>
-            <group>
-                <name>PMW3901</name>
-                <file>
-                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\PMW3901\PMW3901.c</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\..\code\HW_Drivers\PMW3901\PMW3901.h</name>
-                </file>
             </group>
             <group>
                 <name>VL53L1X</name>
@@ -3439,7 +3426,6 @@
                             <state>$PROJ_DIR$\..\..\user</state>
                             <state>$PROJ_DIR$\..\..\code</state>
                             <state>$PROJ_DIR$\..\..\code\HW_Drivers\ICM42688</state>
-                            <state>$PROJ_DIR$\..\..\code\HW_Drivers\PMW3901</state>
                             <state>$PROJ_DIR$\..\..\code\HW_Drivers\VL53L1X</state>
                         </option>
                         <option>
@@ -4165,9 +4151,6 @@
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\code\filter.h</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\code\本文件夹作用.txt</name>
         </file>
     </group>
     <group>
@@ -5014,12 +4997,6 @@
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_imu963ra.h</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_ips114.c</name>
-        </file>
-        <file>
-            <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_ips114.h</name>
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\..\libraries\zf_device\zf_device_ips200.c</name>

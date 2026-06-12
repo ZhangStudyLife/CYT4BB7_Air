@@ -1,8 +1,14 @@
 #include "camera_spi.h"
 
+#include "IPC/ipc_image_data.h"
 #include "gpio/cy_gpio.h"
 #include "scb/cy_scb_spi.h"
 #include "sysclk/cy_sysclk.h"
+
+#define CAMERA_SPI_BOARD_COUNT              (2U)
+#define CAMERA_SPI_TRANSFER_LEN             (97U)
+#define CAMERA_SPI_APP_DATA_CAPACITY        (77U)
+#define CAMERA_SPI_DOWNLINK_APP_LEN         (9U)
 
 #define CAMERA_SPI_FRAME_HEAD_0             (0xAAU)
 #define CAMERA_SPI_FRAME_HEAD_1             (0x55U)
@@ -19,7 +25,6 @@
 #define CAMERA_SPI_BAUDRATE                 (2000000UL)
 #define CAMERA_SPI_CLOCK_OVERSAMPLE         (4U)
 #define CAMERA_SPI_TRANSFER_TIMEOUT_POLLS   (100000U)
-#define CAMERA_SPI_DOWNLINK_MASK_ALL        (0x03U)
 #define CAMERA_SPI_READY0_PIN               P01_0
 #define CAMERA_SPI_READY1_PIN               P01_1
 #define CAMERA_SPI_CS0_PIN                  P03_3
@@ -28,6 +33,28 @@
 #define CAMERA_SPI_IRQ_SRC                  scb_6_interrupt_IRQn
 #define CAMERA_SPI_CPU_IRQ                  CPUIntIdx5_IRQn
 #define CAMERA_SPI_PERI_FREQ                CY_INITIAL_TARGET_PERI_FREQ
+#define CAMERA_SPI_IMAGE_TCP_ENABLE         (1U)
+#define CAMERA_SPI_IMAGE_DISPLAY_ENABLE     (0U)
+
+#define CAMERA_SPI_IMAGE_VERSION_OFFSET        (0U)
+#define CAMERA_SPI_IMAGE_BEACON_COUNT_OFFSET   (1U)
+#define CAMERA_SPI_IMAGE_LAMP_COUNT_OFFSET     (2U)
+#define CAMERA_SPI_IMAGE_HEADER_SIZE           (4U)
+#define CAMERA_SPI_IMAGE_BEACON_VALID_OFFSET   (0U)
+#define CAMERA_SPI_IMAGE_BEACON_X_OFFSET       (1U)
+#define CAMERA_SPI_IMAGE_BEACON_Y_OFFSET       (5U)
+#define CAMERA_SPI_IMAGE_BEACON_RADIUS_OFFSET  (9U)
+#define CAMERA_SPI_IMAGE_BEACON_SLOT_SIZE      (13U)
+#define CAMERA_SPI_IMAGE_BEACON_COUNT          (4U)
+#define CAMERA_SPI_IMAGE_LAMP_VALID_OFFSET     (0U)
+#define CAMERA_SPI_IMAGE_LAMP_CX_OFFSET        (1U)
+#define CAMERA_SPI_IMAGE_LAMP_CY_OFFSET        (5U)
+#define CAMERA_SPI_IMAGE_LAMP_ANGLE_OFFSET     (17U)
+#define CAMERA_SPI_IMAGE_LAMP_SLOT_SIZE        (21U)
+#define CAMERA_SPI_IMAGE_BEACON_PACKET_OFFSET  CAMERA_SPI_IMAGE_HEADER_SIZE
+#define CAMERA_SPI_IMAGE_LAMP_PACKET_OFFSET \
+    (CAMERA_SPI_IMAGE_BEACON_PACKET_OFFSET + \
+     (CAMERA_SPI_IMAGE_BEACON_COUNT * CAMERA_SPI_IMAGE_BEACON_SLOT_SIZE))
 
 #define CAMERA_SPI_ERR_OK                   (0U)
 #define CAMERA_SPI_ERR_INVALID_BOARD        (1U)
@@ -44,11 +71,14 @@
 typedef struct
 {
     uint8 online;
-    uint8 has_new;
     uint8 last_error;
     uint8 peer_last_error;
     uint8 flags;
-    uint16 app_len;
+    uint8 version;
+    uint8 beacon_count;
+    uint8 car_lamp_count;
+    uint8 first_beacon_valid;
+    uint8 first_lamp_valid;
     uint32 tx_sequence;
     uint32 tx_counter;
     uint32 rx_sequence;
@@ -57,9 +87,12 @@ typedef struct
     uint32 rx_error_count;
     uint8 last_rx_head0;
     uint8 last_rx_head1;
-    uint8 app_data[CAMERA_SPI_APP_DATA_CAPACITY];
-    uint8 downlink_data[CAMERA_SPI_APP_DATA_CAPACITY];
-    uint8 has_custom_downlink;
+    float first_beacon_x;
+    float first_beacon_y;
+    float first_beacon_radius;
+    float first_lamp_cx;
+    float first_lamp_cy;
+    float first_lamp_angle;
 } camera_spi_board_state_t;
 
 static camera_spi_board_state_t s_boards[CAMERA_SPI_BOARD_COUNT];
@@ -69,14 +102,11 @@ static uint8 s_rx_frame[CAMERA_SPI_TRANSFER_LEN];
 static uint8 s_initialized;
 static uint8 s_active;
 static uint8 s_active_board;
-static uint8 s_next_board;
-static uint8 s_downlink_mask;
 static uint8 s_flight_state;
-static uint8 s_image_tcp;
-static uint8 s_image_display = 1U;
 static uint8 s_ready_mask;
-static uint8 s_last_polled_board;
+static uint8 s_polled_mask;
 static uint32 s_active_poll_count;
+static uint32 s_log_seq;
 
 static void camera_spi_write_u16_be(uint8 *buffer, uint16 value)
 {
@@ -171,45 +201,17 @@ static uint8 camera_spi_ready_mask(void)
     return mask;
 }
 
-static uint8 camera_spi_select_board(uint8 candidates, uint8 *board_id)
-{
-    uint8 i;
-
-    if(board_id == NULL)
-    {
-        return 0U;
-    }
-
-    for(i = 0U; i < CAMERA_SPI_BOARD_COUNT; i++)
-    {
-        uint8 id = (uint8)((s_next_board + i) % CAMERA_SPI_BOARD_COUNT);
-        if((candidates & (uint8)(1U << id)) != 0U)
-        {
-            *board_id = id;
-            s_next_board = (uint8)((id + 1U) % CAMERA_SPI_BOARD_COUNT);
-            return 1U;
-        }
-    }
-
-    return 0U;
-}
-
 static void camera_spi_build_downlink_app(uint8 board_id, uint8 *app)
 {
     camera_spi_board_state_t *board = &s_boards[board_id];
 
     memset(app, 0, CAMERA_SPI_APP_DATA_CAPACITY);
-    if(board->has_custom_downlink != 0U)
-    {
-        memcpy(app, board->downlink_data, CAMERA_SPI_APP_DATA_CAPACITY);
-    }
-
     app[0] = CAMERA_SPI_DOWNLINK_MAGIC;
     app[1] = board_id;
     camera_spi_write_u32_le(&app[2], board->tx_counter++);
     app[6] = s_flight_state;
-    app[7] = s_image_tcp;
-    app[8] = (s_flight_state == 0U) ? s_image_display : 0U;
+    app[7] = CAMERA_SPI_IMAGE_TCP_ENABLE;
+    app[8] = (s_flight_state == 0U) ? CAMERA_SPI_IMAGE_DISPLAY_ENABLE : 0U;
 }
 
 static void camera_spi_refresh_flight_state(void)
@@ -227,7 +229,6 @@ static void camera_spi_refresh_flight_state(void)
     {
         s_boards[board_id].tx_sequence++;
     }
-    s_downlink_mask |= CAMERA_SPI_DOWNLINK_MASK_ALL;
 }
 
 static void camera_spi_build_request_frame(uint8 board_id)
@@ -263,6 +264,33 @@ static void camera_spi_record_error(uint8 board_id, uint8 error)
             s_boards[board_id].rx_error_count++;
         }
     }
+}
+
+static void camera_spi_read_float(const uint8 *data, uint16 offset, float *value)
+{
+    memcpy(value, &data[offset], sizeof(float));
+}
+
+static void camera_spi_parse_image_payload(uint8 board_id, const uint8 *data)
+{
+    const uint8 *slot;
+    camera_spi_board_state_t *board = &s_boards[board_id];
+
+    board->version = data[CAMERA_SPI_IMAGE_VERSION_OFFSET];
+    board->beacon_count = data[CAMERA_SPI_IMAGE_BEACON_COUNT_OFFSET];
+    board->car_lamp_count = data[CAMERA_SPI_IMAGE_LAMP_COUNT_OFFSET];
+
+    slot = &data[CAMERA_SPI_IMAGE_BEACON_PACKET_OFFSET];
+    board->first_beacon_valid = slot[CAMERA_SPI_IMAGE_BEACON_VALID_OFFSET];
+    camera_spi_read_float(slot, CAMERA_SPI_IMAGE_BEACON_X_OFFSET, &board->first_beacon_x);
+    camera_spi_read_float(slot, CAMERA_SPI_IMAGE_BEACON_Y_OFFSET, &board->first_beacon_y);
+    camera_spi_read_float(slot, CAMERA_SPI_IMAGE_BEACON_RADIUS_OFFSET, &board->first_beacon_radius);
+
+    slot = &data[CAMERA_SPI_IMAGE_LAMP_PACKET_OFFSET];
+    board->first_lamp_valid = slot[CAMERA_SPI_IMAGE_LAMP_VALID_OFFSET];
+    camera_spi_read_float(slot, CAMERA_SPI_IMAGE_LAMP_CX_OFFSET, &board->first_lamp_cx);
+    camera_spi_read_float(slot, CAMERA_SPI_IMAGE_LAMP_CY_OFFSET, &board->first_lamp_cy);
+    camera_spi_read_float(slot, CAMERA_SPI_IMAGE_LAMP_ANGLE_OFFSET, &board->first_lamp_angle);
 }
 
 static uint8 camera_spi_parse_response(uint8 board_id)
@@ -315,20 +343,12 @@ static uint8 camera_spi_parse_response(uint8 board_id)
     board = &s_boards[board_id];
     board->rx_sequence = camera_spi_read_u32_le(&payload[0]);
     board->ack_sequence = camera_spi_read_u32_le(&payload[4]);
-    board->app_len = CAMERA_SPI_APP_DATA_CAPACITY;
     board->flags = payload[10];
     board->peer_last_error = payload[11];
-    memcpy(board->app_data, &payload[12], CAMERA_SPI_APP_DATA_CAPACITY);
+    camera_spi_parse_image_payload(board_id, &payload[12]);
     board->online = 1U;
-    board->has_new = 1U;
     board->last_error = CAMERA_SPI_ERR_OK;
     board->rx_ok_count++;
-
-    if(board->ack_sequence >= board->tx_sequence)
-    {
-        s_downlink_mask &= (uint8)~(1U << board_id);
-        board->has_custom_downlink = 0U;
-    }
 
     return CAMERA_SPI_ERR_OK;
 }
@@ -481,6 +501,58 @@ static void camera_spi_wait_active_complete(void)
     }
 }
 
+static void camera_spi_poll_board(uint8 board_id)
+{
+    uint8 board_mask = (uint8)(1U << board_id);
+
+    s_polled_mask |= board_mask;
+    camera_spi_start_transfer(board_id);
+    camera_spi_wait_active_complete();
+}
+
+static void camera_spi_publish_log(void)
+{
+    ipc_camera_spi_log_t log;
+    uint8 board_id;
+
+    memset(&log, 0, sizeof(log));
+    log.seq = ++s_log_seq;
+    log.ready_mask = s_ready_mask;
+    log.last_polled_board = s_polled_mask;
+
+    for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
+    {
+        const camera_spi_board_state_t *state = &s_boards[board_id];
+        ipc_camera_spi_board_log_t *board = &log.board[board_id];
+
+        board->online = state->online;
+        board->last_error = state->last_error;
+        board->peer_last_error = state->peer_last_error;
+        board->flags = state->flags;
+        board->version = state->version;
+        board->beacon_count = state->beacon_count;
+        board->car_lamp_count = state->car_lamp_count;
+        board->first_beacon_valid = state->first_beacon_valid;
+        board->first_lamp_valid = state->first_lamp_valid;
+        board->ready_mask = s_ready_mask;
+        board->last_rx_head0 = state->last_rx_head0;
+        board->last_rx_head1 = state->last_rx_head1;
+        board->last_polled_board = s_polled_mask;
+        board->rx_ok_count = state->rx_ok_count;
+        board->rx_error_count = state->rx_error_count;
+        board->rx_sequence = state->rx_sequence;
+        board->ack_sequence = state->ack_sequence;
+        board->first_beacon_x = state->first_beacon_x;
+        board->first_beacon_y = state->first_beacon_y;
+        board->first_beacon_radius = state->first_beacon_radius;
+        board->first_lamp_cx = state->first_lamp_cx;
+        board->first_lamp_cy = state->first_lamp_cy;
+        board->first_lamp_angle = state->first_lamp_angle;
+    }
+
+    ipc_camera_spi_log_publish(&log);
+}
+
 void CameraSpi_Init(void)
 {
     uint8 board_id;
@@ -492,14 +564,11 @@ void CameraSpi_Init(void)
     s_initialized = 0U;
     s_active = 0U;
     s_active_board = 0U;
-    s_next_board = 0U;
-    s_downlink_mask = CAMERA_SPI_DOWNLINK_MASK_ALL;
     s_flight_state = (ipc_core0_is_flying() != 0U) ? 1U : 0U;
-    s_image_tcp = 0U;
-    s_image_display = 1U;
     s_ready_mask = 0U;
-    s_last_polled_board = 0xFFU;
+    s_polled_mask = 0U;
     s_active_poll_count = 0U;
+    s_log_seq = 0U;
 
     for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
     {
@@ -513,9 +582,8 @@ void CameraSpi_Init(void)
     s_initialized = 1U;
 }
 
-void CameraSpi_Poll(void)
+void CameraSpi_Update(void)
 {
-    uint8 candidates;
     uint8 board_id;
 
     if(s_initialized == 0U)
@@ -531,105 +599,11 @@ void CameraSpi_Poll(void)
 
     camera_spi_refresh_flight_state();
     s_ready_mask = camera_spi_ready_mask();
-    candidates = (uint8)(s_ready_mask | s_downlink_mask);
-    if(camera_spi_select_board(candidates, &board_id) != 0U)
-    {
-        s_last_polled_board = board_id;
-        camera_spi_start_transfer(board_id);
-        camera_spi_wait_active_complete();
-    }
-}
-
-uint8 CameraSpi_SendRaw(uint8 board_id, const uint8 *data, uint16 len)
-{
-    uint16 copy_len = len;
-
-    if(board_id >= CAMERA_SPI_BOARD_COUNT)
-    {
-        return 0U;
-    }
-    if((data == NULL) && (len > 0U))
-    {
-        return 0U;
-    }
-    if(copy_len > CAMERA_SPI_APP_DATA_CAPACITY)
-    {
-        copy_len = CAMERA_SPI_APP_DATA_CAPACITY;
-    }
-
-    memset(s_boards[board_id].downlink_data, 0, CAMERA_SPI_APP_DATA_CAPACITY);
-    if(copy_len > 0U)
-    {
-        memcpy(s_boards[board_id].downlink_data, data, copy_len);
-    }
-    s_boards[board_id].tx_sequence++;
-    s_boards[board_id].has_custom_downlink = 1U;
-    s_downlink_mask |= (uint8)(1U << board_id);
-
-    return 1U;
-}
-
-uint8 CameraSpi_ReceiveRaw(uint8 board_id, uint8 *data, uint16 *len)
-{
-    if((board_id >= CAMERA_SPI_BOARD_COUNT) || (data == NULL) || (len == NULL))
-    {
-        return 0U;
-    }
-    if(s_boards[board_id].has_new == 0U)
-    {
-        *len = 0U;
-        return 0U;
-    }
-    if(*len < CAMERA_SPI_APP_DATA_CAPACITY)
-    {
-        return 0U;
-    }
-
-    memcpy(data, s_boards[board_id].app_data, CAMERA_SPI_APP_DATA_CAPACITY);
-    *len = CAMERA_SPI_APP_DATA_CAPACITY;
-    s_boards[board_id].has_new = 0U;
-
-    return 1U;
-}
-
-uint8 CameraSpi_GetSnapshot(uint8 board_id, camera_spi_snapshot_t *snapshot)
-{
-    const camera_spi_board_state_t *board;
-
-    if((board_id >= CAMERA_SPI_BOARD_COUNT) || (snapshot == NULL))
-    {
-        return 0U;
-    }
-
-    board = &s_boards[board_id];
-    snapshot->online = board->online;
-    snapshot->has_new = board->has_new;
-    snapshot->last_error = board->last_error;
-    snapshot->peer_last_error = board->peer_last_error;
-    snapshot->flags = board->flags;
-    snapshot->app_len = board->app_len;
-    snapshot->rx_sequence = board->rx_sequence;
-    snapshot->ack_sequence = board->ack_sequence;
-    snapshot->rx_ok_count = board->rx_ok_count;
-    snapshot->rx_error_count = board->rx_error_count;
-    snapshot->ready_mask = s_ready_mask;
-    snapshot->last_rx_head0 = board->last_rx_head0;
-    snapshot->last_rx_head1 = board->last_rx_head1;
-    snapshot->last_polled_board = s_last_polled_board;
-    memcpy(snapshot->app_data, board->app_data, CAMERA_SPI_APP_DATA_CAPACITY);
-
-    return 1U;
-}
-
-void CameraSpi_SetDebugOptions(uint8 image_tcp, uint8 image_display)
-{
-    uint8 board_id;
-
-    s_image_tcp = (image_tcp != 0U) ? 1U : 0U;
-    s_image_display = (image_display != 0U) ? 1U : 0U;
+    s_polled_mask = 0U;
     for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
     {
-        s_boards[board_id].tx_sequence++;
+        camera_spi_poll_board(board_id);
     }
-    s_downlink_mask |= CAMERA_SPI_DOWNLINK_MASK_ALL;
+
+    camera_spi_publish_log();
 }

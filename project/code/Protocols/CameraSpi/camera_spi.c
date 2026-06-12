@@ -517,8 +517,6 @@ static void camera_spi_publish_log(void)
 
     memset(&log, 0, sizeof(log));
     log.seq = ++s_log_seq;
-    log.ready_mask = s_ready_mask;
-    log.last_polled_board = s_polled_mask;
 
     for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
     {
@@ -526,22 +524,10 @@ static void camera_spi_publish_log(void)
         ipc_camera_spi_board_log_t *board = &log.board[board_id];
 
         board->online = state->online;
-        board->last_error = state->last_error;
-        board->peer_last_error = state->peer_last_error;
-        board->flags = state->flags;
-        board->version = state->version;
         board->beacon_count = state->beacon_count;
         board->car_lamp_count = state->car_lamp_count;
         board->first_beacon_valid = state->first_beacon_valid;
         board->first_lamp_valid = state->first_lamp_valid;
-        board->ready_mask = s_ready_mask;
-        board->last_rx_head0 = state->last_rx_head0;
-        board->last_rx_head1 = state->last_rx_head1;
-        board->last_polled_board = s_polled_mask;
-        board->rx_ok_count = state->rx_ok_count;
-        board->rx_error_count = state->rx_error_count;
-        board->rx_sequence = state->rx_sequence;
-        board->ack_sequence = state->ack_sequence;
         board->first_beacon_x = state->first_beacon_x;
         board->first_beacon_y = state->first_beacon_y;
         board->first_beacon_radius = state->first_beacon_radius;

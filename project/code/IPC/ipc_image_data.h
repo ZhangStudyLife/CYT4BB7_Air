@@ -14,23 +14,11 @@ extern "C" {
 typedef struct
 {
     uint8 online;
-    uint8 last_error;
-    uint8 peer_last_error;
-    uint8 flags;
-    uint8 version;
     uint8 beacon_count;
     uint8 car_lamp_count;
     uint8 first_beacon_valid;
     uint8 first_lamp_valid;
-    uint8 ready_mask;
-    uint8 last_rx_head0;
-    uint8 last_rx_head1;
-    uint8 last_polled_board;
     uint8 _pad[3];
-    uint32 rx_ok_count;
-    uint32 rx_error_count;
-    uint32 rx_sequence;
-    uint32 ack_sequence;
     float first_beacon_x;
     float first_beacon_y;
     float first_beacon_radius;
@@ -42,9 +30,6 @@ typedef struct
 typedef struct
 {
     volatile uint32 seq;
-    uint8 ready_mask;
-    uint8 last_polled_board;
-    uint8 _pad[2];
     ipc_camera_spi_board_log_t board[IPC_CAMERA_SPI_BOARD_COUNT];
 } ipc_camera_spi_log_t;
 

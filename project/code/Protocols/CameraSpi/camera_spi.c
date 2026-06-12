@@ -473,6 +473,14 @@ static void camera_spi_finish_active(void)
     s_active = 0U;
 }
 
+static void camera_spi_wait_active_complete(void)
+{
+    while(s_active != 0U)
+    {
+        camera_spi_finish_active();
+    }
+}
+
 void CameraSpi_Init(void)
 {
     uint8 board_id;
@@ -528,6 +536,7 @@ void CameraSpi_Poll(void)
     {
         s_last_polled_board = board_id;
         camera_spi_start_transfer(board_id);
+        camera_spi_wait_active_complete();
     }
 }
 

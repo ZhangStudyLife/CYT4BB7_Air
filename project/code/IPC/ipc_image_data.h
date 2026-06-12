@@ -9,6 +9,44 @@ extern "C" {
 
 #define IPC_IMAGE_MAX_BEACONS      (4U)
 #define IPC_IMAGE_MAX_CAR_LAMPS    (1U)
+#define IPC_CAMERA_SPI_BOARD_COUNT (2U)
+
+typedef struct
+{
+    uint8 online;
+    uint8 last_error;
+    uint8 peer_last_error;
+    uint8 flags;
+    uint8 version;
+    uint8 beacon_count;
+    uint8 car_lamp_count;
+    uint8 first_beacon_valid;
+    uint8 first_lamp_valid;
+    uint8 ready_mask;
+    uint8 last_rx_head0;
+    uint8 last_rx_head1;
+    uint8 last_polled_board;
+    uint8 _pad[3];
+    uint32 rx_ok_count;
+    uint32 rx_error_count;
+    uint32 rx_sequence;
+    uint32 ack_sequence;
+    float first_beacon_x;
+    float first_beacon_y;
+    float first_beacon_radius;
+    float first_lamp_cx;
+    float first_lamp_cy;
+    float first_lamp_angle;
+} ipc_camera_spi_board_log_t;
+
+typedef struct
+{
+    volatile uint32 seq;
+    uint8 ready_mask;
+    uint8 last_polled_board;
+    uint8 _pad[2];
+    ipc_camera_spi_board_log_t board[IPC_CAMERA_SPI_BOARD_COUNT];
+} ipc_camera_spi_log_t;
 
 typedef struct
 {
@@ -54,6 +92,8 @@ extern volatile float g_down_camera_lamp_angle;
 extern volatile float g_down_camera_lamp_valid;
 #endif
 
+extern volatile ipc_camera_spi_log_t g_ipc_camera_spi_log;
+
 void ipc_image_send(void);
 void ipc_image_callback(uint32 ipc_data);
 uint8 ipc_image_is_new(void);
@@ -61,6 +101,8 @@ void ipc_image_get(ipc_image_payload_t *out);
 
 uint8 ipc_flight_state_send(uint8 flying);
 uint8 ipc_core0_is_flying(void);
+void ipc_camera_spi_log_publish(const ipc_camera_spi_log_t *log);
+void ipc_camera_spi_log_get(ipc_camera_spi_log_t *out);
 
 #ifdef __cplusplus
 }

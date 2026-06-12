@@ -7,6 +7,8 @@
 
 #pragma location=".global_ram_data"
 volatile ipc_image_payload_t g_ipc_image_shared;
+#pragma location=".global_ram_data"
+volatile ipc_camera_spi_log_t g_ipc_camera_spi_log;
 
 #define IPC_FLIGHT_STATE_MAGIC   (0xA5000000UL)
 #define IPC_FLIGHT_STATE_MASK    (0xFFFF0000UL)
@@ -87,6 +89,32 @@ uint8 ipc_core0_is_flying(void)
 #else
     return 0U;
 #endif
+}
+
+void ipc_camera_spi_log_publish(const ipc_camera_spi_log_t *log)
+{
+#if defined(CY_CORE_CM7_1)
+    if(log == NULL)
+    {
+        return;
+    }
+    memcpy((void *)&g_ipc_camera_spi_log, (const void *)log, sizeof(g_ipc_camera_spi_log));
+    SCB_CleanDCache_by_Addr((volatile void *)&g_ipc_camera_spi_log, sizeof(g_ipc_camera_spi_log));
+#else
+    (void)log;
+#endif
+}
+
+void ipc_camera_spi_log_get(ipc_camera_spi_log_t *out)
+{
+    if(out == NULL)
+    {
+        return;
+    }
+#if defined(CY_CORE_CM7_0)
+    SCB_InvalidateDCache_by_Addr((volatile void *)&g_ipc_camera_spi_log, sizeof(g_ipc_camera_spi_log));
+#endif
+    memcpy((void *)out, (const void *)&g_ipc_camera_spi_log, sizeof(ipc_camera_spi_log_t));
 }
 
 #if defined(CY_CORE_CM7_0)

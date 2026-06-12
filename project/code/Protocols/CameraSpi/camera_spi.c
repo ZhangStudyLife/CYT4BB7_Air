@@ -55,6 +55,8 @@ typedef struct
     uint32 ack_sequence;
     uint32 rx_ok_count;
     uint32 rx_error_count;
+    uint8 last_rx_head0;
+    uint8 last_rx_head1;
     uint8 app_data[CAMERA_SPI_APP_DATA_CAPACITY];
     uint8 downlink_data[CAMERA_SPI_APP_DATA_CAPACITY];
     uint8 has_custom_downlink;
@@ -72,6 +74,8 @@ static uint8 s_downlink_mask;
 static uint8 s_flight_state;
 static uint8 s_image_tcp;
 static uint8 s_image_display = 1U;
+static uint8 s_ready_mask;
+static uint8 s_last_polled_board;
 static uint32 s_active_poll_count;
 
 static void camera_spi_write_u16_be(uint8 *buffer, uint16 value)
@@ -462,6 +466,8 @@ static void camera_spi_finish_active(void)
     }
 
     camera_spi_set_cs(s_active_board, 0U);
+    s_boards[s_active_board].last_rx_head0 = s_rx_frame[0];
+    s_boards[s_active_board].last_rx_head1 = s_rx_frame[1];
     error = camera_spi_parse_response(s_active_board);
     camera_spi_record_error(s_active_board, error);
     s_active = 0U;
@@ -483,6 +489,8 @@ void CameraSpi_Init(void)
     s_flight_state = (ipc_core0_is_flying() != 0U) ? 1U : 0U;
     s_image_tcp = 0U;
     s_image_display = 1U;
+    s_ready_mask = 0U;
+    s_last_polled_board = 0xFFU;
     s_active_poll_count = 0U;
 
     for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
@@ -514,9 +522,11 @@ void CameraSpi_Poll(void)
     }
 
     camera_spi_refresh_flight_state();
-    candidates = (uint8)(camera_spi_ready_mask() | s_downlink_mask);
+    s_ready_mask = camera_spi_ready_mask();
+    candidates = (uint8)(s_ready_mask | s_downlink_mask);
     if(camera_spi_select_board(candidates, &board_id) != 0U)
     {
+        s_last_polled_board = board_id;
         camera_spi_start_transfer(board_id);
     }
 }
@@ -593,6 +603,10 @@ uint8 CameraSpi_GetSnapshot(uint8 board_id, camera_spi_snapshot_t *snapshot)
     snapshot->ack_sequence = board->ack_sequence;
     snapshot->rx_ok_count = board->rx_ok_count;
     snapshot->rx_error_count = board->rx_error_count;
+    snapshot->ready_mask = s_ready_mask;
+    snapshot->last_rx_head0 = board->last_rx_head0;
+    snapshot->last_rx_head1 = board->last_rx_head1;
+    snapshot->last_polled_board = s_last_polled_board;
     memcpy(snapshot->app_data, board->app_data, CAMERA_SPI_APP_DATA_CAPACITY);
 
     return 1U;

@@ -20,6 +20,10 @@ typedef struct
     uint32 ack_sequence;
     uint32 rx_ok_count;
     uint32 rx_error_count;
+    uint8 ready_mask;
+    uint8 last_rx_head0;
+    uint8 last_rx_head1;
+    uint8 last_polled_board;
     uint8 app_data[CAMERA_SPI_APP_DATA_CAPACITY];
 } camera_spi_snapshot_t;
 

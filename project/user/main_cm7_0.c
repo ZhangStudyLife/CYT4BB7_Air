@@ -71,45 +71,47 @@ int main(void)
             // ICM42688_Aux_Update_1000Hz(tick_1000us_cnt);         //对比用的陀螺仪关掉
             // BMI088_Update_1000Hz(tick_1000us_cnt);
             Pos_Est_Update_1000HZ();
-            {
-                const VL53L1X_data_struct *tof = VL53L1X_GetData();
-                ipc_camera_spi_log_t spi_log;
-                ipc_camera_spi_log_get(&spi_log);
-                wifi_justfloat(ICM42688.gyro_x,
-                               ICM42688.gyro_y,
-                               ICM42688.gyro_z,
-                               ICM42688.acc_x,
-                               ICM42688.acc_y,
-                               ICM42688.acc_z,
-                               tof->distance_mm[0],
-                               tof->distance_mm[1],
-                               tof->distance_mm[2],
-                               tof->distance_mm[3],
-                               lc302_data.flow_x_integral,
-                               lc302_data.flow_y_integral,
-                               lc302_data.integration_timespan,
-                               lc302_data.ground_distance,
-                               lc302_data.valid,
-                               lc302_data.version,
-                               CRSF_CH[0],
-                               spi_log.board[0].online,
-                               spi_log.board[0].first_beacon_x,
-                               spi_log.board[0].first_beacon_y,
-                               spi_log.board[1].online,
-                               spi_log.board[1].first_beacon_x,
-                               spi_log.board[1].first_beacon_y,
-                               spi_log.seq,
-                               spi_log.board[0].last_error,
-                               spi_log.board[0].rx_ok_count,
-                               spi_log.board[0].rx_error_count,
-                               spi_log.board[0].last_rx_head0,
-                               spi_log.board[0].last_rx_head1,
-                               spi_log.board[1].last_error,
-                               spi_log.board[1].rx_ok_count,
-                               spi_log.board[1].rx_error_count,
-                               spi_log.board[1].last_rx_head0,
-                               spi_log.board[1].last_rx_head1);
-            }
+            // {
+            //     const VL53L1X_data_struct *tof = VL53L1X_GetData();
+            //     ipc_camera_spi_log_t spi_log;
+            //     ipc_camera_spi_log_get(&spi_log);
+            //     wifi_justfloat(ICM42688.gyro_x,
+            //                    ICM42688.gyro_y,
+            //                    ICM42688.gyro_z,
+            //                    ICM42688.acc_x,
+            //                    ICM42688.acc_y,
+            //                    ICM42688.acc_z,
+            //                    tof->distance_mm[0],
+            //                    tof->distance_mm[1],
+            //                    tof->distance_mm[2],
+            //                    tof->distance_mm[3],
+            //                    lc302_data.flow_x_integral,
+            //                    lc302_data.flow_y_integral,
+            //                    lc302_data.integration_timespan,
+            //                    lc302_data.ground_distance,
+            //                    lc302_data.valid,
+            //                    lc302_data.version,
+            //                    CRSF_CH[0],
+            //                    spi_log.board[0].online,
+            //                    spi_log.board[0].first_beacon_x,
+            //                    spi_log.board[0].first_beacon_y,
+            //                    spi_log.board[1].online,
+            //                    spi_log.board[1].first_beacon_x,
+            //                    spi_log.board[1].first_beacon_y,
+            //                    spi_log.seq,
+            //                    spi_log.board[0].last_error,
+            //                    spi_log.board[0].rx_ok_count,
+            //                    spi_log.board[0].rx_error_count,
+            //                    spi_log.board[0].last_rx_head0,
+            //                    spi_log.board[0].last_rx_head1,
+            //                    spi_log.board[1].last_error,
+            //                    spi_log.board[1].rx_ok_count,
+            //                    spi_log.board[1].rx_error_count,
+            //                    spi_log.board[1].last_rx_head0,
+            //                    spi_log.board[1].last_rx_head1);
+            // }
+
+            wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw, Pos_Est_vel_x, Pos_Est_vel_y);
 
             div500++;
             if (div500 >= 2U)

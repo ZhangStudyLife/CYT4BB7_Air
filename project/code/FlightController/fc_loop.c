@@ -628,7 +628,7 @@ void FC_Loop_500Hz(void)
         yaw_gyro_target = 0.0f;
     }
 
-    wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw,
+    wifi_justfloat(s_flight_mode,g_euler.roll, g_euler.pitch, g_euler.yaw,
         roll_angle_target, pitch_angle_target, yaw_angle_target,
         opflow_vel_x, opflow_vel_y,
         Pos_Est_vel_x, Pos_Est_vel_y,

@@ -162,7 +162,6 @@
 //     vel_x_pred = Pos_Est_vel_x;
 //     vel_y_pred = Pos_Est_vel_y;
 
-//     wifi_justfloat(tick_1000us_cnt,
 //                         acc_x_lp, acc_y_lp,
 //                         opflow_vel_x, opflow_vel_y,
 //                         Pos_Est_vel_x, Pos_Est_vel_y,
@@ -407,7 +406,6 @@ void Pos_Est_Update_1000HZ(void)
     // float dec_x, dec_y;
     // dec_x = FlowGyroDecoupler_LC302_GetDecX();
     // dec_y = FlowGyroDecoupler_LC302_GetDecY();
-    // wifi_justfloat(tick_1000us_cnt,
     //                acc_x_temp, acc_y_temp,
     //                g_tof_fused_height_mm * 0.001f,
     //                lc302_data.flow_x_integral, lc302_data.flow_y_integral,
@@ -454,7 +452,6 @@ void Pos_Est_Update_1000HZ(void)
         vely_pid = &zero_pid;
     }
     
-    // wifi_justfloat(tick_1000us_cnt,
     //                acc_x_temp, acc_y_temp,
     //                ICM42688.acc_x, ICM42688.acc_y, ICM42688.acc_z,
     //                acc_x_lp, acc_y_lp,

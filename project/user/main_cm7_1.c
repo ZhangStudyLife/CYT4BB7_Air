@@ -1,7 +1,8 @@
 #include "zf_common_headfile.h"
 
-#define SPI_TEST_TIMER       (TC_TIME2_CH0)
-#define SPI_TEST_PERIOD_MS   (10U)
+#define CAMERA_SPI_PIT       (PIT_CH10)
+
+volatile uint8 g_camera_spi_tick_100hz = 0U;
 
 int main(void)
 {
@@ -9,14 +10,13 @@ int main(void)
     SCB_DisableDCache();
 
     CameraSpi_Init();
-    timer_init(SPI_TEST_TIMER, TIMER_MS);
-    timer_start(SPI_TEST_TIMER);
+    pit_ms_init(CAMERA_SPI_PIT, 10U);
 
     while(true)
     {
-        if(timer_get(SPI_TEST_TIMER) >= SPI_TEST_PERIOD_MS)
+        if(g_camera_spi_tick_100hz > 0U)
         {
-            timer_clear(SPI_TEST_TIMER);
+            g_camera_spi_tick_100hz--;
             CameraSpi_Update();
         }
     }

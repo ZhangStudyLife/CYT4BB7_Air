@@ -231,23 +231,6 @@ void IMU_Update_1000HZ(void)
 	g_euler = MahonyAhrs_GetEulerDegrees(&g_mahony_ahrs);
 	AccelCalibration_Update_1000HZ();
 	Height_Est_predict_1000HZ();
-
-	// wifi_justfloat(tick_1000us_cnt,
-	// 			   ICM42688.gyro_x,
-	// 			   ICM42688.gyro_y,
-	// 			   ICM42688.gyro_z,
-	// 			   ICM42688.acc_x,
-	// 			   ICM42688.acc_y,
-	// 			   ICM42688.acc_z,
-	// 			   g_imufilter_1000hz.gyrox,
-	// 			   g_imufilter_1000hz.gyroy,
-	// 			   g_imufilter_1000hz.gyroz,
-	// 			   g_imufilter_1000hz.accx,
-	// 			   g_imufilter_1000hz.accy,
-	// 			   g_imufilter_1000hz.accz,
-	// 			   g_euler.roll,
-	// 			   g_euler.pitch,
-	// 			   g_euler.yaw);
 }
 
 uint8 IMU_Is_Ready(void)

@@ -38,6 +38,8 @@
 
 #include "zf_common_headfile.h"
 
+extern volatile uint8 g_camera_spi_tick_100hz;
+
 // **************************** PIT中断函数 ****************************
 void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数      
 {
@@ -62,7 +64,10 @@ void pit0_ch2_isr()                     // 定时器通道 2 周期中断服务函数
 void pit0_ch10_isr()                    // 定时器通道 10 周期中断服务函数      
 {
     pit_isr_flag_clear(PIT_CH10);
-    
+    if(g_camera_spi_tick_100hz < 100U)
+    {
+        g_camera_spi_tick_100hz++;
+    }
 }
 
 void pit0_ch11_isr()                    // 定时器通道 11 周期中断服务函数      

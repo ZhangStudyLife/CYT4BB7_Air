@@ -1,10 +1,7 @@
 #include "fc_mode.h"
 #include "../Estimation/Pos_Est/Pos_Est.h"
 #include "../Estimation/Attitude/IMU_TOP.h"
-#include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
 #include <math.h>
-
-extern volatile uint32 tick_1000us_cnt;
 
 pid_t g_mode4_velx_pid;
 pid_t g_mode4_vely_pid;
@@ -254,64 +251,6 @@ static void FC_Mode4_ADRC_FillPidDebug(pid_t *pid, const mode4_adrc_axis_t *axis
     pid->output = axis->u_deg_sat;
 }
 
-static void FC_Mode4_ADRC_SendLog(float dt, float ch0, float ch1,
-                                  float target_x_raw, float target_y_raw,
-                                  float meas_x, float meas_y)
-{
-    float data[40];
-
-    if (g_fc_params.mode4_adrc_log_enable < 0.5f)
-    {
-        return;
-    }
-
-    data[0] = 2004.0f;
-    data[1] = (float)tick_1000us_cnt;
-    data[2] = dt;
-    data[3] = ch0;
-    data[4] = ch1;
-    data[5] = target_x_raw;
-    data[6] = target_y_raw;
-    data[7] = s_mode4_adrc_x.td_v;
-    data[8] = s_mode4_adrc_y.td_v;
-    data[9] = meas_x;
-    data[10] = meas_y;
-
-    data[11] = s_mode4_adrc_x.td_v;
-    data[12] = s_mode4_adrc_x.td_a;
-    data[13] = s_mode4_adrc_x.z1;
-    data[14] = s_mode4_adrc_x.z2;
-    data[15] = s_mode4_adrc_x.obs_error;
-    data[16] = s_mode4_adrc_x.ctrl_error;
-    data[17] = s_mode4_adrc_x.fb_acc;
-    data[18] = s_mode4_adrc_x.comp_acc;
-    data[19] = s_mode4_adrc_x.u_acc;
-    data[20] = s_mode4_adrc_x.u_deg;
-    data[21] = s_mode4_adrc_x.u_deg_sat;
-
-    data[22] = s_mode4_adrc_y.td_v;
-    data[23] = s_mode4_adrc_y.td_a;
-    data[24] = s_mode4_adrc_y.z1;
-    data[25] = s_mode4_adrc_y.z2;
-    data[26] = s_mode4_adrc_y.obs_error;
-    data[27] = s_mode4_adrc_y.ctrl_error;
-    data[28] = s_mode4_adrc_y.fb_acc;
-    data[29] = s_mode4_adrc_y.comp_acc;
-    data[30] = s_mode4_adrc_y.u_acc;
-    data[31] = s_mode4_adrc_y.u_deg;
-    data[32] = s_mode4_adrc_y.u_deg_sat;
-
-    data[33] = roll_angle_target;
-    data[34] = pitch_angle_target;
-    data[35] = g_euler.roll;
-    data[36] = g_euler.pitch;
-    data[37] = g_fc_params.mode4_adrc_enable;
-    data[38] = s_mode4_adrc_x.sat_flag;
-    data[39] = s_mode4_adrc_y.sat_flag;
-
-    (void)wifi_justfloat_Array(data, 40U);
-}
-
 static float FC_Mode4_ApplyDeadzone(float v, float dz)
 {
     if (v > dz)
@@ -410,5 +349,4 @@ void FC_Mode4_50Hz(float dt)
     pitch_angle_target = FC_Mode_Clamp(vely_out + FC_Mode_Get_Pitch_Mech_Trim_Deg(),
                                        -s_mode4_angle_limit_deg, s_mode4_angle_limit_deg);
 
-    FC_Mode4_ADRC_SendLog(dt, ch0, ch1, velx_target_raw, vely_target_raw, meas_x, meas_y);
 }

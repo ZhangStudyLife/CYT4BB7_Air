@@ -5,9 +5,9 @@
 #include "../Estimation/Pos_Est/image.h"
 #endif
 
-#pragma location=".global_ram_data"
+#pragma location=".ipc_image_shared"
 volatile ipc_image_payload_t g_ipc_image_shared;
-#pragma location=".global_ram_data"
+#pragma location=".ipc_camera_spi_log"
 volatile ipc_camera_spi_log_t g_ipc_camera_spi_log;
 
 #define IPC_FLIGHT_STATE_MAGIC   (0xA5000000UL)

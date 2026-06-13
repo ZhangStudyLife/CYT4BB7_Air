@@ -18,7 +18,11 @@ typedef struct
     uint8 car_lamp_count;
     uint8 first_beacon_valid;
     uint8 first_lamp_valid;
-    uint8 _pad[3];
+    uint8 last_error;
+    uint8 last_rx_head0;
+    uint8 last_rx_head1;
+    uint32 rx_ok_count;
+    uint32 rx_error_count;
     float first_beacon_x;
     float first_beacon_y;
     float first_beacon_radius;

@@ -73,6 +73,8 @@ int main(void)
             Pos_Est_Update_1000HZ();
             {
                 const VL53L1X_data_struct *tof = VL53L1X_GetData();
+                ipc_camera_spi_log_t spi_log;
+                ipc_camera_spi_log_get(&spi_log);
                 wifi_justfloat(ICM42688.gyro_x,
                                ICM42688.gyro_y,
                                ICM42688.gyro_z,
@@ -90,12 +92,23 @@ int main(void)
                                lc302_data.valid,
                                lc302_data.version,
                                CRSF_CH[0],
-                               g_ipc_camera_spi_log.board[0].online,
-                               g_ipc_camera_spi_log.board[0].first_beacon_x,
-                               g_ipc_camera_spi_log.board[0].first_beacon_y,
-                               g_ipc_camera_spi_log.board[1].online,
-                               g_ipc_camera_spi_log.board[1].first_beacon_x,
-                               g_ipc_camera_spi_log.board[1].first_beacon_y);
+                               spi_log.board[0].online,
+                               spi_log.board[0].first_beacon_x,
+                               spi_log.board[0].first_beacon_y,
+                               spi_log.board[1].online,
+                               spi_log.board[1].first_beacon_x,
+                               spi_log.board[1].first_beacon_y,
+                               spi_log.seq,
+                               spi_log.board[0].last_error,
+                               spi_log.board[0].rx_ok_count,
+                               spi_log.board[0].rx_error_count,
+                               spi_log.board[0].last_rx_head0,
+                               spi_log.board[0].last_rx_head1,
+                               spi_log.board[1].last_error,
+                               spi_log.board[1].rx_ok_count,
+                               spi_log.board[1].rx_error_count,
+                               spi_log.board[1].last_rx_head0,
+                               spi_log.board[1].last_rx_head1);
             }
 
             div500++;

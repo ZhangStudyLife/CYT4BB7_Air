@@ -528,6 +528,11 @@ static void camera_spi_publish_log(void)
         board->car_lamp_count = state->car_lamp_count;
         board->first_beacon_valid = state->first_beacon_valid;
         board->first_lamp_valid = state->first_lamp_valid;
+        board->last_error = state->last_error;
+        board->last_rx_head0 = state->last_rx_head0;
+        board->last_rx_head1 = state->last_rx_head1;
+        board->rx_ok_count = state->rx_ok_count;
+        board->rx_error_count = state->rx_error_count;
         board->first_beacon_x = state->first_beacon_x;
         board->first_beacon_y = state->first_beacon_y;
         board->first_beacon_radius = state->first_beacon_radius;

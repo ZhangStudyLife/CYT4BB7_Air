@@ -41,20 +41,20 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pitch_mech_trim_deg = 3.0f;   /* Pitch 机械配平角 */
 
     /* ===== Roll 轴角速度环参数 ===== */
-    params->roll_gyro_kp = 4.0f;
-    params->roll_gyro_ki = 0.18f;
-    params->roll_gyro_kd = 0.045f;
+    params->roll_gyro_kp = 2.64f;
+    params->roll_gyro_ki = 0.14f;
+    params->roll_gyro_kd = 0.010f;
     params->roll_gyro_kff = 0.0f;
     params->roll_gyro_i_limit = 180.0f;
-    params->roll_gyro_d_lpf = 60.0f;   /* 25→60: 解放D项高频响应，D_LPF=25Hz恰好滤掉22-27Hz振荡信号 */
+    params->roll_gyro_d_lpf = 25.0f;
 
     /* ===== Pitch 轴角速度环参数 ===== */
-    params->pitch_gyro_kp = 3.8f;
+    params->pitch_gyro_kp = 2.46f;
     params->pitch_gyro_ki = 0.14f;
-    params->pitch_gyro_kd = 0.050f;
+    params->pitch_gyro_kd = 0.008f;
     params->pitch_gyro_kff = 0.0f;
     params->pitch_gyro_i_limit = 140.0f;
-    params->pitch_gyro_d_lpf = 60.0f;  /* 25→60: 解放D项高频响应 */
+    params->pitch_gyro_d_lpf = 25.0f;
 
     /* ===== Yaw 轴角速度环参数 ===== */
     params->yaw_gyro_kp = 11.0f;
@@ -65,18 +65,18 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->yaw_gyro_d_lpf = 30.0f;
 
     /* ===== Roll 轴角度环参数 ===== */
-    params->roll_angle_kp = 5.0f;
+    params->roll_angle_kp = 5.2f;
     params->roll_angle_ki = 0.0f;
     params->roll_angle_kd = 0.0f;
-    params->roll_angle_kff = 0.02f;
+    params->roll_angle_kff = 0.0f;
     params->roll_angle_i_limit = 80.0f;
     params->roll_angle_d_lpf = 15.0f;
 
     /* ===== Pitch 轴角度环参数 ===== */
-    params->pitch_angle_kp = 5.0f;
+    params->pitch_angle_kp = 5.2f;
     params->pitch_angle_ki = 0.0f;
     params->pitch_angle_kd = 0.0f;
-    params->pitch_angle_kff = 0.04f;
+    params->pitch_angle_kff = 0.0f;
     params->pitch_angle_i_limit = 80.0f;
     params->pitch_angle_d_lpf = 15.0f;
 

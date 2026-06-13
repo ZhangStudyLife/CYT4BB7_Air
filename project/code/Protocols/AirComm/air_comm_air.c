@@ -1094,26 +1094,6 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(mode2_vel_y_kff, 0.0f, 3000.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_vel_y_i_limit, 0.0f, 5000.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_vel_y_d_lpf, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(mode4_adrc_enable, 0.0f, 1.0f);
-    AIR_COMM_REGISTER_FLOAT(mode4_adrc_log_enable, 0.0f, 1.0f);
-    AIR_COMM_REGISTER_FLOAT(mode4_adrc_b0_x, 1.0f, 100.0f);
-    AIR_COMM_REGISTER_FLOAT(mode4_adrc_b0_y, 1.0f, 100.0f);
-    AIR_COMM_REGISTER_FLOAT(mode4_adrc_td_acc_limit_cmss, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(mode4_adrc_td_jerk_limit_cmsss, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode4_adrc_td_brake_acc_limit_cmss, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(mode4_adrc_td_brake_jerk_limit_cmsss, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode4_adrc_eso_beta1, 0.0f, 300.0f);
-    AIR_COMM_REGISTER_FLOAT(mode4_adrc_eso_beta2, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode4_adrc_eso_alpha1, 0.01f, 0.99f);
-    AIR_COMM_REGISTER_FLOAT(mode4_adrc_eso_alpha2, 0.01f, 0.99f);
-    AIR_COMM_REGISTER_FLOAT(mode4_adrc_eso_delta_cmps, 0.1f, 100.0f);
-    AIR_COMM_REGISTER_FLOAT(mode4_adrc_nl_kp, 0.0f, 100.0f);
-    AIR_COMM_REGISTER_FLOAT(mode4_adrc_nl_alpha, 0.01f, 0.99f);
-    AIR_COMM_REGISTER_FLOAT(mode4_adrc_nl_delta_cmps, 0.1f, 100.0f);
-    AIR_COMM_REGISTER_FLOAT(mode4_adrc_comp_limit_cmss, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(mode4_adrc_angle_limit_deg, 1.0f, 30.0f);
-    AIR_COMM_REGISTER_FLOAT(mode4_adrc_output_rate_limit_degps, 1.0f, 200.0f);
-    AIR_COMM_REGISTER_FLOAT(mode4_adrc_zero_quiet_cmps, 0.1f, 50.0f);
     AIR_COMM_REGISTER_FLOAT(pos_est_k_flow, 0.0f, 1.0f);
 
     AIR_COMM_REGISTER_FLOAT(mode8_img_x_kp, 0.0f, 3000.0f);

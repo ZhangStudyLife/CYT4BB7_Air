@@ -144,29 +144,6 @@ typedef struct
     float mode8_img_y_kff;             /* 模式8图像Y位置环前馈增益 */
     float mode8_img_y_i_limit;         /* 模式8图像Y位置环积分限幅 */
     float mode8_img_y_d_lpf;           /* 模式8图像Y位置环D项低通截止频率，单位Hz */
-    /* ===== Mode 4 ADRC params ===== */
-    float reserved_vel_x_ff_deg_per_cmps; /* Reserved for Flash layout compatibility */
-    float reserved_vel_y_ff_deg_per_cmps; /* Reserved for Flash layout compatibility */
-    float mode4_adrc_enable;           /* Mode 4 ADRC enable, >=0.5 enables ADRC */
-    float mode4_adrc_log_enable;       /* Mode 4 ADRC JustFloat log enable */
-    float mode4_adrc_b0_x;             /* X velocity plant gain, cm/s^2/deg */
-    float mode4_adrc_b0_y;             /* Y velocity plant gain, cm/s^2/deg */
-    float mode4_adrc_td_acc_limit_cmss;
-    float mode4_adrc_td_jerk_limit_cmsss;
-    float mode4_adrc_eso_beta1;
-    float mode4_adrc_eso_beta2;
-    float mode4_adrc_eso_alpha1;
-    float mode4_adrc_eso_alpha2;
-    float mode4_adrc_eso_delta_cmps;
-    float mode4_adrc_nl_kp;
-    float mode4_adrc_nl_alpha;
-    float mode4_adrc_nl_delta_cmps;
-    float mode4_adrc_comp_limit_cmss;
-    float mode4_adrc_angle_limit_deg;
-    float mode4_adrc_output_rate_limit_degps;
-    float mode4_adrc_td_brake_acc_limit_cmss;
-    float mode4_adrc_td_brake_jerk_limit_cmsss;
-    float mode4_adrc_zero_quiet_cmps;
     float mode2_vel_x_kp;
     float mode2_vel_x_ki;
     float mode2_vel_x_kd;

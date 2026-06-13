@@ -23,7 +23,7 @@
  * MODE1 - 纯手动姿态
  * MODE2 - 纯手动姿态
  * MODE3 - 纯手动姿态
- * MODE4 - 位置保持模式，复用原模式1逻辑
+ * MODE4 - 纯手动姿态
  * MODE5 - 固定高度位置保持模式，横向复用原模式1逻辑
  * MODE6 - 纯手动姿态
  * MODE7 - 速度环模式，复用原模式2逻辑
@@ -266,11 +266,6 @@ void FC_Mode4_100Hz(void);
  * 返回值: 无
  */
 void FC_Mode4_50Hz(float dt);
-
-extern pid_t g_mode4_velx_pid;
-extern pid_t g_mode4_vely_pid;
-extern float g_mode4_velx_target;
-extern float g_mode4_vely_target;
 
 /*
  * 函数名: FC_Mode5_Init

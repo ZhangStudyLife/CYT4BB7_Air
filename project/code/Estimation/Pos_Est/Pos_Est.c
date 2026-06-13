@@ -430,12 +430,6 @@ void Pos_Est_Update_1000HZ(void)
         velx_pid = &g_mode2_velx_pid;
         vely_pid = &g_mode2_vely_pid;
     }
-    else if (s_flight_mode == FC_START_CRSF_FLIGHT_MODE_4){
-        velx_target = g_mode4_velx_target;
-        vely_target = g_mode4_vely_target;
-        velx_pid = &g_mode4_velx_pid;
-        vely_pid = &g_mode4_vely_pid;
-    }
     else if (s_flight_mode == FC_START_CRSF_FLIGHT_MODE_8){
         velx_target = g_mode8_velx_target;
         vely_target = g_mode8_vely_target;

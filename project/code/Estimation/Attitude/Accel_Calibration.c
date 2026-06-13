@@ -3571,24 +3571,24 @@ static void imu_calib_apply_default_accel_calibration(void)
 {
     AccelCalibrationParams_t params;
 
-    /* 由25点椭球拟合得到的最优校准参数, max_norm_err=0.0006g */
-    params.accel_bias_g[0] = 0.00110100f;
-    params.accel_bias_g[1] = 0.00112800f;
-    params.accel_bias_g[2] = 0.00480400f;
+    /* Manual ellipsoid accel calibration, pose_count=16, max_norm_err=0.001236g */
+    params.accel_bias_g[0] = 0.00049800f;
+    params.accel_bias_g[1] = -0.00131900f;
+    params.accel_bias_g[2] = 0.00320700f;
 
-    params.accel_corr_matrix[0][0] = 0.99930200f;
-    params.accel_corr_matrix[0][1] = 0.00370700f;
-    params.accel_corr_matrix[0][2] = -0.00138100f;
+    params.accel_corr_matrix[0][0] = 1.00052300f;
+    params.accel_corr_matrix[0][1] = -0.05700000f;
+    params.accel_corr_matrix[0][2] = -0.00181700f;
     params.accel_corr_matrix[1][0] = 0.00000000f;
-    params.accel_corr_matrix[1][1] = 0.99960100f;
-    params.accel_corr_matrix[1][2] = -0.00053700f;
+    params.accel_corr_matrix[1][1] = 1.00357700f;
+    params.accel_corr_matrix[1][2] = 0.01000000f;
     params.accel_corr_matrix[2][0] = 0.00000000f;
     params.accel_corr_matrix[2][1] = 0.00000000f;
-    params.accel_corr_matrix[2][2] = 0.99878000f;
+    params.accel_corr_matrix[2][2] = 1.00076700f;
 
-    params.accel_scale[0] = 0.99930200f;
-    params.accel_scale[1] = 0.99960100f;
-    params.accel_scale[2] = 0.99878000f;
+    params.accel_scale[0] = 1.00052300f;
+    params.accel_scale[1] = 1.00357700f;
+    params.accel_scale[2] = 1.00076700f;
 
     params.use_full_matrix = 1U;
     params.gravity_mps2 = 9.80665f;
@@ -3597,7 +3597,7 @@ static void imu_calib_apply_default_accel_calibration(void)
     AccelCalibration_LoadParams(&params);
     IMUCalib_SaveCurrentToFlash();
 
-    printf("cal,default,optimal,max_err=0.0006g\r\n");
+    printf("cal,default,optimal,max_err=0.001236g\r\n");
 }
 
 void IMUCalib_Init(void)

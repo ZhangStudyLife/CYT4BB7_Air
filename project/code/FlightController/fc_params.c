@@ -36,7 +36,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->vel_z_dt = 0.01f;   /* 100Hz */
 
     /* ===== 油门与机械配平参数 ===== */
-    params->base_throttle = 2800;         /* 悬停油门 */
+    params->base_throttle = 2900;         /* 悬停油门 */
     params->roll_mech_trim_deg = 2.3f;    /* Roll 机械配平角 */
     params->pitch_mech_trim_deg = 3.0f;   /* Pitch 机械配平角 */
 
@@ -46,7 +46,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->roll_gyro_kd = 0.010f;
     params->roll_gyro_kff = 0.0f;
     params->roll_gyro_i_limit = 180.0f;
-    params->roll_gyro_d_lpf = 25.0f;
+    params->roll_gyro_d_lpf = 60.0f;   /* 25→60: 解放D项高频响应，D_LPF=25Hz恰好滤掉22-27Hz振荡信号 */
 
     /* ===== Pitch 轴角速度环参数 ===== */
     params->pitch_gyro_kp = 5.3f;
@@ -54,7 +54,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pitch_gyro_kd = 0.010f;
     params->pitch_gyro_kff = 0.0f;
     params->pitch_gyro_i_limit = 140.0f;
-    params->pitch_gyro_d_lpf = 25.0f;
+    params->pitch_gyro_d_lpf = 60.0f;  /* 25→60: 解放D项高频响应 */
 
     /* ===== Yaw 轴角速度环参数 ===== */
     params->yaw_gyro_kp = 11.0f;

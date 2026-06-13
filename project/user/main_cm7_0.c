@@ -111,7 +111,7 @@ int main(void)
             //                    spi_log.board[1].last_rx_head1);
             // }
 
-            wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw, Pos_Est_vel_x, Pos_Est_vel_y);
+            // wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw, Pos_Est_vel_x, Pos_Est_vel_y);
 
             div500++;
             if (div500 >= 2U)

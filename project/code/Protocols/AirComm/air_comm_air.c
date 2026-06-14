@@ -1108,6 +1108,18 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(mode8_img_y_kff, 0.0f, 3000.0f);
     AIR_COMM_REGISTER_FLOAT(mode8_img_y_i_limit, 0.0f, 5000.0f);
     AIR_COMM_REGISTER_FLOAT(mode8_img_y_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_x_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_x_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_x_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_x_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_x_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_x_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_y_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_y_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_y_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_y_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_y_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_y_d_lpf, 0.0f, 500.0f);
     air_comm_register_default_commands();
 
     /* 配置 UART_2：波特率 1152000，TX=P10_1，RX=P10_0，开接收中断 */

@@ -630,13 +630,22 @@ void FC_Loop_500Hz(void)
 
     wifi_justfloat(s_flight_mode,g_euler.roll, g_euler.pitch, g_euler.yaw,
         roll_angle_target, pitch_angle_target, yaw_angle_target,
-        opflow_vel_x, opflow_vel_y,
-        Pos_Est_vel_x, Pos_Est_vel_y,
-        -g_mode2_velx_target,-g_mode2_vely_target,
-        g_mode2_velx_pid.p_term, g_mode2_velx_pid.i_term,g_mode2_velx_pid.ff_term,
-        g_mode2_vely_pid.p_term, g_mode2_vely_pid.i_term,g_mode2_vely_pid.ff_term,
-        Pos_Est_acc_bias_x_cmss, Pos_Est_acc_bias_y_cmss
-        );
+    Pos_Est_vel_x, Pos_Est_vel_y,
+    -g_mode8_velx_target, -g_mode8_vely_target,
+    g_down_camera_lamp_x,g_down_camera_lamp_y
+    
+
+    );
+
+    // wifi_justfloat(s_flight_mode,g_euler.roll, g_euler.pitch, g_euler.yaw,
+    //     roll_angle_target, pitch_angle_target, yaw_angle_target,
+    //     opflow_vel_x, opflow_vel_y,
+    //     Pos_Est_vel_x, Pos_Est_vel_y,
+    //     -g_mode2_velx_target,-g_mode2_vely_target,
+    //     g_mode2_velx_pid.p_term, g_mode2_velx_pid.i_term,g_mode2_velx_pid.ff_term,
+    //     g_mode2_vely_pid.p_term, g_mode2_vely_pid.i_term,g_mode2_vely_pid.ff_term,
+    //     Pos_Est_acc_bias_x_cmss, Pos_Est_acc_bias_y_cmss
+    //     );
 }
 
 void FC_Loop_1000Hz(void)

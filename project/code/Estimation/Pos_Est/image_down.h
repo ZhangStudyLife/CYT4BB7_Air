@@ -1,5 +1,5 @@
-#ifndef IMAGE_H_
-#define IMAGE_H_
+#ifndef IMAGE_DOWN_H_
+#define IMAGE_DOWN_H_
 
 #include "zf_common_headfile.h"
 
@@ -33,12 +33,12 @@ extern uint8 g_image_beacon_count;
 extern beacon_rect_t g_image_car_lamps[IMAGE_MAX_CAR_LAMP_COUNT];
 extern uint8 g_image_car_lamp_count;
 
-void image_init(void);
-void image_update(void);
-uint8 *image_get_frame_buffer(void);
+void image_down_init(void);
+uint8 image_down_update(void);
+uint8 *image_down_get_frame_buffer(void);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* IMAGE_H_ */
+#endif /* IMAGE_DOWN_H_ */

@@ -1118,10 +1118,10 @@
     <group>
         <name>code</name>
         <file>
-            <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\image.c</name>
+            <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\image_down.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\image.h</name>
+            <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\image_down.h</name>
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\code\IPC\ipc_image_data.c</name>

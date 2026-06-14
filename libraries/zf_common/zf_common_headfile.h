@@ -96,7 +96,7 @@
 #include "../code/Estimation/Pos_Est/FlowGyroDecoupler.h"
 #include "../code/filter.h"
 #if defined(CY_CORE_CM7_1)
-#include "../code/Estimation/Pos_Est/image.h"
+#include "../code/Estimation/Pos_Est/image_down.h"
 #endif
 #include "../code/HW_Drivers/LC302/LC302.h"
 #include "../code/HW_Drivers/LC302/LC302_Aux.h"

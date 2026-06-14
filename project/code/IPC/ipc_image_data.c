@@ -2,7 +2,7 @@
 #include "string.h"
 
 #if defined(CY_CORE_CM7_1)
-#include "../Estimation/Pos_Est/image.h"
+#include "../Estimation/Pos_Est/image_down.h"
 #endif
 
 #pragma location=".ipc_image_shared"
@@ -121,6 +121,7 @@ void ipc_camera_spi_log_get(ipc_camera_spi_log_t *out)
 
 static volatile uint8 s_new_data = 0U;
 static ipc_image_payload_t s_latest_image;
+static uint32 s_latest_seq = 0U;
 
 volatile uint32 g_air_image_seq = 0U;
 volatile uint8 g_air_image_beacon_count = 0U;
@@ -189,6 +190,7 @@ void ipc_image_callback(uint32 ipc_data)
     (void)ipc_data;
     SCB_InvalidateDCache_by_Addr((volatile void *)&g_ipc_image_shared, sizeof(g_ipc_image_shared));
     memcpy((void *)&s_latest_image, (const void *)&g_ipc_image_shared, sizeof(s_latest_image));
+    s_latest_seq = s_latest_image.seq;
     ipc_image_publish_latest();
     s_new_data = 1U;
 #elif defined(CY_CORE_CM7_1)
@@ -198,6 +200,20 @@ void ipc_image_callback(uint32 ipc_data)
     }
 #else
     (void)ipc_data;
+#endif
+}
+
+void ipc_image_poll(void)
+{
+#if defined(CY_CORE_CM7_0)
+    SCB_InvalidateDCache_by_Addr((volatile void *)&g_ipc_image_shared, sizeof(g_ipc_image_shared));
+    if (g_ipc_image_shared.seq != s_latest_seq)
+    {
+        memcpy((void *)&s_latest_image, (const void *)&g_ipc_image_shared, sizeof(s_latest_image));
+        s_latest_seq = s_latest_image.seq;
+        ipc_image_publish_latest();
+        s_new_data = 1U;
+    }
 #endif
 }
 

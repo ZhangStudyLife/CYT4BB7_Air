@@ -132,6 +132,7 @@ int main(void)
         {
             g_tick_100HZ--;
             Height_Est_update_100HZ();
+            ipc_image_poll();
             CRSF_Update_100HZ();
             FC_START_CRSF_UpdateLandingButton100Hz();
             FC_Loop_100Hz();

@@ -85,6 +85,7 @@ extern volatile ipc_camera_spi_log_t g_ipc_camera_spi_log;
 
 void ipc_image_send(void);
 void ipc_image_callback(uint32 ipc_data);
+void ipc_image_poll(void);
 uint8 ipc_image_is_new(void);
 void ipc_image_get(ipc_image_payload_t *out);
 

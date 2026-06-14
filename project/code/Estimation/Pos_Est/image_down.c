@@ -1,4 +1,4 @@
-#include "image.h"
+#include "image_down.h"
 
 #include <math.h>
 #include <string.h>
@@ -1140,39 +1140,30 @@ static void image_down_store_result(const beacon_result_t *result)
     g_image_car_lamp_count = car_lamp_count;
 }
 
-static void image_down_init(void)
+void image_down_init(void)
 {
     memset(g_image_frame, 0, MT9V03X_IMAGE_SIZE);
     image_down_clear_results();
     beacon_image_init();
+    mt9v03x_finish_flag = 0U;
+    (void)mt9v03x_init();
 }
 
-static void image_down_update(void)
+uint8 image_down_update(void)
 {
     beacon_result_t result;
 
     if(0U == image_down_latch_frame())
     {
-        return;
+        return 0U;
     }
 
     beacon_image_process(g_image_frame, &result);
     image_down_store_result(&result);
+    return 1U;
 }
 
-void image_init(void)
-{
-    image_down_init();
-    mt9v03x_finish_flag = 0U;
-    (void)mt9v03x_init();
-}
-
-void image_update(void)
-{
-    image_down_update();
-}
-
-uint8 *image_get_frame_buffer(void)
+uint8 *image_down_get_frame_buffer(void)
 {
     return g_image_frame[0];
 }

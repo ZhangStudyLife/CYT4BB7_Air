@@ -8,13 +8,18 @@ from scipy import signal
 
 BASE = Path(__file__).resolve().parent
 FILES = [
-    ("F1", "第一次飞行.csv", 0.12, 0.02),
-    ("F2", "第二次飞行.csv", 0.12, 0.00),
-    ("F3", "第三次飞行.csv", 0.18, 0.00),
-    ("F4", "第四次飞行.csv", 0.12, 0.04),
-    ("F5", "第五次飞行.csv", 0.12, 0.06),
-    ("F6", "第六次飞行.csv", 0.16, 0.00),
-    ("F7", "第七次飞行.csv", 0.16, 0.03),
+    ("F1", "第一次飞行.csv", 0.12, 0.02, 0.000),
+    ("F2", "第二次飞行.csv", 0.12, 0.00, 0.000),
+    ("F3", "第三次飞行.csv", 0.18, 0.00, 0.000),
+    ("F4", "第四次飞行.csv", 0.12, 0.04, 0.000),
+    ("F5", "第五次飞行.csv", 0.12, 0.06, 0.000),
+    ("F6", "第六次飞行.csv", 0.16, 0.00, 0.000),
+    ("F7", "第七次飞行.csv", 0.16, 0.03, 0.000),
+    ("F8", "第八次飞行.csv", 0.18, 0.00, 0.000),
+    ("F9", "第九次飞行.csv", 0.16, 0.00, 0.030),
+    ("F10", "第十次飞行.csv", 0.18, 0.00, 0.040),
+    ("F11", "第十一次飞行.csv", 0.12, 0.00, 0.040),
+    ("F12", "第十二次飞行.csv", 0.16, 0.01, 0.035),
 ]
 
 
@@ -101,6 +106,78 @@ def highpass_rms_parts(parts, fs=100.0, cutoff=4.0):
             float(np.median(doms)) if doms else float("nan"))
 
 
+def mask_duration(t, mask):
+    return float(np.sum(np.diff(t, prepend=t[0]) * mask))
+
+
+def smoothness_metrics(a):
+    t = a[:, 0]
+    roll, pitch = a[:, 2], a[:, 3]
+    rt, pt = a[:, 5], a[:, 6]
+    tx, ty = a[:, 12], a[:, 13]
+    ffx, ffy = a[:, 16], a[:, 19]
+    tmag = np.hypot(tx, ty)
+    masks = {
+        "all": np.ones_like(t, dtype=bool),
+        "zero": tmag <= 6.0,
+        "track": tmag >= 25.0,
+    }
+    out = {}
+    for name, mask in masks.items():
+        parts = segments(mask, t, 1.5)
+        rt_d, pt_d, rt_dd, pt_dd = [], [], [], []
+        euler_r_d, euler_p_d = [], []
+        rt_hp_parts, pt_hp_parts, roll_hp_parts, pitch_hp_parts = [], [], [], []
+        ffx_d, ffy_d = [], []
+        for s, e in parts:
+            tu, rtu = resample(t[s:e], rt[s:e], 50.0)
+            _, ptu = resample(t[s:e], pt[s:e], 50.0)
+            _, ru = resample(t[s:e], roll[s:e], 50.0)
+            _, pu = resample(t[s:e], pitch[s:e], 50.0)
+            _, ffxu = resample(t[s:e], ffx[s:e], 50.0)
+            _, ffyu = resample(t[s:e], ffy[s:e], 50.0)
+            if rtu is None or len(rtu) < 4:
+                continue
+            drt = np.diff(rtu)
+            dpt = np.diff(ptu)
+            rt_d.extend(np.abs(drt))
+            pt_d.extend(np.abs(dpt))
+            rt_dd.extend(np.abs(np.diff(drt)))
+            pt_dd.extend(np.abs(np.diff(dpt)))
+            euler_r_d.extend(np.abs(np.diff(ru)))
+            euler_p_d.extend(np.abs(np.diff(pu)))
+            ffx_d.extend(np.abs(np.diff(ffxu)))
+            ffy_d.extend(np.abs(np.diff(ffyu)))
+            if len(rtu) >= 100:
+                rt_hp_parts.append((tu, rtu))
+                pt_hp_parts.append((tu, ptu))
+                roll_hp_parts.append((tu, ru))
+                pitch_hp_parts.append((tu, pu))
+        rt_hp, _ = highpass_rms_parts(rt_hp_parts, 50.0, 4.0)
+        pt_hp, _ = highpass_rms_parts(pt_hp_parts, 50.0, 4.0)
+        roll_hp, _ = highpass_rms_parts(roll_hp_parts, 50.0, 4.0)
+        pitch_hp, _ = highpass_rms_parts(pitch_hp_parts, 50.0, 4.0)
+        out.update({
+            f"{name}_dur_s": mask_duration(t, mask),
+            f"{name}_angle_target_d_p95": max(pct(rt_d, 95), pct(pt_d, 95)),
+            f"{name}_angle_target_d_max": max(pct(rt_d, 100), pct(pt_d, 100)),
+            f"{name}_angle_target_dd_p95": max(pct(rt_dd, 95), pct(pt_dd, 95)),
+            f"{name}_euler_d_p95": max(pct(euler_r_d, 95), pct(euler_p_d, 95)),
+            f"{name}_ff_d_p95": max(pct(ffx_d, 95), pct(ffy_d, 95)),
+            f"{name}_ff_d_max": max(pct(ffx_d, 100), pct(ffy_d, 100)),
+            f"{name}_angle_target_hp_rms": max(rt_hp, pt_hp),
+            f"{name}_euler_hp_rms": max(roll_hp, pitch_hp),
+        })
+    out.update({
+        "ff_abs_p95": max(pct(np.abs(ffx), 95), pct(np.abs(ffy), 95)),
+        "ff_abs_max": max(pct(np.abs(ffx), 100), pct(np.abs(ffy), 100)),
+        "p_abs_p95": max(pct(np.abs(a[:, 14]), 95), pct(np.abs(a[:, 17]), 95)),
+        "angle_target_abs_p95": max(pct(np.abs(rt), 95), pct(np.abs(pt), 95)),
+        "angle_target_abs_max": max(pct(np.abs(rt), 100), pct(np.abs(pt), 100)),
+    })
+    return out
+
+
 def lag_seconds(t, target, meas, fs=50.0):
     tu, tar = resample(t, target, fs)
     _, mea = resample(t, meas, fs)
@@ -177,12 +254,17 @@ def tracking_metrics(a):
     along = (vx * tx + vy * ty) / np.maximum(tmag, 1.0)
     lateral = (vx * ty - vy * tx) / np.maximum(tmag, 1.0)
     err = tmag - along
+    signed_err = along - tmag
     lx, cx = lag_seconds(t, tx, vx)
     ly, cy = lag_seconds(t, ty, vy)
+    overspeed = signed_err[good]
+    overspeed = overspeed[overspeed > 0.0]
     return {
         "track_dur_s": float(np.sum(np.diff(t, prepend=t[0]) * nonzero)),
         "track_err_mean": float(np.mean(np.abs(err[good]))) if np.any(good) else float("nan"),
         "track_err_p95": pct(np.abs(err[good]), 95),
+        "track_signed_err_mean": float(np.mean(signed_err[good])) if np.any(good) else float("nan"),
+        "track_overspeed_p95": pct(overspeed, 95),
         "track_ratio_med": float(np.median(along[good] / np.maximum(tmag[good], 1.0))) if np.any(good) else float("nan"),
         "lateral_p95": pct(np.abs(lateral[good]), 95),
         "lag_x_s": lx,
@@ -198,7 +280,7 @@ def brake_metrics(a):
     tx, ty = a[:, 12], a[:, 13]
     tmag = np.hypot(tx, ty)
     zero_segs = segments(tmag <= 6.0, t, 1.0)
-    times, residual_1s, residual_2s, initv = [], [], [], []
+    times, residual_1s, residual_2s, residual_abs_1s, residual_abs_2s, initv = [], [], [], [], [], []
     hard_times, hard_residual_2s = [], []
     for s, e in zero_segs:
         pre = (t >= t[s] - 0.7) & (t < t[s] - 0.1) & (tmag > 25.0)
@@ -222,6 +304,10 @@ def brake_metrics(a):
             idx = np.searchsorted(t[s:e], t[s] + sec)
             idx = min(max(idx, 0), len(same) - 1)
             out.append(float(same[idx]))
+            if sec == 1.0:
+                residual_abs_1s.append(float(abs(same[idx])))
+            else:
+                residual_abs_2s.append(float(abs(same[idx])))
         if abs(start_v) >= 35.0:
             hard_times.append(times[-1])
             hard_residual_2s.append(residual_2s[-1])
@@ -233,6 +319,8 @@ def brake_metrics(a):
         "brake_time_p80": pct(times, 80),
         "brake_residual_1s": float(np.mean(residual_1s)) if residual_1s else float("nan"),
         "brake_residual_2s": float(np.mean(residual_2s)) if residual_2s else float("nan"),
+        "brake_abs_residual_1s": float(np.mean(residual_abs_1s)) if residual_abs_1s else float("nan"),
+        "brake_abs_residual_2s": float(np.mean(residual_abs_2s)) if residual_abs_2s else float("nan"),
         "brake_fail_2s_pct": float(np.mean(np.asarray(times) > 2.0) * 100.0) if times else float("nan"),
         "hard_brake_time_med": float(np.median(hard_times)) if hard_times else float("nan"),
         "hard_brake_residual_2s": float(np.mean(hard_residual_2s)) if hard_residual_2s else float("nan"),
@@ -289,17 +377,18 @@ def angle_accel_fit(a):
 
 def main():
     summary = []
-    for label, name, kp, ki in FILES:
+    for label, name, kp, ki, kff in FILES:
         a = load_mode7(BASE / name)
-        m = {"flight": label, "file": name, "kp": kp, "ki": ki, "rows": len(a), "duration_s": float(a[-1, 0] - a[0, 0])}
+        m = {"flight": label, "file": name, "kp": kp, "ki": ki, "kff": kff, "rows": len(a), "duration_s": float(a[-1, 0] - a[0, 0])}
         m.update(zero_metrics(a))
         m.update(tracking_metrics(a))
         m.update(brake_metrics(a))
+        m.update(smoothness_metrics(a))
         m.update(angle_accel_fit(a))
         summary.append(m)
 
     keys = sorted({k for row in summary for k in row.keys()})
-    first = ["flight", "file", "kp", "ki", "rows", "duration_s"]
+    first = ["flight", "file", "kp", "ki", "kff", "rows", "duration_s"]
     keys = first + [k for k in keys if k not in first]
     with (BASE / "velocity_loop_analysis_summary.csv").open("w", encoding="utf-8", newline="") as f:
         w = csv.DictWriter(f, fieldnames=keys)
@@ -308,10 +397,11 @@ def main():
             w.writerow(row)
 
     lines = ["# Velocity loop analysis", ""]
-    lines.append("|flight|Kp|Ki|zero speed p95|roll hp rms|pitch hp rms|track err p95|brake med|brake residual 2s|I sat %|")
-    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
+    lines.append("|flight|Kp|Ki|Kff|zero speed p95|Euler HP RMS|target d95|track err p95|brake med|abs residual 2s|FF p95|")
+    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
     for r in summary:
-        lines.append("|{flight}|{kp:.2f}|{ki:.2f}|{zero_speed_p95:.1f}|{roll_hp_rms:.3f}|{pitch_hp_rms:.3f}|{track_err_p95:.1f}|{brake_time_med:.2f}|{brake_residual_2s:.1f}|{i_sat_pct:.1f}|".format(**r))
+        euler_hp = max(r["roll_hp_rms"], r["pitch_hp_rms"])
+        lines.append("|{flight}|{kp:.2f}|{ki:.2f}|{kff:.3f}|{zero_speed_p95:.1f}|{euler_hp:.3f}|{track_angle_target_d_p95:.3f}|{track_err_p95:.1f}|{brake_time_med:.2f}|{brake_abs_residual_2s:.1f}|{ff_abs_p95:.2f}|".format(euler_hp=euler_hp, **r))
     lines.extend(["", "Generated by analyze_velocity_loop.py."])
     (BASE / "velocity_loop_analysis_report.md").write_text("\n".join(lines), encoding="utf-8")
 

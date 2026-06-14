@@ -30,5 +30,7 @@ extern float acc_x_lp;
 extern float acc_y_lp;
 extern float acc_x_temp;
 extern float acc_y_temp;
+extern float Pos_Est_acc_bias_x_cmss;
+extern float Pos_Est_acc_bias_y_cmss;
 
 #endif /* POS_EST_H */

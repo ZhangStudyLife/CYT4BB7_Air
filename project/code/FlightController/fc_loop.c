@@ -634,7 +634,8 @@ void FC_Loop_500Hz(void)
         Pos_Est_vel_x, Pos_Est_vel_y,
         -g_mode2_velx_target,-g_mode2_vely_target,
         g_mode2_velx_pid.p_term, g_mode2_velx_pid.i_term,g_mode2_velx_pid.ff_term,
-        g_mode2_vely_pid.p_term, g_mode2_vely_pid.i_term,g_mode2_vely_pid.ff_term
+        g_mode2_vely_pid.p_term, g_mode2_vely_pid.i_term,g_mode2_vely_pid.ff_term,
+        Pos_Est_acc_bias_x_cmss, Pos_Est_acc_bias_y_cmss
         );
 }
 

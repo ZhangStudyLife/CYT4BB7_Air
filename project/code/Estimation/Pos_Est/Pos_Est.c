@@ -181,6 +181,7 @@
 #include "filter.h"
 #include "FlightController/fc_mode.h"
 #include "FlightController/fc_params.h"
+#include "FlightController/fc_start_crsf.h"
 #include <math.h>
 
 extern volatile uint32 tick_1000us_cnt;
@@ -199,6 +200,13 @@ extern volatile uint32 tick_1000us_cnt;
 /* 左右轴水平加速度限幅，单位 cm/s^2 */
 #define POS_EST_ACC_RIGHT_LIMIT_CMSS (600.0f)
 #define POS_EST_DEG_TO_RAD (0.017453292519943295f)
+#define POS_EST_STATIC_GYRO_MAX_DPS (3.0f)
+#define POS_EST_STATIC_TILT_MAX_DEG (6.0f)
+#define POS_EST_STATIC_HEIGHT_MIN_MM (70.0f)
+#define POS_EST_STATIC_HEIGHT_MAX_MM (200.0f)
+#define POS_EST_STATIC_LOCK_SAMPLES (300U)
+#define POS_EST_ACC_BIAS_ALPHA (0.001f)
+#define POS_EST_ACC_BIAS_LIMIT_CMSS (120.0f)
 /* 光流解算得到的 X 轴速度，单位 cm/s，往左飞为正，往右飞为负 */
 float opflow_vel_x = 0.0f;
 /* 光流解算得到的 Y 轴速度，单位 cm/s，往前飞为正，往后飞为负 */
@@ -237,6 +245,7 @@ static float s_vel_pred_x = 0.0f;
 static float s_vel_pred_y = 0.0f;
 static float s_raw_acc_lp_x = 0.0f;
 static float s_raw_acc_lp_y = 0.0f;
+static uint16_t s_static_sample_count = 0U;
 
 /* X 轴加速度 单位 cm/s^2，飞机往前加速为正，往后加速为负 */
 float acc_x_temp = 0.0f;
@@ -244,6 +253,54 @@ float acc_x_temp = 0.0f;
 float acc_y_temp = 0.0f;
 float acc_x_lp = 0.0f;
 float acc_y_lp = 0.0f;
+float Pos_Est_acc_bias_x_cmss = 0.0f;
+float Pos_Est_acc_bias_y_cmss = 0.0f;
+
+static float Pos_Est_ClampFloat(float value, float min_value, float max_value)
+{
+    if (value < min_value)
+    {
+        return min_value;
+    }
+    if (value > max_value)
+    {
+        return max_value;
+    }
+    return value;
+}
+
+static uint8_t Pos_Est_IsStaticForAccelBias(void)
+{
+    FC_START_CRSF_state_e fc_state = FC_START_CRSF_Get_State();
+
+    if ((fc_state != FC_START_CRSF_STATE_STANDBY) &&
+        (fc_state != FC_START_CRSF_STATE_LANDING))
+    {
+        return 0U;
+    }
+    if ((g_tof_fused_valid == 0U) ||
+        (g_tof_fused_height_mm < POS_EST_STATIC_HEIGHT_MIN_MM) ||
+        (g_tof_fused_height_mm > POS_EST_STATIC_HEIGHT_MAX_MM))
+    {
+        return 0U;
+    }
+    if ((fabsf(g_euler.roll) > POS_EST_STATIC_TILT_MAX_DEG) ||
+        (fabsf(g_euler.pitch) > POS_EST_STATIC_TILT_MAX_DEG))
+    {
+        return 0U;
+    }
+    if ((fabsf(g_imufilter_1000hz.gyrox) > POS_EST_STATIC_GYRO_MAX_DPS) ||
+        (fabsf(g_imufilter_1000hz.gyroy) > POS_EST_STATIC_GYRO_MAX_DPS) ||
+        (fabsf(g_imufilter_1000hz.gyroz) > POS_EST_STATIC_GYRO_MAX_DPS))
+    {
+        return 0U;
+    }
+    if (g_imu_shock_flag != 0U)
+    {
+        return 0U;
+    }
+    return 1U;
+}
 
 /*
  * 函数名: Pos_Est_Init
@@ -279,6 +336,9 @@ void Pos_Est_Init(void)
     s_vel_pred_y = 0.0f;
     s_raw_acc_lp_x = 0.0f;
     s_raw_acc_lp_y = 0.0f;
+    Pos_Est_acc_bias_x_cmss = 0.0f;
+    Pos_Est_acc_bias_y_cmss = 0.0f;
+    s_static_sample_count = 0U;
 }
 
 /*
@@ -314,6 +374,9 @@ void Pos_Est_Reinit(void)
     s_vel_pred_y = 0.0f;
     s_raw_acc_lp_x = 0.0f;
     s_raw_acc_lp_y = 0.0f;
+    Pos_Est_acc_bias_x_cmss = 0.0f;
+    Pos_Est_acc_bias_y_cmss = 0.0f;
+    s_static_sample_count = 0U;
 }
 
 /*
@@ -337,6 +400,8 @@ void Pos_Est_Update_1000HZ(void)
     float cp;
     float sr;
     float cr;
+    uint8_t accel_bias_static;
+    uint8_t accel_bias_locked = 0U;
 
     // FlowGyroDecoupler_Push1000Hz(tick_1000us_cnt, g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy);
     FlowGyroDecoupler_LC302_Push1000Hz(tick_1000us_cnt, g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy);
@@ -360,8 +425,37 @@ void Pos_Est_Update_1000HZ(void)
     acc_y_temp = (cr * acc_body[1] - sr * acc_body[2]) * 9.80665f * 100.0f;
     s_raw_acc_lp_x += POS_EST_RAW_ACC_LPF_ALPHA * (acc_x_temp - s_raw_acc_lp_x);
     s_raw_acc_lp_y += POS_EST_RAW_ACC_LPF_ALPHA * (acc_y_temp - s_raw_acc_lp_y);
-    acc_x_lp = s_raw_acc_lp_x;
-    acc_y_lp = s_raw_acc_lp_y;
+    accel_bias_static = Pos_Est_IsStaticForAccelBias();
+    if (accel_bias_static != 0U)
+    {
+        if (s_static_sample_count < POS_EST_STATIC_LOCK_SAMPLES)
+        {
+            s_static_sample_count++;
+        }
+        else
+        {
+            accel_bias_locked = 1U;
+            Pos_Est_acc_bias_x_cmss += POS_EST_ACC_BIAS_ALPHA * (s_raw_acc_lp_x - Pos_Est_acc_bias_x_cmss);
+            Pos_Est_acc_bias_y_cmss += POS_EST_ACC_BIAS_ALPHA * (s_raw_acc_lp_y - Pos_Est_acc_bias_y_cmss);
+            Pos_Est_acc_bias_x_cmss = Pos_Est_ClampFloat(Pos_Est_acc_bias_x_cmss,
+                                                         -POS_EST_ACC_BIAS_LIMIT_CMSS,
+                                                         POS_EST_ACC_BIAS_LIMIT_CMSS);
+            Pos_Est_acc_bias_y_cmss = Pos_Est_ClampFloat(Pos_Est_acc_bias_y_cmss,
+                                                         -POS_EST_ACC_BIAS_LIMIT_CMSS,
+                                                         POS_EST_ACC_BIAS_LIMIT_CMSS);
+            s_vel_pred_x = 0.0f;
+            s_vel_pred_y = 0.0f;
+            Pos_Est_vel_x = 0.0f;
+            Pos_Est_vel_y = 0.0f;
+        }
+    }
+    else
+    {
+        s_static_sample_count = 0U;
+    }
+
+    acc_x_lp = s_raw_acc_lp_x - Pos_Est_acc_bias_x_cmss;
+    acc_y_lp = s_raw_acc_lp_y - Pos_Est_acc_bias_y_cmss;
 
     /* IMU 冲击窗口内不让水平加速度污染后续速度积分 */
     if (g_imu_shock_flag != 0U)
@@ -392,7 +486,7 @@ void Pos_Est_Update_1000HZ(void)
         acc_y_lp = -POS_EST_ACC_RIGHT_LIMIT_CMSS;
     }
 
-    if (g_imu_shock_flag == 0U)
+    if ((g_imu_shock_flag == 0U) && (accel_bias_locked == 0U))
     {
         s_vel_pred_x -= acc_y_lp * POS_EST_ACC_DT_S;
         s_vel_pred_y += acc_x_lp * POS_EST_ACC_DT_S;

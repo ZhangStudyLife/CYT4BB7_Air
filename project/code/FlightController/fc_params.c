@@ -159,28 +159,28 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pos_est_k_flow = 0.04f;
 
     /* ===== 模式 8 图像位置环参数 ===== */
-    params->mode8_img_x_kp = 1.2f;
+    params->mode8_img_x_kp = 1.0f;
     params->mode8_img_x_ki = 0.0f;
-    params->mode8_img_x_kd = 0.10f;
+    params->mode8_img_x_kd = 0.00f;
     params->mode8_img_x_kff = 0.0f;
     params->mode8_img_x_i_limit = 0.0f;
     params->mode8_img_x_d_lpf = 0.0f;
-    params->mode8_img_y_kp = 1.2f;
+    params->mode8_img_y_kp = 1.0f;
     params->mode8_img_y_ki = 0.0f;
-    params->mode8_img_y_kd = 0.10f;
+    params->mode8_img_y_kd = 0.00f;
     params->mode8_img_y_kff = 0.0f;
     params->mode8_img_y_i_limit = 0.0f;
     params->mode8_img_y_d_lpf = 0.0f;
     params->mode8_vel_x_kp = 0.16f;
     params->mode8_vel_x_ki = 0.0f;
     params->mode8_vel_x_kd = 0.0f;
-    params->mode8_vel_x_kff = 0.030f;
+    params->mode8_vel_x_kff = 0.000f;
     params->mode8_vel_x_i_limit = 3.0f;
     params->mode8_vel_x_d_lpf = 0.0f;
     params->mode8_vel_y_kp = 0.16f;
     params->mode8_vel_y_ki = 0.0f;
     params->mode8_vel_y_kd = 0.0f;
-    params->mode8_vel_y_kff = 0.030f;
+    params->mode8_vel_y_kff = 0.000f;
     params->mode8_vel_y_i_limit = 3.0f;
     params->mode8_vel_y_d_lpf = 0.0f;
 }

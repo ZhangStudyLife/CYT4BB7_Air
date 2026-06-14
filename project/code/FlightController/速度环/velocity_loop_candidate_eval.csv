@@ -1,0 +1,6 @@
+candidate,kp,ki,kff,zero_u_p95_deg,dyn_u_p95_deg,i_p95_deg,ff_p95_deg,sat_pct,verdict
+A_balanced,0.16,0.000,0.040,4.42,19.20,0.00,9.38,11.28,balanced baseline with FF
+B_best_PI_plus_FF,0.18,0.000,0.040,4.94,20.77,0.00,9.38,12.81,best current PI plus moderate FF
+C_fast,0.22,0.000,0.050,6.04,25.57,0.00,11.73,17.69,too aggressive; use only if A/B under-brake
+D_small_I,0.16,0.012,0.040,5.10,19.32,2.12,9.38,11.61,small-I test only; static cost visible
+E_conservative_highFF,0.14,0.000,0.060,4.06,21.47,0.00,14.07,14.45,isolates FF; higher saturation risk

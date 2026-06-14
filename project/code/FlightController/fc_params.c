@@ -143,15 +143,15 @@ static void fc_params_fill_defaults(fc_params_t *params)
 
     /* ===== 模式 2 速度环参数 ===== */
     params->mode2_vel_x_kp = 0.16f;
-    params->mode2_vel_x_ki = 0.03f;
+    params->mode2_vel_x_ki = 0.01f;
     params->mode2_vel_x_kd = 0.0f;
-    params->mode2_vel_x_kff = 0.0f;
+    params->mode2_vel_x_kff = 0.035f;
     params->mode2_vel_x_i_limit = 3.0f;
     params->mode2_vel_x_d_lpf = 0.0f;
     params->mode2_vel_y_kp = 0.16f;
-    params->mode2_vel_y_ki = 0.03f;
+    params->mode2_vel_y_ki = 0.01f;
     params->mode2_vel_y_kd = 0.0f;
-    params->mode2_vel_y_kff = 0.0f;
+    params->mode2_vel_y_kff = 0.035f;
     params->mode2_vel_y_i_limit = 3.0f;
     params->mode2_vel_y_d_lpf = 0.0f;
 

@@ -16,11 +16,9 @@ float g_mode2_vely_target = 0.0f;
 static const float s_mode2_vel_limit_cmps = 200.0f;
 static const float s_mode2_vel_deadzone_cmps = 6.0f;
 static const float s_mode2_vel_expo = 0.60f;
-static const float s_mode2_vel_accel_cmps2 = 170.0f;
-static const float s_mode2_vel_jerk_cmps3 = 1000.0f;
+static const float s_mode2_vel_accel_cmps2 = 250.0f;
+static const float s_mode2_vel_jerk_cmps3 = 1800.0f;
 static const float s_mode2_angle_limit_deg = 15.0f;
-static const float s_mode2_ff_angle_limit_deg = 5.0f;
-static const float s_mode2_angle_slew_dps = 70.0f;
 static float s_mode2_accel_x = 0.0f;
 static float s_mode2_accel_y = 0.0f;
 
@@ -93,10 +91,6 @@ void FC_Mode2_50Hz(float dt)
     float vely_ff;
     float velx_out;
     float vely_out;
-    float roll_target_raw;
-    float pitch_target_raw;
-    float roll_target_step;
-    float pitch_target_step;
     float roll_trim;
     float pitch_trim;
 
@@ -136,9 +130,9 @@ void FC_Mode2_50Hz(float dt)
     roll_trim = FC_Mode_Get_Roll_Mech_Trim_Deg();
     pitch_trim = FC_Mode_Get_Pitch_Mech_Trim_Deg();
     velx_ff = FC_Mode_Clamp(g_fc_params.mode2_vel_x_kff * s_mode2_accel_x,
-                            -s_mode2_ff_angle_limit_deg, s_mode2_ff_angle_limit_deg);
+                            -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
     vely_ff = FC_Mode_Clamp(g_fc_params.mode2_vel_y_kff * s_mode2_accel_y,
-                            -s_mode2_ff_angle_limit_deg, s_mode2_ff_angle_limit_deg);
+                            -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
 
     g_mode2_velx_pid.output_min = -s_mode2_angle_limit_deg - roll_trim - velx_ff;
     g_mode2_velx_pid.output_max = s_mode2_angle_limit_deg - roll_trim - velx_ff;
@@ -150,13 +144,6 @@ void FC_Mode2_50Hz(float dt)
     g_mode2_velx_pid.ff_term = velx_ff;
     g_mode2_vely_pid.ff_term = vely_ff;
 
-    roll_target_raw = FC_Mode_Clamp(velx_out + roll_trim, -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
-    pitch_target_raw = FC_Mode_Clamp(vely_out + pitch_trim, -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
-    roll_target_step = roll_target_raw - roll_angle_target;
-    pitch_target_step = pitch_target_raw - pitch_angle_target;
-    FC_Mode2_LimitVector(&roll_target_step, &pitch_target_step, s_mode2_angle_slew_dps * dt);
-    roll_angle_target = FC_Mode_Clamp(roll_angle_target + roll_target_step,
-                                      -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
-    pitch_angle_target = FC_Mode_Clamp(pitch_angle_target + pitch_target_step,
-                                       -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
+    roll_angle_target = FC_Mode_Clamp(velx_out + roll_trim, -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
+    pitch_angle_target = FC_Mode_Clamp(vely_out + pitch_trim, -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
 }

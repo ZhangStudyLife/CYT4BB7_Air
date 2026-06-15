@@ -11,10 +11,17 @@ static uint8 div10 = 0U;
 static uint8 s_ipc_last_flying = 0U;      /* 上一次成功通知给核1的飞行状态 */
 static uint8 s_ipc_flying_retry_div = 0U; /* 飞行状态 IPC 通知失败后的 100Hz 重试分频 */
 
+float g_car_vel_x = 0.0f;
+float g_car_vel_y = 0.0f;
+
 static void on_car_data(const float *data, uint8 count)
 {
-    (void)data;
-    (void)count;
+    if (count == 10U)
+    {
+        g_car_vel_x = data[0];
+        g_car_vel_y = data[1];
+        wifi_justfloat(g_car_vel_x, g_car_vel_y);
+    }
 }
 
 int main(void)
@@ -49,13 +56,13 @@ int main(void)
     pit_ms_init(PIT_CH1, 10);
 
     Motor_Enable();
-    Motor_SetThrottleAll((int32[]){2000, 0, 0, 0});
+    Motor_SetThrottleAll((int32[]){1200, 0, 0, 0});
     system_delay_ms(500);
-    Motor_SetThrottleAll((int32[]){0, 2000, 0, 0});
+    Motor_SetThrottleAll((int32[]){0, 1200, 0, 0});
     system_delay_ms(500);
-    Motor_SetThrottleAll((int32[]){0, 0, 2000, 0});
+    Motor_SetThrottleAll((int32[]){0, 0, 1200, 0});
     system_delay_ms(500);
-    Motor_SetThrottleAll((int32[]){0, 0, 0, 2000});
+    Motor_SetThrottleAll((int32[]){0, 0, 0, 1200});
     system_delay_ms(500);
     Motor_SetThrottleAll((int32[]){0, 0, 0, 0});
     air_comm_set_run_data_callback(on_car_data);

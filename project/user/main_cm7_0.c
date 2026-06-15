@@ -20,7 +20,6 @@ static void on_car_data(const float *data, uint8 count)
     {
         g_car_vel_x = data[0];
         g_car_vel_y = data[1];
-        wifi_justfloat(g_car_vel_x, g_car_vel_y);
     }
 }
 

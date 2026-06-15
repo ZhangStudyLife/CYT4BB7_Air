@@ -4,6 +4,7 @@
 #include "../Estimation/Attitude/IMU_TOP.h"
 #include "../Estimation/Height_Est/Height_Est.h"
 #include "../IPC/ipc_image_data.h"
+#include "../Protocols/AirComm/air_comm_air.h"
 #include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
 
 pid_t roll_gyro_pid;
@@ -514,27 +515,24 @@ void FC_Loop_100Hz(void)
         break;
     }
 
-    // {
-    // air_comm_air_stats_t air_stats;
+    {
+        air_comm_air_stats_t air_stats;
 
-    // memset(&air_stats, 0, sizeof(air_stats));
-    // air_comm_air_get_stats(&air_stats);
-    //                (float)air_stats.online_status,
-    //                (float)air_stats.heartbeat_rx_count,
-    //                (float)air_stats.heartbeat_tx_count,
-    //                (float)air_stats.rx_frame_count,
-    //                (float)air_stats.tx_frame_count,
-    //                (float)air_stats.set_param_ok_count,
-    //                (float)air_stats.set_param_fail_count,
-    //                (float)air_stats.command_ok_count,
-    //                (float)air_stats.command_fail_count,
-    //                (float)air_stats.crc_error_count,
-    //                (float)air_stats.rx_queue_overflow_count,
-    //                air_min_area,
-    //                air_hold_ms,
-    //                air_x_bias,
-    //                air_y_bias);
-    // }
+        memset(&air_stats, 0, sizeof(air_stats));
+        air_comm_air_get_stats(&air_stats);
+        wifi_justfloat(1.0f,
+                       air_stats.tick_ms,
+                       air_stats.tx_frame_count,
+                       air_stats.rx_frame_count,
+                       air_stats.raw_rx_byte_count,
+                       air_stats.rx_byte_count,
+                       air_stats.heartbeat_tx_count,
+                       air_stats.heartbeat_rx_count,
+                       air_stats.crc_error_count,
+                       air_stats.rx_oversize_count,
+                       air_stats.rx_queue_overflow_count,
+                       air_stats.online_status);
+    }
 
     // 依托这个确认了车端的flash确实有效以及确实可以修改飞机的参数
     //                target_height_m * 1000.0f,   /* 目标高度，单位 mm */
@@ -572,6 +570,9 @@ void FC_Loop_500Hz(void)
         float yaw_angle_meas = g_euler.yaw;
         float yaw_error_deg;
         float yaw_hold_rate;
+        float limit;
+        float roll_ctrl;
+        float pitch_ctrl;
 
         if (roll_angle_target > 20.0f)
         {
@@ -591,9 +592,9 @@ void FC_Loop_500Hz(void)
         }
 
         /* 控制量限幅 */
-        float limit = s_fc_angle_out_limit;
-        float roll_ctrl = fc_clampf(PID_Update(&roll_angle_pid, roll_angle_target, roll_angle_meas, dt), -limit, limit);
-        float pitch_ctrl = fc_clampf(PID_Update(&pitch_angle_pid, pitch_angle_target, pitch_angle_meas, dt), -limit, limit);
+        limit = s_fc_angle_out_limit;
+        roll_ctrl = fc_clampf(PID_Update(&roll_angle_pid, roll_angle_target, roll_angle_meas, dt), -limit, limit);
+        pitch_ctrl = fc_clampf(PID_Update(&pitch_angle_pid, pitch_angle_target, pitch_angle_meas, dt), -limit, limit);
 
         /* 首次进入飞行态时复位 yaw 外环，后续 yaw 目标固定为 0 度 */
         if (0U == s_yaw_target_inited)

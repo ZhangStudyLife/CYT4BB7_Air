@@ -6,6 +6,8 @@
 extern volatile float g_down_camera_lamp_x;
 extern volatile float g_down_camera_lamp_y;
 extern volatile float g_down_camera_lamp_valid;
+extern float g_car_vel_x;
+extern float g_car_vel_y;
 
 static pid_t s_mode8_imgx_pid;
 static pid_t s_mode8_imgy_pid;
@@ -122,15 +124,19 @@ void FC_Mode8_50Hz(float dt)
         img_fb_x = FC_Mode_Clamp(img_fb_x, -s_mode8_img_fb_limit_cmps, s_mode8_img_fb_limit_cmps);
         img_fb_y = FC_Mode_Clamp(img_fb_y, -s_mode8_img_fb_limit_cmps, s_mode8_img_fb_limit_cmps);
 
-        velx_sp = img_fb_x;
-        vely_sp = img_fb_y;
+        velx_sp = img_fb_x + g_car_vel_x * 1.0f * g_fc_params.mode8_kp_car_x;
+        vely_sp = img_fb_y + g_car_vel_y * -1.0f * g_fc_params.mode8_kp_car_y;
     }
     else
     {
         PID_Reset(&s_mode8_imgx_pid);
         PID_Reset(&s_mode8_imgy_pid);
     }
-
+    wifi_justfloat(g_car_vel_x,g_car_vel_y,
+        img_fb_x,img_fb_y,
+        velx_sp,vely_sp,
+        g_mode8_velx_target,g_mode8_vely_target,
+        roll_angle_target,pitch_angle_target);
     FC_Mode8_LimitVector(&velx_sp, &vely_sp, s_mode8_vel_limit_cmps);
 
     accx_sp = (velx_sp - g_mode8_velx_target) / dt;

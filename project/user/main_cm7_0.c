@@ -11,8 +11,8 @@ static uint8 div10 = 0U;
 static uint8 s_ipc_last_flying = 0U;      /* 上一次成功通知给核1的飞行状态 */
 static uint8 s_ipc_flying_retry_div = 0U; /* 飞行状态 IPC 通知失败后的 100Hz 重试分频 */
 
-float g_car_vel_x = 0.0f;
-float g_car_vel_y = 0.0f;
+float g_car_vel_x = 0.0f;       // 这个是车的速度 这个变量大于0 , 车往右
+float g_car_vel_y = 0.0f;       // 这个是车的速度 这个变量大于0 , 车往前
 
 static void on_car_data(const float *data, uint8 count)
 {

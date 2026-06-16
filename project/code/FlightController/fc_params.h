@@ -156,6 +156,8 @@ typedef struct
     float mode8_vel_y_kff;
     float mode8_vel_y_i_limit;
     float mode8_vel_y_d_lpf;
+    float mode8_kp_car_x;
+    float mode8_kp_car_y;
     float mode2_vel_x_kp;
     float mode2_vel_x_ki;
     float mode2_vel_x_kd;

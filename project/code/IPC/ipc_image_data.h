@@ -7,8 +7,6 @@
 extern "C" {
 #endif
 
-#define IPC_IMAGE_MAX_BEACONS      (4U)
-#define IPC_IMAGE_MAX_CAR_LAMPS    (1U)
 #define IPC_CAMERA_SPI_BOARD_COUNT (2U)
 
 typedef struct
@@ -39,40 +37,26 @@ typedef struct
 
 typedef struct
 {
-    float x;
-    float y;
-    float radius;
-    uint8 valid;
-    uint8 _pad[3];
-} ipc_image_beacon_t;
-
-typedef struct
-{
-    float cx;
-    float cy;
-    float width;
-    float length;
-    float angle;
-    uint8 valid;
-    uint8 _pad[3];
-} ipc_image_car_lamp_t;
-
-typedef struct
-{
     volatile uint32 seq;
-    uint8 beacon_count;
-    uint8 car_lamp_count;
-    uint8 _pad[2];
-    ipc_image_beacon_t beacons[IPC_IMAGE_MAX_BEACONS];
-    ipc_image_car_lamp_t car_lamps[IPC_IMAGE_MAX_CAR_LAMPS];
-} ipc_image_payload_t;
+    float target_valid;
+    float target_x;
+    float target_y;
+    float car_lamp_valid;
+    float car_lamp_cx;
+    float car_lamp_cy;
+    float lamp_angle_deg;
+} ipc_mode2_payload_t;
 
 #if defined(CY_CORE_CM7_0)
-extern volatile uint32 g_air_image_seq;
-extern volatile uint8 g_air_image_beacon_count;
-extern volatile uint8 g_air_image_car_lamp_count;
-extern volatile ipc_image_beacon_t g_air_image_beacons[IPC_IMAGE_MAX_BEACONS];
-extern volatile ipc_image_car_lamp_t g_air_image_car_lamps[IPC_IMAGE_MAX_CAR_LAMPS];
+extern volatile uint32 g_air_mode2_seq;
+extern volatile float g_air_mode2_target_valid;
+extern volatile float g_air_mode2_target_x;
+extern volatile float g_air_mode2_target_y;
+extern volatile float g_air_mode2_car_lamp_valid;
+extern volatile float g_air_mode2_car_lamp_cx;
+extern volatile float g_air_mode2_car_lamp_cy;
+extern volatile float g_air_mode2_lamp_angle_deg;
+
 extern volatile float g_down_camera_lamp_x;
 extern volatile float g_down_camera_lamp_y;
 extern volatile float g_down_camera_lamp_width;
@@ -83,11 +67,11 @@ extern volatile float g_down_camera_lamp_valid;
 
 extern volatile ipc_camera_spi_log_t g_ipc_camera_spi_log;
 
-void ipc_image_send(void);
+void ipc_mode2_send(float target_valid, float target_x, float target_y,
+                    float car_lamp_valid, float car_lamp_cx, float car_lamp_cy,
+                    float lamp_angle_deg);
 void ipc_image_callback(uint32 ipc_data);
-void ipc_image_poll(void);
-uint8 ipc_image_is_new(void);
-void ipc_image_get(ipc_image_payload_t *out);
+void ipc_mode2_poll(void);
 
 uint8 ipc_flight_state_send(uint8 flying);
 uint8 ipc_core0_is_flying(void);

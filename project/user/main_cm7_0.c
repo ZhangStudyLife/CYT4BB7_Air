@@ -77,7 +77,14 @@ int main(void)
             // ICM42688_Aux_Update_1000Hz(tick_1000us_cnt);         //对比用的陀螺仪关掉
             // BMI088_Update_1000Hz(tick_1000us_cnt);
             Pos_Est_Update_1000HZ();
-
+            wifi_justfloat((float)g_air_mode2_seq,
+                           g_air_mode2_target_valid,
+                           g_air_mode2_target_x,
+                           g_air_mode2_target_y,
+                           g_air_mode2_car_lamp_valid,
+                           g_air_mode2_car_lamp_cx,
+                           g_air_mode2_car_lamp_cy,
+                           g_air_mode2_lamp_angle_deg);
             // wifi_justfloat();
             // {
             //     const VL53L1X_data_struct *tof = VL53L1X_GetData();
@@ -140,13 +147,13 @@ int main(void)
         {
             g_tick_100HZ--;
             Height_Est_update_100HZ();
-            ipc_image_poll();
             CRSF_Update_100HZ();
             FC_START_CRSF_UpdateLandingButton100Hz();
             FC_Loop_100Hz();
             air_comm_air_update_100HZ();
+            ipc_mode2_poll();
 
-            float air_data[15];
+            float air_data[22];
             air_data[0] = g_tof_fused_height_mm;
             air_data[1] = g_euler.roll;
             air_data[2] = g_euler.pitch;
@@ -162,7 +169,14 @@ int main(void)
             air_data[12] = (float)CRSF_STD[5];
             air_data[13] = (float)CRSF_STD[6];
             air_data[14] = (float)CRSF_STD[7];
-            air_comm_send_run_data(air_data, 15);
+            air_data[15] = g_air_mode2_target_valid;
+            air_data[16] = g_air_mode2_target_x;
+            air_data[17] = g_air_mode2_target_y;
+            air_data[18] = g_air_mode2_car_lamp_valid;
+            air_data[19] = g_air_mode2_car_lamp_cx;
+            air_data[20] = g_air_mode2_car_lamp_cy;
+            air_data[21] = g_air_mode2_lamp_angle_deg;
+            air_comm_send_run_data(air_data, 22);
 
 
             wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));

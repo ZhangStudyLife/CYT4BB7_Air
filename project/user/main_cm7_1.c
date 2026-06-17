@@ -1,6 +1,5 @@
 #include "zf_common_headfile.h"
 #include "Estimation/Pos_Est/image_down.h"
-#include "Estimation/image/image_fusion.h"
 
 #define IMAGE_PIT  (PIT_CH10)
 #define IMAGE_SCREEN_X_VALUE  (32U)
@@ -10,7 +9,6 @@
 #define IMAGE_SCREEN_A_VALUE  (184U)
 #define IMAGE_SCREEN_ROW_H    (16U)
 
-struct image_data image_data[IMAGE_CAMERA_COUNT];
 volatile uint8 g_image_tick_100hz = 0U;
 
 static void Get_Image_data(void)
@@ -94,29 +92,15 @@ int main(void)
     ipc_communicate_init(IPC_PORT_2, ipc_image_callback);
     image_down_init();
     CameraSpi_Init();
-    image_fusion_init();
     pit_ms_init(IMAGE_PIT, 10U);
 
     while(true)
     {
         if(g_image_tick_100hz > 0U)
         {
-            float tv;
-            float lv;
-
             g_image_tick_100hz--;
             Get_Image_data();
-            image_fusion_update_100HZ(image_data);
-
-            tv = (g_image_fusion.center_delta_valid != 0U) ? 1.0f : 0.0f;
-            lv = (g_image_fusion.lamp_angle_valid != 0U) ? 1.0f : 0.0f;
-            ipc_mode2_send(tv,
-                           g_image_fusion.center_delta_x,
-                           g_image_fusion.center_delta_y,
-                           lv,
-                           g_image_fusion.car_lamp_cx,
-                           g_image_fusion.car_lamp_cy,
-                           g_image_fusion.lamp_angle_deg);
+            ipc_image_publish();
             ImageDebugScreen_Update();
         }
     }

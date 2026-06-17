@@ -1,94 +1,54 @@
-======================================
- 核心1 (CM7_1) 摄像头图像变量说明
-======================================
+Air image variables
+===================
 
-三个摄像头各自识别信标灯和车灯后，输出的变量如下。
-数据来源: main_cm7_1.c -> mode2_update_100HZ()
+The only image result interface between CM7_1 and CM7_0 is:
 
-一、板子0 (前方SPI摄像头)
-    数据通过SPI主从通信获取，存在 camera_spi_board_snapshot_t 结构体中。
-    访问方式: spi_snap[0]
+    image_data[IMAGE_CAMERA_COUNT]
 
-    信标灯坐标:
-        spi_snap[0].beacons[i].valid   -- 该信标是否有效
-        spi_snap[0].beacons[i].x       -- 信标 x 坐标 (图像像素)
-        spi_snap[0].beacons[i].y       -- 信标 y 坐标 (图像像素)
-        spi_snap[0].beacons[i].area    -- 信标面积
-        i 的范围: 0 ~ 3 (最多4个信标)
+It is declared in `project/code/Image/image_data.h` and defined in shared memory by
+`project/code/IPC/ipc_image_data.c`.
 
-    车灯坐标:
-        spi_snap[0].car_lamps[0].valid   -- 车灯是否有效
-        spi_snap[0].car_lamps[0].cx      -- 车灯中心 x 坐标
-        spi_snap[0].car_lamps[0].cy      -- 车灯中心 y 坐标
-        spi_snap[0].car_lamps[0].width   -- 车灯宽度
-        spi_snap[0].car_lamps[0].length  -- 车灯长度
-        spi_snap[0].car_lamps[0].angle   -- 车灯角度 (度)
+Camera slots:
 
+    image_data[Front]   - front 2BL3 image board, received through Camera SPI
+    image_data[Center]  - Air center/down MT9V03X, processed by image_down.c
+    image_data[Back]    - rear 2BL3 image board, received through Camera SPI
 
-二、板子1 (后方SPI摄像头)
-    数据通过SPI主从通信获取，存在 camera_spi_board_snapshot_t 结构体中。
-    访问方式: spi_snap[1]
+Beacon data:
 
-    信标灯坐标:
-        spi_snap[1].beacons[i].valid   -- 该信标是否有效
-        spi_snap[1].beacons[i].x       -- 信标 x 坐标 (图像像素)
-        spi_snap[1].beacons[i].y       -- 信标 y 坐标 (图像像素)
-        spi_snap[1].beacons[i].area    -- 信标面积
-        i 的范围: 0 ~ 3 (最多4个信标)
+    image_data[camera].beacon_data[i].valid
+    image_data[camera].beacon_data[i].x
+    image_data[camera].beacon_data[i].y
+    image_data[camera].beacon_data[i].area
 
-    车灯坐标:
-        spi_snap[1].car_lamps[0].valid   -- 车灯是否有效
-        spi_snap[1].car_lamps[0].cx      -- 车灯中心 x 坐标
-        spi_snap[1].car_lamps[0].cy      -- 车灯中心 y 坐标
-        spi_snap[1].car_lamps[0].width   -- 车灯宽度
-        spi_snap[1].car_lamps[0].length  -- 车灯长度
-        spi_snap[1].car_lamps[0].angle   -- 车灯角度 (度)
+Car-lamp data:
 
+    image_data[camera].car_lamp_data[i].valid
+    image_data[camera].car_lamp_data[i].cx
+    image_data[camera].car_lamp_data[i].cy
+    image_data[camera].car_lamp_data[i].width
+    image_data[camera].car_lamp_data[i].length
+    image_data[camera].car_lamp_data[i].angle
 
-三、中心下视摄像头 (直连CM7_1, MT9V03X 188x120)
-    数据由 mode2_center_image 算法在本地处理，存在全局变量中。
+Coordinate convention:
 
-    信标灯坐标:
-        g_mode2_center_image_beacons[i].valid   -- 该信标是否有效
-        g_mode2_center_image_beacons[i].x       -- 信标 x 坐标 (图像像素)
-        g_mode2_center_image_beacons[i].y       -- 信标 y 坐标 (图像像素)
-        g_mode2_center_image_beacons[i].area    -- 信标面积
-        g_mode2_center_image_beacon_count        -- 检测到的信标总数
-        i 的范围: 0 ~ 3 (最多4个信标)
+    x/cx = raw_image_x - image_width / 2
+    y/cy = raw_image_y - image_height / 2
 
-    车灯坐标:
-        g_mode2_center_image_car_lamps[0].valid   -- 车灯是否有效
-        g_mode2_center_image_car_lamps[0].cx      -- 车灯中心 x 坐标
-        g_mode2_center_image_car_lamps[0].cy      -- 车灯中心 y 坐标
-        g_mode2_center_image_car_lamps[0].width   -- 车灯宽度
-        g_mode2_center_image_car_lamps[0].length  -- 车灯长度
-        g_mode2_center_image_car_lamps[0].angle   -- 车灯角度 (度)
-        g_mode2_center_image_car_lamp_count        -- 检测到的车灯总数
+For the center camera car lamp:
 
+    cx < 0 means the airplane is left of the car.
+    cx > 0 means the airplane is right of the car.
+    cy < 0 means the airplane is behind the car.
+    cy > 0 means the airplane is in front of the car.
 
-四、三目融合后输出 (g_mode2_three_camera)
-    经过 mode2_three_camera 融合算法后，统一输出到此结构体。
+`area` is connected-component area in pixels, not radius.
 
-    信标灯 (三目融合, 单目标跨相机追踪):
-        g_mode2_three_camera.center_delta_valid   -- 融合后信标偏差是否有效
-        g_mode2_three_camera.center_delta_x       -- 融合后信标 x 偏差 (机体系, 已旋转)
-        g_mode2_three_camera.center_delta_y       -- 融合后信标 y 偏差 (机体系, 已旋转)
-        g_mode2_three_camera.camera_id            -- 当前追踪来自哪个摄像头 (0=前,1=中,2=后)
+IPC shared addresses:
 
-    车灯 (仅中心下视摄像头, 不融合):
-        g_mode2_three_camera.car_lamp_cx          -- 车灯中心 x 坐标
-        g_mode2_three_camera.car_lamp_cy          -- 车灯中心 y 坐标
-        g_mode2_three_camera.lamp_angle_valid     -- 车灯角度是否有效
-        g_mode2_three_camera.lamp_angle_deg       -- 车灯角度 (度)
+    image_data         0x28001000
+    g_image_data_seq   0x28001160
+    g_ipc_camera_spi_log 0x28001180
 
-
-五、IPC发送到核心0的变量
-    通过 ipc_mode2_send() 发送到核心0。
-
-        target_valid      -- 信标有效标志 (1.0=有效, 0.0=无效)
-        target_x          -- 信标 x 偏差
-        target_y          -- 信标 y 偏差
-        car_lamp_valid    -- 车灯有效标志
-        car_lamp_cx       -- 车灯中心 x
-        car_lamp_cy       -- 车灯中心 y
-        lamp_angle_deg    -- 车灯角度
+Old fusion/crop variables such as `g_image_fusion`, `g_air_mode2_*`,
+`g_down_camera_lamp_*`, and `ipc_mode2_send()` are intentionally removed.

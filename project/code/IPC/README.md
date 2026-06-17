@@ -1,23 +1,13 @@
-# IPC 核间通信模块
+# IPC image data
 
-CM7_1 图像处理结果 → CM7_0 飞控核，50Hz。
+CM7_1 writes the shared `image_data[IMAGE_CAMERA_COUNT]` array. CM7_0 reads the same symbol directly.
 
-## 原理
+Fixed shared addresses are assigned in `linker_directives_tviibh.icf`:
 
-1. 共享内存（`.global_ram_data` 段，地址 0x28001000）存放 `ipc_image_payload_t` 结构体
-2. CM7_1 每帧写入共享内存后，通过 `ipc_send_data(seq)` 发送帧序号通知
-3. CM7_0 在 IPC 中断回调中置标志，主循环 50Hz 槽中读取共享数据
+- `image_data`: `.ipc_image_data` at `0x28001000`
+- `g_image_data_seq`: `.ipc_image_seq` at `0x28001160`
+- `g_ipc_camera_spi_log`: `.ipc_camera_spi_log` at `0x28001180`
 
-## 接口
+CM7_1 calls `ipc_image_publish()` after updating all three camera slots. The function cleans D-cache for `image_data` and `g_image_data_seq`, then sends an IPC notification.
 
-| 函数 | 核 | 作用 |
-|------|----|------|
-| `ipc_image_send()` | CM7_1 | 写共享内存 + 发送通知 |
-| `ipc_image_callback()` | CM7_0 | IPC 回调，置新数据标志 |
-| `ipc_image_is_new()` | CM7_0 | 查询并清除新数据标志 |
-| `ipc_image_get(out)` | CM7_0 | 拷贝共享数据到本地 |
-
-## 注意
-
-- 两核均需 `SCB_DisableDCache()` 避免缓存一致性问题
-- 条件编译宏：`CY_CORE_CM7_0` / `CY_CORE_CM7_1`
+CM7_0 calls `ipc_image_poll()` before using image results. The function invalidates D-cache for `image_data` and `g_image_data_seq`.

@@ -35,7 +35,7 @@ typedef struct
 #define BEACON_CAR_LAMP_THRESHOLD     200
 
 /* Connected-component area filters. */
-#define BEACON_MIN_COMPONENT_AREA     8
+#define BEACON_MIN_COMPONENT_AREA     10
 #define BEACON_MAX_COMPONENT_AREA     5000
 #define BEACON_MIN_LAMP_AREA          24
 #define BEACON_MAX_LAMP_AREA          1200
@@ -64,14 +64,14 @@ typedef struct
 #define BEACON_MAX_BEACON_AREA        260
 #define BEACON_MAX_BEACON_ELONGATION  2.8f
 #define BEACON_TOP_BEACON_Y           24.0f
-#define BEACON_TOP_BEACON_MIN_AREA    3
+#define BEACON_TOP_BEACON_MIN_AREA    10
 #define BEACON_TOP_BEACON_MAX_AREA    48
 #define BEACON_TOP_BEACON_MAX_ELONGATION 3.4f
 #define BEACON_MID_BEACON_Y           56.0f
 #define BEACON_MID_BEACON_MAX_AREA    150
 #define BEACON_LAMP_RESIDUE_ELONGATION 1.65f
 #define BEACON_LAMP_RESIDUE_DISTANCE  24.0f
-#define BEACON_EDGE_BEACON_MIN_AREA   8
+#define BEACON_EDGE_BEACON_MIN_AREA   10
 #define BEACON_EDGE_BEACON_MAX_AREA   90
 #define BEACON_EDGE_BEACON_MAX_SPAN   18
 #define BEACON_EDGE_BEACON_MARGIN     1
@@ -85,7 +85,7 @@ typedef struct
 #define BEACON_LAMP_MICRO_BACKGROUND_MAX 25
 #define BEACON_LOCAL_RING_PAD         3
 #define BEACON_LOCAL_BACKGROUND_MAX   50
-#define BEACON_NEW_SLOT_MIN_AREA      3
+#define BEACON_NEW_SLOT_MIN_AREA      10
 #define BEACON_NEW_SLOT_MAX_ELONGATION 3.4f
 #define BEACON_NEW_SLOT_EDGE_MARGIN   1
 #define BEACON_LAMP_CONTEXT_FRAMES    12
@@ -605,7 +605,7 @@ static void write_car_lamp(const component_t *lamp, beacon_result_t *result)
     }
 
     rect = &result->car_lamps[0];
-    rect->cx = (float)BEACON_IMAGE_W * 0.5f - lamp->cx;
+    rect->cx = lamp->cx - (float)BEACON_IMAGE_W * 0.5f;
     rect->cy = lamp->cy - (float)BEACON_IMAGE_H * 0.5f;
     rect->length = lamp->major;
     rect->width = lamp->minor;
@@ -731,7 +731,7 @@ static void insert_beacon_candidate(const component_t *comp)
         return;
     }
 
-    comp_x = (float)BEACON_IMAGE_W * 0.5f - comp->cx;
+    comp_x = comp->cx - (float)BEACON_IMAGE_W * 0.5f;
     comp_y = comp->cy - (float)BEACON_IMAGE_H * 0.5f;
     for (i = 0; i < g_beacon_candidate_count; i++)
     {

@@ -1,11 +1,9 @@
 #include "fc_mode.h"
 #include "../Estimation/Pos_Est/Pos_Est.h"
 #include "../Estimation/Height_Est/Height_Est.h"
+#include "../Image/image_data.h"
 #include <math.h>
 
-extern volatile float g_down_camera_lamp_x;
-extern volatile float g_down_camera_lamp_y;
-extern volatile float g_down_camera_lamp_valid;
 extern float g_car_vel_x;
 extern float g_car_vel_y;
 
@@ -16,8 +14,6 @@ pid_t g_mode8_vely_pid;
 float g_mode8_velx_target = 0.0f;
 float g_mode8_vely_target = 0.0f;
 
-static const float s_mode8_img_x_dir = -1.0f; /* image x: right positive, left negative; target x: right positive */
-static const float s_mode8_img_y_dir = 1.0f;  /* image y: front positive, rear negative; target y: rear positive */
 static const float s_mode8_img_fb_limit_cmps = 200.0f;
 static const float s_mode8_vel_limit_cmps = 200.0f;
 static const float s_mode8_vel_accel_cmps2 = 250.0f;
@@ -124,10 +120,10 @@ void FC_Mode8_50Hz(float dt)
     float vely_ff;
     float velx_out;
     float vely_out;
-    float img_err_x;
-    float img_err_y;
-    float img_fb_x;
-    float img_fb_y;
+    float img_err_x = 0.0f;
+    float img_err_y = 0.0f;
+    float img_fb_x = 0.0f;
+    float img_fb_y = 0.0f;
     float roll_trim;
     float pitch_trim;
 
@@ -138,7 +134,7 @@ void FC_Mode8_50Hz(float dt)
         return;
     }
 
-    if (g_down_camera_lamp_valid > 0.5f)
+    if (image_data[Center].car_lamp_data[0].valid != 0U)
     {
         Beep_Disable();
     }
@@ -147,12 +143,12 @@ void FC_Mode8_50Hz(float dt)
         Beep_Enable();
     }
 
-    if ((g_down_camera_lamp_valid > 0.5f) &&
+    if ((image_data[Center].car_lamp_data[0].valid != 0U) &&
         (0U != g_tof_fused_valid) &&
         (g_tof_fused_height_mm > 500.0f))
     {
-        img_err_x = s_mode8_img_x_dir * g_down_camera_lamp_x;
-        img_err_y = s_mode8_img_y_dir * g_down_camera_lamp_y;
+        img_err_x = image_data[Center].car_lamp_data[0].cx;
+        img_err_y = image_data[Center].car_lamp_data[0].cy;
         img_fb_x = PID_Update(&s_mode8_imgx_pid, 0.0f, -img_err_x, dt);
         img_fb_y = PID_Update(&s_mode8_imgy_pid, 0.0f, -img_err_y, dt);
         img_fb_x = FC_Mode_Clamp(img_fb_x, -s_mode8_img_fb_limit_cmps, s_mode8_img_fb_limit_cmps);

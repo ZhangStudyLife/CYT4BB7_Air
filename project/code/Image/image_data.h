@@ -38,4 +38,6 @@ struct image_data
     car_lamp_data car_lamp_data[IMAGE_MAX_CAR_LAMP_COUNT];
 };
 
+extern struct image_data image_data[IMAGE_CAMERA_COUNT];
+
 #endif /* IMAGE_DATA_H_ */

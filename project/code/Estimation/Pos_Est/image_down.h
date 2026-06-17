@@ -27,8 +27,6 @@ typedef struct
     uint8 valid;
 } beacon_rect_t;
 
-extern struct image_data image_data[IMAGE_CAMERA_COUNT];
-
 void image_down_init(void);
 uint8 image_down_update(void);
 uint8 *image_down_get_frame_buffer(void);

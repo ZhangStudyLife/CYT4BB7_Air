@@ -40,14 +40,14 @@
 #define CAMERA_SPI_IMAGE_LAMP_COUNT_OFFSET     (2U)
 #define CAMERA_SPI_IMAGE_HEADER_SIZE           (4U)
 #define CAMERA_SPI_IMAGE_BEACON_VALID_OFFSET   (0U)
-#define CAMERA_SPI_IMAGE_BEACON_X_OFFSET       (1U)
-#define CAMERA_SPI_IMAGE_BEACON_Y_OFFSET       (5U)
+#define CAMERA_SPI_IMAGE_BEACON_X_OFFSET       (1U)  /* float LE: centered image x, right positive */
+#define CAMERA_SPI_IMAGE_BEACON_Y_OFFSET       (5U)  /* float LE: centered image y, down positive */
 #define CAMERA_SPI_IMAGE_BEACON_AREA_OFFSET    (9U)
 #define CAMERA_SPI_IMAGE_BEACON_SLOT_SIZE      (13U)
 #define CAMERA_SPI_IMAGE_BEACON_COUNT          (4U)
 #define CAMERA_SPI_IMAGE_LAMP_VALID_OFFSET     (0U)
-#define CAMERA_SPI_IMAGE_LAMP_CX_OFFSET        (1U)
-#define CAMERA_SPI_IMAGE_LAMP_CY_OFFSET        (5U)
+#define CAMERA_SPI_IMAGE_LAMP_CX_OFFSET        (1U)  /* float LE: centered image x, right positive */
+#define CAMERA_SPI_IMAGE_LAMP_CY_OFFSET        (5U)  /* float LE: centered image y, down positive */
 #define CAMERA_SPI_IMAGE_LAMP_WIDTH_OFFSET     (9U)
 #define CAMERA_SPI_IMAGE_LAMP_LENGTH_OFFSET    (13U)
 #define CAMERA_SPI_IMAGE_LAMP_ANGLE_OFFSET     (17U)

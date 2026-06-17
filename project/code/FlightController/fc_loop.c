@@ -629,7 +629,7 @@ void FC_Loop_500Hz(void)
     //     roll_angle_target, pitch_angle_target, yaw_angle_target,
     // Pos_Est_vel_x, Pos_Est_vel_y,
     // -g_mode8_velx_target, -g_mode8_vely_target,
-    // g_down_camera_lamp_x,g_down_camera_lamp_y
+    // image_data[Center].car_lamp_data[0].cx/cy
     
 
     // );
@@ -686,14 +686,14 @@ void FC_Loop_1000Hz(void)
         Motor_Mixer(&g_motor_cmd);
     }
 
-    wifi_justfloat(g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
-        roll_gyro_target, pitch_gyro_target, yaw_gyro_target,
-        roll_gyro_pid.p_term, roll_gyro_pid.i_term, roll_gyro_pid.d_term,
-        pitch_gyro_pid.p_term, pitch_gyro_pid.i_term, pitch_gyro_pid.d_term,
-        yaw_gyro_pid.p_term, yaw_gyro_pid.i_term, yaw_gyro_pid.d_term,
-        g_euler.roll, g_euler.pitch, g_euler.yaw,
-        roll_angle_target,pitch_angle_target,yaw_angle_target
-    );
+    // wifi_justfloat(g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
+    //     roll_gyro_target, pitch_gyro_target, yaw_gyro_target,
+    //     roll_gyro_pid.p_term, roll_gyro_pid.i_term, roll_gyro_pid.d_term,
+    //     pitch_gyro_pid.p_term, pitch_gyro_pid.i_term, pitch_gyro_pid.d_term,
+    //     yaw_gyro_pid.p_term, yaw_gyro_pid.i_term, yaw_gyro_pid.d_term,
+    //     g_euler.roll, g_euler.pitch, g_euler.yaw,
+    //     roll_angle_target,pitch_angle_target,yaw_angle_target
+    // );
 
     air_comm_air_poll();
 }

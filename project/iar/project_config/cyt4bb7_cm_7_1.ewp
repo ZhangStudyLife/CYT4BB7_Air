@@ -1126,21 +1126,6 @@
         <file>
             <name>$PROJ_DIR$\..\..\code\Image\image_data.h</name>
         </file>
-        <group>
-            <name>image</name>
-            <file>
-                <name>$PROJ_DIR$\..\..\code\Estimation\image\image_fusion.c</name>
-            </file>
-            <file>
-                <name>$PROJ_DIR$\..\..\code\Estimation\image\image_fusion.h</name>
-            </file>
-            <file>
-                <name>$PROJ_DIR$\..\..\code\Estimation\image\camera_crop_boundary_final.h</name>
-            </file>
-            <file>
-                <name>$PROJ_DIR$\..\..\code\Estimation\image\camera_crop_boundary_mapping.h</name>
-            </file>
-        </group>
         <file>
             <name>$PROJ_DIR$\..\..\code\IPC\ipc_image_data.c</name>
         </file>

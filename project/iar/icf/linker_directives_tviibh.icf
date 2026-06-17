@@ -333,6 +333,7 @@ define symbol __ICFEDIT_region_RAM_start__ = 0x28001000;
 define symbol __ICFEDIT_region_RAM_size_   = 0x00002000;
 define region ICFEDIT_region_RAM                      = mem:[from __ICFEDIT_region_RAM_start__           size __ICFEDIT_region_RAM_size_          ];
 
-place at address mem:0x28001000 { section .ipc_image_shared };
-place at address mem:0x28001060 { section .ipc_camera_spi_log };
+place at address mem:0x28001000 { section .ipc_image_data };
+place at address mem:0x28001160 { section .ipc_image_seq };
+place at address mem:0x28001180 { section .ipc_camera_spi_log };
 place in ICFEDIT_region_RAM         {section .global_ram_data};

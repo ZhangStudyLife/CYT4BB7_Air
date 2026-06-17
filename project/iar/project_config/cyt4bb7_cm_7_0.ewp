@@ -1731,6 +1731,9 @@
         <group>
             <name>IPC</name>
             <file>
+                <name>$PROJ_DIR$\..\..\code\Image\image_data.h</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\..\..\code\IPC\ipc_image_data.c</name>
             </file>
             <file>

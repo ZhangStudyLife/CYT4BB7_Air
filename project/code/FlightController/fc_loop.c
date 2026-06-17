@@ -67,13 +67,11 @@ static float s_hover_learn_step = 0.0f;
 static float s_hover_learn_gate = 0.0f;
 /* 姿态角外环输出到角速度目标的限幅，单位 deg/s */
 static const float s_fc_angle_out_limit = 260.0f;
-static const float s_fc_yaw_out_limit = 900.0f;
+static const float s_fc_yaw_out_limit = 2000.0f;
 /* Yaw 角度保持修正限幅，单位 deg/s */
-static const float s_fc_yaw_hold_rate_limit_dps = 45.0f;
-/* Yaw 最终角速度目标限幅，单位 deg/s */
-static const float s_fc_yaw_rate_target_limit_dps = 90.0f;
+static const float s_fc_yaw_hold_rate_limit_dps = 500.0f;
 /* Yaw 目标相对当前航向的最大超前角，单位 deg */
-static const float s_fc_yaw_target_delta_limit_deg = 45.0f;
+static const float s_fc_yaw_target_delta_limit_deg = 100.0f;
 /* 姿态角外环 anti-windup 回算增益 */
 static const float s_fc_angle_aw_gain = 0.15f;
 /* 姿态角外环积分松弛阈值，目标变化过快时降低积分堆积 */
@@ -569,7 +567,6 @@ void FC_Loop_500Hz(void)
         float pitch_angle_meas = g_euler.pitch;
         float yaw_angle_meas = g_euler.yaw;
         float yaw_error_deg;
-        float yaw_hold_rate;
         float limit;
         float roll_ctrl;
         float pitch_ctrl;
@@ -604,8 +601,11 @@ void FC_Loop_500Hz(void)
             s_yaw_target_inited = 1U;
         }
 
-        /* yaw 目标永远固定为 0 度，遥控器第 4 路不再参与 yaw 目标角速度 */
-        yaw_angle_target = 0.0f;
+        /* 非 mode8 时 yaw 目标固定为 0 度，mode8 由独立逻辑更新 yaw 目标 */
+        if (s_flight_mode != FC_START_CRSF_FLIGHT_MODE_8)
+        {
+            yaw_angle_target = 0.0f;
+        }
 
         /* 限制目标相对当前航向的误差，处理线缆拉扯自旋和 +/-180 度跨界跳变 */
         yaw_error_deg = FC_Wrap180Deg(yaw_angle_target - yaw_angle_meas);
@@ -613,15 +613,11 @@ void FC_Loop_500Hz(void)
                                   -s_fc_yaw_target_delta_limit_deg,
                                   s_fc_yaw_target_delta_limit_deg);
 
-        yaw_hold_rate = fc_clampf(PID_Update(&yaw_angle_pid, yaw_error_deg, 0.0f, dt),
-                                  -s_fc_yaw_hold_rate_limit_dps,
-                                  s_fc_yaw_hold_rate_limit_dps);
-
         roll_gyro_target = roll_ctrl;
         pitch_gyro_target = pitch_ctrl;
-        yaw_gyro_target = fc_clampf(yaw_hold_rate,
-                                    -s_fc_yaw_rate_target_limit_dps,
-                                    s_fc_yaw_rate_target_limit_dps);
+        yaw_gyro_target = fc_clampf(PID_Update(&yaw_angle_pid, yaw_error_deg, 0.0f, dt),
+                                    -s_fc_yaw_hold_rate_limit_dps,
+                                    s_fc_yaw_hold_rate_limit_dps);
     }
     else
     {
@@ -690,14 +686,14 @@ void FC_Loop_1000Hz(void)
         Motor_Mixer(&g_motor_cmd);
     }
 
-    // wifi_justfloat(g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
-    //     roll_gyro_target, pitch_gyro_target, yaw_gyro_target,
-    //     roll_gyro_pid.p_term, roll_gyro_pid.i_term, roll_gyro_pid.d_term,
-    //     pitch_gyro_pid.p_term, pitch_gyro_pid.i_term, pitch_gyro_pid.d_term,
-    //     yaw_gyro_pid.p_term, yaw_gyro_pid.i_term, yaw_gyro_pid.d_term,
-    //     g_euler.roll, g_euler.pitch, g_euler.yaw,
-    //     roll_angle_target,pitch_angle_target,yaw_angle_target
-    // );
+    wifi_justfloat(g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
+        roll_gyro_target, pitch_gyro_target, yaw_gyro_target,
+        roll_gyro_pid.p_term, roll_gyro_pid.i_term, roll_gyro_pid.d_term,
+        pitch_gyro_pid.p_term, pitch_gyro_pid.i_term, pitch_gyro_pid.d_term,
+        yaw_gyro_pid.p_term, yaw_gyro_pid.i_term, yaw_gyro_pid.d_term,
+        g_euler.roll, g_euler.pitch, g_euler.yaw,
+        roll_angle_target,pitch_angle_target,yaw_angle_target
+    );
 
     air_comm_air_poll();
 }

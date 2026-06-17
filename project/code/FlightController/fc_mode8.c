@@ -25,6 +25,8 @@ static const float s_mode8_vel_jerk_cmps3 = 1800.0f;
 static const float s_mode8_angle_limit_deg = 15.0f;
 static float s_mode8_accel_x = 0.0f;
 static float s_mode8_accel_y = 0.0f;
+static uint16_t s_mode8_yaw_tick = 0U;
+static uint8_t s_mode8_yaw_index = 0U;
 
 static void FC_Mode8_LimitVector(float *x, float *y, float limit)
 {
@@ -34,6 +36,25 @@ static void FC_Mode8_LimitVector(float *x, float *y, float limit)
         float scale = limit / mag;
         *x *= scale;
         *y *= scale;
+    }
+}
+
+static void FC_Mode8_UpdateYawTarget(void)
+{
+    static const float yaw_targets[] = {
+        0.0f, 30.0f, 60.0f, 90.0f, 45.0f,
+        0.0f, -45.0f, -90.0f, -60.0f, -30.0f
+    };
+
+    yaw_angle_target = yaw_targets[s_mode8_yaw_index];
+    if (++s_mode8_yaw_tick >= 400U)
+    {
+        s_mode8_yaw_tick = 0U;
+        s_mode8_yaw_index++;
+        if (s_mode8_yaw_index >= (sizeof(yaw_targets) / sizeof(yaw_targets[0])))
+        {
+            s_mode8_yaw_index = 0U;
+        }
     }
 }
 
@@ -72,12 +93,25 @@ void FC_Mode8_Reset(void)
     g_mode8_vely_target = 0.0f;
     s_mode8_accel_x = 0.0f;
     s_mode8_accel_y = 0.0f;
+    s_mode8_yaw_tick = 0U;
+    s_mode8_yaw_index = 0U;
     roll_angle_target = FC_Mode_Get_Roll_Mech_Trim_Deg();
     pitch_angle_target = FC_Mode_Get_Pitch_Mech_Trim_Deg();
+    yaw_angle_target = 0.0f;
 }
 
 void FC_Mode8_100Hz(void)
 {
+    if (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING)
+    {
+        s_mode8_yaw_tick = 0U;
+        s_mode8_yaw_index = 0U;
+        yaw_angle_target = 0.0f;
+        return;
+    }
+
+    // 这个是自动修改yaw的目标,是为了调节yaw,所以临时写的自动修改yaw目标,注释掉以后yaw目标就是0! 不允许对这部分代码修改,就这么保留注释!
+    // FC_Mode8_UpdateYawTarget();
 }
 
 void FC_Mode8_50Hz(float dt)

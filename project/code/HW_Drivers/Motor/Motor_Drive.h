@@ -56,7 +56,7 @@ extern "C" {
 #define MOTOR_DUTY_LIMIT        (MOTOR_DUTY_MIN + ((MOTOR_DUTY_MAX - MOTOR_DUTY_MIN) * MOTOR_THROTTLE_LIMIT_MAX / MOTOR_INPUT_MAX)) /* 最大duty限制 */
 
 /* 混控模式下的最低怠速（防止BLDC六步换相失速） */
-#define MOTOR_IDLE_THROTTLE     (1200)      /* 最低怠速：20% = 2000/10000，约1200us脉宽 */
+#define MOTOR_IDLE_THROTTLE     (1100)      /* 最低怠速：20% = 2000/10000，约1200us脉宽 */
 
 /* ======================== 电机编号定义（Quad X布局） ======================== */
 /*

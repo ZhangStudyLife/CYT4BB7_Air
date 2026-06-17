@@ -56,8 +56,8 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pitch_gyro_d_lpf = 60.0f;
 
     /* ===== Yaw 轴角速度环参数 ===== */
-    params->yaw_gyro_kp = 11.0f;
-    params->yaw_gyro_ki = 3.0f;
+    params->yaw_gyro_kp = 15.0f;
+    params->yaw_gyro_ki = 5.0f;
     params->yaw_gyro_kd = 0.0f;
     params->yaw_gyro_kff = 0.0f;
     params->yaw_gyro_i_limit = 700.0f;
@@ -80,7 +80,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pitch_angle_d_lpf = 15.0f;
 
     /* ===== Yaw 轴角度环参数 ===== */
-    params->yaw_angle_kp = 1.5f;
+    params->yaw_angle_kp = 6.0f;
     params->yaw_angle_ki = 0.0f;
     params->yaw_angle_kd = 0.0f;
     params->yaw_angle_kff = 0.0f;

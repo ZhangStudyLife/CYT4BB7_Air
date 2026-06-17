@@ -77,14 +77,14 @@ int main(void)
             // ICM42688_Aux_Update_1000Hz(tick_1000us_cnt);         //对比用的陀螺仪关掉
             // BMI088_Update_1000Hz(tick_1000us_cnt);
             Pos_Est_Update_1000HZ();
-            wifi_justfloat((float)g_air_mode2_seq,
-                           g_air_mode2_target_valid,
-                           g_air_mode2_target_x,
-                           g_air_mode2_target_y,
-                           g_air_mode2_car_lamp_valid,
-                           g_air_mode2_car_lamp_cx,
-                           g_air_mode2_car_lamp_cy,
-                           g_air_mode2_lamp_angle_deg);
+            // wifi_justfloat((float)g_air_mode2_seq,
+            //                g_air_mode2_target_valid,
+            //                g_air_mode2_target_x,
+            //                g_air_mode2_target_y,
+            //                g_air_mode2_car_lamp_valid,
+            //                g_air_mode2_car_lamp_cx,
+            //                g_air_mode2_car_lamp_cy,
+            //                g_air_mode2_lamp_angle_deg);
             // wifi_justfloat();
             // {
             //     const VL53L1X_data_struct *tof = VL53L1X_GetData();

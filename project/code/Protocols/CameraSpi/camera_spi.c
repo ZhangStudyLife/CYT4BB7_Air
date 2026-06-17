@@ -86,8 +86,8 @@ typedef struct
     uint32 rx_error_count;
     uint8 last_rx_head0;
     uint8 last_rx_head1;
-    camera_spi_beacon_t beacons[CAMERA_SPI_MAX_BEACONS];
-    camera_spi_car_lamp_t car_lamps[CAMERA_SPI_MAX_CAR_LAMPS];
+    beacon_data beacons[IMAGE_MAX_BEACON_COUNT];
+    car_lamp_data car_lamps[CAMERA_SPI_MAX_CAR_LAMPS];
 } camera_spi_board_state_t;
 
 static camera_spi_board_state_t s_boards[CAMERA_SPI_BOARD_COUNT];
@@ -278,7 +278,7 @@ static void camera_spi_parse_image_payload(uint8 board_id, const uint8 *data)
     board->car_lamp_count = data[CAMERA_SPI_IMAGE_LAMP_COUNT_OFFSET];
 
     count = board->beacon_count;
-    if(count > CAMERA_SPI_MAX_BEACONS) { count = CAMERA_SPI_MAX_BEACONS; }
+    if(count > IMAGE_MAX_BEACON_COUNT) { count = IMAGE_MAX_BEACON_COUNT; }
     memset(board->beacons, 0, sizeof(board->beacons));
     for(i = 0U; i < count; i++)
     {
@@ -610,19 +610,22 @@ void CameraSpi_Update(void)
     camera_spi_publish_log();
 }
 
-void CameraSpi_GetSnapshot(camera_spi_board_snapshot_t out[CAMERA_SPI_BOARD_COUNT])
+void CameraSpi_GetSnapshot(struct image_data camera[IMAGE_CAMERA_COUNT])
 {
     uint8 board_id;
+
+    if(camera == NULL)
+    {
+        return;
+    }
 
     for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
     {
         const camera_spi_board_state_t *state = &s_boards[board_id];
+        const image_camera_e camera_id = (board_id == 0U) ? Front : Back;
 
-        out[board_id].online = state->online;
-        out[board_id].version = state->version;
-        out[board_id].beacon_count = state->beacon_count;
-        out[board_id].car_lamp_count = state->car_lamp_count;
-        memcpy(out[board_id].beacons, state->beacons, sizeof(state->beacons));
-        memcpy(out[board_id].car_lamps, state->car_lamps, sizeof(state->car_lamps));
+        memset(&camera[camera_id], 0, sizeof(camera[camera_id]));
+        memcpy(camera[camera_id].beacon_data, state->beacons, sizeof(state->beacons));
+        memcpy(camera[camera_id].car_lamp_data, state->car_lamps, sizeof(state->car_lamps));
     }
 }

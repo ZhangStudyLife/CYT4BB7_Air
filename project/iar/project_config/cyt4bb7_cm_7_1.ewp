@@ -1123,19 +1123,16 @@
         <file>
             <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\image_down.h</name>
         </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\Image\image_data.h</name>
+        </file>
         <group>
             <name>image</name>
             <file>
-                <name>$PROJ_DIR$\..\..\code\Estimation\image\mode2_center_image.c</name>
+                <name>$PROJ_DIR$\..\..\code\Estimation\image\image_fusion.c</name>
             </file>
             <file>
-                <name>$PROJ_DIR$\..\..\code\Estimation\image\mode2_center_image.h</name>
-            </file>
-            <file>
-                <name>$PROJ_DIR$\..\..\code\Estimation\image\mode2_three_camera.c</name>
-            </file>
-            <file>
-                <name>$PROJ_DIR$\..\..\code\Estimation\image\mode2_three_camera.h</name>
+                <name>$PROJ_DIR$\..\..\code\Estimation\image\image_fusion.h</name>
             </file>
             <file>
                 <name>$PROJ_DIR$\..\..\code\Estimation\image\camera_crop_boundary_final.h</name>

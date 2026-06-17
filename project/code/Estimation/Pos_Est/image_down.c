@@ -134,10 +134,6 @@ typedef struct
 } beacon_candidate_t;
 
 uint8 g_image_frame[MT9V03X_H][MT9V03X_W];
-beacon_circle_t g_image_beacons[IMAGE_MAX_BEACON_COUNT] = {0};
-uint8 g_image_beacon_count = 0U;
-beacon_rect_t g_image_car_lamps[IMAGE_MAX_CAR_LAMP_COUNT] = {0};
-uint8 g_image_car_lamp_count = 0U;
 
 static unsigned char g_binary[BEACON_IMAGE_H][BEACON_IMAGE_W];
 static unsigned char g_mask[BEACON_IMAGE_H][BEACON_IMAGE_W];
@@ -748,6 +744,7 @@ static void insert_beacon_candidate(const component_t *comp)
                 g_beacon_candidates[i].circle.x = comp_x;
                 g_beacon_candidates[i].circle.y = comp_y;
                 g_beacon_candidates[i].circle.radius = comp->radius;
+                g_beacon_candidates[i].circle.area = (float)comp->area;
                 g_beacon_candidates[i].circle.valid = 1;
                 g_beacon_candidates[i].area = comp->area;
                 g_beacon_candidates[i].score = beacon_candidate_score(comp);
@@ -786,6 +783,7 @@ static void insert_beacon_candidate(const component_t *comp)
     g_beacon_candidates[i + 1].circle.x = comp_x;
     g_beacon_candidates[i + 1].circle.y = comp_y;
     g_beacon_candidates[i + 1].circle.radius = comp->radius;
+    g_beacon_candidates[i + 1].circle.area = (float)comp->area;
     g_beacon_candidates[i + 1].circle.valid = 1;
     g_beacon_candidates[i + 1].area = comp->area;
     g_beacon_candidates[i + 1].score = beacon_candidate_score(comp);
@@ -1105,10 +1103,7 @@ static uint8 image_down_latch_frame(void)
 
 static void image_down_clear_results(void)
 {
-    memset(g_image_beacons, 0, sizeof(g_image_beacons));
-    memset(g_image_car_lamps, 0, sizeof(g_image_car_lamps));
-    g_image_beacon_count = 0U;
-    g_image_car_lamp_count = 0U;
+    memset(&image_data[Center], 0, sizeof(image_data[Center]));
 }
 
 static void image_down_store_result(const beacon_result_t *result)
@@ -1125,9 +1120,11 @@ static void image_down_store_result(const beacon_result_t *result)
     }
     for(i = 0U; i < beacon_count; i++)
     {
-        g_image_beacons[i] = result->beacons[i];
+        image_data[Center].beacon_data[i].valid = result->beacons[i].valid;
+        image_data[Center].beacon_data[i].x = result->beacons[i].x;
+        image_data[Center].beacon_data[i].y = result->beacons[i].y;
+        image_data[Center].beacon_data[i].area = result->beacons[i].area;
     }
-    g_image_beacon_count = beacon_count;
 
     if(car_lamp_count > IMAGE_MAX_CAR_LAMP_COUNT)
     {
@@ -1135,9 +1132,13 @@ static void image_down_store_result(const beacon_result_t *result)
     }
     for(i = 0U; i < car_lamp_count; i++)
     {
-        g_image_car_lamps[i] = result->car_lamps[i];
+        image_data[Center].car_lamp_data[i].valid = result->car_lamps[i].valid;
+        image_data[Center].car_lamp_data[i].cx = result->car_lamps[i].cx;
+        image_data[Center].car_lamp_data[i].cy = result->car_lamps[i].cy;
+        image_data[Center].car_lamp_data[i].width = result->car_lamps[i].width;
+        image_data[Center].car_lamp_data[i].length = result->car_lamps[i].length;
+        image_data[Center].car_lamp_data[i].angle = result->car_lamps[i].angle;
     }
-    g_image_car_lamp_count = car_lamp_count;
 }
 
 void image_down_init(void)

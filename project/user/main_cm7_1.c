@@ -1,77 +1,83 @@
 #include "zf_common_headfile.h"
-#include "Estimation/image/mode2_center_image.h"
-#include "Estimation/image/mode2_three_camera.h"
+#include "Estimation/Pos_Est/image_down.h"
+#include "Estimation/image/image_fusion.h"
 
-#define CAMERA_SPI_PIT  (PIT_CH10)
+#define IMAGE_PIT  (PIT_CH10)
+#define IMAGE_SCREEN_X_VALUE  (32U)
+#define IMAGE_SCREEN_Y_LABEL  (88U)
+#define IMAGE_SCREEN_Y_VALUE  (112U)
+#define IMAGE_SCREEN_ROW_H    (16U)
 
-volatile uint8 g_camera_spi_tick_100hz = 0U;
+struct image_data image_data[IMAGE_CAMERA_COUNT];
+volatile uint8 g_image_tick_100hz = 0U;
 
-static void mode2_update_100HZ(void)
+static void Get_Image_data(void)
 {
-    uint8 i;
-    camera_spi_board_snapshot_t spi_snap[CAMERA_SPI_BOARD_COUNT];
-    mode2_three_camera_frame_t camera[MODE2_THREE_CAMERA_CAMERA_COUNT];
-
     CameraSpi_Update();
-    mode2_center_image_update();
-    CameraSpi_GetSnapshot(spi_snap);
+    (void)image_down_update();
+    CameraSpi_GetSnapshot(image_data);
+}
 
-    memset(camera, 0, sizeof(camera));
+static void ImageDebugScreen_Init(void)
+{
+    ips114_init();
+    ips114_set_dir(IPS114_PORTAIT);
+    ips114_set_font(IPS114_8X16_FONT);
+    ips114_set_color(RGB565_BLACK, RGB565_WHITE);
+    ips114_clear();
 
-    for(i = 0U; i < MODE2_THREE_CAMERA_CAMERA_TARGETS; i++)
-    {
-        camera[MODE2_THREE_CAMERA_CAMERA_FRONT].target[i].valid = spi_snap[0].beacons[i].valid;
-        camera[MODE2_THREE_CAMERA_CAMERA_FRONT].target[i].x = spi_snap[0].beacons[i].x;
-        camera[MODE2_THREE_CAMERA_CAMERA_FRONT].target[i].y = spi_snap[0].beacons[i].y;
-        camera[MODE2_THREE_CAMERA_CAMERA_FRONT].target[i].area = spi_snap[0].beacons[i].area;
-    }
+    ips114_show_string(0U, 0U, "Beacon[0] XY");
+    ips114_show_string(0U, 16U, "F x:");
+    ips114_show_string(IMAGE_SCREEN_Y_LABEL, 16U, " y:");
+    ips114_show_string(0U, 32U, "C x:");
+    ips114_show_string(IMAGE_SCREEN_Y_LABEL, 32U, " y:");
+    ips114_show_string(0U, 48U, "B x:");
+    ips114_show_string(IMAGE_SCREEN_Y_LABEL, 48U, " y:");
 
-    for(i = 0U; i < MODE2_THREE_CAMERA_CAMERA_TARGETS; i++)
-    {
-        if(i < g_mode2_center_image_beacon_count)
-        {
-            camera[MODE2_THREE_CAMERA_CAMERA_CENTER].target[i].valid = g_mode2_center_image_beacons[i].valid;
-            camera[MODE2_THREE_CAMERA_CAMERA_CENTER].target[i].x = g_mode2_center_image_beacons[i].x;
-            camera[MODE2_THREE_CAMERA_CAMERA_CENTER].target[i].y = g_mode2_center_image_beacons[i].y;
-            camera[MODE2_THREE_CAMERA_CAMERA_CENTER].target[i].area = g_mode2_center_image_beacons[i].area;
-        }
-    }
+    ips114_show_string(0U, 64U, "Lamp[0] CXY");
+    ips114_show_string(0U, 80U, "F x:");
+    ips114_show_string(IMAGE_SCREEN_Y_LABEL, 80U, " y:");
+    ips114_show_string(0U, 96U, "C x:");
+    ips114_show_string(IMAGE_SCREEN_Y_LABEL, 96U, " y:");
+    ips114_show_string(0U, 112U, "B x:");
+    ips114_show_string(IMAGE_SCREEN_Y_LABEL, 112U, " y:");
+}
 
-    for(i = 0U; i < MODE2_THREE_CAMERA_CAMERA_TARGETS; i++)
-    {
-        camera[MODE2_THREE_CAMERA_CAMERA_REAR].target[i].valid = spi_snap[1].beacons[i].valid;
-        camera[MODE2_THREE_CAMERA_CAMERA_REAR].target[i].x = spi_snap[1].beacons[i].x;
-        camera[MODE2_THREE_CAMERA_CAMERA_REAR].target[i].y = spi_snap[1].beacons[i].y;
-        camera[MODE2_THREE_CAMERA_CAMERA_REAR].target[i].area = spi_snap[1].beacons[i].area;
-    }
+static void ImageDebugScreen_ShowXY(uint16 y, uint8 valid, float x, float y_value)
+{
+    ips114_set_color((valid != 0U) ? RGB565_BLACK : RGB565_RED, RGB565_WHITE);
+    ips114_show_float(IMAGE_SCREEN_X_VALUE, y, x, 3U, 1U);
+    ips114_show_float(IMAGE_SCREEN_Y_VALUE, y, y_value, 3U, 1U);
+    ips114_set_color(RGB565_BLACK, RGB565_WHITE);
+}
 
-    if(g_mode2_center_image_car_lamp_count > 0U)
-    {
-        mode2_three_camera_set_center_car_lamp(
-            g_mode2_center_image_car_lamps[0].valid,
-            g_mode2_center_image_car_lamps[0].cx,
-            g_mode2_center_image_car_lamps[0].cy,
-            g_mode2_center_image_car_lamps[0].angle);
-    }
-    else
-    {
-        mode2_three_camera_set_center_car_lamp(0U, 0.0f, 0.0f, 0.0f);
-    }
+static void ImageDebugScreen_Update(void)
+{
+    ImageDebugScreen_ShowXY(IMAGE_SCREEN_ROW_H,
+                            image_data[Front].beacon_data[0].valid,
+                            image_data[Front].beacon_data[0].x,
+                            image_data[Front].beacon_data[0].y);
+    ImageDebugScreen_ShowXY(2U * IMAGE_SCREEN_ROW_H,
+                            image_data[Center].beacon_data[0].valid,
+                            image_data[Center].beacon_data[0].x,
+                            image_data[Center].beacon_data[0].y);
+    ImageDebugScreen_ShowXY(3U * IMAGE_SCREEN_ROW_H,
+                            image_data[Back].beacon_data[0].valid,
+                            image_data[Back].beacon_data[0].x,
+                            image_data[Back].beacon_data[0].y);
 
-    mode2_three_camera_update_100HZ(camera);
-
-    {
-        float tv = (g_mode2_three_camera.center_delta_valid != 0U) ? 1.0f : 0.0f;
-        float lv = (g_mode2_three_camera.lamp_angle_valid != 0U) ? 1.0f : 0.0f;
-
-        ipc_mode2_send(tv,
-                       g_mode2_three_camera.center_delta_x,
-                       g_mode2_three_camera.center_delta_y,
-                       lv,
-                       g_mode2_three_camera.car_lamp_cx,
-                       g_mode2_three_camera.car_lamp_cy,
-                       g_mode2_three_camera.lamp_angle_deg);
-    }
+    ImageDebugScreen_ShowXY(5U * IMAGE_SCREEN_ROW_H,
+                            image_data[Front].car_lamp_data[0].valid,
+                            image_data[Front].car_lamp_data[0].cx,
+                            image_data[Front].car_lamp_data[0].cy);
+    ImageDebugScreen_ShowXY(6U * IMAGE_SCREEN_ROW_H,
+                            image_data[Center].car_lamp_data[0].valid,
+                            image_data[Center].car_lamp_data[0].cx,
+                            image_data[Center].car_lamp_data[0].cy);
+    ImageDebugScreen_ShowXY(7U * IMAGE_SCREEN_ROW_H,
+                            image_data[Back].car_lamp_data[0].valid,
+                            image_data[Back].car_lamp_data[0].cx,
+                            image_data[Back].car_lamp_data[0].cy);
 }
 
 int main(void)
@@ -79,18 +85,34 @@ int main(void)
     clock_init(SYSTEM_CLOCK_250M);
     SCB_DisableDCache();
 
+    ImageDebugScreen_Init();
     ipc_communicate_init(IPC_PORT_2, ipc_image_callback);
-    mode2_center_image_init();
+    image_down_init();
     CameraSpi_Init();
-    mode2_three_camera_init();
-    pit_ms_init(CAMERA_SPI_PIT, 10U);
+    image_fusion_init();
+    pit_ms_init(IMAGE_PIT, 10U);
 
     while(true)
     {
-        if(g_camera_spi_tick_100hz > 0U)
+        if(g_image_tick_100hz > 0U)
         {
-            g_camera_spi_tick_100hz--;
-            mode2_update_100HZ();
+            float tv;
+            float lv;
+
+            g_image_tick_100hz--;
+            Get_Image_data();
+            image_fusion_update_100HZ(image_data);
+
+            tv = (g_image_fusion.center_delta_valid != 0U) ? 1.0f : 0.0f;
+            lv = (g_image_fusion.lamp_angle_valid != 0U) ? 1.0f : 0.0f;
+            ipc_mode2_send(tv,
+                           g_image_fusion.center_delta_x,
+                           g_image_fusion.center_delta_y,
+                           lv,
+                           g_image_fusion.car_lamp_cx,
+                           g_image_fusion.car_lamp_cy,
+                           g_image_fusion.lamp_angle_deg);
+            ImageDebugScreen_Update();
         }
     }
 }

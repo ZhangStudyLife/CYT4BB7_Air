@@ -2,6 +2,7 @@
 #define IMAGE_DOWN_H_
 
 #include "zf_common_headfile.h"
+#include "Image/image_data.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -12,6 +13,7 @@ typedef struct
     float x;
     float y;
     float radius;
+    float area;
     uint8 valid;
 } beacon_circle_t;
 
@@ -25,13 +27,7 @@ typedef struct
     uint8 valid;
 } beacon_rect_t;
 
-#define IMAGE_MAX_BEACON_COUNT     (4U)
-#define IMAGE_MAX_CAR_LAMP_COUNT   (2U)
-
-extern beacon_circle_t g_image_beacons[IMAGE_MAX_BEACON_COUNT];
-extern uint8 g_image_beacon_count;
-extern beacon_rect_t g_image_car_lamps[IMAGE_MAX_CAR_LAMP_COUNT];
-extern uint8 g_image_car_lamp_count;
+extern struct image_data image_data[IMAGE_CAMERA_COUNT];
 
 void image_down_init(void);
 uint8 image_down_update(void);

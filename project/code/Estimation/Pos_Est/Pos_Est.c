@@ -518,11 +518,11 @@ void Pos_Est_Update_1000HZ(void)
     pid_t *velx_pid = NULL;
     pid_t *vely_pid = NULL;
 
-    if (s_flight_mode == FC_START_CRSF_FLIGHT_MODE_2){
-        velx_target = g_mode2_velx_target;
-        vely_target = g_mode2_vely_target;
-        velx_pid = &g_mode2_velx_pid;
-        vely_pid = &g_mode2_vely_pid;
+    if (s_flight_mode == FC_START_CRSF_FLIGHT_MODE_7){
+        velx_target = g_mode7_velx_target;
+        vely_target = g_mode7_vely_target;
+        velx_pid = &g_mode7_velx_pid;
+        vely_pid = &g_mode7_vely_pid;
     }
     else if (s_flight_mode == FC_START_CRSF_FLIGHT_MODE_8){
         velx_target = g_mode8_velx_target;

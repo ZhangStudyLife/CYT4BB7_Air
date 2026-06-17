@@ -140,19 +140,19 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode1_brake_kp = 0.18f;
     params->mode1_brake_exit_vel_cmps = 10.0f;
 
-    /* ===== 模式 2 速度环参数 ===== */
-    params->mode2_vel_x_kp = 0.16f;
-    params->mode2_vel_x_ki = 0.0f;
-    params->mode2_vel_x_kd = 0.0f;
-    params->mode2_vel_x_kff = 0.030f;
-    params->mode2_vel_x_i_limit = 3.0f;
-    params->mode2_vel_x_d_lpf = 0.0f;
-    params->mode2_vel_y_kp = 0.16f;
-    params->mode2_vel_y_ki = 0.0f;
-    params->mode2_vel_y_kd = 0.0f;
-    params->mode2_vel_y_kff = 0.030f;
-    params->mode2_vel_y_i_limit = 3.0f;
-    params->mode2_vel_y_d_lpf = 0.0f;
+    /* ===== 模式 7 速度环参数 ===== */
+    params->mode7_vel_x_kp = 0.16f;
+    params->mode7_vel_x_ki = 0.0f;
+    params->mode7_vel_x_kd = 0.0f;
+    params->mode7_vel_x_kff = 0.010f;
+    params->mode7_vel_x_i_limit = 3.0f;
+    params->mode7_vel_x_d_lpf = 0.0f;
+    params->mode7_vel_y_kp = 0.16f;
+    params->mode7_vel_y_ki = 0.0f;
+    params->mode7_vel_y_kd = 0.0f;
+    params->mode7_vel_y_kff = 0.010f;
+    params->mode7_vel_y_i_limit = 3.0f;
+    params->mode7_vel_y_d_lpf = 0.0f;
 
     /* ===== 位置估计参数 ===== */
     params->pos_est_k_flow = 0.04f;

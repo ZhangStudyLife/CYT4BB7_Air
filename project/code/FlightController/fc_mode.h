@@ -184,13 +184,13 @@ void FC_Mode2_100Hz(void);
 void FC_Mode2_50Hz(float dt);
 
 /*
- * 模式2 X/Y 轴速度环 PID 实例。
+ * 模式7 X/Y 轴速度环 PID 实例。
  * 作用: 供外部模块读取速度环输出和调试状态。
  */
-extern pid_t g_mode2_velx_pid;
-extern pid_t g_mode2_vely_pid;
-extern float g_mode2_velx_target;
-extern float g_mode2_vely_target;
+extern pid_t g_mode7_velx_pid;
+extern pid_t g_mode7_vely_pid;
+extern float g_mode7_velx_target;
+extern float g_mode7_vely_target;
 
 /*
  * 模式8 X/Y 轴速度环 PID 实例。

@@ -158,18 +158,18 @@ typedef struct
     float mode8_vel_y_d_lpf;
     float mode8_kp_car_x;
     float mode8_kp_car_y;
-    float mode2_vel_x_kp;
-    float mode2_vel_x_ki;
-    float mode2_vel_x_kd;
-    float mode2_vel_x_kff;
-    float mode2_vel_x_i_limit;
-    float mode2_vel_x_d_lpf;
-    float mode2_vel_y_kp;
-    float mode2_vel_y_ki;
-    float mode2_vel_y_kd;
-    float mode2_vel_y_kff;
-    float mode2_vel_y_i_limit;
-    float mode2_vel_y_d_lpf;
+    float mode7_vel_x_kp;
+    float mode7_vel_x_ki;
+    float mode7_vel_x_kd;
+    float mode7_vel_x_kff;
+    float mode7_vel_x_i_limit;
+    float mode7_vel_x_d_lpf;
+    float mode7_vel_y_kp;
+    float mode7_vel_y_ki;
+    float mode7_vel_y_kd;
+    float mode7_vel_y_kff;
+    float mode7_vel_y_i_limit;
+    float mode7_vel_y_d_lpf;
 } fc_params_t;
 
 /* 飞控参数全局实例：运行时调参只会修改这份 RAM 变量 */

@@ -6,6 +6,8 @@
 #define IMAGE_SCREEN_X_VALUE  (32U)
 #define IMAGE_SCREEN_Y_LABEL  (88U)
 #define IMAGE_SCREEN_Y_VALUE  (112U)
+#define IMAGE_SCREEN_A_LABEL  (160U)
+#define IMAGE_SCREEN_A_VALUE  (184U)
 #define IMAGE_SCREEN_ROW_H    (16U)
 
 struct image_data image_data[IMAGE_CAMERA_COUNT];
@@ -26,13 +28,16 @@ static void ImageDebugScreen_Init(void)
     ips114_set_color(RGB565_BLACK, RGB565_WHITE);
     ips114_clear();
 
-    ips114_show_string(0U, 0U, "Beacon[0] XY");
+    ips114_show_string(0U, 0U, "Beacon[0] XYA");
     ips114_show_string(0U, 16U, "F x:");
     ips114_show_string(IMAGE_SCREEN_Y_LABEL, 16U, " y:");
+    ips114_show_string(IMAGE_SCREEN_A_LABEL, 16U, " a:");
     ips114_show_string(0U, 32U, "C x:");
     ips114_show_string(IMAGE_SCREEN_Y_LABEL, 32U, " y:");
+    ips114_show_string(IMAGE_SCREEN_A_LABEL, 32U, " a:");
     ips114_show_string(0U, 48U, "B x:");
     ips114_show_string(IMAGE_SCREEN_Y_LABEL, 48U, " y:");
+    ips114_show_string(IMAGE_SCREEN_A_LABEL, 48U, " a:");
 
     ips114_show_string(0U, 64U, "Lamp[0] CXY");
     ips114_show_string(0U, 80U, "F x:");
@@ -51,20 +56,20 @@ static void ImageDebugScreen_ShowXY(uint16 y, uint8 valid, float x, float y_valu
     ips114_set_color(RGB565_BLACK, RGB565_WHITE);
 }
 
+static void ImageDebugScreen_ShowBeacon(uint16 y, const beacon_data *beacon)
+{
+    ips114_set_color((beacon->valid != 0U) ? RGB565_BLACK : RGB565_RED, RGB565_WHITE);
+    ips114_show_float(IMAGE_SCREEN_X_VALUE, y, beacon->x, 3U, 1U);
+    ips114_show_float(IMAGE_SCREEN_Y_VALUE, y, beacon->y, 3U, 1U);
+    ips114_show_float(IMAGE_SCREEN_A_VALUE, y, beacon->area, 4U, 1U);
+    ips114_set_color(RGB565_BLACK, RGB565_WHITE);
+}
+
 static void ImageDebugScreen_Update(void)
 {
-    ImageDebugScreen_ShowXY(IMAGE_SCREEN_ROW_H,
-                            image_data[Front].beacon_data[0].valid,
-                            image_data[Front].beacon_data[0].x,
-                            image_data[Front].beacon_data[0].y);
-    ImageDebugScreen_ShowXY(2U * IMAGE_SCREEN_ROW_H,
-                            image_data[Center].beacon_data[0].valid,
-                            image_data[Center].beacon_data[0].x,
-                            image_data[Center].beacon_data[0].y);
-    ImageDebugScreen_ShowXY(3U * IMAGE_SCREEN_ROW_H,
-                            image_data[Back].beacon_data[0].valid,
-                            image_data[Back].beacon_data[0].x,
-                            image_data[Back].beacon_data[0].y);
+    ImageDebugScreen_ShowBeacon(IMAGE_SCREEN_ROW_H, &image_data[Front].beacon_data[0]);
+    ImageDebugScreen_ShowBeacon(2U * IMAGE_SCREEN_ROW_H, &image_data[Center].beacon_data[0]);
+    ImageDebugScreen_ShowBeacon(3U * IMAGE_SCREEN_ROW_H, &image_data[Back].beacon_data[0]);
 
     ImageDebugScreen_ShowXY(5U * IMAGE_SCREEN_ROW_H,
                             image_data[Front].car_lamp_data[0].valid,

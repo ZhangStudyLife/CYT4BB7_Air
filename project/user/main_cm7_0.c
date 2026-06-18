@@ -171,13 +171,13 @@ int main(void)
             air_comm_send_run_data(air_data, 22);
 
 
-            wifi_justfloat(image_data[Front].car_lamp_data[0].cx,
-                            image_data[Front].car_lamp_data[0].cy,
-                            image_data[Center].car_lamp_data[0].cx,
-                            image_data[Center].car_lamp_data[0].cy,
-                            image_data[Back].car_lamp_data[0].cx,
-                            image_data[Back].car_lamp_data[0].cy
-                        );
+            // wifi_justfloat(image_data[Front].car_lamp_data[0].cx,
+            //                 image_data[Front].car_lamp_data[0].cy,
+            //                 image_data[Center].car_lamp_data[0].cx,
+            //                 image_data[Center].car_lamp_data[0].cy,
+            //                 image_data[Back].car_lamp_data[0].cx,
+            //                 image_data[Back].car_lamp_data[0].cy
+            //             );
 
 
             wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));

@@ -136,8 +136,7 @@ static void FC_Mode8_UpdateYawTarget(void)
 {
     static const float yaw_targets[] = {
         0.0f, 30.0f, 60.0f, 90.0f, 45.0f,
-        0.0f, -45.0f, -90.0f, -60.0f, -30.0f
-    };
+        0.0f, -45.0f, -90.0f, -60.0f, -30.0f};
 
     yaw_angle_target = yaw_targets[s_mode8_yaw_index];
     if (++s_mode8_yaw_tick >= 400U)
@@ -211,6 +210,8 @@ void FC_Mode8_50Hz(float dt)
 {
     float velx_sp = 0.0f;
     float vely_sp = 0.0f;
+    float velx_sp_raw = 0.0f;
+    float vely_sp_raw = 0.0f;
     float accx_sp;
     float accy_sp;
     float velx_ff;
@@ -264,11 +265,13 @@ void FC_Mode8_50Hz(float dt)
         PID_Reset(&s_mode8_imgx_pid);
         PID_Reset(&s_mode8_imgy_pid);
     }
-    wifi_justfloat(g_car_vel_x,g_car_vel_y,
-        img_fb_x,img_fb_y,
-        velx_sp,vely_sp,
-        g_mode8_velx_target,g_mode8_vely_target,
-        roll_angle_target,pitch_angle_target);
+    // wifi_justfloat(g_car_vel_x, g_car_vel_y,
+    //                img_fb_x, img_fb_y,
+    //                velx_sp, vely_sp,
+    //                g_mode8_velx_target, g_mode8_vely_target,
+    //                roll_angle_target, pitch_angle_target);
+    velx_sp_raw = velx_sp;
+    vely_sp_raw = vely_sp;
     FC_Mode8_LimitVector(&velx_sp, &vely_sp, s_mode8_vel_limit_cmps);
 
     accx_sp = (velx_sp - g_mode8_velx_target) / dt;
@@ -310,4 +313,24 @@ void FC_Mode8_50Hz(float dt)
 
     roll_angle_target = FC_Mode_Clamp(velx_out + roll_trim, -s_mode8_angle_limit_deg, s_mode8_angle_limit_deg);
     pitch_angle_target = FC_Mode_Clamp(vely_out + pitch_trim, -s_mode8_angle_limit_deg, s_mode8_angle_limit_deg);
+
+    wifi_justfloat(g_car_vel_x, g_car_vel_y,
+                 Pos_Est_vel_x, Pos_Est_vel_y,
+                 fused_lamp_cx, fused_lamp_cy,
+                 img_err_x, img_err_y,
+                 img_fb_x, img_fb_y,
+                 velx_sp_raw, vely_sp_raw,
+                 velx_sp, vely_sp,
+                 g_mode8_velx_target, g_mode8_vely_target,
+                 s_mode8_accel_x, s_mode8_accel_y,
+                 roll_angle_target, pitch_angle_target,
+                 g_euler.roll, g_euler.pitch,
+                 opflow_vel_x, opflow_vel_y,
+                 opflow_vel_x_lpf, opflow_vel_y_lpf,
+                 g_mode8_velx_pid.p_term, g_mode8_velx_pid.i_term,
+                 g_mode8_velx_pid.d_term, g_mode8_velx_pid.output,
+                 g_mode8_vely_pid.p_term, g_mode8_vely_pid.i_term,
+                 (float)g_tof_fused_valid,
+                 g_tof_fused_height_mm,
+                 velx_ff, vely_ff);
 }

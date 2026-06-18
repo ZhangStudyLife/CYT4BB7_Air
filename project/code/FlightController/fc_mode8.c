@@ -19,6 +19,13 @@ static const float s_mode8_vel_limit_cmps = 200.0f;
 static const float s_mode8_vel_accel_cmps2 = 250.0f;
 static const float s_mode8_vel_jerk_cmps3 = 1800.0f;
 static const float s_mode8_angle_limit_deg = 15.0f;
+static const float s_mode8_img_y_offset = 0.0f;
+static const float s_mode8_center_weight = 1.0f;
+static const float s_mode8_side_weight_cap = 0.25f;
+static const float s_mode8_front_x_weight = 0.227180f;
+static const float s_mode8_front_y_weight = 0.135893f;
+static const float s_mode8_back_x_weight = 0.194550f;
+static const float s_mode8_back_y_weight = 0.134159f;
 static float s_mode8_accel_x = 0.0f;
 static float s_mode8_accel_y = 0.0f;
 static uint16_t s_mode8_yaw_tick = 0U;
@@ -33,6 +40,96 @@ static void FC_Mode8_LimitVector(float *x, float *y, float limit)
         *x *= scale;
         *y *= scale;
     }
+}
+
+static void FC_Mode8_AddLampEstimate(float cx, float cy,
+                                     float x_weight, float y_weight,
+                                     float *x_sum, float *y_sum,
+                                     float *weight_x_sum, float *weight_y_sum)
+{
+    *x_sum += cx * x_weight;
+    *y_sum += cy * y_weight;
+    *weight_x_sum += x_weight;
+    *weight_y_sum += y_weight;
+}
+
+static uint8_t FC_Mode8_FuseCarLamp(float *cx, float *cy)
+{
+    const car_lamp_data *front_lamp = &image_data[Front].car_lamp_data[0];
+    const car_lamp_data *center_lamp = &image_data[Center].car_lamp_data[0];
+    const car_lamp_data *back_lamp = &image_data[Back].car_lamp_data[0];
+    const uint8_t center_valid = (center_lamp->valid != 0U) ? 1U : 0U;
+    float x_sum = 0.0f;
+    float y_sum = 0.0f;
+    float weight_x_sum = 0.0f;
+    float weight_y_sum = 0.0f;
+    float side_x_sum = 0.0f;
+    float side_y_sum = 0.0f;
+    float side_weight_x_sum = 0.0f;
+    float side_weight_y_sum = 0.0f;
+
+    if (center_valid != 0U)
+    {
+        FC_Mode8_AddLampEstimate(center_lamp->cx, center_lamp->cy,
+                                 s_mode8_center_weight, s_mode8_center_weight,
+                                 &x_sum, &y_sum, &weight_x_sum, &weight_y_sum);
+    }
+
+    if (front_lamp->valid != 0U)
+    {
+        float front_center_cx = -8.902509f + 1.016973f * front_lamp->cx + 0.031254f * front_lamp->cy;
+        float front_center_cy = -51.990433f - 0.020303f * front_lamp->cx + 1.003250f * front_lamp->cy;
+
+        FC_Mode8_AddLampEstimate(front_center_cx, front_center_cy,
+                                 s_mode8_front_x_weight, s_mode8_front_y_weight,
+                                 &side_x_sum, &side_y_sum, &side_weight_x_sum, &side_weight_y_sum);
+    }
+
+    if (back_lamp->valid != 0U)
+    {
+        float back_center_cx = 3.636157f - 0.996270f * back_lamp->cx - 0.085060f * back_lamp->cy;
+        float back_center_cy = 25.907502f + 0.111016f * back_lamp->cx - 1.074126f * back_lamp->cy;
+
+        FC_Mode8_AddLampEstimate(back_center_cx, back_center_cy,
+                                 s_mode8_back_x_weight, s_mode8_back_y_weight,
+                                 &side_x_sum, &side_y_sum, &side_weight_x_sum, &side_weight_y_sum);
+    }
+
+    if (center_valid != 0U)
+    {
+        float side_x_scale = 1.0f;
+        float side_y_scale = 1.0f;
+
+        if (side_weight_x_sum > s_mode8_side_weight_cap)
+        {
+            side_x_scale = s_mode8_side_weight_cap / side_weight_x_sum;
+        }
+        if (side_weight_y_sum > s_mode8_side_weight_cap)
+        {
+            side_y_scale = s_mode8_side_weight_cap / side_weight_y_sum;
+        }
+
+        x_sum += side_x_sum * side_x_scale;
+        y_sum += side_y_sum * side_y_scale;
+        weight_x_sum += side_weight_x_sum * side_x_scale;
+        weight_y_sum += side_weight_y_sum * side_y_scale;
+    }
+    else
+    {
+        x_sum = side_x_sum;
+        y_sum = side_y_sum;
+        weight_x_sum = side_weight_x_sum;
+        weight_y_sum = side_weight_y_sum;
+    }
+
+    if ((weight_x_sum <= 0.0f) || (weight_y_sum <= 0.0f))
+    {
+        return 0U;
+    }
+
+    *cx = x_sum / weight_x_sum;
+    *cy = y_sum / weight_y_sum;
+    return 1U;
 }
 
 static void FC_Mode8_UpdateYawTarget(void)
@@ -126,6 +223,9 @@ void FC_Mode8_50Hz(float dt)
     float img_fb_y = 0.0f;
     float roll_trim;
     float pitch_trim;
+    float fused_lamp_cx = 0.0f;
+    float fused_lamp_cy = 0.0f;
+    uint8_t fused_lamp_valid;
 
     if (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING)
     {
@@ -134,7 +234,9 @@ void FC_Mode8_50Hz(float dt)
         return;
     }
 
-    if (image_data[Center].car_lamp_data[0].valid != 0U)
+    fused_lamp_valid = FC_Mode8_FuseCarLamp(&fused_lamp_cx, &fused_lamp_cy);
+
+    if (fused_lamp_valid != 0U)
     {
         Beep_Disable();
     }
@@ -143,12 +245,12 @@ void FC_Mode8_50Hz(float dt)
         Beep_Enable();
     }
 
-    if ((image_data[Center].car_lamp_data[0].valid != 0U) &&
+    if ((fused_lamp_valid != 0U) &&
         (0U != g_tof_fused_valid) &&
         (g_tof_fused_height_mm > 500.0f))
     {
-        img_err_x = image_data[Center].car_lamp_data[0].cx;
-        img_err_y = image_data[Center].car_lamp_data[0].cy;
+        img_err_x = fused_lamp_cx;
+        img_err_y = fused_lamp_cy + s_mode8_img_y_offset;
         img_fb_x = PID_Update(&s_mode8_imgx_pid, 0.0f, -img_err_x, dt);
         img_fb_y = PID_Update(&s_mode8_imgy_pid, 0.0f, -img_err_y, dt);
         img_fb_x = FC_Mode_Clamp(img_fb_x, -s_mode8_img_fb_limit_cmps, s_mode8_img_fb_limit_cmps);

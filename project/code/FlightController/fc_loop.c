@@ -36,7 +36,7 @@ extern volatile uint32 tick_1000us_cnt;
 
 /* Yaw 角度目标是否已经对齐当前机头方向 */
 static uint8_t s_yaw_target_inited = 0U;
-#define FC_TARGET_HEIGHT_M 1.0f
+#define FC_TARGET_HEIGHT_M 1.15f
 #define FC_LANDING_TARGET_HEIGHT_M -0.5f
 /* 100Hz 锁存的飞行模式，50Hz 控制只消费该锁存值 */
 static FC_START_CRSF_flight_mode_e s_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;

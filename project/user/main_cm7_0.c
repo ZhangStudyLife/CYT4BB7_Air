@@ -171,16 +171,7 @@ int main(void)
             air_comm_send_run_data(air_data, 22);
 
 
-            wifi_justfloat(image_data[Front].beacon_data[0].x,
-                            image_data[Front].beacon_data[0].y,
-                            image_data[Front].beacon_data[0].area,
-                            image_data[Center].beacon_data[0].x,
-                            image_data[Center].beacon_data[0].y,
-                            image_data[Center].beacon_data[0].area,
-                            image_data[Back].beacon_data[0].x,
-                            image_data[Back].beacon_data[0].y,
-                            image_data[Back].beacon_data[0].area,
-                            image_data[Front].car_lamp_data[0].cx,
+            wifi_justfloat(image_data[Front].car_lamp_data[0].cx,
                             image_data[Front].car_lamp_data[0].cy,
                             image_data[Center].car_lamp_data[0].cx,
                             image_data[Center].car_lamp_data[0].cy,

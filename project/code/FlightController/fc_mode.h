@@ -191,6 +191,10 @@ extern pid_t g_mode7_velx_pid;
 extern pid_t g_mode7_vely_pid;
 extern float g_mode7_velx_target;
 extern float g_mode7_vely_target;
+extern pid_t g_mode5_velx_pid;
+extern pid_t g_mode5_vely_pid;
+extern float g_mode5_velx_target;
+extern float g_mode5_vely_target;
 
 /*
  * 模式8 X/Y 轴速度环 PID 实例。

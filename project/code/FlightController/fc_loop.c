@@ -548,7 +548,37 @@ void FC_Loop_100Hz(void)
     //                g_tof3_height_mm,
     //                g_tof4_height_mm);
 
-
+    wifi_justfloat(image_data[Front].beacon_data[0].x,     /* I1 */
+                   image_data[Front].beacon_data[0].y,     /* I2 */
+                   image_data[Front].beacon_data[1].x,     /* I3 */
+                   image_data[Front].beacon_data[1].y,     /* I4 */
+                   image_data[Front].beacon_data[2].x,     /* I5 */
+                   image_data[Front].beacon_data[2].y,     /* I6 */
+                   image_data[Front].car_lamp_data[0].cx,  /* I7 */
+                   image_data[Front].car_lamp_data[0].cy,  /* I8 */
+                   image_data[Front].car_lamp_data[1].cx,  /* I9 */
+                   image_data[Front].car_lamp_data[1].cy,  /* I10 */
+                   image_data[Center].beacon_data[0].x,    /* I11 */
+                   image_data[Center].beacon_data[0].y,    /* I12 */
+                   image_data[Center].beacon_data[1].x,    /* I13 */
+                   image_data[Center].beacon_data[1].y,    /* I14 */
+                   image_data[Center].beacon_data[2].x,    /* I15 */
+                   image_data[Center].beacon_data[2].y,    /* I16 */
+                   image_data[Center].car_lamp_data[0].cx, /* I17 */
+                   image_data[Center].car_lamp_data[0].cy, /* I18 */
+                   image_data[Center].car_lamp_data[1].cx, /* I19 */
+                   image_data[Center].car_lamp_data[1].cy, /* I20 */
+                   image_data[Back].beacon_data[0].x,      /* I21 */
+                   image_data[Back].beacon_data[0].y,      /* I22 */
+                   image_data[Back].beacon_data[1].x,      /* I23 */
+                   image_data[Back].beacon_data[1].y,      /* I24 */
+                   image_data[Back].beacon_data[2].x,      /* I25 */
+                   image_data[Back].beacon_data[2].y,      /* I26 */
+                   image_data[Back].car_lamp_data[0].cx,   /* I27 */
+                   image_data[Back].car_lamp_data[0].cy,   /* I28 */
+                   image_data[Back].car_lamp_data[1].cx,   /* I29 */
+                   image_data[Back].car_lamp_data[1].cy,   /* I30 */
+                g_euler.roll, g_euler.pitch, g_euler.yaw); /* I31-I33 */
 
 }
 

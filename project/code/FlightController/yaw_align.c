@@ -8,30 +8,38 @@ typedef struct
 {
     uint8 valid;
     image_camera_e camera;
+    uint8 mode;
     float x;
     float y;
     float area;
+    float error_px;
+    float yaw_delta_deg;
+    float canonical_yaw;
+    float score_deg;
 } yaw_align_beacon_t;
 
 static const float s_yaw_align_deadband_px = 3.0f;
 static const float s_yaw_align_x_to_deg = 0.5f;
-static const float s_yaw_align_near_x_to_deg = 0.25f;
-static const float s_yaw_align_near_y_px = 20.0f;
-static const float s_yaw_align_max_delta_deg = 45.0f;
-static const float s_yaw_align_near_max_delta_deg = 25.0f;
-static const float s_yaw_align_jump_gate_px = 20.0f;
-static const float s_yaw_align_yaw_to_x_px_per_deg = 1.0f;
+static const float s_yaw_align_center_y_to_deg = 0.5f;
+static const float s_yaw_align_max_delta_deg = 35.0f;
+static const float s_yaw_align_center_side_x_px = 20.0f;
+static const float s_yaw_align_same_beacon_gate_deg = 35.0f;
+static const float s_yaw_align_switch_margin_deg = 5.0f;
 static const float s_yaw_align_lamp_gate_y_px = 30.0f;
 static const float s_yaw_align_lamp_gate_dist_px = 38.0f;
 static const float s_yaw_align_lamp_gate_min_dx_px = 10.0f;
 static const float s_yaw_align_lamp_gate_min_dy_px = -5.0f;
 static const uint8 s_yaw_align_stable_frames = 5U;
+static const uint8 s_yaw_align_switch_frames = 3U;
 static const uint8 s_yaw_align_lost_reset_frames = 20U;
+
+#define YAW_ALIGN_MODE_FRONT        (0U)
+#define YAW_ALIGN_MODE_CENTER_LEFT  (1U)
+#define YAW_ALIGN_MODE_BACK         (2U)
+#define YAW_ALIGN_MODE_CENTER_RIGHT (3U)
 
 static yaw_align_beacon_t s_locked_beacon;
 static yaw_align_beacon_t s_candidate_beacon;
-static float s_locked_yaw = 0.0f;
-static float s_candidate_yaw = 0.0f;
 static uint8 s_candidate_frames = 0U;
 static uint8 s_locked = 0U;
 static uint8 s_lost_frames = 0U;
@@ -70,16 +78,9 @@ static float YawAlign_Wrap180Deg(float angle_deg)
     return angle_deg;
 }
 
-static float YawAlign_CompensatedDistanceSq(const yaw_align_beacon_t *ref_beacon,
-                                            float ref_yaw,
-                                            float x,
-                                            float y)
+static float YawAlign_AbsAngleDeltaDeg(float angle0_deg, float angle1_deg)
 {
-    float yaw_delta = YawAlign_Wrap180Deg(g_euler.yaw - ref_yaw);
-    float predicted_x = ref_beacon->x -
-                        yaw_delta * s_yaw_align_yaw_to_x_px_per_deg;
-
-    return YawAlign_DistanceSq(x, y, predicted_x, ref_beacon->y);
+    return fabsf(YawAlign_Wrap180Deg(angle0_deg - angle1_deg));
 }
 
 static void YawAlign_HoldCurrentYaw(void)
@@ -127,79 +128,33 @@ static uint8 YawAlign_IsNearCarLamp(image_camera_e camera, const beacon_data *be
     return 0U;
 }
 
-static uint8 YawAlign_FindLargestBeacon(yaw_align_beacon_t *out)
-{
-    image_camera_e cameras[2] = {Front, Back};
-    uint8 found = 0U;
-    uint8 camera_index;
-    uint8 i;
-
-    for(camera_index = 0U; camera_index < 2U; camera_index++)
-    {
-        image_camera_e camera = cameras[camera_index];
-
-        for(i = 0U; i < IMAGE_MAX_BEACON_COUNT; i++)
-        {
-            const beacon_data *beacon = &image_data[camera].beacon_data[i];
-
-            if((beacon->valid == 0U) || (beacon->area <= 0.0f))
-            {
-                continue;
-            }
-
-            if(YawAlign_IsNearCarLamp(camera, beacon) != 0U)
-            {
-                continue;
-            }
-
-            if((found == 0U) || (beacon->area > out->area))
-            {
-                out->valid = 1U;
-                out->camera = camera;
-                out->x = beacon->x;
-                out->y = beacon->y;
-                out->area = beacon->area;
-                found = 1U;
-            }
-        }
-    }
-
-    return found;
-}
-
-static uint8 YawAlign_FindNearestLockedBeacon(yaw_align_beacon_t *out)
+static uint8 YawAlign_FindLargestBeaconInCamera(image_camera_e camera,
+                                                yaw_align_beacon_t *out)
 {
     uint8 found = 0U;
     uint8 i;
-    float best_dist_sq = s_yaw_align_jump_gate_px * s_yaw_align_jump_gate_px;
 
     for(i = 0U; i < IMAGE_MAX_BEACON_COUNT; i++)
     {
-        const beacon_data *beacon = &image_data[s_locked_beacon.camera].beacon_data[i];
-        float dist_sq;
+        const beacon_data *beacon = &image_data[camera].beacon_data[i];
 
         if((beacon->valid == 0U) || (beacon->area <= 0.0f))
         {
             continue;
         }
 
-        dist_sq = YawAlign_CompensatedDistanceSq(&s_locked_beacon,
-                                                 s_locked_yaw,
-                                                 beacon->x,
-                                                 beacon->y);
-        if(dist_sq > best_dist_sq)
+        if(YawAlign_IsNearCarLamp(camera, beacon) != 0U)
         {
             continue;
         }
 
-        if((found == 0U) || (dist_sq < best_dist_sq))
+        if((found == 0U) || (beacon->area > out->area))
         {
             out->valid = 1U;
-            out->camera = s_locked_beacon.camera;
+            out->camera = camera;
             out->x = beacon->x;
             out->y = beacon->y;
             out->area = beacon->area;
-            best_dist_sq = dist_sq;
             found = 1U;
         }
     }
@@ -207,45 +162,200 @@ static uint8 YawAlign_FindNearestLockedBeacon(yaw_align_beacon_t *out)
     return found;
 }
 
-static void YawAlign_UpdateCandidate(const yaw_align_beacon_t *beacon)
+static uint8 YawAlign_BuildCandidate(image_camera_e camera,
+                                     const yaw_align_beacon_t *raw,
+                                     yaw_align_beacon_t *out)
 {
-    float jump_gate_sq = s_yaw_align_jump_gate_px * s_yaw_align_jump_gate_px;
+    float canonical_offset_deg = 0.0f;
+    float raw_yaw_delta_deg;
 
+    *out = *raw;
+
+    if(camera == Front)
+    {
+        out->mode = YAW_ALIGN_MODE_FRONT;
+        out->error_px = raw->x;
+        raw_yaw_delta_deg = raw->x * s_yaw_align_x_to_deg;
+        canonical_offset_deg = 0.0f;
+    }
+    else if(camera == Back)
+    {
+        out->mode = YAW_ALIGN_MODE_BACK;
+        out->error_px = raw->x;
+        raw_yaw_delta_deg = raw->x * s_yaw_align_x_to_deg;
+        canonical_offset_deg = -180.0f;
+    }
+    else if(camera == Center)
+    {
+        if(raw->x > s_yaw_align_center_side_x_px)
+        {
+            out->mode = YAW_ALIGN_MODE_CENTER_RIGHT;
+            out->error_px = raw->y;
+            raw_yaw_delta_deg = raw->y * s_yaw_align_center_y_to_deg;
+            canonical_offset_deg = 90.0f;
+        }
+        else if(raw->x < -s_yaw_align_center_side_x_px)
+        {
+            out->mode = YAW_ALIGN_MODE_CENTER_LEFT;
+            out->error_px = raw->y;
+            raw_yaw_delta_deg = -raw->y * s_yaw_align_center_y_to_deg;
+            canonical_offset_deg = -90.0f;
+        }
+        else
+        {
+            return 0U;
+        }
+    }
+    else
+    {
+        return 0U;
+    }
+
+    out->yaw_delta_deg = YawAlign_Clamp(raw_yaw_delta_deg,
+                                        -s_yaw_align_max_delta_deg,
+                                        s_yaw_align_max_delta_deg);
+    out->canonical_yaw = YawAlign_Wrap180Deg(g_euler.yaw +
+                                             raw_yaw_delta_deg +
+                                             canonical_offset_deg);
+    out->score_deg = fabsf(raw_yaw_delta_deg);
+    return 1U;
+}
+
+static void YawAlign_ChooseBetterCandidate(const yaw_align_beacon_t *candidate,
+                                           yaw_align_beacon_t *best,
+                                           uint8 *found)
+{
+    if((*found == 0U) || (candidate->score_deg < best->score_deg))
+    {
+        *best = *candidate;
+        *found = 1U;
+    }
+}
+
+static uint8 YawAlign_FindBestCandidate(yaw_align_beacon_t *best)
+{
+    image_camera_e cameras[3] = {Front, Center, Back};
+    uint8 camera_index;
+    uint8 found = 0U;
+
+    for(camera_index = 0U; camera_index < 3U; camera_index++)
+    {
+        yaw_align_beacon_t raw;
+        yaw_align_beacon_t candidate;
+        image_camera_e camera = cameras[camera_index];
+
+        raw.valid = 0U;
+        if(YawAlign_FindLargestBeaconInCamera(camera, &raw) == 0U)
+        {
+            continue;
+        }
+
+        if(YawAlign_BuildCandidate(camera, &raw, &candidate) == 0U)
+        {
+            continue;
+        }
+
+        YawAlign_ChooseBetterCandidate(&candidate, best, &found);
+    }
+
+    return found;
+}
+
+static uint8 YawAlign_FindLockedCandidates(yaw_align_beacon_t *best,
+                                           yaw_align_beacon_t *current)
+{
+    image_camera_e cameras[3] = {Front, Center, Back};
+    uint8 camera_index;
+    uint8 best_found = 0U;
+    uint8 current_found = 0U;
+
+    for(camera_index = 0U; camera_index < 3U; camera_index++)
+    {
+        yaw_align_beacon_t raw;
+        yaw_align_beacon_t candidate;
+        image_camera_e camera = cameras[camera_index];
+
+        raw.valid = 0U;
+        if(YawAlign_FindLargestBeaconInCamera(camera, &raw) == 0U)
+        {
+            continue;
+        }
+
+        if(YawAlign_BuildCandidate(camera, &raw, &candidate) == 0U)
+        {
+            continue;
+        }
+
+        if(YawAlign_AbsAngleDeltaDeg(candidate.canonical_yaw,
+                                     s_locked_beacon.canonical_yaw) >
+           s_yaw_align_same_beacon_gate_deg)
+        {
+            continue;
+        }
+
+        YawAlign_ChooseBetterCandidate(&candidate, best, &best_found);
+        if(candidate.mode == s_locked_beacon.mode)
+        {
+            YawAlign_ChooseBetterCandidate(&candidate, current, &current_found);
+        }
+    }
+
+    return (best_found != 0U) ? (uint8)(1U + current_found) : 0U;
+}
+
+static uint8 YawAlign_UpdateCandidate(const yaw_align_beacon_t *beacon,
+                                      uint8 stable_frames,
+                                      uint8 require_same_mode)
+{
     if((s_candidate_frames == 0U) ||
-       (s_candidate_beacon.camera != beacon->camera) ||
-       (YawAlign_CompensatedDistanceSq(&s_candidate_beacon,
-                                       s_candidate_yaw,
-                                       beacon->x,
-                                       beacon->y) > jump_gate_sq))
+       ((require_same_mode != 0U) &&
+        (s_candidate_beacon.mode != beacon->mode)) ||
+       (YawAlign_AbsAngleDeltaDeg(s_candidate_beacon.canonical_yaw,
+                                  beacon->canonical_yaw) >
+        s_yaw_align_same_beacon_gate_deg))
     {
         s_candidate_beacon = *beacon;
-        s_candidate_yaw = g_euler.yaw;
         s_candidate_frames = 1U;
-        return;
+        return 0U;
     }
 
     s_candidate_beacon = *beacon;
-    s_candidate_yaw = g_euler.yaw;
-    if(s_candidate_frames < s_yaw_align_stable_frames)
+    if(s_candidate_frames < stable_frames)
     {
         s_candidate_frames++;
     }
 
-    if(s_candidate_frames >= s_yaw_align_stable_frames)
+    return (s_candidate_frames >= stable_frames) ? 1U : 0U;
+}
+
+static void YawAlign_AcceptLockedBeacon(const yaw_align_beacon_t *beacon)
+{
+    s_locked_beacon = *beacon;
+    s_locked = 1U;
+    s_lost_frames = 0U;
+}
+
+static void YawAlign_ResetCandidate(void)
+{
+    s_candidate_beacon.valid = 0U;
+    s_candidate_frames = 0U;
+}
+
+static void YawAlign_ApplyYawTarget(const yaw_align_beacon_t *beacon)
+{
+    if(fabsf(beacon->error_px) <= s_yaw_align_deadband_px)
     {
-        s_locked_beacon = s_candidate_beacon;
-        s_locked_yaw = s_candidate_yaw;
-        s_locked = 1U;
-        s_lost_frames = 0U;
+        YawAlign_HoldCurrentYaw();
+        return;
     }
+
+    yaw_angle_target = g_euler.yaw + beacon->yaw_delta_deg;
 }
 
 void YawAlign_Reset(void)
 {
     s_locked_beacon.valid = 0U;
     s_candidate_beacon.valid = 0U;
-    s_locked_yaw = 0.0f;
-    s_candidate_yaw = 0.0f;
     s_candidate_frames = 0U;
     s_locked = 0U;
     s_lost_frames = 0U;
@@ -275,44 +385,38 @@ void YawAlign_GetDebug(yaw_align_debug_t *out)
     YawAlign_FillDebugBeacon(&s_candidate_beacon, &out->candidate_beacon);
 }
 
-static float YawAlign_GetYawDelta(const yaw_align_beacon_t *beacon)
-{
-    float x_to_deg = s_yaw_align_x_to_deg;
-    float max_delta_deg = s_yaw_align_max_delta_deg;
-
-    if(beacon->y > s_yaw_align_near_y_px)
-    {
-        x_to_deg = s_yaw_align_near_x_to_deg;
-        max_delta_deg = s_yaw_align_near_max_delta_deg;
-    }
-
-    return YawAlign_Clamp(beacon->x * x_to_deg,
-                          -max_delta_deg,
-                          max_delta_deg);
-}
-
 uint8 YawAlign_Update(void)
 {
     yaw_align_beacon_t beacon;
-    float yaw_delta;
+    yaw_align_beacon_t current_beacon;
+    uint8 locked_find_result;
 
     beacon.valid = 0U;
+    current_beacon.valid = 0U;
 
     if(s_locked == 0U)
     {
-        if(YawAlign_FindLargestBeacon(&beacon) == 0U)
+        if(YawAlign_FindBestCandidate(&beacon) == 0U)
         {
             YawAlign_Reset();
             YawAlign_HoldCurrentYaw();
             return 0U;
         }
 
-        YawAlign_UpdateCandidate(&beacon);
+        if(YawAlign_UpdateCandidate(&beacon,
+                                    s_yaw_align_stable_frames,
+                                    0U) != 0U)
+        {
+            YawAlign_AcceptLockedBeacon(&s_candidate_beacon);
+        }
+
         YawAlign_HoldCurrentYaw();
         return 0U;
     }
 
-    if(YawAlign_FindNearestLockedBeacon(&beacon) == 0U)
+    locked_find_result = YawAlign_FindLockedCandidates(&beacon,
+                                                       &current_beacon);
+    if(locked_find_result == 0U)
     {
         if(s_lost_frames < s_yaw_align_lost_reset_frames)
         {
@@ -327,17 +431,33 @@ uint8 YawAlign_Update(void)
         return 0U;
     }
 
-    s_locked_beacon = beacon;
-    s_locked_yaw = g_euler.yaw;
-    s_lost_frames = 0U;
-
-    if(fabsf(beacon.x) <= s_yaw_align_deadband_px)
+    if((current_beacon.valid != 0U) &&
+       ((beacon.mode == current_beacon.mode) ||
+        (beacon.score_deg + s_yaw_align_switch_margin_deg >=
+         current_beacon.score_deg)))
     {
-        YawAlign_HoldCurrentYaw();
+        YawAlign_AcceptLockedBeacon(&current_beacon);
+        YawAlign_ResetCandidate();
+        YawAlign_ApplyYawTarget(&current_beacon);
         return 1U;
     }
 
-    yaw_delta = YawAlign_GetYawDelta(&beacon);
-    yaw_angle_target = g_euler.yaw + yaw_delta;
+    if(YawAlign_UpdateCandidate(&beacon,
+                                s_yaw_align_switch_frames,
+                                1U) == 0U)
+    {
+        if(current_beacon.valid != 0U)
+        {
+            YawAlign_AcceptLockedBeacon(&current_beacon);
+            YawAlign_ApplyYawTarget(&current_beacon);
+            return 1U;
+        }
+
+        YawAlign_HoldCurrentYaw();
+        return 0U;
+    }
+
+    YawAlign_AcceptLockedBeacon(&s_candidate_beacon);
+    YawAlign_ApplyYawTarget(&s_candidate_beacon);
     return 1U;
 }

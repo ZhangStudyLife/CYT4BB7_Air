@@ -149,7 +149,7 @@ int main(void)
             air_comm_air_update_100HZ();
             ipc_image_poll();
 
-            float air_data[22];
+            float air_data[16];
             air_data[0] = g_tof_fused_height_mm;
             air_data[1] = g_euler.roll;
             air_data[2] = g_euler.pitch;
@@ -165,14 +165,8 @@ int main(void)
             air_data[12] = (float)CRSF_STD[5];
             air_data[13] = (float)CRSF_STD[6];
             air_data[14] = (float)CRSF_STD[7];
-            air_data[15] = (float)image_data[Center].beacon_data[0].valid;
-            air_data[16] = image_data[Center].beacon_data[0].x;
-            air_data[17] = image_data[Center].beacon_data[0].y;
-            air_data[18] = (float)image_data[Center].car_lamp_data[0].valid;
-            air_data[19] = image_data[Center].car_lamp_data[0].cx;
-            air_data[20] = image_data[Center].car_lamp_data[0].cy;
-            air_data[21] = image_data[Center].car_lamp_data[0].angle;
-            air_comm_send_run_data(air_data, 22);
+            air_data[15] = yaw_angle_target;
+            air_comm_send_run_data(air_data, 16);
 
             // wifi_justfloat(image_data[Front].car_lamp_data[0].cx,
             //                 image_data[Front].car_lamp_data[0].cy,

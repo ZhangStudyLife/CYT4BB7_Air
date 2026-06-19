@@ -1,4 +1,5 @@
 #include "fc_mode.h"
+#include "yaw_align.h"
 #include "../Estimation/Pos_Est/Pos_Est.h"
 #include "../Estimation/Height_Est/Height_Est.h"
 #include "../Image/image_data.h"
@@ -234,9 +235,10 @@ void FC_Mode8_Reset(void)
     s_mode8_lamp_lpf_valid = 0U;
     s_mode8_yaw_tick = 0U;
     s_mode8_yaw_index = 0U;
+    YawAlign_Reset();
     roll_angle_target = FC_Mode_Get_Roll_Mech_Trim_Deg();
     pitch_angle_target = FC_Mode_Get_Pitch_Mech_Trim_Deg();
-    yaw_angle_target = 0.0f;
+    yaw_angle_target = g_euler.yaw;
 }
 
 void FC_Mode8_100Hz(void)
@@ -286,6 +288,8 @@ void FC_Mode8_50Hz(float dt)
         FC_Mode8_Reset();
         return;
     }
+
+    (void)YawAlign_Update();
 
     fused_lamp_valid = FC_Mode8_FuseCarLamp(&fused_lamp_cx, &fused_lamp_cy);
 

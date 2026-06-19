@@ -1779,6 +1779,12 @@
                 <name>$PROJ_DIR$\..\..\code\FlightController\fc_mode8.c</name>
             </file>
             <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\yaw_align.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\FlightController\yaw_align.h</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\..\..\code\FlightController\fc_params.c</name>
             </file>
             <file>

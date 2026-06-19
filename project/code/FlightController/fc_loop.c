@@ -596,13 +596,14 @@ void FC_Loop_500Hz(void)
         /* 首次进入飞行态时复位 yaw 外环，后续 yaw 目标固定为 0 度 */
         if (0U == s_yaw_target_inited)
         {
-            yaw_angle_target = 0.0f;
+            yaw_angle_target = yaw_angle_meas;
             PID_Reset(&yaw_angle_pid);
             s_yaw_target_inited = 1U;
         }
 
-        /* 非 mode8 时 yaw 目标固定为 0 度，mode8 由独立逻辑更新 yaw 目标 */
-        if (s_flight_mode != FC_START_CRSF_FLIGHT_MODE_8)
+        /* 非 mode5/mode8 时 yaw 目标固定为 0 度，mode5/mode8 由独立逻辑更新 yaw 目标 */
+        if ((s_flight_mode != FC_START_CRSF_FLIGHT_MODE_5) &&
+            (s_flight_mode != FC_START_CRSF_FLIGHT_MODE_8))
         {
             yaw_angle_target = 0.0f;
         }

@@ -3,6 +3,7 @@
 #include "../Estimation/Pos_Est/Pos_Est.h"
 #include "../Estimation/Height_Est/Height_Est.h"
 #include "../Image/image_data.h"
+#include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
 #include <math.h>
 
 extern float g_car_vel_x;
@@ -281,6 +282,8 @@ void FC_Mode8_50Hz(float dt)
     float car_ff_y = 0.0f;
     uint8_t fused_lamp_valid;
     uint8_t tof_height_valid;
+    uint8_t yaw_align_active;
+    yaw_align_debug_t yaw_debug;
 
     if (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING)
     {
@@ -289,7 +292,7 @@ void FC_Mode8_50Hz(float dt)
         return;
     }
 
-    (void)YawAlign_Update();
+    yaw_align_active = YawAlign_Update();
 
     fused_lamp_valid = FC_Mode8_FuseCarLamp(&fused_lamp_cx, &fused_lamp_cy);
 
@@ -372,6 +375,7 @@ void FC_Mode8_50Hz(float dt)
 
     roll_angle_target = FC_Mode_Clamp(velx_out + roll_trim, -s_mode8_angle_limit_deg, s_mode8_angle_limit_deg);
     pitch_angle_target = FC_Mode_Clamp(vely_out + pitch_trim, -s_mode8_angle_limit_deg, s_mode8_angle_limit_deg);
+    YawAlign_GetDebug(&yaw_debug);
 
     // wifi_justfloat(g_car_vel_x,                 /* I1 */
     //              g_car_vel_y,                   /* I2 */
@@ -409,4 +413,43 @@ void FC_Mode8_50Hz(float dt)
     //              g_tof_fused_height_mm,         /* I34 */
     //              velx_ff,                       /* I35 */
     //              vely_ff);                      /* I36 */
+    wifi_justfloat(image_data[Front].beacon_data[0].x,     /* I1 */
+                   image_data[Front].beacon_data[0].y,     /* I2 */
+                   image_data[Front].beacon_data[1].x,     /* I3 */
+                   image_data[Front].beacon_data[1].y,     /* I4 */
+                   image_data[Front].beacon_data[2].x,     /* I5 */
+                   image_data[Front].beacon_data[2].y,     /* I6 */
+                   image_data[Front].car_lamp_data[0].cx,  /* I7 */
+                   image_data[Front].car_lamp_data[0].cy,  /* I8 */
+                   image_data[Front].car_lamp_data[1].cx,  /* I9 */
+                   image_data[Front].car_lamp_data[1].cy,  /* I10 */
+                   image_data[Center].beacon_data[0].x,    /* I11 */
+                   image_data[Center].beacon_data[0].y,    /* I12 */
+                   image_data[Center].beacon_data[1].x,    /* I13 */
+                   image_data[Center].beacon_data[1].y,    /* I14 */
+                   image_data[Center].beacon_data[2].x,    /* I15 */
+                   image_data[Center].beacon_data[2].y,    /* I16 */
+                   image_data[Center].car_lamp_data[0].cx, /* I17 */
+                   image_data[Center].car_lamp_data[0].cy, /* I18 */
+                   image_data[Center].car_lamp_data[1].cx, /* I19 */
+                   image_data[Center].car_lamp_data[1].cy, /* I20 */
+                   image_data[Back].beacon_data[0].x,      /* I21 */
+                   image_data[Back].beacon_data[0].y,      /* I22 */
+                   image_data[Back].beacon_data[1].x,      /* I23 */
+                   image_data[Back].beacon_data[1].y,      /* I24 */
+                   image_data[Back].beacon_data[2].x,      /* I25 */
+                   image_data[Back].beacon_data[2].y,      /* I26 */
+                   image_data[Back].car_lamp_data[0].cx,   /* I27 */
+                   image_data[Back].car_lamp_data[0].cy,   /* I28 */
+                   image_data[Back].car_lamp_data[1].cx,   /* I29 */
+                   image_data[Back].car_lamp_data[1].cy,   /* I30 */
+                   (float)yaw_align_active,                /* I31 */
+                   (float)yaw_debug.locked,                /* I32 */
+                   (float)yaw_debug.locked_beacon.camera,  /* I33 */
+                   yaw_debug.locked_beacon.x,              /* I34 */
+                   yaw_debug.locked_beacon.y,              /* I35 */
+                   g_euler.yaw,                            /* I36 */
+                   yaw_angle_target,                       /* I37 */
+                   yaw_gyro_target,                        /* I38 */
+                   yaw_gyro_pid.output);                   /* I39 */
 }

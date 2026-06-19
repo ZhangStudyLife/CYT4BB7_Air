@@ -165,6 +165,30 @@ void YawAlign_Reset(void)
     s_lost_frames = 0U;
 }
 
+static void YawAlign_FillDebugBeacon(const yaw_align_beacon_t *src,
+                                     yaw_align_debug_beacon_t *dst)
+{
+    dst->valid = src->valid;
+    dst->camera = (uint8)src->camera;
+    dst->x = src->x;
+    dst->y = src->y;
+    dst->area = src->area;
+}
+
+void YawAlign_GetDebug(yaw_align_debug_t *out)
+{
+    if(out == 0)
+    {
+        return;
+    }
+
+    out->locked = s_locked;
+    out->candidate_frames = s_candidate_frames;
+    out->lost_frames = s_lost_frames;
+    YawAlign_FillDebugBeacon(&s_locked_beacon, &out->locked_beacon);
+    YawAlign_FillDebugBeacon(&s_candidate_beacon, &out->candidate_beacon);
+}
+
 uint8 YawAlign_Update(void)
 {
     yaw_align_beacon_t beacon;

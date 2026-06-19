@@ -33,6 +33,7 @@ static float height_vel_out = 0.0f;
 static float height_pos_out = 0.0f;
 /* 目标高度，单位米 */
 extern volatile uint32 tick_1000us_cnt;
+extern float g_car_sync_time_ms;
 
 /* Yaw 角度目标是否已经对齐当前机头方向 */
 static uint8_t s_yaw_target_inited = 0U;
@@ -548,37 +549,49 @@ void FC_Loop_100Hz(void)
     //                g_tof3_height_mm,
     //                g_tof4_height_mm);
 
-    wifi_justfloat(image_data[Front].beacon_data[0].x,     /* I1 */
-                   image_data[Front].beacon_data[0].y,     /* I2 */
-                   image_data[Front].beacon_data[1].x,     /* I3 */
-                   image_data[Front].beacon_data[1].y,     /* I4 */
-                   image_data[Front].beacon_data[2].x,     /* I5 */
-                   image_data[Front].beacon_data[2].y,     /* I6 */
-                   image_data[Front].car_lamp_data[0].cx,  /* I7 */
-                   image_data[Front].car_lamp_data[0].cy,  /* I8 */
-                   image_data[Front].car_lamp_data[1].cx,  /* I9 */
-                   image_data[Front].car_lamp_data[1].cy,  /* I10 */
-                   image_data[Center].beacon_data[0].x,    /* I11 */
-                   image_data[Center].beacon_data[0].y,    /* I12 */
-                   image_data[Center].beacon_data[1].x,    /* I13 */
-                   image_data[Center].beacon_data[1].y,    /* I14 */
-                   image_data[Center].beacon_data[2].x,    /* I15 */
-                   image_data[Center].beacon_data[2].y,    /* I16 */
-                   image_data[Center].car_lamp_data[0].cx, /* I17 */
-                   image_data[Center].car_lamp_data[0].cy, /* I18 */
-                   image_data[Center].car_lamp_data[1].cx, /* I19 */
-                   image_data[Center].car_lamp_data[1].cy, /* I20 */
-                   image_data[Back].beacon_data[0].x,      /* I21 */
-                   image_data[Back].beacon_data[0].y,      /* I22 */
-                   image_data[Back].beacon_data[1].x,      /* I23 */
-                   image_data[Back].beacon_data[1].y,      /* I24 */
-                   image_data[Back].beacon_data[2].x,      /* I25 */
-                   image_data[Back].beacon_data[2].y,      /* I26 */
-                   image_data[Back].car_lamp_data[0].cx,   /* I27 */
-                   image_data[Back].car_lamp_data[0].cy,   /* I28 */
-                   image_data[Back].car_lamp_data[1].cx,   /* I29 */
-                   image_data[Back].car_lamp_data[1].cy,   /* I30 */
-                g_euler.roll, g_euler.pitch, g_euler.yaw); /* I31-I33 */
+    if (s_flight_mode == FC_START_CRSF_FLIGHT_MODE_8)
+    {
+        wifi_justfloat(image_data[Front].beacon_data[0].x,          /* I1 */
+                       image_data[Front].beacon_data[0].y,          /* I2 */
+                       image_data[Front].beacon_data[1].x,          /* I3 */
+                       image_data[Front].beacon_data[1].y,          /* I4 */
+                       image_data[Center].beacon_data[0].x,         /* I5 */
+                       image_data[Center].beacon_data[0].y,         /* I6 */
+                       image_data[Center].beacon_data[1].x,         /* I7 */
+                       image_data[Center].beacon_data[1].y,         /* I8 */
+                       image_data[Back].beacon_data[0].x,           /* I9 */
+                       image_data[Back].beacon_data[0].y,           /* I10 */
+                       image_data[Back].beacon_data[1].x,           /* I11 */
+                       image_data[Back].beacon_data[1].y,           /* I12 */
+                       (float)image_data[Front].beacon_data[0].valid,  /* I13 */
+                       (float)image_data[Front].beacon_data[1].valid,  /* I14 */
+                       (float)image_data[Center].beacon_data[0].valid, /* I15 */
+                       (float)image_data[Center].beacon_data[1].valid, /* I16 */
+                       (float)image_data[Back].beacon_data[0].valid,   /* I17 */
+                       (float)image_data[Back].beacon_data[1].valid,   /* I18 */
+                       image_data[Front].car_lamp_data[0].cx,       /* I19 */
+                       image_data[Front].car_lamp_data[0].cy,       /* I20 */
+                       image_data[Front].car_lamp_data[0].angle,    /* I21 */
+                       image_data[Front].car_lamp_data[0].width,    /* I22 */
+                       image_data[Front].car_lamp_data[0].length,   /* I23 */
+                       image_data[Center].car_lamp_data[0].cx,      /* I24 */
+                       image_data[Center].car_lamp_data[0].cy,      /* I25 */
+                       image_data[Center].car_lamp_data[0].angle,   /* I26 */
+                       image_data[Center].car_lamp_data[0].width,   /* I27 */
+                       image_data[Center].car_lamp_data[0].length,  /* I28 */
+                       image_data[Back].car_lamp_data[0].cx,        /* I29 */
+                       image_data[Back].car_lamp_data[0].cy,        /* I30 */
+                       image_data[Back].car_lamp_data[0].angle,     /* I31 */
+                       image_data[Back].car_lamp_data[0].width,     /* I32 */
+                       image_data[Back].car_lamp_data[0].length,    /* I33 */
+                       (float)image_data[Front].car_lamp_data[0].valid,  /* I34 */
+                       (float)image_data[Center].car_lamp_data[0].valid, /* I35 */
+                       (float)image_data[Back].car_lamp_data[0].valid,   /* I36 */
+                       g_euler.pitch,                              /* I37 */
+                       g_euler.roll,                               /* I38 */
+                       g_euler.yaw,                                /* I39 */
+                       g_car_sync_time_ms);                        /* I40 */
+    }
 
 }
 

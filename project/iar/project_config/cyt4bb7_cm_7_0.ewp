@@ -1741,6 +1741,15 @@
             </file>
         </group>
         <group>
+            <name>Planner</name>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\car_plan.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\car_plan.h</name>
+            </file>
+        </group>
+        <group>
             <name>FlightController</name>
             <file>
                 <name>$PROJ_DIR$\..\..\code\FlightController\fc_loop.c</name>

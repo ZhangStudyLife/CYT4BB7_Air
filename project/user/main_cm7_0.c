@@ -14,12 +14,15 @@ static uint8 s_ipc_flying_retry_div = 0U; /* 飞行状态 IPC 通知失败后的
 float g_car_vel_x = 0.0f; // 这个是车的速度 这个变量大于0 , 车往右
 float g_car_vel_y = 0.0f; // 这个是车的速度 这个变量大于0 , 车往前
 
+float g_car_sync_time_ms = 0.0f; /* Last car-side sync timestamp, unit: ms */
+
 static void on_car_data(const float *data, uint8 count)
 {
-    if (count == 10U)
+    if (count == 11U)
     {
         g_car_vel_x = data[0];
         g_car_vel_y = data[1];
+        g_car_sync_time_ms = data[10];
     }
 }
 
@@ -149,7 +152,12 @@ int main(void)
             air_comm_air_update_100HZ();
             ipc_image_poll();
 
-            float air_data[16];
+            car_plan_result_t car_plan;
+            uint8 car_plan_send_valid;
+            (void)CarPlan_Update(&car_plan);
+            car_plan_send_valid = ((car_plan.valid != 0U) && (g_tof_fused_height_mm > 500.0f)) ? 1U : 0U;
+
+            float air_data[23];
             air_data[0] = g_tof_fused_height_mm;
             air_data[1] = g_euler.roll;
             air_data[2] = g_euler.pitch;
@@ -166,7 +174,14 @@ int main(void)
             air_data[13] = (float)CRSF_STD[6];
             air_data[14] = (float)CRSF_STD[7];
             air_data[15] = yaw_angle_target;
-            air_comm_send_run_data(air_data, 16);
+            air_data[16] = (float)tick_1000us_cnt;
+            air_data[17] = (float)car_plan_send_valid;
+            air_data[18] = (car_plan_send_valid != 0U) ? car_plan.target_strafe_mps : 0.0f;
+            air_data[19] = (car_plan_send_valid != 0U) ? car_plan.target_forward_mps : 0.0f;
+            air_data[20] = (float)car_plan.camera;
+            air_data[21] = (float)car_plan.beacon_index;
+            air_data[22] = car_plan.dist_px;
+            air_comm_send_run_data(air_data, 23);
 
             // wifi_justfloat(image_data[Front].car_lamp_data[0].cx,
             //                 image_data[Front].car_lamp_data[0].cy,

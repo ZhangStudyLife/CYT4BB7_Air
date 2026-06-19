@@ -19,7 +19,14 @@ static const float s_mode8_vel_limit_cmps = 200.0f;
 static const float s_mode8_vel_accel_cmps2 = 250.0f;
 static const float s_mode8_vel_jerk_cmps3 = 1800.0f;
 static const float s_mode8_angle_limit_deg = 15.0f;
-static const float s_mode8_img_y_offset = 0.0f;
+static const float s_mode8_lamp_lpf_alpha = 0.557f;
+static const float s_mode8_lamp_decay = 0.95f;
+static const float s_mode8_down_proj_x_bias = 0.0f;
+static const float s_mode8_down_proj_x_roll_k = 1.408988f;
+static const float s_mode8_down_proj_x_pitch_k = 0.015998f;
+static const float s_mode8_down_proj_y_bias = -19.863429f;
+static const float s_mode8_down_proj_y_roll_k = -0.064165f;
+static const float s_mode8_down_proj_y_pitch_k = 1.377711f;
 static const float s_mode8_center_weight = 1.0f;
 static const float s_mode8_side_weight_cap = 0.25f;
 static const float s_mode8_front_x_weight = 0.227180f;
@@ -28,6 +35,9 @@ static const float s_mode8_back_x_weight = 0.194550f;
 static const float s_mode8_back_y_weight = 0.134159f;
 static float s_mode8_accel_x = 0.0f;
 static float s_mode8_accel_y = 0.0f;
+static float s_mode8_lamp_lpf_cx = 0.0f;
+static float s_mode8_lamp_lpf_cy = 0.0f;
+static uint8_t s_mode8_lamp_lpf_valid = 0U;
 static uint16_t s_mode8_yaw_tick = 0U;
 static uint8_t s_mode8_yaw_index = 0U;
 
@@ -124,12 +134,46 @@ static uint8_t FC_Mode8_FuseCarLamp(float *cx, float *cy)
 
     if ((weight_x_sum <= 0.0f) || (weight_y_sum <= 0.0f))
     {
-        return 0U;
+        if (s_mode8_lamp_lpf_valid == 0U)
+        {
+            *cx = 0.0f;
+            *cy = 0.0f;
+            return 0U;
+        }
+
+        s_mode8_lamp_lpf_cx *= s_mode8_lamp_decay;
+        s_mode8_lamp_lpf_cy *= s_mode8_lamp_decay;
+        *cx = s_mode8_lamp_lpf_cx;
+        *cy = s_mode8_lamp_lpf_cy;
+        return 1U;
     }
 
     *cx = x_sum / weight_x_sum;
     *cy = y_sum / weight_y_sum;
+    if (s_mode8_lamp_lpf_valid == 0U)
+    {
+        s_mode8_lamp_lpf_cx = *cx;
+        s_mode8_lamp_lpf_cy = *cy;
+        s_mode8_lamp_lpf_valid = 1U;
+    }
+    else
+    {
+        s_mode8_lamp_lpf_cx += s_mode8_lamp_lpf_alpha * (*cx - s_mode8_lamp_lpf_cx);
+        s_mode8_lamp_lpf_cy += s_mode8_lamp_lpf_alpha * (*cy - s_mode8_lamp_lpf_cy);
+    }
+    *cx = s_mode8_lamp_lpf_cx;
+    *cy = s_mode8_lamp_lpf_cy;
     return 1U;
+}
+
+static void FC_Mode8_GetDownProjectionCenter(float *cx, float *cy)
+{
+    *cx = s_mode8_down_proj_x_bias +
+          s_mode8_down_proj_x_roll_k * g_euler.roll +
+          s_mode8_down_proj_x_pitch_k * g_euler.pitch;
+    *cy = s_mode8_down_proj_y_bias +
+          s_mode8_down_proj_y_roll_k * g_euler.roll +
+          s_mode8_down_proj_y_pitch_k * g_euler.pitch;
 }
 
 static void FC_Mode8_UpdateYawTarget(void)
@@ -185,6 +229,9 @@ void FC_Mode8_Reset(void)
     g_mode8_vely_target = 0.0f;
     s_mode8_accel_x = 0.0f;
     s_mode8_accel_y = 0.0f;
+    s_mode8_lamp_lpf_cx = 0.0f;
+    s_mode8_lamp_lpf_cy = 0.0f;
+    s_mode8_lamp_lpf_valid = 0U;
     s_mode8_yaw_tick = 0U;
     s_mode8_yaw_index = 0U;
     roll_angle_target = FC_Mode_Get_Roll_Mech_Trim_Deg();
@@ -226,7 +273,12 @@ void FC_Mode8_50Hz(float dt)
     float pitch_trim;
     float fused_lamp_cx = 0.0f;
     float fused_lamp_cy = 0.0f;
+    float down_proj_cx = 0.0f;
+    float down_proj_cy = 0.0f;
+    float car_ff_x = 0.0f;
+    float car_ff_y = 0.0f;
     uint8_t fused_lamp_valid;
+    uint8_t tof_height_valid;
 
     if (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING)
     {
@@ -246,25 +298,28 @@ void FC_Mode8_50Hz(float dt)
         Beep_Enable();
     }
 
-    if ((fused_lamp_valid != 0U) &&
-        (0U != g_tof_fused_valid) &&
-        (g_tof_fused_height_mm > 500.0f))
+    tof_height_valid = ((0U != g_tof_fused_valid) && (g_tof_fused_height_mm > 500.0f)) ? 1U : 0U;
+
+    if ((fused_lamp_valid != 0U) && (tof_height_valid != 0U))
     {
-        img_err_x = fused_lamp_cx;
-        img_err_y = fused_lamp_cy + s_mode8_img_y_offset;
+        FC_Mode8_GetDownProjectionCenter(&down_proj_cx, &down_proj_cy);
+        img_err_x = fused_lamp_cx - down_proj_cx;
+        img_err_y = fused_lamp_cy - down_proj_cy;
         img_fb_x = PID_Update(&s_mode8_imgx_pid, 0.0f, -img_err_x, dt);
         img_fb_y = PID_Update(&s_mode8_imgy_pid, 0.0f, -img_err_y, dt);
         img_fb_x = FC_Mode_Clamp(img_fb_x, -s_mode8_img_fb_limit_cmps, s_mode8_img_fb_limit_cmps);
         img_fb_y = FC_Mode_Clamp(img_fb_y, -s_mode8_img_fb_limit_cmps, s_mode8_img_fb_limit_cmps);
-
-        velx_sp = img_fb_x + g_car_vel_x * 1.0f * g_fc_params.mode8_kp_car_x;
-        vely_sp = img_fb_y + g_car_vel_y * -1.0f * g_fc_params.mode8_kp_car_y;
     }
     else
     {
         PID_Reset(&s_mode8_imgx_pid);
         PID_Reset(&s_mode8_imgy_pid);
     }
+
+    car_ff_x = g_car_vel_x * g_fc_params.mode8_kp_car_x;
+    car_ff_y = -g_car_vel_y * g_fc_params.mode8_kp_car_y;
+    velx_sp = img_fb_x + car_ff_x;
+    vely_sp = img_fb_y + car_ff_y;
     // wifi_justfloat(g_car_vel_x, g_car_vel_y,
     //                img_fb_x, img_fb_y,
     //                velx_sp, vely_sp,
@@ -314,23 +369,40 @@ void FC_Mode8_50Hz(float dt)
     roll_angle_target = FC_Mode_Clamp(velx_out + roll_trim, -s_mode8_angle_limit_deg, s_mode8_angle_limit_deg);
     pitch_angle_target = FC_Mode_Clamp(vely_out + pitch_trim, -s_mode8_angle_limit_deg, s_mode8_angle_limit_deg);
 
-    wifi_justfloat(g_car_vel_x, g_car_vel_y,
-                 Pos_Est_vel_x, Pos_Est_vel_y,
-                 fused_lamp_cx, fused_lamp_cy,
-                 img_err_x, img_err_y,
-                 img_fb_x, img_fb_y,
-                 velx_sp_raw, vely_sp_raw,
-                 velx_sp, vely_sp,
-                 g_mode8_velx_target, g_mode8_vely_target,
-                 s_mode8_accel_x, s_mode8_accel_y,
-                 roll_angle_target, pitch_angle_target,
-                 g_euler.roll, g_euler.pitch,
-                 opflow_vel_x, opflow_vel_y,
-                 opflow_vel_x_lpf, opflow_vel_y_lpf,
-                 g_mode8_velx_pid.p_term, g_mode8_velx_pid.i_term,
-                 g_mode8_velx_pid.d_term, g_mode8_velx_pid.output,
-                 g_mode8_vely_pid.p_term, g_mode8_vely_pid.i_term,
-                 (float)g_tof_fused_valid,
-                 g_tof_fused_height_mm,
-                 velx_ff, vely_ff);
+    // wifi_justfloat(g_car_vel_x,                 /* I1 */
+    //              g_car_vel_y,                   /* I2 */
+    //              Pos_Est_vel_x,                 /* I3 */
+    //              Pos_Est_vel_y,                 /* I4 */
+    //              fused_lamp_cx,                 /* I5 */
+    //              fused_lamp_cy,                 /* I6 */
+    //              img_err_x,                     /* I7 */
+    //              img_err_y,                     /* I8 */
+    //              img_fb_x,                      /* I9 */
+    //              img_fb_y,                      /* I10 */
+    //              velx_sp_raw,                   /* I11 */
+    //              vely_sp_raw,                   /* I12 */
+    //              velx_sp,                       /* I13 */
+    //              vely_sp,                       /* I14 */
+    //              g_mode8_velx_target,           /* I15 */
+    //              g_mode8_vely_target,           /* I16 */
+    //              s_mode8_accel_x,               /* I17 */
+    //              s_mode8_accel_y,               /* I18 */
+    //              roll_angle_target,             /* I19 */
+    //              pitch_angle_target,            /* I20 */
+    //              g_euler.roll,                  /* I21 */
+    //              g_euler.pitch,                 /* I22 */
+    //              opflow_vel_x,                  /* I23 */
+    //              opflow_vel_y,                  /* I24 */
+    //              opflow_vel_x_lpf,              /* I25 */
+    //              opflow_vel_y_lpf,              /* I26 */
+    //              g_mode8_velx_pid.p_term,       /* I27 */
+    //              g_mode8_velx_pid.i_term,       /* I28 */
+    //              g_mode8_velx_pid.d_term,       /* I29 */
+    //              g_mode8_velx_pid.output,       /* I30 */
+    //              g_mode8_vely_pid.p_term,       /* I31 */
+    //              g_mode8_vely_pid.i_term,       /* I32 */
+    //              (float)g_tof_fused_valid,      /* I33 */
+    //              g_tof_fused_height_mm,         /* I34 */
+    //              velx_ff,                       /* I35 */
+    //              vely_ff);                      /* I36 */
 }

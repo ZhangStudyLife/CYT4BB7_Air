@@ -11,8 +11,8 @@ static uint8 div10 = 0U;
 static uint8 s_ipc_last_flying = 0U;      /* 上一次成功通知给核1的飞行状态 */
 static uint8 s_ipc_flying_retry_div = 0U; /* 飞行状态 IPC 通知失败后的 100Hz 重试分频 */
 
-float g_car_vel_x = 0.0f;       // 这个是车的速度 这个变量大于0 , 车往右
-float g_car_vel_y = 0.0f;       // 这个是车的速度 这个变量大于0 , 车往前
+float g_car_vel_x = 0.0f; // 这个是车的速度 这个变量大于0 , 车往右
+float g_car_vel_y = 0.0f; // 这个是车的速度 这个变量大于0 , 车往前
 
 static void on_car_data(const float *data, uint8 count)
 {
@@ -120,7 +120,11 @@ int main(void)
 
             // wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw, Pos_Est_vel_x, Pos_Est_vel_y);
 
-            div500++;
+                //                    tof->distance_mm[0],
+                //                    tof->distance_mm[1],
+                //                    tof->distance_mm[2],
+                //                    tof->distance_mm[3],
+                div500++;
             if (div500 >= 2U)
             {
                 div500 = 0U;
@@ -130,7 +134,7 @@ int main(void)
             FC_Loop_1000Hz();
             guard++;
         }
-        
+
 #if (0U == WIFI_IMAGE_ENABLE)
         wifi_cmd_Poll();
 #endif
@@ -170,15 +174,19 @@ int main(void)
             air_data[21] = image_data[Center].car_lamp_data[0].angle;
             air_comm_send_run_data(air_data, 22);
 
-
             // wifi_justfloat(image_data[Front].car_lamp_data[0].cx,
             //                 image_data[Front].car_lamp_data[0].cy,
             //                 image_data[Center].car_lamp_data[0].cx,
             //                 image_data[Center].car_lamp_data[0].cy,
             //                 image_data[Back].car_lamp_data[0].cx,
-            //                 image_data[Back].car_lamp_data[0].cy
+            //                 image_data[Back].car_lamp_data[0].cy,
+            //                 g_euler.roll,
+            //                 g_euler.pitch,
+            //                 g_euler.yaw,
+            //                 Pos_Est_vel_x,
+            //                 Pos_Est_vel_y,
+            //                 g_tof_fused_height_mm
             //             );
-
 
             wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
             {
@@ -234,6 +242,5 @@ int main(void)
                 }
             }
         }
-
     }
 }

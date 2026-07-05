@@ -23,12 +23,12 @@ extern "C" {
 #define IMU_ACCEL_NOTCH0_Q         (IMU_NOTCH0_HZ / IMU_ACCEL_NOTCH0_BW_HZ)
 
 /* 第二级陷波是否启用：0=旁路，1=启用 */
-#define IMU_NOTCH1_ENABLE          (0U)
+#define IMU_NOTCH1_ENABLE          (1U)
 
 /* 第二级陷波中心频率，单位 Hz */
-#define IMU_NOTCH1_HZ              (450.0f)
+#define IMU_NOTCH1_HZ              (93.0f)
 /* 第二级陷波带宽，单位 Hz */
-#define IMU_NOTCH1_BW_HZ           (70.0f)
+#define IMU_NOTCH1_BW_HZ           (35.0f)
 /* 第二级陷波品质因数，按 Q=f/BW 定义 */
 #define IMU_NOTCH1_Q               (IMU_NOTCH1_HZ / IMU_NOTCH1_BW_HZ)
 

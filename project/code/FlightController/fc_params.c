@@ -35,9 +35,9 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->vel_z_dt = 0.01f;   /* 100Hz */
 
     /* ===== 油门与机械配平参数 ===== */
-    params->base_throttle = 3100;         /* 悬停油门 */
-    params->roll_mech_trim_deg = 2.3f;    /* Roll 机械配平角 */
-    params->pitch_mech_trim_deg = 3.0f;   /* Pitch 机械配平角 */
+    params->base_throttle = 3200;         /* 悬停油门 */
+    params->roll_mech_trim_deg = 1.3f;    /* Roll 机械配平角 */
+    params->pitch_mech_trim_deg = 1.0f;   /* Pitch 机械配平角 */
 
     /* ===== Roll 轴角速度环参数 ===== */
     params->roll_gyro_kp = 5.4f;
@@ -155,7 +155,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode7_vel_y_d_lpf = 0.0f;
 
     /* ===== 位置估计参数 ===== */
-    params->pos_est_k_flow = 0.06f;
+    params->pos_est_k_flow = 0.04f;
 
     /* ===== 模式 8 图像位置环参数 ===== */
     params->mode8_img_x_kp = 1.8f;
@@ -170,6 +170,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode8_img_y_kff = 0.0f;
     params->mode8_img_y_i_limit = 0.0f;
     params->mode8_img_y_d_lpf = 0.0f;
+
     /* ===== Mode 5 image and velocity params ===== */
     params->mode5_img_x_kp = 1.8f;
     params->mode5_img_x_ki = 0.0f;
@@ -183,20 +184,21 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode5_img_y_kff = 0.0f;
     params->mode5_img_y_i_limit = 0.0f;
     params->mode5_img_y_d_lpf = 0.0f;
-    params->mode5_vel_x_kp = 0.18f;
+    params->mode5_vel_x_kp = 0.16f;
     params->mode5_vel_x_ki = 0.0f;
     params->mode5_vel_x_kd = 0.0f;
-    params->mode5_vel_x_kff = 0.015f;
+    params->mode5_vel_x_kff = 0.010f;
     params->mode5_vel_x_i_limit = 3.0f;
     params->mode5_vel_x_d_lpf = 0.0f;
-    params->mode5_vel_y_kp = 0.18f;
+    params->mode5_vel_y_kp = 0.16f;
     params->mode5_vel_y_ki = 0.0f;
     params->mode5_vel_y_kd = 0.0f;
-    params->mode5_vel_y_kff = 0.015f;
+    params->mode5_vel_y_kff = 0.010f;
     params->mode5_vel_y_i_limit = 3.0f;
     params->mode5_vel_y_d_lpf = 0.0f;
     params->mode5_kp_car_x = 30.0f;
     params->mode5_kp_car_y = 30.0f;
+
     params->mode8_vel_x_kp = 0.18f;
     params->mode8_vel_x_ki = 0.0f;
     params->mode8_vel_x_kd = 0.0f;

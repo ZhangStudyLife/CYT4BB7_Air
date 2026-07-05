@@ -1743,6 +1743,12 @@
         <group>
             <name>Planner</name>
             <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\car_lamp_fused.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\car_lamp_fused.h</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\..\..\code\Planner\car_plan.c</name>
             </file>
             <file>

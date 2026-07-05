@@ -65,7 +65,6 @@ static FC_START_CRSF_state_e s_prev_fc_state = FC_START_CRSF_STATE_INIT;
 #define FC_HEIGHT_VEL_KD_PWM (FC_HEIGHT_VEL_KD_ACC / FC_THRUST_ACC_MPS2_PER_PWM)
 static float s_hover_throttle = 2800.0f;
 static float s_hover_learn_step = 0.0f;
-static float s_hover_learn_gate = 0.0f;
 /* 姿态角外环输出到角速度目标的限幅，单位 deg/s */
 static const float s_fc_angle_out_limit = 260.0f;
 static const float s_fc_yaw_out_limit = 2000.0f;
@@ -436,7 +435,6 @@ void FC_Loop_100Hz(void)
 
     /* 悬停油门在线学习：仅在接近稳态悬停时更新 */
     s_hover_learn_step = 0.0f;
-    s_hover_learn_gate = 0.0f;
     if ((fc_state == FC_START_CRSF_STATE_FLYING) &&
         (g_height_meas_health > 0.65f) &&
         (g_height_fused_vz_mps > -FC_HOVER_LEARN_VZ_MAX) && (g_height_fused_vz_mps < FC_HOVER_LEARN_VZ_MAX) &&
@@ -447,7 +445,6 @@ void FC_Loop_100Hz(void)
         ((fmaxf(fmaxf(g_tof1_height_mm, g_tof2_height_mm), fmaxf(g_tof3_height_mm, g_tof4_height_mm)) -
           fminf(fminf(g_tof1_height_mm, g_tof2_height_mm), fminf(g_tof3_height_mm, g_tof4_height_mm))) < FC_HOVER_LEARN_TOF_SPREAD_MAX))
     {
-        s_hover_learn_gate = 1.0f;
         s_hover_learn_step = fc_clampf((dt / (dt + FC_HOVER_THR_TC)) * height_vel_out,
             -FC_HOVER_LEARN_RATE_MAX * dt, FC_HOVER_LEARN_RATE_MAX * dt);
         s_hover_learn_step = fc_clampf(s_hover_throttle + s_hover_learn_step,
@@ -456,7 +453,6 @@ void FC_Loop_100Hz(void)
         s_hover_throttle += s_hover_learn_step;
         height_vel_out -= s_hover_learn_step;
     }
-
 
     // 发送融合高度 , 目标高度 ,融合速度 , 高度环输出的目标速度 , 基础油门 , 综合学习的油门 , 输出到电调混动的基础油们
     wifi_justfloat(g_tof_fused_height_mm,
@@ -469,6 +465,15 @@ void FC_Loop_100Hz(void)
 
 
 
+        // wifi_justfloat(ICM42688.gyro_x,ICM42688.gyro_y,ICM42688.gyro_z,
+        //     ICM42688.acc_x,ICM42688.acc_y,ICM42688.acc_z);
+
+    //                g_tof_fused_height_mm,    // 融合高度 mm
+    //                g_imufilter_1000hz.accz,  // 机体系Z轴加速度 m/s²
+    //                g_height_acc_up_mps2,     // 大地系Z轴加速度 m/s²
+    //                g_motor_cmd.throttle, // 目标高度 mm
+    //                  g_motor_cmd.yaw      // Yaw 电调输入
+    // );
 
     if (fc_state == FC_START_CRSF_STATE_LANDING)
     {

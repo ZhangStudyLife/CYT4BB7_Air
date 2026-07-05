@@ -8,6 +8,7 @@ typedef struct
 {
     uint8 valid;
     image_camera_e camera;
+    uint8 beacon_index;
     uint8 mode;
     float x;
     float y;
@@ -17,6 +18,11 @@ typedef struct
     float canonical_yaw;
     float score_deg;
 } yaw_align_beacon_t;
+
+typedef struct
+{
+    float target_yaw;
+} yaw_align_lamp_vector_t;
 
 static const float s_yaw_align_deadband_px = 5.0f;
 static const float s_yaw_align_x_to_deg = 0.5f;
@@ -29,6 +35,13 @@ static const float s_yaw_align_lamp_gate_y_px = 30.0f;
 static const float s_yaw_align_lamp_gate_dist_px = 38.0f;
 static const float s_yaw_align_lamp_gate_min_dx_px = 10.0f;
 static const float s_yaw_align_lamp_gate_min_dy_px = -5.0f;
+static const float s_yaw_align_deg_to_rad = 0.017453292519943295f;
+static const float s_yaw_align_rad_to_deg = 57.29577951308232f;
+static const float s_yaw_align_lamp_vector_max_dist_px = 70.0f;
+static const float s_yaw_align_lamp_vector_min_alpha_deg = 35.0f;
+static const float s_yaw_align_lamp_vector_close_dist_px = 35.0f;
+static const float s_yaw_align_lamp_vector_normal_gate_deg = 15.0f;
+static const float s_yaw_align_lamp_vector_canonical_gate_deg = 35.0f;
 static const uint8 s_yaw_align_stable_frames = 5U;
 static const uint8 s_yaw_align_switch_frames = 8U;
 static const uint8 s_yaw_align_lost_reset_frames = 80U;
@@ -82,6 +95,16 @@ static float YawAlign_Wrap180Deg(float angle_deg)
 static float YawAlign_AbsAngleDeltaDeg(float angle0_deg, float angle1_deg)
 {
     return fabsf(YawAlign_Wrap180Deg(angle0_deg - angle1_deg));
+}
+
+static uint8 YawAlign_IsSameSource(const yaw_align_beacon_t *a,
+                                   const yaw_align_beacon_t *b)
+{
+    return ((a->camera == b->camera) &&
+            (a->mode == b->mode) &&
+            (a->beacon_index == b->beacon_index))
+               ? 1U
+               : 0U;
 }
 
 static void YawAlign_HoldCurrentYaw(void)
@@ -189,6 +212,7 @@ static uint8 YawAlign_BuildCandidate(image_camera_e camera,
 }
 
 static uint8 YawAlign_BuildImageCandidate(image_camera_e camera,
+                                          uint8 beacon_index,
                                           const beacon_data *beacon,
                                           yaw_align_beacon_t *candidate)
 {
@@ -206,11 +230,188 @@ static uint8 YawAlign_BuildImageCandidate(image_camera_e camera,
 
     raw.valid = 1U;
     raw.camera = camera;
+    raw.beacon_index = beacon_index;
     raw.x = beacon->x;
     raw.y = beacon->y;
     raw.area = beacon->area;
 
     return YawAlign_BuildCandidate(camera, &raw, candidate);
+}
+
+static uint8 YawAlign_HasFrontBeacon(void)
+{
+    uint8 i;
+
+    for(i = 0U; i < IMAGE_MAX_BEACON_COUNT; i++)
+    {
+        if(image_data[Front].beacon_data[i].valid != 0U)
+        {
+            return 1U;
+        }
+    }
+
+    return 0U;
+}
+
+static float YawAlign_GetNormalYawTarget(const yaw_align_beacon_t *beacon)
+{
+    if(fabsf(beacon->error_px) <= s_yaw_align_deadband_px)
+    {
+        return g_euler.yaw;
+    }
+
+    return YawAlign_Wrap180Deg(g_euler.yaw + beacon->yaw_delta_deg);
+}
+
+static uint8 YawAlign_BuildRawImageCandidate(image_camera_e camera,
+                                             uint8 beacon_index,
+                                             const beacon_data *beacon,
+                                             yaw_align_beacon_t *candidate)
+{
+    yaw_align_beacon_t raw;
+
+    if((beacon->valid == 0U) || (beacon->area <= 0.0f))
+    {
+        return 0U;
+    }
+
+    raw.valid = 1U;
+    raw.camera = camera;
+    raw.beacon_index = beacon_index;
+    raw.x = beacon->x;
+    raw.y = beacon->y;
+    raw.area = beacon->area;
+
+    return YawAlign_BuildCandidate(camera, &raw, candidate);
+}
+
+static uint8 YawAlign_BuildLampVectorCandidate(image_camera_e camera,
+                                               uint8 beacon_index,
+                                               uint8 front_has_beacon,
+                                               yaw_align_lamp_vector_t *out)
+{
+    const car_lamp_data *lamp = &image_data[camera].car_lamp_data[0];
+    const beacon_data *beacon = &image_data[camera].beacon_data[beacon_index];
+    yaw_align_beacon_t image_candidate;
+    float dx;
+    float dy;
+    float dist;
+    float angle_rad;
+    float line_x;
+    float line_y;
+    float normal_x;
+    float normal_y;
+    float along;
+    float perp;
+    float strafe;
+    float forward;
+    float alpha_deg;
+    float yaw0;
+    float yaw1;
+    float ref_yaw;
+    float score0;
+    float score1;
+    float continuity0;
+    float continuity1;
+    float gate_deg;
+
+    if((camera == Center) ||
+       (lamp->valid == 0U) ||
+       (YawAlign_BuildRawImageCandidate(camera,
+                                        beacon_index,
+                                        beacon,
+                                        &image_candidate) == 0U))
+    {
+        return 0U;
+    }
+
+    dx = beacon->x - lamp->cx;
+    dy = beacon->y - lamp->cy;
+    dist = sqrtf((dx * dx) + (dy * dy));
+    if((dist <= 2.0f) ||
+       (dist > s_yaw_align_lamp_vector_max_dist_px))
+    {
+        return 0U;
+    }
+
+    dx /= dist;
+    dy /= dist;
+    angle_rad = lamp->angle * s_yaw_align_deg_to_rad;
+    line_x = cosf(angle_rad);
+    line_y = sinf(angle_rad);
+    normal_x = -line_y;
+    normal_y = line_x;
+    along = (dx * line_x) + (dy * line_y);
+    perp = (dx * normal_x) + (dy * normal_y);
+
+    if(camera == Back)
+    {
+        strafe = -along;
+        forward = perp;
+    }
+    else
+    {
+        strafe = along;
+        forward = -perp;
+    }
+
+    alpha_deg = atan2f(strafe, forward) * s_yaw_align_rad_to_deg;
+    if(fabsf(alpha_deg) < s_yaw_align_lamp_vector_min_alpha_deg)
+    {
+        return 0U;
+    }
+
+    yaw0 = YawAlign_Wrap180Deg(YawAlign_GetNormalYawTarget(&image_candidate) -
+                               alpha_deg);
+    yaw1 = YawAlign_Wrap180Deg(yaw0 + 180.0f);
+
+    if((front_has_beacon == 0U) ||
+       (dist < s_yaw_align_lamp_vector_close_dist_px))
+    {
+        ref_yaw = image_candidate.canonical_yaw;
+        gate_deg = s_yaw_align_lamp_vector_canonical_gate_deg;
+    }
+    else
+    {
+        ref_yaw = YawAlign_GetNormalYawTarget(&image_candidate);
+        gate_deg = s_yaw_align_lamp_vector_normal_gate_deg;
+    }
+
+    score0 = YawAlign_AbsAngleDeltaDeg(yaw0, ref_yaw);
+    score1 = YawAlign_AbsAngleDeltaDeg(yaw1, ref_yaw);
+    if((score0 > gate_deg) && (score1 > gate_deg))
+    {
+        return 0U;
+    }
+
+    continuity0 = YawAlign_AbsAngleDeltaDeg(yaw0, yaw_angle_target);
+    continuity1 = YawAlign_AbsAngleDeltaDeg(yaw1, yaw_angle_target);
+    if(continuity1 < continuity0)
+    {
+        yaw0 = yaw1;
+    }
+
+    out->target_yaw = yaw0;
+    return 1U;
+}
+
+static uint8 YawAlign_TryGetLampVectorYaw(const yaw_align_beacon_t *beacon,
+                                          float *target_yaw)
+{
+    yaw_align_lamp_vector_t candidate;
+    uint8 front_has_beacon = YawAlign_HasFrontBeacon();
+
+    if(((beacon->camera != Front) && (beacon->camera != Back)) ||
+       (YawAlign_BuildLampVectorCandidate(beacon->camera,
+                                          beacon->beacon_index,
+                                          front_has_beacon,
+                                          &candidate) == 0U))
+    {
+        return 0U;
+    }
+
+    *target_yaw = candidate.target_yaw;
+    return 1U;
 }
 
 static void YawAlign_ChooseBetterCandidate(const yaw_align_beacon_t *candidate,
@@ -221,6 +422,70 @@ static void YawAlign_ChooseBetterCandidate(const yaw_align_beacon_t *candidate,
     {
         *best = *candidate;
         *found = 1U;
+    }
+}
+
+static void YawAlign_ChooseCurrentCandidate(const yaw_align_beacon_t *candidate,
+                                            yaw_align_beacon_t *best,
+                                            uint8 *found)
+{
+    uint8 candidate_is_locked;
+    uint8 best_is_locked;
+
+    if(*found == 0U)
+    {
+        *best = *candidate;
+        *found = 1U;
+        return;
+    }
+
+    candidate_is_locked = YawAlign_IsSameSource(candidate, &s_locked_beacon);
+    best_is_locked = YawAlign_IsSameSource(best, &s_locked_beacon);
+
+    if((candidate_is_locked != 0U) && (best_is_locked == 0U))
+    {
+        *best = *candidate;
+        return;
+    }
+
+    if((candidate_is_locked == 0U) && (best_is_locked != 0U))
+    {
+        return;
+    }
+
+    if(YawAlign_AbsAngleDeltaDeg(candidate->canonical_yaw,
+                                 s_locked_canonical_yaw) <
+       YawAlign_AbsAngleDeltaDeg(best->canonical_yaw,
+                                 s_locked_canonical_yaw))
+    {
+        *best = *candidate;
+    }
+}
+
+static void YawAlign_ChooseLockedCandidate(const yaw_align_beacon_t *candidate,
+                                           yaw_align_beacon_t *best,
+                                           uint8 *found)
+{
+    float candidate_delta;
+    float best_delta;
+
+    if(*found == 0U)
+    {
+        *best = *candidate;
+        *found = 1U;
+        return;
+    }
+
+    candidate_delta = YawAlign_AbsAngleDeltaDeg(candidate->canonical_yaw,
+                                                s_locked_canonical_yaw);
+    best_delta = YawAlign_AbsAngleDeltaDeg(best->canonical_yaw,
+                                           s_locked_canonical_yaw);
+
+    if((candidate_delta < best_delta) ||
+       ((candidate_delta == best_delta) &&
+        (candidate->score_deg < best->score_deg)))
+    {
+        *best = *candidate;
     }
 }
 
@@ -240,7 +505,7 @@ static uint8 YawAlign_FindBestCandidate(yaw_align_beacon_t *best)
         {
             const beacon_data *beacon = &image_data[camera].beacon_data[i];
 
-            if(YawAlign_BuildImageCandidate(camera, beacon, &candidate) == 0U)
+            if(YawAlign_BuildImageCandidate(camera, i, beacon, &candidate) == 0U)
             {
                 continue;
             }
@@ -270,7 +535,7 @@ static uint8 YawAlign_FindLockedCandidates(yaw_align_beacon_t *best,
         {
             const beacon_data *beacon = &image_data[camera].beacon_data[i];
 
-            if(YawAlign_BuildImageCandidate(camera, beacon, &candidate) == 0U)
+            if(YawAlign_BuildImageCandidate(camera, i, beacon, &candidate) == 0U)
             {
                 continue;
             }
@@ -282,10 +547,10 @@ static uint8 YawAlign_FindLockedCandidates(yaw_align_beacon_t *best,
                 continue;
             }
 
-            YawAlign_ChooseBetterCandidate(&candidate, best, &best_found);
+            YawAlign_ChooseLockedCandidate(&candidate, best, &best_found);
             if(candidate.mode == s_locked_beacon.mode)
             {
-                YawAlign_ChooseBetterCandidate(&candidate, current, &current_found);
+                YawAlign_ChooseCurrentCandidate(&candidate, current, &current_found);
             }
         }
     }
@@ -300,6 +565,7 @@ static uint8 YawAlign_UpdateCandidate(const yaw_align_beacon_t *beacon,
     if((s_candidate_frames == 0U) ||
        ((require_same_mode != 0U) &&
         (s_candidate_beacon.mode != beacon->mode)) ||
+       (YawAlign_IsSameSource(&s_candidate_beacon, beacon) == 0U) ||
        (YawAlign_AbsAngleDeltaDeg(s_candidate_beacon.canonical_yaw,
                                   beacon->canonical_yaw) >
         s_yaw_align_same_beacon_gate_deg))
@@ -339,13 +605,21 @@ static void YawAlign_ResetCandidate(void)
 
 static void YawAlign_ApplyYawTarget(const yaw_align_beacon_t *beacon)
 {
+    float lamp_vector_yaw;
+
+    if(YawAlign_TryGetLampVectorYaw(beacon, &lamp_vector_yaw) != 0U)
+    {
+        yaw_angle_target = lamp_vector_yaw;
+        return;
+    }
+
     if(fabsf(beacon->error_px) <= s_yaw_align_deadband_px)
     {
         YawAlign_HoldCurrentYaw();
         return;
     }
 
-    yaw_angle_target = g_euler.yaw + beacon->yaw_delta_deg;
+    yaw_angle_target = YawAlign_GetNormalYawTarget(beacon);
 }
 
 void YawAlign_Reset(void)

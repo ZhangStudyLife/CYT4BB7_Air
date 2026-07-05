@@ -4,6 +4,7 @@
 #include "../Estimation/Attitude/IMU_TOP.h"
 #include "../Estimation/Height_Est/Height_Est.h"
 #include "../IPC/ipc_image_data.h"
+#include "../Planner/car_lamp_fused.h"
 #include "../Protocols/AirComm/air_comm_air.h"
 #include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
 
@@ -602,7 +603,9 @@ void FC_Loop_100Hz(void)
                         g_euler.pitch,                              /* I34 */
                         g_euler.roll,                               /* I35 */
                         g_euler.yaw,                                /* I36 */
-                        g_car_sync_time_ms);                        /* I37 */
+                        g_car_sync_time_ms,                         /* I37 */
+                        g_car_lamp_fused.cx,                        /* I38 */
+                        g_car_lamp_fused.cy);                       /* I39 */
 
 }
 

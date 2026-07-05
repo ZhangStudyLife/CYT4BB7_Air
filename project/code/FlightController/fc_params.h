@@ -201,6 +201,8 @@ typedef struct
 
 /* 飞控参数全局实例：运行时调参只会修改这份 RAM 变量 */
 extern fc_params_t g_fc_params;
+/* 2BL3 图传发送开关：0=关闭，1=仅非飞行发送，2=始终发送 */
+extern volatile uint8_t g_2bl3_image_send_enable;
 
 /*
  * 函数名: FC_Params_Init

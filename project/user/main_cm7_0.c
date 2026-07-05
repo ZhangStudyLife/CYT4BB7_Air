@@ -8,7 +8,9 @@ static uint8 div500 = 0U;
 static uint8 div50 = 0U;
 static uint8 slot50 = 0U;
 static uint8 div10 = 0U;
-static uint8 s_ipc_last_flying = 0U;      /* 上一次成功通知给核1的飞行状态 */
+static uint8 s_ipc_last_flying = 0xFFU;   /* 上一次成功通知给核1的飞行状态 */
+/* 上一次成功通知给核1的 2BL3 图传发送模式 */
+static uint8 s_ipc_last_image_send_enable = 0xFFU;
 static uint8 s_ipc_flying_retry_div = 0U; /* 飞行状态 IPC 通知失败后的 100Hz 重试分频 */
 
 float g_car_vel_x = 0.0f; // 这个是车的速度 这个变量大于0 , 车往右
@@ -200,14 +202,21 @@ int main(void)
             wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
             {
                 uint8 flying = (FC_START_CRSF_STATE_FLYING == FC_START_CRSF_Get_State()) ? 1U : 0U;
+                uint8 image_send_enable = g_2bl3_image_send_enable;
 
-                if (flying != s_ipc_last_flying)
+                if(image_send_enable > 2U)
+                {
+                    image_send_enable = 0U;
+                }
+
+                if ((flying != s_ipc_last_flying) || (image_send_enable != s_ipc_last_image_send_enable))
                 {
                     if (0U == s_ipc_flying_retry_div)
                     {
-                        if (0U == ipc_flight_state_send(flying))
+                        if (0U == ipc_flight_state_send(flying, image_send_enable))
                         {
                             s_ipc_last_flying = flying;
+                            s_ipc_last_image_send_enable = image_send_enable;
                         }
                         s_ipc_flying_retry_div = 10U;
                     }

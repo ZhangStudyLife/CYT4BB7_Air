@@ -43,8 +43,9 @@ void ipc_image_callback(uint32 ipc_data);
 void ipc_image_publish(void);
 void ipc_image_poll(void);
 
-uint8 ipc_flight_state_send(uint8 flying);
+uint8 ipc_flight_state_send(uint8 flying, uint8 image_send_enable);
 uint8 ipc_core0_is_flying(void);
+uint8 ipc_core0_image_send_enable(void);
 void ipc_camera_spi_log_publish(const ipc_camera_spi_log_t *log);
 void ipc_camera_spi_log_get(ipc_camera_spi_log_t *out);
 

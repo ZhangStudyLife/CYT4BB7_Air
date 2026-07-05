@@ -32,7 +32,6 @@
 #define CAMERA_SPI_IRQ_SRC                  scb_6_interrupt_IRQn
 #define CAMERA_SPI_CPU_IRQ                  CPUIntIdx5_IRQn
 #define CAMERA_SPI_PERI_FREQ                CY_INITIAL_TARGET_PERI_FREQ
-#define CAMERA_SPI_IMAGE_TCP_ENABLE         (1U)
 #define CAMERA_SPI_IMAGE_DISPLAY_ENABLE     (0U)
 
 #define CAMERA_SPI_IMAGE_VERSION_OFFSET        (0U)
@@ -98,6 +97,8 @@ static uint8 s_initialized;
 static uint8 s_active;
 static uint8 s_active_board;
 static uint8 s_flight_state;
+/* 核0同步过来的 2BL3 图传发送模式 */
+static uint8 s_image_send_enable;
 static uint8 s_ready_mask;
 static uint8 s_polled_mask;
 static uint32 s_active_poll_count;
@@ -205,7 +206,8 @@ static void camera_spi_build_downlink_app(uint8 board_id, uint8 *app)
     app[1] = board_id;
     camera_spi_write_u32_le(&app[2], board->tx_counter++);
     app[6] = s_flight_state;
-    app[7] = CAMERA_SPI_IMAGE_TCP_ENABLE;
+    app[7] = ((s_image_send_enable == 2U) ||
+              ((s_image_send_enable == 1U) && (s_flight_state == 0U))) ? 1U : 0U;
     app[8] = (s_flight_state == 0U) ? CAMERA_SPI_IMAGE_DISPLAY_ENABLE : 0U;
 }
 
@@ -213,13 +215,20 @@ static void camera_spi_refresh_flight_state(void)
 {
     uint8 board_id;
     uint8 flying = (ipc_core0_is_flying() != 0U) ? 1U : 0U;
+    uint8 image_send_enable = ipc_core0_image_send_enable();
 
-    if(flying == s_flight_state)
+    if(image_send_enable > 2U)
+    {
+        image_send_enable = 0U;
+    }
+
+    if((flying == s_flight_state) && (image_send_enable == s_image_send_enable))
     {
         return;
     }
 
     s_flight_state = flying;
+    s_image_send_enable = image_send_enable;
     for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
     {
         s_boards[board_id].tx_sequence++;
@@ -567,6 +576,11 @@ void CameraSpi_Init(void)
     s_active = 0U;
     s_active_board = 0U;
     s_flight_state = (ipc_core0_is_flying() != 0U) ? 1U : 0U;
+    s_image_send_enable = ipc_core0_image_send_enable();
+    if(s_image_send_enable > 2U)
+    {
+        s_image_send_enable = 0U;
+    }
     s_ready_mask = 0U;
     s_polled_mask = 0U;
     s_active_poll_count = 0U;

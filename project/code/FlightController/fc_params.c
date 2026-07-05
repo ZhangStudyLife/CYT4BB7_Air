@@ -10,6 +10,8 @@
 
 /* 飞控参数全局实例：集中保存控制周期、油门基准和各控制环 PID 参数 */
 fc_params_t g_fc_params;
+/* 2BL3 图传发送开关：0=关闭，1=仅非飞行发送，2=始终发送 */
+volatile uint8_t g_2bl3_image_send_enable = 1U;
 /*
  * 函数名: fc_params_fill_defaults
  * 功能: 向目标参数结构体写入编译期默认值

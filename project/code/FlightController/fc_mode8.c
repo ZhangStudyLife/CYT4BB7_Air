@@ -70,7 +70,7 @@ static uint8_t FC_Mode8_FuseCarLamp(float *cx, float *cy)
     const car_lamp_data *front_lamp = &image_data[Front].car_lamp_data[0];
     const car_lamp_data *center_lamp = &image_data[Center].car_lamp_data[0];
     const car_lamp_data *back_lamp = &image_data[Back].car_lamp_data[0];
-    const uint8_t center_valid = (center_lamp->valid != 0U) ? 1U : 0U;
+    const uint8_t center_valid = image_data_car_lamp_valid(center_lamp);
     float x_sum = 0.0f;
     float y_sum = 0.0f;
     float weight_x_sum = 0.0f;
@@ -87,7 +87,7 @@ static uint8_t FC_Mode8_FuseCarLamp(float *cx, float *cy)
                                  &x_sum, &y_sum, &weight_x_sum, &weight_y_sum);
     }
 
-    if (front_lamp->valid != 0U)
+    if (image_data_car_lamp_valid(front_lamp) != 0U)
     {
         float front_center_cx = -8.902509f + 1.016973f * front_lamp->cx + 0.031254f * front_lamp->cy;
         float front_center_cy = -51.990433f - 0.020303f * front_lamp->cx + 1.003250f * front_lamp->cy;
@@ -97,7 +97,7 @@ static uint8_t FC_Mode8_FuseCarLamp(float *cx, float *cy)
                                  &side_x_sum, &side_y_sum, &side_weight_x_sum, &side_weight_y_sum);
     }
 
-    if (back_lamp->valid != 0U)
+    if (image_data_car_lamp_valid(back_lamp) != 0U)
     {
         float back_center_cx = 3.636157f - 0.996270f * back_lamp->cx - 0.085060f * back_lamp->cy;
         float back_center_cy = 25.907502f + 0.111016f * back_lamp->cx - 1.074126f * back_lamp->cy;

@@ -46,17 +46,17 @@ static void ImageDebugScreen_Init(void)
     ips114_show_string(IMAGE_SCREEN_Y_LABEL, 112U, " y:");
 }
 
-static void ImageDebugScreen_ShowXY(uint16 y, uint8 valid, float x, float y_value)
+static void ImageDebugScreen_ShowLamp(uint16 y, const car_lamp_data *lamp)
 {
-    ips114_set_color((valid != 0U) ? RGB565_BLACK : RGB565_RED, RGB565_WHITE);
-    ips114_show_float(IMAGE_SCREEN_X_VALUE, y, x, 3U, 1U);
-    ips114_show_float(IMAGE_SCREEN_Y_VALUE, y, y_value, 3U, 1U);
+    ips114_set_color((image_data_car_lamp_valid(lamp) != 0U) ? RGB565_BLACK : RGB565_RED, RGB565_WHITE);
+    ips114_show_float(IMAGE_SCREEN_X_VALUE, y, lamp->cx, 3U, 1U);
+    ips114_show_float(IMAGE_SCREEN_Y_VALUE, y, lamp->cy, 3U, 1U);
     ips114_set_color(RGB565_BLACK, RGB565_WHITE);
 }
 
 static void ImageDebugScreen_ShowBeacon(uint16 y, const beacon_data *beacon)
 {
-    ips114_set_color((beacon->valid != 0U) ? RGB565_BLACK : RGB565_RED, RGB565_WHITE);
+    ips114_set_color((image_data_beacon_valid(beacon) != 0U) ? RGB565_BLACK : RGB565_RED, RGB565_WHITE);
     ips114_show_float(IMAGE_SCREEN_X_VALUE, y, beacon->x, 3U, 1U);
     ips114_show_float(IMAGE_SCREEN_Y_VALUE, y, beacon->y, 3U, 1U);
     ips114_show_float(IMAGE_SCREEN_A_VALUE, y, beacon->area, 4U, 1U);
@@ -69,18 +69,9 @@ static void ImageDebugScreen_Update(void)
     ImageDebugScreen_ShowBeacon(2U * IMAGE_SCREEN_ROW_H, &image_data[Center].beacon_data[0]);
     ImageDebugScreen_ShowBeacon(3U * IMAGE_SCREEN_ROW_H, &image_data[Back].beacon_data[0]);
 
-    ImageDebugScreen_ShowXY(5U * IMAGE_SCREEN_ROW_H,
-                            image_data[Front].car_lamp_data[0].valid,
-                            image_data[Front].car_lamp_data[0].cx,
-                            image_data[Front].car_lamp_data[0].cy);
-    ImageDebugScreen_ShowXY(6U * IMAGE_SCREEN_ROW_H,
-                            image_data[Center].car_lamp_data[0].valid,
-                            image_data[Center].car_lamp_data[0].cx,
-                            image_data[Center].car_lamp_data[0].cy);
-    ImageDebugScreen_ShowXY(7U * IMAGE_SCREEN_ROW_H,
-                            image_data[Back].car_lamp_data[0].valid,
-                            image_data[Back].car_lamp_data[0].cx,
-                            image_data[Back].car_lamp_data[0].cy);
+    ImageDebugScreen_ShowLamp(5U * IMAGE_SCREEN_ROW_H, &image_data[Front].car_lamp_data[0]);
+    ImageDebugScreen_ShowLamp(6U * IMAGE_SCREEN_ROW_H, &image_data[Center].car_lamp_data[0]);
+    ImageDebugScreen_ShowLamp(7U * IMAGE_SCREEN_ROW_H, &image_data[Back].car_lamp_data[0]);
 }
 
 int main(void)
@@ -90,6 +81,9 @@ int main(void)
 
     ImageDebugScreen_Init();
     ipc_communicate_init(IPC_PORT_2, ipc_image_callback);
+    image_data_clear(&image_data[Front]);
+    image_data_clear(&image_data[Center]);
+    image_data_clear(&image_data[Back]);
     image_down_init();
     CameraSpi_Init();
     pit_ms_init(IMAGE_PIT, 10U);

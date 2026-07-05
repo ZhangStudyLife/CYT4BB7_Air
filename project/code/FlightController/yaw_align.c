@@ -130,7 +130,7 @@ static uint8 YawAlign_IsNearCarLamp(image_camera_e camera, const beacon_data *be
         float dx;
         float dy;
 
-        if(lamp->valid == 0U)
+        if(image_data_car_lamp_valid(lamp) == 0U)
         {
             continue;
         }
@@ -218,7 +218,7 @@ static uint8 YawAlign_BuildImageCandidate(image_camera_e camera,
 {
     yaw_align_beacon_t raw;
 
-    if((beacon->valid == 0U) || (beacon->area <= 0.0f))
+    if(image_data_beacon_valid(beacon) == 0U)
     {
         return 0U;
     }
@@ -244,7 +244,7 @@ static uint8 YawAlign_HasFrontBeacon(void)
 
     for(i = 0U; i < IMAGE_MAX_BEACON_COUNT; i++)
     {
-        if(image_data[Front].beacon_data[i].valid != 0U)
+        if(image_data_beacon_valid(&image_data[Front].beacon_data[i]) != 0U)
         {
             return 1U;
         }
@@ -270,7 +270,7 @@ static uint8 YawAlign_BuildRawImageCandidate(image_camera_e camera,
 {
     yaw_align_beacon_t raw;
 
-    if((beacon->valid == 0U) || (beacon->area <= 0.0f))
+    if(image_data_beacon_valid(beacon) == 0U)
     {
         return 0U;
     }
@@ -316,7 +316,7 @@ static uint8 YawAlign_BuildLampVectorCandidate(image_camera_e camera,
     float gate_deg;
 
     if((camera == Center) ||
-       (lamp->valid == 0U) ||
+       (image_data_car_lamp_valid(lamp) == 0U) ||
        (YawAlign_BuildRawImageCandidate(camera,
                                         beacon_index,
                                         beacon,

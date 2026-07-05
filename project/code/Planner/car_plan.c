@@ -62,6 +62,11 @@ static void CarPlan_CopyResult(car_plan_result_t *dst, const car_plan_result_t *
     }
 }
 
+static uint8 CarPlan_CarLampValid(uint8 camera)
+{
+    return image_data_car_lamp_valid(&image_data[camera].car_lamp_data[0]);
+}
+
 static float CarPlan_LimitAbs(float value, float limit)
 {
     if (value > limit)
@@ -201,7 +206,8 @@ static uint8 CarPlan_MakeCandidate(uint8 camera, uint8 beacon_index, car_plan_re
     const car_lamp_data *lamp = &image_data[camera].car_lamp_data[0];
     const beacon_data *beacon = &image_data[camera].beacon_data[beacon_index];
 
-    if ((lamp->valid == 0U) || (beacon->valid == 0U))
+    if ((image_data_car_lamp_valid(lamp) == 0U) ||
+        (image_data_beacon_valid(beacon) == 0U))
     {
         return 0U;
     }
@@ -237,7 +243,7 @@ static void CarPlan_UpdateLampMemory(void)
     {
         const car_lamp_data *lamp = &image_data[camera].car_lamp_data[0];
 
-        if (lamp->valid != 0U)
+        if (image_data_car_lamp_valid(lamp) != 0U)
         {
             s_lamp_memory[camera].valid = 1U;
             s_lamp_memory[camera].age_ticks = 0U;
@@ -302,7 +308,7 @@ static uint8 CarPlan_MakeStaleLampCandidate(car_plan_result_t *out)
         {
             const beacon_data *beacon = &image_data[camera].beacon_data[beacon_index];
 
-            if (beacon->valid == 0U)
+            if (image_data_beacon_valid(beacon) == 0U)
             {
                 continue;
             }
@@ -354,7 +360,7 @@ static uint8 CarPlan_GetFirstValidBeacon(uint8 camera, uint8 *beacon_index, cons
     {
         const beacon_data *item = &image_data[camera].beacon_data[index];
 
-        if (item->valid != 0U)
+        if (image_data_beacon_valid(item) != 0U)
         {
             *beacon_index = index;
             *beacon = item;
@@ -391,8 +397,8 @@ static uint8 CarPlan_MakeFrontSplitCandidate(car_plan_result_t *out)
     float forward;
     float dist_px;
 
-    if (((image_data[(uint8)Center].car_lamp_data[0].valid == 0U) &&
-         (image_data[(uint8)Back].car_lamp_data[0].valid == 0U)) ||
+    if (((CarPlan_CarLampValid((uint8)Center) == 0U) &&
+         (CarPlan_CarLampValid((uint8)Back) == 0U)) ||
         (CarPlan_GetFirstValidBeacon((uint8)Front, &beacon_index, &beacon) == 0U))
     {
         return 0U;
@@ -445,8 +451,8 @@ static uint8 CarPlan_MakeCenterSplitCandidate(car_plan_result_t *out)
     const beacon_data *beacon;
     uint8 beacon_index;
 
-    if (((image_data[(uint8)Front].car_lamp_data[0].valid == 0U) &&
-         (image_data[(uint8)Back].car_lamp_data[0].valid == 0U)) ||
+    if (((CarPlan_CarLampValid((uint8)Front) == 0U) &&
+         (CarPlan_CarLampValid((uint8)Back) == 0U)) ||
         (CarPlan_GetFirstValidBeacon((uint8)Center, &beacon_index, &beacon) == 0U) ||
         (s_last_valid_result_valid == 0U) ||
         (s_last_valid_result_age_ticks >= CAR_PLAN_INTENT_HOLD_TICKS))
@@ -477,8 +483,8 @@ static uint8 CarPlan_MakeBackSplitCandidate(car_plan_result_t *out)
     float forward;
     float dist_px;
 
-    if (((image_data[(uint8)Front].car_lamp_data[0].valid == 0U) &&
-         (image_data[(uint8)Center].car_lamp_data[0].valid == 0U)) ||
+    if (((CarPlan_CarLampValid((uint8)Front) == 0U) &&
+         (CarPlan_CarLampValid((uint8)Center) == 0U)) ||
         (CarPlan_GetFirstValidBeacon((uint8)Back, &beacon_index, &beacon) == 0U))
     {
         return 0U;
@@ -490,7 +496,7 @@ static uint8 CarPlan_MakeBackSplitCandidate(car_plan_result_t *out)
 
     if (beacon->y < CAR_PLAN_BACK_FORWARD_Y_PX)
     {
-        if (image_data[(uint8)Center].car_lamp_data[0].valid != 0U)
+        if (CarPlan_CarLampValid((uint8)Center) != 0U)
         {
             forward = -0.6f;
         }
@@ -517,9 +523,9 @@ static uint8 CarPlan_MakeBackSplitCandidate(car_plan_result_t *out)
 
 static uint8 CarPlan_MakeLampOnlyIntentCandidate(car_plan_result_t *out)
 {
-    if (((image_data[(uint8)Front].car_lamp_data[0].valid == 0U) &&
-         (image_data[(uint8)Center].car_lamp_data[0].valid == 0U) &&
-         (image_data[(uint8)Back].car_lamp_data[0].valid == 0U)) ||
+    if (((CarPlan_CarLampValid((uint8)Front) == 0U) &&
+         (CarPlan_CarLampValid((uint8)Center) == 0U) &&
+         (CarPlan_CarLampValid((uint8)Back) == 0U)) ||
         (s_last_valid_result_valid == 0U) ||
         (s_last_valid_result_age_ticks >= CAR_PLAN_INTENT_HOLD_TICKS) ||
         (s_last_valid_result.target_forward_mps >= CAR_PLAN_INTENT_NEG_FORWARD_MPS))

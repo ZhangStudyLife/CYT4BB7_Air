@@ -275,6 +275,20 @@ static void camera_spi_read_float(const uint8 *data, uint16 offset, float *value
     memcpy(value, &data[offset], sizeof(float));
 }
 
+static void camera_spi_clear_board_targets(camera_spi_board_state_t *board)
+{
+    uint8 i;
+
+    for(i = 0U; i < IMAGE_MAX_BEACON_COUNT; i++)
+    {
+        image_data_clear_beacon(&board->beacons[i]);
+    }
+    for(i = 0U; i < CAMERA_SPI_MAX_CAR_LAMPS; i++)
+    {
+        image_data_clear_car_lamp(&board->car_lamps[i]);
+    }
+}
+
 static void camera_spi_parse_image_payload(uint8 board_id, const uint8 *data)
 {
     uint8 i;
@@ -285,10 +299,10 @@ static void camera_spi_parse_image_payload(uint8 board_id, const uint8 *data)
     board->version = data[CAMERA_SPI_IMAGE_VERSION_OFFSET];
     board->beacon_count = data[CAMERA_SPI_IMAGE_BEACON_COUNT_OFFSET];
     board->car_lamp_count = data[CAMERA_SPI_IMAGE_LAMP_COUNT_OFFSET];
+    camera_spi_clear_board_targets(board);
 
     count = board->beacon_count;
     if(count > IMAGE_MAX_BEACON_COUNT) { count = IMAGE_MAX_BEACON_COUNT; }
-    memset(board->beacons, 0, sizeof(board->beacons));
     for(i = 0U; i < count; i++)
     {
         slot = &data[CAMERA_SPI_IMAGE_BEACON_PACKET_OFFSET + (uint16)i * CAMERA_SPI_IMAGE_BEACON_SLOT_SIZE];
@@ -296,11 +310,14 @@ static void camera_spi_parse_image_payload(uint8 board_id, const uint8 *data)
         camera_spi_read_float(slot, CAMERA_SPI_IMAGE_BEACON_X_OFFSET, &board->beacons[i].x);
         camera_spi_read_float(slot, CAMERA_SPI_IMAGE_BEACON_Y_OFFSET, &board->beacons[i].y);
         camera_spi_read_float(slot, CAMERA_SPI_IMAGE_BEACON_AREA_OFFSET, &board->beacons[i].area);
+        if(image_data_beacon_valid(&board->beacons[i]) == 0U)
+        {
+            image_data_clear_beacon(&board->beacons[i]);
+        }
     }
 
     count = board->car_lamp_count;
     if(count > CAMERA_SPI_MAX_CAR_LAMPS) { count = CAMERA_SPI_MAX_CAR_LAMPS; }
-    memset(board->car_lamps, 0, sizeof(board->car_lamps));
     for(i = 0U; i < count; i++)
     {
         slot = &data[CAMERA_SPI_IMAGE_LAMP_PACKET_OFFSET + (uint16)i * CAMERA_SPI_IMAGE_LAMP_SLOT_SIZE];
@@ -310,6 +327,10 @@ static void camera_spi_parse_image_payload(uint8 board_id, const uint8 *data)
         camera_spi_read_float(slot, CAMERA_SPI_IMAGE_LAMP_WIDTH_OFFSET, &board->car_lamps[i].width);
         camera_spi_read_float(slot, CAMERA_SPI_IMAGE_LAMP_LENGTH_OFFSET, &board->car_lamps[i].length);
         camera_spi_read_float(slot, CAMERA_SPI_IMAGE_LAMP_ANGLE_OFFSET, &board->car_lamps[i].angle);
+        if(image_data_car_lamp_valid(&board->car_lamps[i]) == 0U)
+        {
+            image_data_clear_car_lamp(&board->car_lamps[i]);
+        }
     }
 }
 
@@ -588,6 +609,7 @@ void CameraSpi_Init(void)
 
     for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
     {
+        camera_spi_clear_board_targets(&s_boards[board_id]);
         s_boards[board_id].tx_sequence = 1U;
     }
 
@@ -638,7 +660,7 @@ void CameraSpi_GetSnapshot(struct image_data camera[IMAGE_CAMERA_COUNT])
         const camera_spi_board_state_t *state = &s_boards[board_id];
         const image_camera_e camera_id = (board_id == 0U) ? Front : Back;
 
-        memset(&camera[camera_id], 0, sizeof(camera[camera_id]));
+        image_data_clear(&camera[camera_id]);
         memcpy(camera[camera_id].beacon_data, state->beacons, sizeof(state->beacons));
         memcpy(camera[camera_id].car_lamp_data, state->car_lamps, sizeof(state->car_lamps));
     }

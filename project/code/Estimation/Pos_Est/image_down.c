@@ -1199,7 +1199,7 @@ static uint8 image_down_latch_frame(void)
 
 static void image_down_clear_results(void)
 {
-    memset(&image_data[Center], 0, sizeof(image_data[Center]));
+    image_data_clear(&image_data[Center]);
 }
 
 static void image_down_store_result(const beacon_result_t *result)

@@ -1,22 +1,26 @@
 #include "car_lamp_fused.h"
 #include "../Image/image_data.h"
+#include <math.h>
 
 static const float s_lamp_lpf_alpha = 0.557f;
-static const float s_lamp_decay = 0.95f;
+static const float s_lamp_step_limit_px = 6.0f;
 static const float s_center_weight = 1.0f;
 static const float s_side_weight_cap = 0.25f;
 static const float s_front_x_weight = 0.227180f;
 static const float s_front_y_weight = 0.135893f;
 static const float s_back_x_weight = 0.194550f;
 static const float s_back_y_weight = 0.134159f;
+static const uint8 s_lamp_hold_max_ticks = 20U;
 
 car_lamp_fused_result_t g_car_lamp_fused;
+static uint8 s_lamp_hold_ticks = 0U;
 
 void CarLampFused_Init(void)
 {
     g_car_lamp_fused.valid = 0U;
     g_car_lamp_fused.cx = 0.0f;
     g_car_lamp_fused.cy = 0.0f;
+    s_lamp_hold_ticks = 0U;
 }
 
 uint8 CarLampFused_Update50Hz(void)
@@ -35,6 +39,12 @@ uint8 CarLampFused_Update50Hz(void)
     float side_y_weight = 0.0f;
     float cx;
     float cy;
+    float next_cx;
+    float next_cy;
+    float dx;
+    float dy;
+    float step;
+    float scale;
 
     if(center_valid != 0U)
     {
@@ -46,8 +56,8 @@ uint8 CarLampFused_Update50Hz(void)
 
     if(image_data_car_lamp_valid(front_lamp) != 0U)
     {
-        cx = -8.902509f + 1.016973f * front_lamp->cx + 0.031254f * front_lamp->cy;
-        cy = -51.990433f - 0.020303f * front_lamp->cx + 1.003250f * front_lamp->cy;
+        cx = -2.742171f + 1.000615f * front_lamp->cx - 0.007433f * front_lamp->cy;
+        cy = -62.238740f - 0.000411f * front_lamp->cx + 1.033626f * front_lamp->cy;
         side_x_sum += cx * s_front_x_weight;
         side_y_sum += cy * s_front_y_weight;
         side_x_weight += s_front_x_weight;
@@ -56,8 +66,8 @@ uint8 CarLampFused_Update50Hz(void)
 
     if(image_data_car_lamp_valid(back_lamp) != 0U)
     {
-        cx = 3.636157f - 0.996270f * back_lamp->cx - 0.085060f * back_lamp->cy;
-        cy = 25.907502f + 0.111016f * back_lamp->cx - 1.074126f * back_lamp->cy;
+        cx = -11.578788f - 0.975309f * back_lamp->cx + 0.045800f * back_lamp->cy;
+        cy = 58.365121f - 0.049687f * back_lamp->cx - 1.023470f * back_lamp->cy;
         side_x_sum += cx * s_back_x_weight;
         side_y_sum += cy * s_back_y_weight;
         side_x_weight += s_back_x_weight;
@@ -97,13 +107,21 @@ uint8 CarLampFused_Update50Hz(void)
             g_car_lamp_fused.cy = 0.0f;
             return 0U;
         }
-        g_car_lamp_fused.cx *= s_lamp_decay;
-        g_car_lamp_fused.cy *= s_lamp_decay;
-        return 1U;
+        if(s_lamp_hold_ticks < s_lamp_hold_max_ticks)
+        {
+            s_lamp_hold_ticks++;
+            return 1U;
+        }
+        g_car_lamp_fused.valid = 0U;
+        g_car_lamp_fused.cx = 0.0f;
+        g_car_lamp_fused.cy = 0.0f;
+        s_lamp_hold_ticks = 0U;
+        return 0U;
     }
 
     cx = x_sum / x_weight;
     cy = y_sum / y_weight;
+    s_lamp_hold_ticks = 0U;
     if(g_car_lamp_fused.valid == 0U)
     {
         g_car_lamp_fused.valid = 1U;
@@ -112,7 +130,18 @@ uint8 CarLampFused_Update50Hz(void)
         return 1U;
     }
 
-    g_car_lamp_fused.cx += s_lamp_lpf_alpha * (cx - g_car_lamp_fused.cx);
-    g_car_lamp_fused.cy += s_lamp_lpf_alpha * (cy - g_car_lamp_fused.cy);
+    next_cx = g_car_lamp_fused.cx + s_lamp_lpf_alpha * (cx - g_car_lamp_fused.cx);
+    next_cy = g_car_lamp_fused.cy + s_lamp_lpf_alpha * (cy - g_car_lamp_fused.cy);
+    dx = next_cx - g_car_lamp_fused.cx;
+    dy = next_cy - g_car_lamp_fused.cy;
+    step = sqrtf(dx * dx + dy * dy);
+    if(step > s_lamp_step_limit_px)
+    {
+        scale = s_lamp_step_limit_px / step;
+        dx *= scale;
+        dy *= scale;
+    }
+    g_car_lamp_fused.cx += dx;
+    g_car_lamp_fused.cy += dy;
     return 1U;
 }

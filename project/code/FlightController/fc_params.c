@@ -174,13 +174,13 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode8_img_y_d_lpf = 0.0f;
 
     /* ===== Mode 5 image and velocity params ===== */
-    params->mode5_img_x_kp = 1.8f;
+    params->mode5_img_x_kp = 3.0f;
     params->mode5_img_x_ki = 0.0f;
     params->mode5_img_x_kd = 0.0f;
     params->mode5_img_x_kff = 0.0f;
     params->mode5_img_x_i_limit = 0.0f;
     params->mode5_img_x_d_lpf = 0.0f;
-    params->mode5_img_y_kp = 1.8f;
+    params->mode5_img_y_kp = 3.0f;
     params->mode5_img_y_ki = 0.0f;
     params->mode5_img_y_kd = 0.0f;
     params->mode5_img_y_kff = 0.0f;

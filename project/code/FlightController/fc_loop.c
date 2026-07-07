@@ -603,9 +603,10 @@ void FC_Loop_100Hz(void)
                         g_euler.pitch,                              /* I34 */
                         g_euler.roll,                               /* I35 */
                         g_euler.yaw,                                /* I36 */
-                        g_car_sync_time_ms,                         /* I37 */
-                        g_car_lamp_fused.cx,                        /* I38 */
-                        g_car_lamp_fused.cy);                       /* I39 */
+                        g_car_sync_time_ms                         /* I37 */
+                        //g_car_lamp_fused.cx,                        /* I38 */
+                        //g_car_lamp_fused.cy                       /* I39 */
+                        );                       
 
 }
 

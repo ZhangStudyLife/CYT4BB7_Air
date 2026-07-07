@@ -29,13 +29,15 @@ typedef struct
 #define BEACON_MIN_COMPONENT_AREA       8
 #define BEACON_MAX_COMPONENT_AREA       5000
 #define CAR_LAMP_BINARY_THRESHOLD       200
-#define BEACON_BINARY_THRESHOLD         160
+#define BEACON_BINARY_THRESHOLD         120
 #define LAMP_MASK_PAD                   2
 #define LAMP_NEAR_BEACON_PAD            8
-#define LAMP_NEAR_BEACON_MIN_AREA       21
+#define LAMP_NEAR_BEACON_MIN_AREA       45
+#define LAMP_NEAR_BEACON_ISOLATED_MIN_AREA 18
+#define LAMP_NEAR_BEACON_BACKGROUND_MAX 40
 #define BEACON_SIDE_EDGE_MARGIN         25
-#define BEACON_SIDE_EDGE_MIN_AREA       5
-#define BEACON_SIDE_EDGE_THRESHOLD      150
+#define BEACON_SIDE_EDGE_MIN_AREA       8
+#define BEACON_SIDE_EDGE_THRESHOLD      100
 #define CLOSE_LAMP_SPLIT_THRESHOLD      250
 #define CLOSE_LAMP_MIN_AREA             120
 #define CLOSE_LAMP_MAX_AREA             260
@@ -74,6 +76,21 @@ typedef struct
 #define CAR_LAMP_SIDE_SUN_Y             36
 #define CAR_LAMP_EDGE_MARGIN            2
 #define CAR_LAMP_LOCAL_RING_PAD         3
+#define B0_MATCH_DISTANCE               18.0f
+#define B0_SWITCH_AREA_RATIO            1.45f
+#define B0_INIT_CONFIRM_FRAMES          2
+#define BEACON_MAX_MISSES               5
+#define CAR_LAMP_EDGE_MAX_MISSES        3
+#define CAR_LAMP_CENTER_MAX_MISSES      24
+#define CAR_LAMP_TEMPORAL_EDGE_MARGIN   8
+#define CAR_LAMP_TEMPORAL_MASK_PAD      5
+#define CAR_LAMP_TEMPORAL_CORE_PAD      2
+#define CAR_LAMP_TEMPORAL_TAKEOVER_PAD  10
+#define CAR_LAMP_TEMPORAL_MIN_BRIGHT_AREA 3
+#define KALMAN_GATE_DISTANCE            24.0f
+#define KALMAN_NEW_TARGET_DISTANCE      36.0f
+#define FILTER_POS_ALPHA                0.65f
+#define FILTER_VEL_ALPHA                0.30f
 
 #define IMAGE_QUEUE_SIZE                (BEACON_IMAGE_W * BEACON_IMAGE_H)
 #define PI_F                            3.1415926f
@@ -94,6 +111,22 @@ typedef struct
     unsigned char valid;
 } component_t;
 
+typedef struct
+{
+    unsigned char active;
+    unsigned char confirmed;
+    unsigned char hits;
+    unsigned char misses;
+    float x;
+    float y;
+    float vx;
+    float vy;
+    float radius;
+    float width;
+    float length;
+    float angle;
+} temporal_track_t;
+
 uint8 g_image_frame[MT9V03X_H][MT9V03X_W];
 
 static unsigned char g_binary[BEACON_IMAGE_H][BEACON_IMAGE_W];
@@ -103,6 +136,10 @@ static unsigned char g_queue_x[IMAGE_QUEUE_SIZE];
 static unsigned char g_queue_y[IMAGE_QUEUE_SIZE];
 static const unsigned char (*g_current_image)[BEACON_IMAGE_W] = 0;
 static unsigned char g_has_lamp_track = 0;
+static temporal_track_t g_b0_track;
+static temporal_track_t g_car_track;
+
+static void beacon_image_reset_temporal(void);
 
 static void beacon_image_init(void)
 {
@@ -111,6 +148,13 @@ static void beacon_image_init(void)
     g_current_image = 0;
     g_has_lamp_track = 0;
     g_current_stamp = 0;
+    beacon_image_reset_temporal();
+}
+
+static void beacon_image_reset_temporal(void)
+{
+    memset(&g_b0_track, 0, sizeof(g_b0_track));
+    memset(&g_car_track, 0, sizeof(g_car_track));
 }
 
 static void clear_result(beacon_result_t *result)
@@ -953,6 +997,16 @@ static unsigned char find_compound_close_lamp(component_t *best_lamp)
     return found;
 }
 
+static void fill_car_lamp_rect(const component_t *lamp, beacon_rect_t *rect)
+{
+    rect->cx = lamp->cx - (float)BEACON_IMAGE_W * 0.5f;
+    rect->cy = lamp->cy - (float)BEACON_IMAGE_H * 0.5f;
+    rect->length = lamp->major;
+    rect->width = lamp->minor;
+    rect->angle = lamp->angle;
+    rect->valid = 1;
+}
+
 static void write_car_lamp(const component_t *lamp, beacon_result_t *result)
 {
     beacon_rect_t *rect;
@@ -964,12 +1018,7 @@ static void write_car_lamp(const component_t *lamp, beacon_result_t *result)
     }
 
     rect = &result->car_lamps[0];
-    rect->cx = lamp->cx - (float)BEACON_IMAGE_W * 0.5f;
-    rect->cy = lamp->cy - (float)BEACON_IMAGE_H * 0.5f;
-    rect->length = lamp->major;
-    rect->width = lamp->minor;
-    rect->angle = lamp->angle;
-    rect->valid = 1;
+    fill_car_lamp_rect(lamp, rect);
     result->car_lamp_count = 1;
 }
 
@@ -1006,6 +1055,118 @@ static void erase_lamp_rect_from_binary(const component_t *lamp)
     }
 }
 
+static unsigned char component_from_temporal_car(
+    const temporal_track_t *track,
+    component_t *lamp,
+    unsigned char predicted)
+{
+    float image_cx;
+    float image_cy;
+    float half_len;
+    float half_wid;
+    float radius;
+
+    if (track == 0 || lamp == 0 || track->confirmed == 0 ||
+        track->length <= 0.0f || track->width <= 0.0f)
+    {
+        return 0;
+    }
+
+    memset(lamp, 0, sizeof(*lamp));
+    image_cx = track->x + (float)BEACON_IMAGE_W * 0.5f;
+    image_cy = track->y + (float)BEACON_IMAGE_H * 0.5f;
+    if (predicted != 0)
+    {
+        image_cx += track->vx;
+        image_cy += track->vy;
+    }
+
+    half_len = track->length * 0.5f + (float)CAR_LAMP_TEMPORAL_MASK_PAD;
+    half_wid = track->width * 0.5f + (float)CAR_LAMP_TEMPORAL_MASK_PAD;
+    radius = sqrtf(half_len * half_len + half_wid * half_wid);
+
+    lamp->cx = image_cx;
+    lamp->cy = image_cy;
+    lamp->major = track->length;
+    lamp->minor = track->width;
+    lamp->angle = track->angle;
+    lamp->area = (int)(track->length * track->width + 0.5f);
+    lamp->min_x = (int)(image_cx - radius);
+    lamp->max_x = (int)(image_cx + radius);
+    lamp->min_y = (int)(image_cy - radius);
+    lamp->max_y = (int)(image_cy + radius);
+    if (lamp->min_x < 0) lamp->min_x = 0;
+    if (lamp->min_y < 0) lamp->min_y = 0;
+    if (lamp->max_x >= BEACON_IMAGE_W) lamp->max_x = BEACON_IMAGE_W - 1;
+    if (lamp->max_y >= BEACON_IMAGE_H) lamp->max_y = BEACON_IMAGE_H - 1;
+    lamp->valid = 1;
+    return 1;
+}
+
+static void erase_temporal_lamp_from_binary(const component_t *lamp)
+{
+    int x;
+    int y;
+    float angle;
+    float cos_a;
+    float sin_a;
+    float half_len;
+    float half_wid;
+
+    if (lamp == 0 || lamp->valid == 0)
+    {
+        return;
+    }
+
+    angle = lamp->angle * (PI_F / 180.0f);
+    cos_a = cosf(angle);
+    sin_a = sinf(angle);
+    half_len = lamp->major * 0.5f + (float)CAR_LAMP_TEMPORAL_MASK_PAD;
+    half_wid = lamp->minor * 0.5f + (float)CAR_LAMP_TEMPORAL_MASK_PAD;
+
+    for (y = lamp->min_y; y <= lamp->max_y; y++)
+    {
+        for (x = lamp->min_x; x <= lamp->max_x; x++)
+        {
+            float dx = (float)x - lamp->cx;
+            float dy = (float)y - lamp->cy;
+            float major = dx * cos_a + dy * sin_a;
+            float minor = -dx * sin_a + dy * cos_a;
+            if (fabsf(major) <= half_len && fabsf(minor) <= half_wid)
+            {
+                g_binary[y][x] = 0;
+            }
+        }
+    }
+}
+
+static unsigned char is_component_in_lamp_core(const component_t *comp, const component_t *lamp)
+{
+    float angle;
+    float cos_a;
+    float sin_a;
+    float dx;
+    float dy;
+    float major;
+    float minor;
+
+    if (comp == 0 || comp->valid == 0 || lamp == 0 || lamp->valid == 0)
+    {
+        return 0;
+    }
+
+    angle = lamp->angle * (PI_F / 180.0f);
+    cos_a = cosf(angle);
+    sin_a = sinf(angle);
+    dx = comp->cx - lamp->cx;
+    dy = comp->cy - lamp->cy;
+    major = dx * cos_a + dy * sin_a;
+    minor = -dx * sin_a + dy * cos_a;
+
+    return (fabsf(major) <= lamp->major * 0.5f + (float)CAR_LAMP_TEMPORAL_CORE_PAD &&
+            fabsf(minor) <= lamp->minor * 0.5f + (float)CAR_LAMP_TEMPORAL_CORE_PAD) ? 1 : 0;
+}
+
 static unsigned char is_near_lamp(const component_t *comp, const component_t *lamp)
 {
     if (comp == 0 || lamp == 0 || lamp->valid == 0)
@@ -1028,9 +1189,21 @@ static unsigned char is_side_edge_beacon(const component_t *comp)
             comp->max_x >= BEACON_IMAGE_W - BEACON_SIDE_EDGE_MARGIN) ? 1 : 0;
 }
 
+static unsigned char is_isolated_near_lamp_beacon(const component_t *comp)
+{
+    if (comp == 0 || comp->valid == 0 || comp->area < LAMP_NEAR_BEACON_ISOLATED_MIN_AREA)
+    {
+        return 0;
+    }
+
+    return local_background_average(comp, CAR_LAMP_LOCAL_RING_PAD) <=
+        LAMP_NEAR_BEACON_BACKGROUND_MAX ? 1 : 0;
+}
+
 static void insert_beacon_by_area(
     const component_t *comp,
     const component_t *lamp,
+    const component_t *temporal_lamp,
     beacon_result_t *result)
 {
     int i;
@@ -1049,8 +1222,15 @@ static void insert_beacon_by_area(
     {
         return;
     }
-    if (is_near_lamp(comp, lamp) != 0 &&
-        comp->area < LAMP_NEAR_BEACON_MIN_AREA)
+    if (is_component_in_lamp_core(comp, lamp) != 0 ||
+        is_component_in_lamp_core(comp, temporal_lamp) != 0)
+    {
+        return;
+    }
+    if ((is_near_lamp(comp, lamp) != 0 ||
+         is_near_lamp(comp, temporal_lamp) != 0) &&
+        comp->area < LAMP_NEAR_BEACON_MIN_AREA &&
+        is_isolated_near_lamp_beacon(comp) == 0)
     {
         return;
     }
@@ -1106,6 +1286,7 @@ static void sync_legacy_beacons(beacon_result_t *result)
 static void find_beacons(
     const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
     const component_t *lamp,
+    const component_t *temporal_lamp,
     beacon_result_t *result)
 {
     unsigned char x;
@@ -1114,6 +1295,7 @@ static void find_beacons(
     result->beacon_count = 0;
     threshold_beacon_image(image);
     erase_lamp_rect_from_binary(lamp);
+    erase_temporal_lamp_from_binary(temporal_lamp);
     begin_visit_pass();
 
     for (y = 0; y < BEACON_IMAGE_H; y++)
@@ -1128,11 +1310,414 @@ static void find_beacons(
             }
 
             comp = grow_component(x, y);
-            insert_beacon_by_area(&comp, lamp, result);
+            insert_beacon_by_area(&comp, lamp, temporal_lamp, result);
         }
     }
 
     sync_legacy_beacons(result);
+}
+
+static float square_distance(float ax, float ay, float bx, float by)
+{
+    float dx = ax - bx;
+    float dy = ay - by;
+
+    return dx * dx + dy * dy;
+}
+
+static float beacon_area(const beacon_circle_t *beacon)
+{
+    return beacon->radius * beacon->radius * PI_F;
+}
+
+static void reset_track(temporal_track_t *track)
+{
+    memset(track, 0, sizeof(*track));
+}
+
+static unsigned char predict_missed_track(temporal_track_t *track, unsigned char max_misses)
+{
+    if (track->confirmed != 0 && track->misses < max_misses)
+    {
+        track->x += track->vx;
+        track->y += track->vy;
+        track->misses++;
+        return 1;
+    }
+
+    reset_track(track);
+    return 0;
+}
+
+static void start_pending_track(temporal_track_t *track, float x, float y)
+{
+    reset_track(track);
+    track->active = 1;
+    track->hits = 1;
+    track->x = x;
+    track->y = y;
+}
+
+static void update_track_position(temporal_track_t *track, float x, float y)
+{
+    float old_x = track->x;
+    float old_y = track->y;
+    float predict_x = track->x + track->vx;
+    float predict_y = track->y + track->vy;
+
+    track->vx = (1.0f - FILTER_VEL_ALPHA) * track->vx + FILTER_VEL_ALPHA * (x - old_x);
+    track->vy = (1.0f - FILTER_VEL_ALPHA) * track->vy + FILTER_VEL_ALPHA * (y - old_y);
+    track->x = FILTER_POS_ALPHA * x + (1.0f - FILTER_POS_ALPHA) * predict_x;
+    track->y = FILTER_POS_ALPHA * y + (1.0f - FILTER_POS_ALPHA) * predict_y;
+    track->misses = 0;
+}
+
+static void set_beacon_track_shape(temporal_track_t *track, const beacon_circle_t *beacon)
+{
+    track->radius = beacon->radius;
+}
+
+static void set_car_track_shape(temporal_track_t *track, const beacon_rect_t *car)
+{
+    track->width = car->width;
+    track->length = car->length;
+    track->angle = car->angle;
+}
+
+static void output_temporal_beacon(const temporal_track_t *track, beacon_result_t *result)
+{
+    beacon_circle_t beacon;
+    int i;
+    int matched = -1;
+    float best_d2 = B0_MATCH_DISTANCE * B0_MATCH_DISTANCE;
+
+    memset(&beacon, 0, sizeof(beacon));
+    beacon.x = track->x;
+    beacon.y = track->y;
+    beacon.radius = track->radius;
+    beacon.area = track->radius * track->radius * PI_F;
+    beacon.valid = 1;
+
+    for (i = 0; i < result->beacon_count; i++)
+    {
+        float d2 = square_distance(result->beacons[i].x, result->beacons[i].y,
+                                   beacon.x, beacon.y);
+        if (d2 <= best_d2)
+        {
+            best_d2 = d2;
+            matched = i;
+        }
+    }
+
+    if (matched == 0)
+    {
+        result->beacons[0] = beacon;
+        sync_legacy_beacons(result);
+        return;
+    }
+
+    if (matched > 0)
+    {
+        for (i = matched; i < result->beacon_count - 1; i++)
+        {
+            result->beacons[i] = result->beacons[i + 1];
+        }
+        result->beacon_count--;
+    }
+
+    if (result->beacon_count >= BEACON_MAX_BEACON_COUNT)
+    {
+        result->beacon_count = BEACON_MAX_BEACON_COUNT - 1;
+    }
+    for (i = result->beacon_count; i > 0; i--)
+    {
+        result->beacons[i] = result->beacons[i - 1];
+    }
+    result->beacons[0] = beacon;
+    result->beacon_count++;
+    sync_legacy_beacons(result);
+}
+
+static void output_temporal_car(const temporal_track_t *track, beacon_result_t *result)
+{
+    beacon_rect_t *car = &result->car_lamps[0];
+
+    car->cx = track->x;
+    car->cy = track->y;
+    car->width = track->width;
+    car->length = track->length;
+    car->angle = track->angle;
+    car->valid = 1;
+    if (result->car_lamp_count == 0)
+    {
+        result->car_lamp_count = 1;
+    }
+}
+
+static unsigned char temporal_car_max_misses(const temporal_track_t *track)
+{
+    component_t lamp;
+
+    if (component_from_temporal_car(track, &lamp, 1) == 0)
+    {
+        return CAR_LAMP_EDGE_MAX_MISSES;
+    }
+
+    if (lamp.min_x <= CAR_LAMP_TEMPORAL_EDGE_MARGIN ||
+        lamp.min_y <= CAR_LAMP_TEMPORAL_EDGE_MARGIN ||
+        lamp.max_x >= BEACON_IMAGE_W - 1 - CAR_LAMP_TEMPORAL_EDGE_MARGIN ||
+        lamp.max_y >= BEACON_IMAGE_H - 1 - CAR_LAMP_TEMPORAL_EDGE_MARGIN)
+    {
+        return CAR_LAMP_EDGE_MAX_MISSES;
+    }
+
+    return CAR_LAMP_CENTER_MAX_MISSES;
+}
+
+static unsigned char can_use_temporal_car_mask(const temporal_track_t *track)
+{
+    return (track != 0 &&
+            track->confirmed != 0 &&
+            track->misses < temporal_car_max_misses(track)) ? 1 : 0;
+}
+
+static unsigned char find_temporal_car_lamp(component_t *best_lamp)
+{
+    component_t temporal_lamp;
+    component_t best_comp;
+    unsigned char found = 0;
+    int min_x;
+    int max_x;
+    int min_y;
+    int max_y;
+    unsigned char x;
+    unsigned char y;
+
+    if (best_lamp == 0 || g_current_image == 0 ||
+        component_from_temporal_car(&g_car_track, &temporal_lamp, 1) == 0)
+    {
+        return 0;
+    }
+
+    memset(&best_comp, 0, sizeof(best_comp));
+
+    min_x = temporal_lamp.min_x - CAR_LAMP_TEMPORAL_TAKEOVER_PAD;
+    max_x = temporal_lamp.max_x + CAR_LAMP_TEMPORAL_TAKEOVER_PAD;
+    min_y = temporal_lamp.min_y - CAR_LAMP_TEMPORAL_TAKEOVER_PAD;
+    max_y = temporal_lamp.max_y + CAR_LAMP_TEMPORAL_TAKEOVER_PAD;
+    if (min_x < 0) min_x = 0;
+    if (min_y < 0) min_y = 0;
+    if (max_x >= BEACON_IMAGE_W) max_x = BEACON_IMAGE_W - 1;
+    if (max_y >= BEACON_IMAGE_H) max_y = BEACON_IMAGE_H - 1;
+
+    threshold_image(g_current_image, BEACON_BINARY_THRESHOLD);
+    begin_visit_pass();
+    for (y = (unsigned char)min_y; y <= (unsigned char)max_y; y++)
+    {
+        for (x = (unsigned char)min_x; x <= (unsigned char)max_x; x++)
+        {
+            component_t comp;
+
+            if (g_binary[y][x] == 0 || is_visited(x, y))
+            {
+                continue;
+            }
+
+            comp = grow_component(x, y);
+            if (comp.area >= CAR_LAMP_TEMPORAL_MIN_BRIGHT_AREA &&
+                is_component_in_lamp_core(&comp, &temporal_lamp) != 0)
+            {
+                if (found == 0 || comp.area > best_comp.area)
+                {
+                    best_comp = comp;
+                    found = 1;
+                }
+            }
+        }
+    }
+
+    if (found != 0)
+    {
+        *best_lamp = best_comp;
+    }
+
+    return found;
+}
+
+static int nearest_beacon_index(const beacon_result_t *result, float x, float y)
+{
+    int i;
+    int best = -1;
+    float best_d2 = B0_MATCH_DISTANCE * B0_MATCH_DISTANCE;
+
+    for (i = 0; i < result->beacon_count; i++)
+    {
+        float d2 = square_distance(result->beacons[i].x, result->beacons[i].y, x, y);
+        if (d2 <= best_d2)
+        {
+            best_d2 = d2;
+            best = i;
+        }
+    }
+
+    return best;
+}
+
+static unsigned char update_temporal_beacon(beacon_result_t *result)
+{
+    int selected = -1;
+    beacon_circle_t *measurement;
+
+    if (result->beacon_count == 0)
+    {
+        return predict_missed_track(&g_b0_track, BEACON_MAX_MISSES);
+    }
+
+    if (g_b0_track.confirmed != 0)
+    {
+        float predict_x = g_b0_track.x + g_b0_track.vx;
+        float predict_y = g_b0_track.y + g_b0_track.vy;
+
+        selected = nearest_beacon_index(result, predict_x, predict_y);
+        if (selected > 0 &&
+            beacon_area(&result->beacons[0]) > beacon_area(&result->beacons[selected]) * B0_SWITCH_AREA_RATIO)
+        {
+            selected = 0;
+        }
+        if (selected < 0 &&
+            square_distance(predict_x, predict_y, result->beacons[0].x, result->beacons[0].y) >
+                KALMAN_NEW_TARGET_DISTANCE * KALMAN_NEW_TARGET_DISTANCE)
+        {
+            start_pending_track(&g_b0_track, result->beacons[0].x, result->beacons[0].y);
+            set_beacon_track_shape(&g_b0_track, &result->beacons[0]);
+            return 0;
+        }
+    }
+    else
+    {
+        selected = 0;
+    }
+
+    if (selected < 0)
+    {
+        return predict_missed_track(&g_b0_track, BEACON_MAX_MISSES);
+    }
+
+    measurement = &result->beacons[selected];
+    if (g_b0_track.active == 0)
+    {
+        start_pending_track(&g_b0_track, measurement->x, measurement->y);
+        set_beacon_track_shape(&g_b0_track, measurement);
+        return 0;
+    }
+
+    if (g_b0_track.confirmed == 0)
+    {
+        if (square_distance(g_b0_track.x, g_b0_track.y, measurement->x, measurement->y) >
+            KALMAN_NEW_TARGET_DISTANCE * KALMAN_NEW_TARGET_DISTANCE)
+        {
+            start_pending_track(&g_b0_track, measurement->x, measurement->y);
+            set_beacon_track_shape(&g_b0_track, measurement);
+            return 0;
+        }
+        update_track_position(&g_b0_track, measurement->x, measurement->y);
+        set_beacon_track_shape(&g_b0_track, measurement);
+        g_b0_track.hits++;
+        if (g_b0_track.hits >= B0_INIT_CONFIRM_FRAMES)
+        {
+            g_b0_track.confirmed = 1;
+            return 1;
+        }
+        return 0;
+    }
+
+    if (square_distance(g_b0_track.x + g_b0_track.vx, g_b0_track.y + g_b0_track.vy,
+                        measurement->x, measurement->y) >
+        KALMAN_NEW_TARGET_DISTANCE * KALMAN_NEW_TARGET_DISTANCE)
+    {
+        start_pending_track(&g_b0_track, measurement->x, measurement->y);
+        set_beacon_track_shape(&g_b0_track, measurement);
+        return 0;
+    }
+
+    update_track_position(&g_b0_track, measurement->x, measurement->y);
+    set_beacon_track_shape(&g_b0_track, measurement);
+    return 1;
+}
+
+static unsigned char update_temporal_car(beacon_result_t *result)
+{
+    beacon_rect_t *measurement = 0;
+
+    if (result->car_lamp_count > 0 && result->car_lamps[0].valid != 0)
+    {
+        measurement = &result->car_lamps[0];
+    }
+    if (measurement == 0)
+    {
+        return predict_missed_track(&g_car_track,
+                                    temporal_car_max_misses(&g_car_track));
+    }
+
+    if (g_car_track.active == 0)
+    {
+        start_pending_track(&g_car_track, measurement->cx, measurement->cy);
+        set_car_track_shape(&g_car_track, measurement);
+        return 0;
+    }
+    if (g_car_track.confirmed != 0 &&
+        square_distance(g_car_track.x + g_car_track.vx, g_car_track.y + g_car_track.vy,
+                        measurement->cx, measurement->cy) >
+            KALMAN_GATE_DISTANCE * KALMAN_GATE_DISTANCE)
+    {
+        start_pending_track(&g_car_track, measurement->cx, measurement->cy);
+        set_car_track_shape(&g_car_track, measurement);
+        return 0;
+    }
+    if (g_car_track.confirmed == 0 &&
+        square_distance(g_car_track.x, g_car_track.y, measurement->cx, measurement->cy) >
+            KALMAN_NEW_TARGET_DISTANCE * KALMAN_NEW_TARGET_DISTANCE)
+    {
+        start_pending_track(&g_car_track, measurement->cx, measurement->cy);
+        set_car_track_shape(&g_car_track, measurement);
+        return 0;
+    }
+
+    update_track_position(&g_car_track, measurement->cx, measurement->cy);
+    set_car_track_shape(&g_car_track, measurement);
+    g_car_track.hits++;
+    if (g_car_track.confirmed == 0 && g_car_track.hits >= B0_INIT_CONFIRM_FRAMES)
+    {
+        g_car_track.confirmed = 1;
+    }
+
+    return g_car_track.confirmed;
+}
+
+static void apply_temporal_beacon(beacon_result_t *result)
+{
+    if (update_temporal_beacon(result) == 0)
+    {
+        return;
+    }
+
+    output_temporal_beacon(&g_b0_track, result);
+}
+
+static void apply_temporal_car(beacon_result_t *result)
+{
+    if (update_temporal_car(result) == 0)
+    {
+        return;
+    }
+
+    output_temporal_car(&g_car_track, result);
+}
+
+static void update_temporal_result(beacon_result_t *result)
+{
+    apply_temporal_beacon(result);
+    apply_temporal_car(result);
 }
 
 static void beacon_image_process(
@@ -1140,6 +1725,7 @@ static void beacon_image_process(
     beacon_result_t *result)
 {
     component_t lamp;
+    component_t temporal_lamp;
     unsigned char has_lamp;
     int i;
 
@@ -1155,6 +1741,7 @@ static void beacon_image_process(
     }
 
     g_current_image = image;
+    memset(&temporal_lamp, 0, sizeof(temporal_lamp));
     threshold_image(image, CAR_LAMP_BINARY_THRESHOLD);
     has_lamp = find_car_lamp(&lamp);
     if (has_lamp == 0)
@@ -1164,6 +1751,10 @@ static void beacon_image_process(
     if (has_lamp == 0)
     {
         has_lamp = find_compound_close_lamp(&lamp);
+    }
+    if (has_lamp == 0)
+    {
+        has_lamp = find_temporal_car_lamp(&lamp);
     }
 
     if (has_lamp == 0)
@@ -1176,8 +1767,14 @@ static void beacon_image_process(
         g_has_lamp_track = 1;
     }
 
+    if (can_use_temporal_car_mask(&g_car_track) != 0)
+    {
+        (void)component_from_temporal_car(&g_car_track, &temporal_lamp, 1);
+    }
+
     write_car_lamp(&lamp, result);
-    find_beacons(image, &lamp, result);
+    find_beacons(image, &lamp, &temporal_lamp, result);
+    update_temporal_result(result);
 
     for (i = result->car_lamp_count; i < BEACON_MAX_CAR_LAMP_COUNT; i++)
     {

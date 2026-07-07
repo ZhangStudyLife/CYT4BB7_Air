@@ -19,6 +19,7 @@
 #define BEACON_LOST_BEEP_COUNT         (1U)
 #define BEACON_LOST_SCAN_COUNT         (2U)
 #define BEACON_LOST_CENTER_MIN_AREA    (15.0f)
+#define BEACON_LOST_CENTER_X_LIMIT_PX  (84.0f)
 
 typedef struct
 {
@@ -58,6 +59,13 @@ static uint8 BeaconLostDetector_BeaconAllowed(image_camera_e camera,
     }
 
     if((camera == Center) && (beacon->area <= BEACON_LOST_CENTER_MIN_AREA))
+    {
+        return 0U;
+    }
+
+    if((camera == Center) &&
+       ((beacon->x <= -BEACON_LOST_CENTER_X_LIMIT_PX) ||
+        (beacon->x >= BEACON_LOST_CENTER_X_LIMIT_PX)))
     {
         return 0U;
     }

@@ -1,4 +1,5 @@
 #include "zf_common_headfile.h"
+#include "../code/Planner/beacon_lost_detector.h"
 
 volatile uint32 tick_1000us_cnt = 0U;
 volatile uint16 g_tick_1000HZ = 0U;
@@ -48,6 +49,7 @@ int main(void)
     (void)FC_Params_LoadFromFlash();
     Pos_Est_Init();
     FC_Loop_Init();
+    BeaconLostDetector_Init();
     wifi_justfloat_Init();
     wifi_params_Init();
     wifi_cal_imu_Init();
@@ -153,13 +155,14 @@ int main(void)
             FC_Loop_100Hz();
             air_comm_air_update_100HZ();
             ipc_image_poll();
+            (void)BeaconLostDetector_Update();
 
             car_plan_result_t car_plan;
             uint8 car_plan_send_valid;
             (void)CarPlan_Update(&car_plan);
             car_plan_send_valid = ((car_plan.valid != 0U) && (g_tof_fused_height_mm > 500.0f)) ? 1U : 0U;
 
-            float air_data[23];
+            float air_data[24];
             air_data[0] = g_tof_fused_height_mm;
             air_data[1] = g_euler.roll;
             air_data[2] = g_euler.pitch;
@@ -183,7 +186,8 @@ int main(void)
             air_data[20] = (float)car_plan.camera;
             air_data[21] = (float)car_plan.beacon_index;
             air_data[22] = car_plan.dist_px;
-            air_comm_send_run_data(air_data, 23);
+            air_data[23] = (float)BeaconLostDetector_GetFlag();
+            air_comm_send_run_data(air_data, 24);
 
             // wifi_justfloat(image_data[Front].car_lamp_data[0].cx,
             //                 image_data[Front].car_lamp_data[0].cy,

@@ -14,7 +14,7 @@ typedef struct
 } yaw_align_beacon_t;
 
 static const float s_yaw_align_deadband_px = 3.0f;
-static const float s_yaw_align_center_turn_x_px = 40.0f;
+static const float s_yaw_align_center_turn_x_px = 50.0f;
 static const float s_yaw_align_x_to_deg = 0.5f;
 static const float s_yaw_align_near_x_to_deg = 0.25f;
 static const float s_yaw_align_near_y_px = 20.0f;

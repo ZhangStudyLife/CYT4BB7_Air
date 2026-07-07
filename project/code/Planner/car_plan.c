@@ -6,7 +6,7 @@
 #define CAR_PLAN_BEACON0_INDEX             (0U)
 #define CAR_PLAN_MIN_DIST_PX               (2.0f)
 #define CAR_PLAN_ANGLE_TO_RAD              (0.017453292519943295f)
-#define CAR_PLAN_CENTER_X_LIMIT_PX         (70.0f)
+#define CAR_PLAN_CENTER_X_LIMIT_PX         (50.0f)
 
 static car_plan_result_t s_car_plan_result;
 

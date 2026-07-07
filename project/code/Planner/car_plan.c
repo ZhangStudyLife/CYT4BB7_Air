@@ -1,23 +1,14 @@
 #include "car_plan.h"
 #include "../Image/image_data.h"
 #include <math.h>
+#include <string.h>
 
-#define CAR_PLAN_BEACON_SCAN_COUNT         (2U)
+#define CAR_PLAN_BEACON0_INDEX             (0U)
 #define CAR_PLAN_MIN_DIST_PX               (2.0f)
 #define CAR_PLAN_ANGLE_TO_RAD              (0.017453292519943295f)
-#define CAR_PLAN_FORCED_FORWARD_MPS        (1.0f)
-
-typedef struct
-{
-    uint8 found;
-    car_plan_result_t result;
-} car_plan_candidate_t;
+#define CAR_PLAN_CENTER_X_LIMIT_PX         (70.0f)
 
 static car_plan_result_t s_car_plan_result;
-static uint8 s_lock_valid = 0U;
-static uint8 s_lock_camera = 0U;
-static uint8 s_lock_beacon_index = 0U;
-static uint16 s_lock_lost_ticks = 0U;
 
 static void CarPlan_ClearResult(car_plan_result_t *result)
 {
@@ -32,109 +23,20 @@ static void CarPlan_CopyResult(car_plan_result_t *dst, const car_plan_result_t *
     }
 }
 
+static uint8 CarPlan_BeaconValid(uint8 camera)
+{
+    return image_data_beacon_valid(&image_data[camera].beacon_data[CAR_PLAN_BEACON0_INDEX]);
+}
+
 static uint8 CarPlan_CarLampValid(uint8 camera)
 {
-    return (image_data[camera].car_lamp_data[0].valid != 0U) ? 1U : 0U;
+    return image_data_car_lamp_valid(&image_data[camera].car_lamp_data[0]);
 }
 
-static uint8 CarPlan_FindFirstValidBeacon(uint8 camera, uint8 *beacon_index, float *dist_px)
-{
-    uint8 index;
-
-    for (index = 0U; index < CAR_PLAN_BEACON_SCAN_COUNT; index++)
-    {
-        const beacon_data *beacon = &image_data[camera].beacon_data[index];
-
-        if (beacon->valid != 0U)
-        {
-            if (beacon_index != 0)
-            {
-                *beacon_index = index;
-            }
-            if (dist_px != 0)
-            {
-                *dist_px = sqrtf((beacon->x * beacon->x) + (beacon->y * beacon->y));
-            }
-            return 1U;
-        }
-    }
-
-    return 0U;
-}
-
-static void CarPlan_SetForcedForwardResult(uint8 camera,
-                                           uint8 beacon_index,
-                                           float forward,
-                                           float dist_px,
-                                           car_plan_result_t *out)
-{
-    out->valid = 1U;
-    out->camera = camera;
-    out->beacon_index = beacon_index;
-    out->target_strafe_mps = 0.0f;
-    out->target_forward_mps = forward;
-    out->dist_px = dist_px;
-    out->along = 0.0f;
-    out->perp = forward;
-}
-
-static uint8 CarPlan_MakeSingleSideFallbackCandidate(car_plan_result_t *out)
-{
-    uint8 front_beacon_index = 0U;
-    uint8 back_beacon_index = 0U;
-    float front_dist_px = 0.0f;
-    float back_dist_px = 0.0f;
-    uint8 front_beacon_valid;
-    uint8 center_beacon_valid;
-    uint8 back_beacon_valid;
-
-    front_beacon_valid = CarPlan_FindFirstValidBeacon((uint8)Front,
-                                                      &front_beacon_index,
-                                                      &front_dist_px);
-    center_beacon_valid = CarPlan_FindFirstValidBeacon((uint8)Center,
-                                                       0,
-                                                       0);
-    back_beacon_valid = CarPlan_FindFirstValidBeacon((uint8)Back,
-                                                     &back_beacon_index,
-                                                     &back_dist_px);
-
-    if ((center_beacon_valid != 0U) ||
-        ((front_beacon_valid != 0U) && (back_beacon_valid != 0U)))
-    {
-        return 0U;
-    }
-
-    if ((front_beacon_valid != 0U) &&
-        ((CarPlan_CarLampValid((uint8)Center) != 0U) ||
-         (CarPlan_CarLampValid((uint8)Back) != 0U)))
-    {
-        CarPlan_SetForcedForwardResult((uint8)Front,
-                                       front_beacon_index,
-                                       CAR_PLAN_FORCED_FORWARD_MPS,
-                                       front_dist_px,
-                                       out);
-        return 1U;
-    }
-
-    if ((back_beacon_valid != 0U) &&
-        ((CarPlan_CarLampValid((uint8)Center) != 0U) ||
-         (CarPlan_CarLampValid((uint8)Front) != 0U)))
-    {
-        CarPlan_SetForcedForwardResult((uint8)Back,
-                                       back_beacon_index,
-                                       -CAR_PLAN_FORCED_FORWARD_MPS,
-                                       back_dist_px,
-                                       out);
-        return 1U;
-    }
-
-    return 0U;
-}
-
-static uint8 CarPlan_MakeCandidate(uint8 camera, uint8 beacon_index, car_plan_result_t *out)
+static uint8 CarPlan_MakeGeometryResult(uint8 camera, car_plan_result_t *out)
 {
     const car_lamp_data *lamp = &image_data[camera].car_lamp_data[0];
-    const beacon_data *beacon = &image_data[camera].beacon_data[beacon_index];
+    const beacon_data *beacon = &image_data[camera].beacon_data[CAR_PLAN_BEACON0_INDEX];
     float dx;
     float dy;
     float dist;
@@ -149,7 +51,8 @@ static uint8 CarPlan_MakeCandidate(uint8 camera, uint8 beacon_index, car_plan_re
     float strafe;
     float forward;
 
-    if ((lamp->valid == 0U) || (beacon->valid == 0U))
+    if ((image_data_car_lamp_valid(lamp) == 0U) ||
+        (image_data_beacon_valid(beacon) == 0U))
     {
         return 0U;
     }
@@ -187,7 +90,7 @@ static uint8 CarPlan_MakeCandidate(uint8 camera, uint8 beacon_index, car_plan_re
 
     out->valid = 1U;
     out->camera = camera;
-    out->beacon_index = beacon_index;
+    out->beacon_index = CAR_PLAN_BEACON0_INDEX;
     out->target_strafe_mps = strafe * CAR_PLAN_SPEED_MPS;
     out->target_forward_mps = forward * CAR_PLAN_SPEED_MPS;
     out->dist_px = dist;
@@ -196,118 +99,119 @@ static uint8 CarPlan_MakeCandidate(uint8 camera, uint8 beacon_index, car_plan_re
     return 1U;
 }
 
-static void CarPlan_TryUpdateBest(const car_plan_result_t *candidate, car_plan_candidate_t *best)
+static void CarPlan_SetForcedForwardResult(uint8 camera,
+                                           float forward,
+                                           car_plan_result_t *out)
 {
-    if ((best->found == 0U) || (candidate->dist_px < best->result.dist_px))
-    {
-        best->found = 1U;
-        best->result = *candidate;
-    }
+    const beacon_data *beacon = &image_data[camera].beacon_data[CAR_PLAN_BEACON0_INDEX];
+
+    out->valid = 1U;
+    out->camera = camera;
+    out->beacon_index = CAR_PLAN_BEACON0_INDEX;
+    out->target_strafe_mps = 0.0f;
+    out->target_forward_mps = forward;
+    out->dist_px = sqrtf((beacon->x * beacon->x) + (beacon->y * beacon->y));
+    out->along = 0.0f;
+    out->perp = forward;
 }
 
-static void CarPlan_AgeLockLost(void)
+static uint8 CarPlan_SelectSideBeacon0(uint8 *camera)
 {
-    if (s_lock_valid != 0U)
+    const beacon_data *front_beacon = &image_data[Front].beacon_data[CAR_PLAN_BEACON0_INDEX];
+    const beacon_data *back_beacon = &image_data[Back].beacon_data[CAR_PLAN_BEACON0_INDEX];
+    uint8 front_valid = CarPlan_BeaconValid((uint8)Front);
+    uint8 back_valid = CarPlan_BeaconValid((uint8)Back);
+
+    if ((front_valid == 0U) && (back_valid == 0U))
     {
-        if (s_lock_lost_ticks < CAR_PLAN_LOCK_LOST_HOLD_TICKS)
-        {
-            s_lock_lost_ticks++;
-        }
-        else
-        {
-            s_lock_valid = 0U;
-            s_lock_lost_ticks = 0U;
-        }
+        return 0U;
     }
+
+    if ((front_valid != 0U) && (back_valid == 0U))
+    {
+        *camera = (uint8)Front;
+        return 1U;
+    }
+
+    if ((front_valid == 0U) && (back_valid != 0U))
+    {
+        *camera = (uint8)Back;
+        return 1U;
+    }
+
+    if (front_beacon->area > back_beacon->area)
+    {
+        *camera = (uint8)Front;
+        return 1U;
+    }
+
+    if (back_beacon->area > front_beacon->area)
+    {
+        *camera = (uint8)Back;
+        return 1U;
+    }
+
+    if ((CarPlan_CarLampValid((uint8)Back) != 0U) &&
+        (CarPlan_CarLampValid((uint8)Front) == 0U))
+    {
+        *camera = (uint8)Back;
+        return 1U;
+    }
+
+    *camera = (uint8)Front;
+    return 1U;
 }
 
 void CarPlan_Reset(void)
 {
     CarPlan_ClearResult(&s_car_plan_result);
-    s_lock_valid = 0U;
-    s_lock_camera = 0U;
-    s_lock_beacon_index = 0U;
-    s_lock_lost_ticks = 0U;
 }
 
 uint8 CarPlan_Update(car_plan_result_t *result)
 {
-    car_plan_candidate_t best;
-    car_plan_candidate_t locked;
+    const beacon_data *center_beacon = &image_data[Center].beacon_data[CAR_PLAN_BEACON0_INDEX];
     car_plan_result_t candidate;
-    uint8 camera;
-    uint8 beacon_index;
+    uint8 side_camera;
 
-    memset(&best, 0, sizeof(best));
-    memset(&locked, 0, sizeof(locked));
-
-    for (camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
+    if ((CarPlan_CarLampValid((uint8)Center) != 0U) &&
+        (CarPlan_BeaconValid((uint8)Center) != 0U) &&
+        (fabsf(center_beacon->x) <= CAR_PLAN_CENTER_X_LIMIT_PX) &&
+        (CarPlan_MakeGeometryResult((uint8)Center, &candidate) != 0U))
     {
-        for (beacon_index = 0U; beacon_index < CAR_PLAN_BEACON_SCAN_COUNT; beacon_index++)
-        {
-            if (CarPlan_MakeCandidate(camera, beacon_index, &candidate) == 0U)
-            {
-                continue;
-            }
-
-            CarPlan_TryUpdateBest(&candidate, &best);
-            if ((s_lock_valid != 0U) &&
-                (camera == s_lock_camera) &&
-                (beacon_index == s_lock_beacon_index))
-            {
-                locked.found = 1U;
-                locked.result = candidate;
-            }
-        }
-    }
-
-    if (best.found == 0U)
-    {
-        if (CarPlan_MakeSingleSideFallbackCandidate(&candidate) != 0U)
-        {
-            s_car_plan_result = candidate;
-            CarPlan_AgeLockLost();
-            CarPlan_CopyResult(result, &s_car_plan_result);
-            return s_car_plan_result.valid;
-        }
-
-        CarPlan_ClearResult(&s_car_plan_result);
-        CarPlan_AgeLockLost();
+        s_car_plan_result = candidate;
         CarPlan_CopyResult(result, &s_car_plan_result);
-        return 0U;
+        return s_car_plan_result.valid;
     }
 
-    if (locked.found != 0U)
+    if (CarPlan_SelectSideBeacon0(&side_camera) != 0U)
     {
-        if (best.result.dist_px + CAR_PLAN_LOCK_SWITCH_MARGIN_PX < locked.result.dist_px)
+        if (CarPlan_CarLampValid(side_camera) != 0U)
         {
-            s_car_plan_result = best.result;
+            if (CarPlan_MakeGeometryResult(side_camera, &candidate) != 0U)
+            {
+                s_car_plan_result = candidate;
+                CarPlan_CopyResult(result, &s_car_plan_result);
+                return s_car_plan_result.valid;
+            }
+
+            CarPlan_ClearResult(&s_car_plan_result);
+            CarPlan_CopyResult(result, &s_car_plan_result);
+            return 0U;
         }
-        else
-        {
-            s_car_plan_result = locked.result;
-        }
-        s_lock_valid = 1U;
-        s_lock_camera = s_car_plan_result.camera;
-        s_lock_beacon_index = s_car_plan_result.beacon_index;
-        s_lock_lost_ticks = 0U;
-    }
-    else if ((s_lock_valid == 0U) || (s_lock_lost_ticks >= CAR_PLAN_LOCK_LOST_HOLD_TICKS))
-    {
-        s_car_plan_result = best.result;
-        s_lock_valid = 1U;
-        s_lock_camera = s_car_plan_result.camera;
-        s_lock_beacon_index = s_car_plan_result.beacon_index;
-        s_lock_lost_ticks = 0U;
-    }
-    else
-    {
-        s_lock_lost_ticks++;
-        CarPlan_ClearResult(&s_car_plan_result);
+
+        CarPlan_SetForcedForwardResult(side_camera,
+                                       (side_camera == (uint8)Back)
+                                           ? -CAR_PLAN_SPEED_MPS
+                                           : CAR_PLAN_SPEED_MPS,
+                                       &candidate);
+        s_car_plan_result = candidate;
+        CarPlan_CopyResult(result, &s_car_plan_result);
+        return s_car_plan_result.valid;
     }
 
+    CarPlan_ClearResult(&s_car_plan_result);
     CarPlan_CopyResult(result, &s_car_plan_result);
-    return s_car_plan_result.valid;
+    return 0U;
 }
 
 void CarPlan_GetResult(car_plan_result_t *result)

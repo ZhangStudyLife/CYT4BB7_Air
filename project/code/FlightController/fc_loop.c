@@ -371,7 +371,7 @@ void FC_Loop_50Hz(void)
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_2:
-        FC_Mode0_50Hz(dt);
+        FC_Mode2_50Hz(dt);
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_3:
@@ -503,7 +503,7 @@ void FC_Loop_100Hz(void)
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_2:
-        FC_Mode0_100Hz();
+        FC_Mode2_100Hz();
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_3:
@@ -677,7 +677,8 @@ void FC_Loop_500Hz(void)
         }
 
         /* 非 mode5/mode8 时 yaw 目标固定为 0 度，mode5/mode8 由独立逻辑更新 yaw 目标 */
-        if ((s_flight_mode != FC_START_CRSF_FLIGHT_MODE_5) &&
+        if ((s_flight_mode != FC_START_CRSF_FLIGHT_MODE_2) &&
+            (s_flight_mode != FC_START_CRSF_FLIGHT_MODE_5) &&
             (s_flight_mode != FC_START_CRSF_FLIGHT_MODE_8))
         {
             yaw_angle_target = 0.0f;

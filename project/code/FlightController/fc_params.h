@@ -144,6 +144,33 @@ typedef struct
     float mode8_img_y_kff;             /* 模式8图像Y位置环前馈增益 */
     float mode8_img_y_i_limit;         /* 模式8图像Y位置环积分限幅 */
     float mode8_img_y_d_lpf;           /* 模式8图像Y位置环D项低通截止频率，单位Hz */
+    /* ===== Mode 2 image and velocity params ===== */
+    float mode2_img_x_kp;
+    float mode2_img_x_ki;
+    float mode2_img_x_kd;
+    float mode2_img_x_kff;
+    float mode2_img_x_i_limit;
+    float mode2_img_x_d_lpf;
+    float mode2_img_y_kp;
+    float mode2_img_y_ki;
+    float mode2_img_y_kd;
+    float mode2_img_y_kff;
+    float mode2_img_y_i_limit;
+    float mode2_img_y_d_lpf;
+    float mode2_vel_x_kp;
+    float mode2_vel_x_ki;
+    float mode2_vel_x_kd;
+    float mode2_vel_x_kff;
+    float mode2_vel_x_i_limit;
+    float mode2_vel_x_d_lpf;
+    float mode2_vel_y_kp;
+    float mode2_vel_y_ki;
+    float mode2_vel_y_kd;
+    float mode2_vel_y_kff;
+    float mode2_vel_y_i_limit;
+    float mode2_vel_y_d_lpf;
+    float mode2_kp_car_x;
+    float mode2_kp_car_y;
     /* ===== Mode 5 image and velocity params ===== */
     float mode5_img_x_kp;
     float mode5_img_x_ki;

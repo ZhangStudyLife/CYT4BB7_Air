@@ -1760,6 +1760,12 @@
             <file>
                 <name>$PROJ_DIR$\..\..\code\Planner\car_plan.h</name>
             </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\pix_to_distance.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\pix_to_distance.h</name>
+            </file>
         </group>
         <group>
             <name>FlightController</name>

@@ -5,6 +5,7 @@
 #include "../Estimation/Height_Est/Height_Est.h"
 #include "../IPC/ipc_image_data.h"
 #include "../Planner/car_lamp_fused.h"
+#include "../Planner/pix_to_distance.h"
 #include "../Protocols/AirComm/air_comm_air.h"
 #include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
 
@@ -35,6 +36,8 @@ static float height_pos_out = 0.0f;
 /* 目标高度，单位米 */
 extern volatile uint32 tick_1000us_cnt;
 extern float g_car_sync_time_ms;
+extern float g_car_vel_x;
+extern float g_car_vel_y;
 
 /* Yaw 角度目标是否已经对齐当前机头方向 */
 static uint8_t s_yaw_target_inited = 0U;
@@ -275,6 +278,8 @@ void FC_Loop_Init(void)
     FC_Mode7_Init();
     FC_Mode8_Init();
     FC_Reset_All_Mode_Control();
+    CarLampFused_Init();
+    PixToDistance_Init();
     s_hover_throttle = (float)g_fc_params.base_throttle;
 }
 
@@ -295,6 +300,8 @@ void FC_Loop_Reset(void)
     PID_Reset(&height_pos_pid);
     PID_Reset(&height_vel_pid);
     FC_Reset_All_Mode_Control();
+    CarLampFused_Init();
+    PixToDistance_Init();
     roll_gyro_target = 0.0f;
     pitch_gyro_target = 0.0f;
     yaw_gyro_target = 0.0f;
@@ -349,6 +356,9 @@ void FC_Loop_50Hz(void)
     {
         height_pos_out = 0.0f;
     }
+
+    CarLampFused_Update50Hz();
+    PixToDistance_Update();
 
     switch (s_flight_mode)
     {

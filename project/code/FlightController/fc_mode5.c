@@ -107,7 +107,6 @@ void FC_Mode5_Reset(void)
     s_mode5_accel_y = 0.0f;
     s_mode5_yaw_tick = 0U;
     s_mode5_yaw_index = 0U;
-    CarLampFused_Init();
     YawAlign_Reset();
     roll_angle_target = FC_Mode_Get_Roll_Mech_Trim_Deg();
     pitch_angle_target = FC_Mode_Get_Pitch_Mech_Trim_Deg();
@@ -167,7 +166,7 @@ void FC_Mode5_50Hz(float dt)
 
     yaw_align_active = YawAlign_Update();
 
-    fused_lamp_valid = CarLampFused_Update50Hz();
+    fused_lamp_valid = g_car_lamp_fused.valid;
     fused_lamp_cx = g_car_lamp_fused.cx;
     fused_lamp_cy = g_car_lamp_fused.cy;
 

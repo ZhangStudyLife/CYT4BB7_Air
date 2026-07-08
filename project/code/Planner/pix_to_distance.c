@@ -41,22 +41,27 @@ static float PixToDistance_SmoothStep01(float t)
 
 static float PixToDistance_CalcStrongGain(float pixel_abs)
 {
-    if(pixel_abs <= 40.0f)
+    if(pixel_abs <= 30.0f)
     {
         return 1.0f;
     }
 
+    if(pixel_abs < 40.0f)
+    {
+        return 1.0f + 0.3f * PixToDistance_SmoothStep01((pixel_abs - 30.0f) * 0.1f);
+    }
+
     if(pixel_abs < 50.0f)
     {
-        return 1.0f + 0.3f * PixToDistance_SmoothStep01((pixel_abs - 40.0f) * 0.1f);
+        return 1.3f + 0.3f * PixToDistance_SmoothStep01((pixel_abs - 40.0f) * 0.1f);
     }
 
     if(pixel_abs < 60.0f)
     {
-        return 1.3f + 0.2f * PixToDistance_SmoothStep01((pixel_abs - 50.0f) * 0.1f);
+        return 1.6f + 0.4f * PixToDistance_SmoothStep01((pixel_abs - 50.0f) * 0.1f);
     }
 
-    return 1.5f;
+    return 2.0f;
 }
 
 static void PixToDistance_Clear(void)

@@ -1,19 +1,21 @@
 #include "pix_to_distance.h"
 #include "car_lamp_fused.h"
+#include "ProjectionCenter.h"
 
-#define PIX_TO_DISTANCE_X_STRETCH_START   (40.0f)
-#define PIX_TO_DISTANCE_X_STRETCH_END     (80.0f)
-#define PIX_TO_DISTANCE_X_STRETCH_GAIN    (0.20f)
-#define PIX_TO_DISTANCE_Y_STRETCH_START   (40.0f)
-#define PIX_TO_DISTANCE_Y_STRETCH_END     (80.0f)
-#define PIX_TO_DISTANCE_Y_STRETCH_GAIN    (0.60f)
 #define PIX_TO_DISTANCE_OUTPUT_LIMIT_CM   (200.0f)
 
 pix_to_distance_result_t g_car_lamp_fused_distance;
+pix_to_distance_result_t g_car_lamp_fused_distance_projectioncenter;
+pix_to_distance_result_t g_car_lamp_fused_distance_projectioncenter_2;
 
 static float PixToDistance_AbsF(float x)
 {
     return (x >= 0.0f) ? x : -x;
+}
+
+static float PixToDistance_SignF(float x)
+{
+    return (x >= 0.0f) ? 1.0f : -1.0f;
 }
 
 static float PixToDistance_ClampF(float x, float min_val, float max_val)
@@ -37,6 +39,26 @@ static float PixToDistance_SmoothStep01(float t)
     return t * t * (3.0f - 2.0f * t);
 }
 
+static float PixToDistance_CalcStrongGain(float pixel_abs)
+{
+    if(pixel_abs <= 40.0f)
+    {
+        return 1.0f;
+    }
+
+    if(pixel_abs < 50.0f)
+    {
+        return 1.0f + 0.3f * PixToDistance_SmoothStep01((pixel_abs - 40.0f) * 0.1f);
+    }
+
+    if(pixel_abs < 60.0f)
+    {
+        return 1.3f + 0.2f * PixToDistance_SmoothStep01((pixel_abs - 50.0f) * 0.1f);
+    }
+
+    return 1.5f;
+}
+
 static void PixToDistance_Clear(void)
 {
     g_car_lamp_fused_distance.valid = 0U;
@@ -44,54 +66,69 @@ static void PixToDistance_Clear(void)
     g_car_lamp_fused_distance.y_cm = 0.0f;
 }
 
+static void PixToDistance_ClearProjectionCenter(void)
+{
+    g_car_lamp_fused_distance_projectioncenter.valid = 0U;
+    g_car_lamp_fused_distance_projectioncenter.x_cm = 0.0f;
+    g_car_lamp_fused_distance_projectioncenter.y_cm = 0.0f;
+}
+
+static void PixToDistance_ClearProjectionCenter2(void)
+{
+    g_car_lamp_fused_distance_projectioncenter_2.valid = 0U;
+    g_car_lamp_fused_distance_projectioncenter_2.x_cm = 0.0f;
+    g_car_lamp_fused_distance_projectioncenter_2.y_cm = 0.0f;
+}
+
 static void PixToDistance_Calc5thStretchXY(float cx, float cy, float *x_cm, float *y_cm)
 {
-    float u = cx * 0.02f;
-    float v = cy * 0.02f;
-    float u2 = u * u;
-    float u3 = u2 * u;
-    float u4 = u2 * u2;
-    float u5 = u4 * u;
-    float v2 = v * v;
-    float v3 = v2 * v;
-    float v4 = v2 * v2;
-    float v5 = v4 * v;
-    float x;
-    float y;
     float cx_abs;
     float cy_abs;
-    float tx;
-    float ty;
     float sx;
     float sy;
-    float x_stretch;
-    float y_stretch;
-
-    x = 44.01069065f * u
-      - 27.61256553f * u * v2
-      + 17.90590983f * u * v4
-      + 20.56672332f * u3
-      + 36.47132093f * u3 * v2
-      - 2.96596734f * u5;
-
-    y = 65.36820230f * v
-      + 15.76715691f * v3
-      - 4.84363232f * v5
-      + 1.97772301f * u2 * v
-      - 5.97205674f * u2 * v3
-      - 22.11071927f * u4 * v;
+    float u;
+    float v;
+    float u2;
+    float u3;
+    float u5;
+    float v2;
+    float v3;
+    float v5;
+    float x;
+    float y;
+    float gain_x;
+    float gain_y;
 
     cx_abs = PixToDistance_AbsF(cx);
-    tx = (cx_abs - PIX_TO_DISTANCE_X_STRETCH_START) * 0.025f;
-    sx = PixToDistance_SmoothStep01(tx);
-    x_stretch = 1.0f + PIX_TO_DISTANCE_X_STRETCH_GAIN * sx;
-    x = x * x_stretch;
-
     cy_abs = PixToDistance_AbsF(cy);
-    ty = (cy_abs - PIX_TO_DISTANCE_Y_STRETCH_START) * 0.025f;
-    sy = PixToDistance_SmoothStep01(ty);
-    y_stretch = 1.0f + PIX_TO_DISTANCE_Y_STRETCH_GAIN * sy;
-    y = y * y_stretch;
+    sx = PixToDistance_SignF(cx);
+    sy = PixToDistance_SignF(cy);
+
+    u = cx_abs * 0.02f;
+    v = cy_abs * 0.02f;
+
+    u2 = u * u;
+    u3 = u2 * u;
+    u5 = u3 * u2;
+
+    v2 = v * v;
+    v3 = v2 * v;
+    v5 = v3 * v2;
+
+    x = 42.61037587f * u
+      + 18.26989440f * u3
+      - 1.67580239f * u5;
+    x = sx * x;
+
+    y = 74.91278180f * v
+      - 11.85777924f * v3
+      + 10.88236607f * v5;
+    y = sy * y;
+
+    gain_x = PixToDistance_CalcStrongGain(cx_abs);
+    gain_y = PixToDistance_CalcStrongGain(cy_abs);
+    x = x * gain_x;
+    y = y * gain_y;
 
     x = PixToDistance_ClampF(x,
                              -PIX_TO_DISTANCE_OUTPUT_LIMIT_CM,
@@ -100,13 +137,22 @@ static void PixToDistance_Calc5thStretchXY(float cx, float cy, float *x_cm, floa
                              -PIX_TO_DISTANCE_OUTPUT_LIMIT_CM,
                              PIX_TO_DISTANCE_OUTPUT_LIMIT_CM);
 
-    *x_cm = x;
-    *y_cm = y;
+    if(x_cm != 0)
+    {
+        *x_cm = x;
+    }
+
+    if(y_cm != 0)
+    {
+        *y_cm = y;
+    }
 }
 
 void PixToDistance_Init(void)
 {
     PixToDistance_Clear();
+    PixToDistance_ClearProjectionCenter();
+    PixToDistance_ClearProjectionCenter2();
 }
 
 uint8 PixToDistance_Update(void)
@@ -129,5 +175,56 @@ uint8 PixToDistance_Update(void)
     g_car_lamp_fused_distance.valid = 1U;
     g_car_lamp_fused_distance.x_cm = x_cm;
     g_car_lamp_fused_distance.y_cm = y_cm;
+    return 1U;
+}
+
+uint8 PixToDistance_Update_ProjectionCenter(void)
+{
+    float lamp_x_cm;
+    float lamp_y_cm;
+    float projection_x_cm;
+    float projection_y_cm;
+
+    if((g_car_lamp_fused.valid == 0U) || (g_projection_center.valid == 0U))
+    {
+        PixToDistance_ClearProjectionCenter();
+        return 0U;
+    }
+
+    PixToDistance_Calc5thStretchXY(g_car_lamp_fused.cx,
+                                   g_car_lamp_fused.cy,
+                                   &lamp_x_cm,
+                                   &lamp_y_cm);
+    PixToDistance_Calc5thStretchXY(g_projection_center.cx,
+                                   g_projection_center.cy,
+                                   &projection_x_cm,
+                                   &projection_y_cm);
+
+    g_car_lamp_fused_distance_projectioncenter.valid = 1U;
+    g_car_lamp_fused_distance_projectioncenter.x_cm = lamp_x_cm - projection_x_cm;
+    g_car_lamp_fused_distance_projectioncenter.y_cm = lamp_y_cm - projection_y_cm;
+    return 1U;
+}
+
+uint8 PixToDistance_Update_ProjectionCenter_2(void)
+{
+    float delta_cx;
+    float delta_cy;
+    float x_cm;
+    float y_cm;
+
+    if((g_car_lamp_fused.valid == 0U) || (g_projection_center.valid == 0U))
+    {
+        PixToDistance_ClearProjectionCenter2();
+        return 0U;
+    }
+
+    delta_cx = g_car_lamp_fused.cx - g_projection_center.cx;
+    delta_cy = g_car_lamp_fused.cy - g_projection_center.cy;
+    PixToDistance_Calc5thStretchXY(delta_cx, delta_cy, &x_cm, &y_cm);
+
+    g_car_lamp_fused_distance_projectioncenter_2.valid = 1U;
+    g_car_lamp_fused_distance_projectioncenter_2.x_cm = x_cm;
+    g_car_lamp_fused_distance_projectioncenter_2.y_cm = y_cm;
     return 1U;
 }

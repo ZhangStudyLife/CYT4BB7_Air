@@ -39,6 +39,8 @@ extern volatile uint32 tick_1000us_cnt;
 extern float g_car_sync_time_ms;
 extern float g_car_vel_x;
 extern float g_car_vel_y;
+extern float img_err_x_old;
+extern float img_err_y_old;
 
 /* Yaw 角度目标是否已经对齐当前机头方向 */
 static uint8_t s_yaw_target_inited = 0U;
@@ -361,8 +363,8 @@ void FC_Loop_50Hz(void)
     }
 
     CarLampFused_Update50Hz();
-    PixToDistance_Update();
     ProjectionCenter_Update();
+    PixToDistance_Update_ProjectionCenter_2();
 
     switch (s_flight_mode)
     {
@@ -620,22 +622,24 @@ void FC_Loop_100Hz(void)
     //                     g_car_sync_time_ms,                         /* I37 */
     //                     g_car_lamp_fused.cx,                        /* I38 */
     //                     g_car_lamp_fused.cy,                        /* I39 */
-    //                     g_car_lamp_fused_distance.x_cm,
-    //                     g_car_lamp_fused_distance.y_cm
+    //                     g_car_lamp_fused_distance_projectioncenter_2.x_cm,
+    //                     g_car_lamp_fused_distance_projectioncenter_2.y_cm
     //                     );
 
+    wifi_justfloat(g_car_lamp_fused.cx,                               /* I1 */
+                   g_car_lamp_fused.cy,                               /* I2 */
+                   g_projection_center.cx,
+                   g_projection_center.cy,
+                   img_err_x_old,
+                   img_err_y_old,
+                   g_car_lamp_fused_distance_projectioncenter_2.x_cm, /* I3 */
+                   g_car_lamp_fused_distance_projectioncenter_2.y_cm, /* I4 */
+                   g_euler.pitch,                                     /* I5 */
+                   g_euler.roll,                                      /* I6 */
+                   g_euler.yaw,                                       /* I7 */
+                   lc302_data.flow_x_integral,
+                   lc302_data.flow_y_integral);
 
-    wifi_justfloat( g_car_lamp_fused.cx,                        /* I1 */
-                    g_car_lamp_fused.cy,                        /* I2 */
-                    g_car_lamp_fused_distance.x_cm,             /* I3 */
-                    g_car_lamp_fused_distance.y_cm,             /* I4 */
-                    g_euler.pitch,                              /* I5 */
-                    g_euler.roll,                               /* I6 */
-                    g_euler.yaw,                                /* I7 */
-                    g_car_sync_time_ms,                          /* I8 */
-                    lc302_data.flow_x_integral,
-                    lc302_data.flow_y_integral
-                    );
 
 }
 

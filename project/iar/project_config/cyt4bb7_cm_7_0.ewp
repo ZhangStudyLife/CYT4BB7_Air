@@ -1766,6 +1766,12 @@
             <file>
                 <name>$PROJ_DIR$\..\..\code\Planner\pix_to_distance.h</name>
             </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\ProjectionCenter.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\ProjectionCenter.h</name>
+            </file>
         </group>
         <group>
             <name>FlightController</name>

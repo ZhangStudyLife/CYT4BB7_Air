@@ -3,7 +3,7 @@
 #include "../Estimation/Pos_Est/Pos_Est.h"
 #include "../Estimation/Height_Est/Height_Est.h"
 #include "../Image/image_data.h"
-#include "../Planner/car_lamp_fused.h"
+#include "../Planner/pix_to_distance.h"
 #include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
 #include <math.h>
 
@@ -22,12 +22,6 @@ static const float s_mode8_vel_limit_cmps = 200.0f;
 static const float s_mode8_vel_accel_cmps2 = 250.0f;
 static const float s_mode8_vel_jerk_cmps3 = 1800.0f;
 static const float s_mode8_angle_limit_deg = 15.0f;
-static const float s_mode8_down_proj_x_bias = 0.0f;
-static const float s_mode8_down_proj_x_roll_k = 1.408988f;
-static const float s_mode8_down_proj_x_pitch_k = 0.015998f;
-static const float s_mode8_down_proj_y_bias = -19.863429f;
-static const float s_mode8_down_proj_y_roll_k = -0.064165f;
-static const float s_mode8_down_proj_y_pitch_k = 1.377711f;
 static float s_mode8_accel_x = 0.0f;
 static float s_mode8_accel_y = 0.0f;
 static uint16_t s_mode8_yaw_tick = 0U;
@@ -42,16 +36,6 @@ static void FC_Mode8_LimitVector(float *x, float *y, float limit)
         *x *= scale;
         *y *= scale;
     }
-}
-
-static void FC_Mode8_GetDownProjectionCenter(float *cx, float *cy)
-{
-    *cx = s_mode8_down_proj_x_bias +
-          s_mode8_down_proj_x_roll_k * g_euler.roll +
-          s_mode8_down_proj_x_pitch_k * g_euler.pitch;
-    *cy = s_mode8_down_proj_y_bias +
-          s_mode8_down_proj_y_roll_k * g_euler.roll +
-          s_mode8_down_proj_y_pitch_k * g_euler.pitch;
 }
 
 static void FC_Mode8_UpdateYawTarget(void)
@@ -147,10 +131,6 @@ void FC_Mode8_50Hz(float dt)
     float img_fb_y = 0.0f;
     float roll_trim;
     float pitch_trim;
-    float fused_lamp_cx = 0.0f;
-    float fused_lamp_cy = 0.0f;
-    float down_proj_cx = 0.0f;
-    float down_proj_cy = 0.0f;
     float car_ff_x = 0.0f;
     float car_ff_y = 0.0f;
     uint8_t fused_lamp_valid;
@@ -167,9 +147,7 @@ void FC_Mode8_50Hz(float dt)
 
     yaw_align_active = YawAlign_Update();
 
-    fused_lamp_valid = g_car_lamp_fused.valid;
-    fused_lamp_cx = g_car_lamp_fused.cx;
-    fused_lamp_cy = g_car_lamp_fused.cy;
+    fused_lamp_valid = g_car_lamp_fused_distance.valid;
 
     if (fused_lamp_valid != 0U)
     {
@@ -184,9 +162,8 @@ void FC_Mode8_50Hz(float dt)
 
     if ((fused_lamp_valid != 0U) && (tof_height_valid != 0U))
     {
-        FC_Mode8_GetDownProjectionCenter(&down_proj_cx, &down_proj_cy);
-        img_err_x = fused_lamp_cx - down_proj_cx;
-        img_err_y = fused_lamp_cy - down_proj_cy;
+        img_err_x = g_car_lamp_fused_distance.x_cm;
+        img_err_y = g_car_lamp_fused_distance.y_cm;
         img_fb_x = PID_Update(&s_mode8_imgx_pid, 0.0f, -img_err_x, dt);
         img_fb_y = PID_Update(&s_mode8_imgy_pid, 0.0f, -img_err_y, dt);
         img_fb_x = FC_Mode_Clamp(img_fb_x, -s_mode8_img_fb_limit_cmps, s_mode8_img_fb_limit_cmps);
@@ -256,8 +233,8 @@ void FC_Mode8_50Hz(float dt)
     //              g_car_vel_y,                   /* I2 */
     //              Pos_Est_vel_x,                 /* I3 */
     //              Pos_Est_vel_y,                 /* I4 */
-    //              fused_lamp_cx,                 /* I5 */
-    //              fused_lamp_cy,                 /* I6 */
+    //              g_car_lamp_fused_distance.x_cm,/* I5 */
+    //              g_car_lamp_fused_distance.y_cm,/* I6 */
     //              img_err_x,                     /* I7 */
     //              img_err_y,                     /* I8 */
     //              img_fb_x,                      /* I9 */

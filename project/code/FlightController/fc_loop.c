@@ -6,6 +6,7 @@
 #include "../IPC/ipc_image_data.h"
 #include "../Planner/car_lamp_fused.h"
 #include "../Planner/pix_to_distance.h"
+#include "../Planner/ProjectionCenter.h"
 #include "../Protocols/AirComm/air_comm_air.h"
 #include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
 
@@ -280,6 +281,7 @@ void FC_Loop_Init(void)
     FC_Reset_All_Mode_Control();
     CarLampFused_Init();
     PixToDistance_Init();
+    ProjectionCenter_Init();
     s_hover_throttle = (float)g_fc_params.base_throttle;
 }
 
@@ -302,6 +304,7 @@ void FC_Loop_Reset(void)
     FC_Reset_All_Mode_Control();
     CarLampFused_Init();
     PixToDistance_Init();
+    ProjectionCenter_Init();
     roll_gyro_target = 0.0f;
     pitch_gyro_target = 0.0f;
     yaw_gyro_target = 0.0f;
@@ -359,6 +362,7 @@ void FC_Loop_50Hz(void)
 
     CarLampFused_Update50Hz();
     PixToDistance_Update();
+    ProjectionCenter_Update();
 
     switch (s_flight_mode)
     {
@@ -571,52 +575,67 @@ void FC_Loop_100Hz(void)
     //                g_tof4_height_mm);
 
 
-       wifi_justfloat(image_data[Front].beacon_data[0].x,          /* I1 */
-                        image_data[Front].beacon_data[0].y,          /* I2 */
-                        image_data[Front].beacon_data[0].area,          /* I3 */
+    //    wifi_justfloat(image_data[Front].beacon_data[0].x,          /* I1 */
+    //                     image_data[Front].beacon_data[0].y,          /* I2 */
+    //                     image_data[Front].beacon_data[0].area,          /* I3 */
                         
-                        image_data[Front].beacon_data[1].x,          /* I4 */
-                        image_data[Front].beacon_data[1].y,          /* I5 */
-                        image_data[Front].beacon_data[1].area,          /* I6 */
+    //                     image_data[Front].beacon_data[1].x,          /* I4 */
+    //                     image_data[Front].beacon_data[1].y,          /* I5 */
+    //                     image_data[Front].beacon_data[1].area,          /* I6 */
                         
-                        image_data[Center].beacon_data[0].x,         /* I7 */
-                        image_data[Center].beacon_data[0].y,         /* I8 */
-                        image_data[Center].beacon_data[0].area,        /* I9 */
+    //                     image_data[Center].beacon_data[0].x,         /* I7 */
+    //                     image_data[Center].beacon_data[0].y,         /* I8 */
+    //                     image_data[Center].beacon_data[0].area,        /* I9 */
 
-                        image_data[Center].beacon_data[1].x,         /* I10 */
-                        image_data[Center].beacon_data[1].y,         /* I11 */
-                        image_data[Center].beacon_data[1].area,        /* I12 */
+    //                     image_data[Center].beacon_data[1].x,         /* I10 */
+    //                     image_data[Center].beacon_data[1].y,         /* I11 */
+    //                     image_data[Center].beacon_data[1].area,        /* I12 */
 
-                        image_data[Back].beacon_data[0].x,           /* I13 */
-                        image_data[Back].beacon_data[0].y,           /* I14 */
-                        image_data[Back].beacon_data[0].area,           /* I15 */
+    //                     image_data[Back].beacon_data[0].x,           /* I13 */
+    //                     image_data[Back].beacon_data[0].y,           /* I14 */
+    //                     image_data[Back].beacon_data[0].area,           /* I15 */
 
-                        image_data[Back].beacon_data[1].x,           /* I16 */
-                        image_data[Back].beacon_data[1].y,           /* I17 */
-                        image_data[Back].beacon_data[1].area,           /* I18 */
+    //                     image_data[Back].beacon_data[1].x,           /* I16 */
+    //                     image_data[Back].beacon_data[1].y,           /* I17 */
+    //                     image_data[Back].beacon_data[1].area,           /* I18 */
 
-                        image_data[Front].car_lamp_data[0].cx,       /* I19 */
-                        image_data[Front].car_lamp_data[0].cy,       /* I20 */
-                        image_data[Front].car_lamp_data[0].angle,    /* I21 */
-                        image_data[Front].car_lamp_data[0].width,    /* I22 */
-                        image_data[Front].car_lamp_data[0].length,   /* I23 */
-                        image_data[Center].car_lamp_data[0].cx,      /* I24 */
-                        image_data[Center].car_lamp_data[0].cy,      /* I25 */
-                        image_data[Center].car_lamp_data[0].angle,   /* I26 */
-                        image_data[Center].car_lamp_data[0].width,   /* I27 */
-                        image_data[Center].car_lamp_data[0].length,  /* I28 */
-                        image_data[Back].car_lamp_data[0].cx,        /* I29 */
-                        image_data[Back].car_lamp_data[0].cy,        /* I30 */
-                        image_data[Back].car_lamp_data[0].angle,     /* I31 */
-                        image_data[Back].car_lamp_data[0].width,     /* I32 */
-                        image_data[Back].car_lamp_data[0].length,    /* I33 */
-                        g_euler.pitch,                              /* I34 */
-                        g_euler.roll,                               /* I35 */
-                        g_euler.yaw,                                /* I36 */
-                        g_car_sync_time_ms                         /* I37 */
-                        //g_car_lamp_fused.cx,                        /* I38 */
-                        //g_car_lamp_fused.cy                       /* I39 */
-                        );                       
+    //                     image_data[Front].car_lamp_data[0].cx,       /* I19 */
+    //                     image_data[Front].car_lamp_data[0].cy,       /* I20 */
+    //                     image_data[Front].car_lamp_data[0].angle,    /* I21 */
+    //                     image_data[Front].car_lamp_data[0].width,    /* I22 */
+    //                     image_data[Front].car_lamp_data[0].length,   /* I23 */
+    //                     image_data[Center].car_lamp_data[0].cx,      /* I24 */
+    //                     image_data[Center].car_lamp_data[0].cy,      /* I25 */
+    //                     image_data[Center].car_lamp_data[0].angle,   /* I26 */
+    //                     image_data[Center].car_lamp_data[0].width,   /* I27 */
+    //                     image_data[Center].car_lamp_data[0].length,  /* I28 */
+    //                     image_data[Back].car_lamp_data[0].cx,        /* I29 */
+    //                     image_data[Back].car_lamp_data[0].cy,        /* I30 */
+    //                     image_data[Back].car_lamp_data[0].angle,     /* I31 */
+    //                     image_data[Back].car_lamp_data[0].width,     /* I32 */
+    //                     image_data[Back].car_lamp_data[0].length,    /* I33 */
+    //                     g_euler.pitch,                              /* I34 */
+    //                     g_euler.roll,                               /* I35 */
+    //                     g_euler.yaw,                                /* I36 */
+    //                     g_car_sync_time_ms,                         /* I37 */
+    //                     g_car_lamp_fused.cx,                        /* I38 */
+    //                     g_car_lamp_fused.cy,                        /* I39 */
+    //                     g_car_lamp_fused_distance.x_cm,
+    //                     g_car_lamp_fused_distance.y_cm
+    //                     );
+
+
+    wifi_justfloat( g_car_lamp_fused.cx,                        /* I1 */
+                    g_car_lamp_fused.cy,                        /* I2 */
+                    g_car_lamp_fused_distance.x_cm,             /* I3 */
+                    g_car_lamp_fused_distance.y_cm,             /* I4 */
+                    g_euler.pitch,                              /* I5 */
+                    g_euler.roll,                               /* I6 */
+                    g_euler.yaw,                                /* I7 */
+                    g_car_sync_time_ms,                          /* I8 */
+                    lc302_data.flow_x_integral,
+                    lc302_data.flow_y_integral
+                    );
 
 }
 

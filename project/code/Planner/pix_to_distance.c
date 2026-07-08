@@ -6,8 +6,8 @@
 #define PIX_TO_DISTANCE_X_STRETCH_GAIN    (0.20f)
 #define PIX_TO_DISTANCE_Y_STRETCH_START   (40.0f)
 #define PIX_TO_DISTANCE_Y_STRETCH_END     (80.0f)
-#define PIX_TO_DISTANCE_Y_STRETCH_GAIN    (0.20f)
-#define PIX_TO_DISTANCE_OUTPUT_LIMIT_CM   (150.0f)
+#define PIX_TO_DISTANCE_Y_STRETCH_GAIN    (0.60f)
+#define PIX_TO_DISTANCE_OUTPUT_LIMIT_CM   (200.0f)
 
 pix_to_distance_result_t g_car_lamp_fused_distance;
 

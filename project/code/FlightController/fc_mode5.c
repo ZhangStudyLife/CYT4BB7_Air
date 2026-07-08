@@ -5,6 +5,7 @@
 #include "../Image/image_data.h"
 #include "../Planner/car_lamp_fused.h"
 #include "../Planner/car_plan.h"
+#include "../Planner/ProjectionCenter.h"
 #include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
 #include <math.h>
 
@@ -20,12 +21,6 @@ static const float s_mode5_vel_limit_cmps = 200.0f;
 static const float s_mode5_vel_accel_cmps2 = 250.0f;
 static const float s_mode5_vel_jerk_cmps3 = 1800.0f;
 static const float s_mode5_angle_limit_deg = 15.0f;
-static const float s_mode5_down_proj_x_bias = 0.0f;
-static const float s_mode5_down_proj_x_roll_k = 1.408988f;
-static const float s_mode5_down_proj_x_pitch_k = 0.015998f;
-static const float s_mode5_down_proj_y_bias = -19.863429f;
-static const float s_mode5_down_proj_y_roll_k = -0.064165f;
-static const float s_mode5_down_proj_y_pitch_k = 1.377711f;
 static float s_mode5_accel_x = 0.0f;
 static float s_mode5_accel_y = 0.0f;
 static uint16_t s_mode5_yaw_tick = 0U;
@@ -40,16 +35,6 @@ static void FC_Mode5_LimitVector(float *x, float *y, float limit)
         *x *= scale;
         *y *= scale;
     }
-}
-
-static void FC_Mode5_GetDownProjectionCenter(float *cx, float *cy)
-{
-    *cx = s_mode5_down_proj_x_bias +
-          s_mode5_down_proj_x_roll_k * g_euler.roll +
-          s_mode5_down_proj_x_pitch_k * g_euler.pitch;
-    *cy = s_mode5_down_proj_y_bias +
-          s_mode5_down_proj_y_roll_k * g_euler.roll +
-          s_mode5_down_proj_y_pitch_k * g_euler.pitch;
 }
 
 static void FC_Mode5_UpdateYawTarget(void)
@@ -147,8 +132,6 @@ void FC_Mode5_50Hz(float dt)
     float pitch_trim;
     float fused_lamp_cx = 0.0f;
     float fused_lamp_cy = 0.0f;
-    float down_proj_cx = 0.0f;
-    float down_proj_cy = 0.0f;
     float car_ff_x = 0.0f;
     float car_ff_y = 0.0f;
     car_plan_result_t car_plan;
@@ -183,9 +166,8 @@ void FC_Mode5_50Hz(float dt)
 
     if ((fused_lamp_valid != 0U) && (tof_height_valid != 0U))
     {
-        FC_Mode5_GetDownProjectionCenter(&down_proj_cx, &down_proj_cy);
-        img_err_x = fused_lamp_cx - down_proj_cx;
-        img_err_y = fused_lamp_cy - down_proj_cy;
+        img_err_x = fused_lamp_cx - g_projection_center.cx;
+        img_err_y = fused_lamp_cy - g_projection_center.cy;
         img_fb_x = PID_Update(&s_mode5_imgx_pid, 0.0f, -img_err_x, dt);
         img_fb_y = PID_Update(&s_mode5_imgy_pid, 0.0f, -img_err_y, dt);
         img_fb_x = FC_Mode_Clamp(img_fb_x, -s_mode5_img_fb_limit_cmps, s_mode5_img_fb_limit_cmps);

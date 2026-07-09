@@ -61,7 +61,12 @@ static float PixToDistance_CalcStrongGain(float pixel_abs)
         return 1.6f + 0.4f * PixToDistance_SmoothStep01((pixel_abs - 50.0f) * 0.1f);
     }
 
-    return 2.0f;
+    if(pixel_abs < 80.0f)
+    {
+        return 2.0f + 0.5f * PixToDistance_SmoothStep01((pixel_abs - 60.0f) * 0.05f);
+    }
+
+    return 2.5f;
 }
 
 static void PixToDistance_Clear(void)

@@ -26,7 +26,7 @@ typedef struct
 #endif
 
 #define BEACON_THRESHOLD_MIN_VALUE      24
-#define BEACON_MIN_COMPONENT_AREA       8
+#define BEACON_MIN_COMPONENT_AREA       14
 #define BEACON_MAX_COMPONENT_AREA       5000
 #define CAR_LAMP_BINARY_THRESHOLD       200
 #define BEACON_BINARY_THRESHOLD         120
@@ -36,8 +36,9 @@ typedef struct
 #define LAMP_NEAR_BEACON_ISOLATED_MIN_AREA 18
 #define LAMP_NEAR_BEACON_BACKGROUND_MAX 40
 #define BEACON_SIDE_EDGE_MARGIN         25
-#define BEACON_SIDE_EDGE_MIN_AREA       8
+#define BEACON_SIDE_EDGE_MIN_AREA       14
 #define BEACON_SIDE_EDGE_THRESHOLD      100
+#define BEACON_TOP_BOTTOM_EDGE_REJECT_MARGIN 8
 #define CLOSE_LAMP_SPLIT_THRESHOLD      250
 #define CLOSE_LAMP_MIN_AREA             120
 #define CLOSE_LAMP_MAX_AREA             260
@@ -62,9 +63,9 @@ typedef struct
 #define CAR_LAMP_MAX_AREA               1200
 #define CAR_LAMP_MIN_ELONGATION         1.6f
 #define CAR_LAMP_MIN_LENGTH             8.0f
-#define CAR_LAMP_TRACK_START_AREA       45
-#define CAR_LAMP_TRACK_START_ELONGATION 2.0f
-#define CAR_LAMP_TRACK_START_SCORE      120.0f
+#define CAR_LAMP_TRACK_START_AREA       30
+#define CAR_LAMP_TRACK_START_ELONGATION 1.6f
+#define CAR_LAMP_TRACK_START_SCORE      80.0f
 #define CAR_LAMP_LARGE_AREA             90
 #define CAR_LAMP_LARGE_ELONGATION       1.2f
 #define CAR_LAMP_STRONG_AREA            45
@@ -79,7 +80,7 @@ typedef struct
 #define B0_MATCH_DISTANCE               18.0f
 #define B0_SWITCH_AREA_RATIO            1.45f
 #define B0_INIT_CONFIRM_FRAMES          2
-#define BEACON_MAX_MISSES               5
+#define BEACON_MAX_MISSES               3
 #define CAR_LAMP_EDGE_MAX_MISSES        3
 #define CAR_LAMP_CENTER_MAX_MISSES      24
 #define CAR_LAMP_TEMPORAL_EDGE_MARGIN   8
@@ -1212,6 +1213,13 @@ static void insert_beacon_by_area(
     beacon_circle_t circle;
 
     if (comp == 0 || comp->valid == 0)
+    {
+        return;
+    }
+    if ((lamp == 0 || lamp->valid == 0) &&
+        (temporal_lamp == 0 || temporal_lamp->valid == 0) &&
+        (comp->max_y <= BEACON_TOP_BOTTOM_EDGE_REJECT_MARGIN ||
+         comp->min_y >= BEACON_IMAGE_H - 1 - BEACON_TOP_BOTTOM_EDGE_REJECT_MARGIN))
     {
         return;
     }

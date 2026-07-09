@@ -3,9 +3,11 @@
 #include "../Estimation/Pos_Est/Pos_Est.h"
 #include "../Estimation/Height_Est/Height_Est.h"
 #include "../Image/image_data.h"
-#include "../Planner/car_plan.h"
 #include "../Planner/pix_to_distance.h"
 #include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
+
+extern float g_car_vel_x;
+extern float g_car_vel_y;
 
 static pid_t s_mode2_imgx_pid;
 static pid_t s_mode2_imgy_pid;
@@ -114,7 +116,6 @@ void FC_Mode2_50Hz(float dt)
     float pitch_trim;
     float car_ff_x = 0.0f;
     float car_ff_y = 0.0f;
-    car_plan_result_t car_plan;
     uint8_t fused_lamp_valid;
     uint8_t tof_height_valid;
     uint8_t yaw_align_active;
@@ -157,12 +158,8 @@ void FC_Mode2_50Hz(float dt)
         PID_Reset(&s_mode2_imgy_pid);
     }
 
-    CarPlan_GetResult(&car_plan);
-    if ((car_plan.valid != 0U) && (tof_height_valid != 0U))
-    {
-        car_ff_x = car_plan.target_strafe_mps * g_fc_params.mode2_kp_car_x;
-        car_ff_y = -car_plan.target_forward_mps * g_fc_params.mode2_kp_car_y;
-    }
+    car_ff_x = g_car_vel_x * g_fc_params.mode2_kp_car_x;
+    car_ff_y = -g_car_vel_y * g_fc_params.mode2_kp_car_y;
     velx_sp = img_fb_x + car_ff_x;
     vely_sp = img_fb_y + car_ff_y;
     // wifi_justfloat(g_car_vel_x, g_car_vel_y,

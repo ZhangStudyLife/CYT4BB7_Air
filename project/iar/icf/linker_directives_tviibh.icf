@@ -208,7 +208,18 @@ define region WORK_FLASH                        = mem:[from _base_WORK_FLASH    
 define region SFLASH                            = mem:[from _base_SFLASH                size _size_SFLASH               ];
 define region SFLASH_ALT                        = mem:[from _base_SFLASH_ALT            size _size_SFLASH_ALT           ];
 define region SELF_DTCM                         = mem:[from _base_SELF_DTCM             size _size_SELF_DTCM            ];
-define region SRAM                              = mem:[from _base_SRAM                  size _size_SRAM                 ];
+define region SRAM_PHYSICAL                     = mem:[from _base_SRAM                  size _size_SRAM                 ];
+if(isdefinedsymbol(_CORE_cm7_0_))
+{
+    // Keep the full physical range for startup ECC, but exclude the cache-line-aligned MT9V03X frame buffer from linker allocation.
+    define region SRAM_LOW                      = mem:[from _base_SRAM to 0x2802601F];
+    define region SRAM_HIGH                     = mem:[from 0x2802B860 to (_base_SRAM + _size_SRAM - 1)];
+    define region SRAM                          = SRAM_LOW | SRAM_HIGH;
+}
+else
+{
+    define region SRAM                          = SRAM_PHYSICAL;
+}
 define region SMIF_MEM                          = mem:[from _base_SMIF_MEMMAP           size _size_SMIF_MEMMAP          ];
 define region ITCM                              = mem:[from _base_ITCM                  size _size_ITCM                 ];
 define region DTCM                              = mem:[from _base_DTCM                  size _size_DTCM                 ];
@@ -263,7 +274,14 @@ if(isdefinedsymbol(_LINK_flash_))
 } 
 else if(isdefinedsymbol(_LINK_sram_)) 
 {
-    place at start of SRAM  { section .intvec };
+    if(isdefinedsymbol(_CORE_cm7_0_))
+    {
+        place at start of SRAM_LOW { section .intvec };
+    }
+    else
+    {
+        place at start of SRAM_PHYSICAL { section .intvec };
+    }
     place in          SRAM  { readonly };
 
     // Include CM7 binary in the CM0+ output. (IAR multi core debugging)
@@ -275,7 +293,14 @@ else if(isdefinedsymbol(_LINK_sram_))
 }
 
 place in          SRAM  { readwrite };
-place at end   of SRAM  { block HEAP_STACK };
+if(isdefinedsymbol(_CORE_cm7_0_))
+{
+    place at end of SRAM_HIGH { block HEAP_STACK };
+}
+else
+{
+    place at end of SRAM_PHYSICAL { block HEAP_STACK };
+}
 
 //============================================================
 // Symbols for use by application
@@ -304,13 +329,13 @@ if(isdefinedsymbol(_LINK_sram_))
     // Following definitions ensure that SRAM will not be touched at all by startup ECC initialization when code is linked to SRAM,
     // use debugger script to initialize the SRAM before downloading the application or adjust below symbols to not include
     // the area of SRAM where "ROM type" sections are linked to 
-    define exported symbol __ecc_init_sram_start_address = start(SRAM);
-    define exported symbol __ecc_init_sram_end_address   = start(SRAM) - 1;
+    define exported symbol __ecc_init_sram_start_address = start(SRAM_PHYSICAL);
+    define exported symbol __ecc_init_sram_end_address   = start(SRAM_PHYSICAL) - 1;
 }
 else
 {
-    define exported symbol __ecc_init_sram_start_address = start(SRAM);
-    define exported symbol __ecc_init_sram_end_address   = end(SRAM);
+    define exported symbol __ecc_init_sram_start_address = start(SRAM_PHYSICAL);
+    define exported symbol __ecc_init_sram_end_address   = end(SRAM_PHYSICAL);
 }
 
 if(isdefinedsymbol(_CORE_cm7_0_) || isdefinedsymbol(_CORE_cm7_1_))

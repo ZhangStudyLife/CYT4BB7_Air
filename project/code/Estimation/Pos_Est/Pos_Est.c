@@ -234,12 +234,30 @@ extern volatile uint32 tick_1000us_cnt;
 #define POS_EST_V2_NIS_REACQUIRE (25.0f)
 /* V2拒绝光流更新的二维NIS硬门限。 */
 #define POS_EST_V2_NIS_MAX (100.0f)
+/* V2通过连续性检查后允许真重捕获使用的NIS上限。 */
+#define POS_EST_V2_NIS_REACQUIRE_MAX (100.0f)
 /* V2正常更新允许的当前速度最大修正量，单位cm/s。 */
 #define POS_EST_V2_CORRECTION_NORMAL_CMPS (25.0f)
 /* V2重捕获允许的当前速度最大修正量，单位cm/s。 */
 #define POS_EST_V2_CORRECTION_REACQUIRE_CMPS (35.0f)
+/* V2真重捕获取得三帧一致前的探测修正上限，单位cm/s。 */
+#define POS_EST_V2_CORRECTION_PROBE_CMPS (10.0f)
 /* V2进入重捕获状态的无有效光流时间，单位毫秒。 */
 #define POS_EST_V2_REACQUIRE_MS (200U)
+/* V2进入降级状态的无有效光流时间，单位毫秒。 */
+#define POS_EST_V2_DEGRADED_MS (100U)
+/* V2真重捕获要求的连续一致光流帧数。 */
+#define POS_EST_V2_REACQUIRE_GOOD_FRAMES (3U)
+/* V2相邻重捕获光流速度允许的最大差，单位cm/s。 */
+#define POS_EST_V2_REACQUIRE_CONSISTENCY_CMPS (100.0f)
+/* V2输出预测器修正注入时间常数，单位秒。 */
+#define POS_EST_V2_OUTPUT_TAU_S (0.020f)
+/* V2输出预测器最大修正注入加速度，单位cm/s^2。 */
+#define POS_EST_V2_OUTPUT_CORRECTION_ACC_CMSS (1000.0f)
+/* V2输出预测器允许积累的最大待注入修正，单位cm/s。 */
+#define POS_EST_V2_OUTPUT_PENDING_MAX_CMPS (200.0f)
+/* V2输出预测器超过该待注入修正时标记不可靠，单位cm/s。 */
+#define POS_EST_V2_OUTPUT_PENDING_UNRELIABLE_CMPS (100.0f)
 /* V2加速度偏置状态限幅，单位cm/s^2。 */
 #define POS_EST_V2_BIAS_LIMIT_CMSS (100.0f)
 /* V2光流有效高度下限，单位米。 */
@@ -270,6 +288,18 @@ extern volatile uint32 tick_1000us_cnt;
 #define POS_EST_V2_STATUS_REJECTED (1U << 7U)
 /* V2当前处于光流重捕获状态位。 */
 #define POS_EST_V2_STATUS_REACQUIRE (1U << 8U)
+/* V2光流更新时间超过100ms。 */
+#define POS_EST_V2_STATUS_DEGRADED (1U << 9U)
+/* V2光流更新时间超过200ms或尚未接受光流。 */
+#define POS_EST_V2_STATUS_UNRELIABLE (1U << 10U)
+/* V2本帧冻结bias更新。 */
+#define POS_EST_V2_STATUS_BIAS_FROZEN (1U << 11U)
+/* V2输出修正注入触发限速。 */
+#define POS_EST_V2_STATUS_OUTPUT_LIMITED (1U << 12U)
+/* V2真重捕获已取得连续一致光流。 */
+#define POS_EST_V2_STATUS_REACQUIRE_CONSISTENT (1U << 13U)
+/* V2待注入修正触发硬限幅。 */
+#define POS_EST_V2_STATUS_PENDING_CLAMPED (1U << 14U)
 
 /* V2单个1000Hz历史样本，保存固定延迟更新和回放所需的全部数据。 */
 typedef struct
@@ -387,8 +417,19 @@ static uint32_t s_pos_est_v2_status = 0U;
 static uint8_t s_pos_est_v2_sensor_clock_ready = 0U;
 /* V2是否至少接受过一次光流更新。 */
 static uint8_t s_pos_est_v2_has_accepted = 0U;
-/* V2光流鲁棒更新后的剩余重捕获帧数。 */
-static uint8_t s_pos_est_v2_recovery_frames = 0U;
+static uint8_t s_pos_est_v2_reacquire_active = 0U;
+static uint8_t s_pos_est_v2_reacquire_good_count = 0U;
+static uint8_t s_pos_est_v2_reacquire_stable_count = 0U;
+static float s_pos_est_v2_reacquire_prev_x = 0.0f;
+static float s_pos_est_v2_reacquire_prev_y = 0.0f;
+static float s_pos_est_v2_output_vel_x = 0.0f;
+static float s_pos_est_v2_output_vel_y = 0.0f;
+static float s_pos_est_v2_pending_x = 0.0f;
+static float s_pos_est_v2_pending_y = 0.0f;
+static float s_pos_est_v2_output_injection_x = 0.0f;
+static float s_pos_est_v2_output_injection_y = 0.0f;
+static float s_pos_est_v2_last_accept_age_ms = 0.0f;
+static float s_pos_est_v2_sigma_flow_radps = POS_EST_V2_SIGMA_FLOW_RADPS;
 
 static float Pos_Est_ClampFloat(float value, float min_value, float max_value)
 {
@@ -649,7 +690,19 @@ void Pos_Est_V2_Init(void)
     s_pos_est_v2_status = 0U;
     s_pos_est_v2_sensor_clock_ready = 0U;
     s_pos_est_v2_has_accepted = 0U;
-    s_pos_est_v2_recovery_frames = 0U;
+    s_pos_est_v2_reacquire_active = 0U;
+    s_pos_est_v2_reacquire_good_count = 0U;
+    s_pos_est_v2_reacquire_stable_count = 0U;
+    s_pos_est_v2_reacquire_prev_x = 0.0f;
+    s_pos_est_v2_reacquire_prev_y = 0.0f;
+    s_pos_est_v2_output_vel_x = 0.0f;
+    s_pos_est_v2_output_vel_y = 0.0f;
+    s_pos_est_v2_pending_x = 0.0f;
+    s_pos_est_v2_pending_y = 0.0f;
+    s_pos_est_v2_output_injection_x = 0.0f;
+    s_pos_est_v2_output_injection_y = 0.0f;
+    s_pos_est_v2_last_accept_age_ms = 0.0f;
+    s_pos_est_v2_sigma_flow_radps = POS_EST_V2_SIGMA_FLOW_RADPS;
 }
 
 /*
@@ -664,6 +717,16 @@ void Pos_Est_V2_Update_1000HZ(void)
     Pos_Est_V2_History_t *previous = NULL;
     uint16_t current_index;
     float yaw_cos_pitch;
+    float dt;
+    float dpsi;
+    float yaw_cos;
+    float yaw_sin;
+    float pending_x;
+    float pending_y;
+    float alpha;
+    float injection_norm;
+    float injection_limit;
+    float injection_scale;
 
     if (s_pos_est_v2_history_count == 0U)
     {
@@ -726,6 +789,88 @@ void Pos_Est_V2_Update_1000HZ(void)
     s_pos_est_v2_vel_y = current->state[1];
     s_pos_est_v2_bias_x = current->state[2];
     s_pos_est_v2_bias_y = current->state[3];
+
+    s_pos_est_v2_status &= ~(POS_EST_V2_STATUS_DEGRADED |
+                             POS_EST_V2_STATUS_UNRELIABLE |
+                             POS_EST_V2_STATUS_OUTPUT_LIMITED |
+                             POS_EST_V2_STATUS_REACQUIRE);
+    s_pos_est_v2_output_injection_x = 0.0f;
+    s_pos_est_v2_output_injection_y = 0.0f;
+    if ((previous == NULL) ||
+        ((current->static_locked != 0U) && (current->height_m < POS_EST_V2_HEIGHT_MIN_M)))
+    {
+        s_pos_est_v2_pending_x = 0.0f;
+        s_pos_est_v2_pending_y = 0.0f;
+    }
+    else
+    {
+        dt = (float)(current->time_ms - previous->time_ms) * 0.001f;
+        if ((dt <= 0.0f) || (dt > 0.050f))
+        {
+            s_pos_est_v2_pending_x = 0.0f;
+            s_pos_est_v2_pending_y = 0.0f;
+        }
+        else
+        {
+            dpsi = current->yaw_rate_rps * dt;
+            yaw_cos = cosf(dpsi);
+            yaw_sin = sinf(dpsi);
+            pending_x = yaw_cos * s_pos_est_v2_pending_x +
+                        yaw_sin * s_pos_est_v2_pending_y;
+            pending_y = -yaw_sin * s_pos_est_v2_pending_x +
+                        yaw_cos * s_pos_est_v2_pending_y;
+            s_pos_est_v2_pending_x = pending_x;
+            s_pos_est_v2_pending_y = pending_y;
+
+            alpha = dt / (POS_EST_V2_OUTPUT_TAU_S + dt);
+            s_pos_est_v2_output_injection_x = alpha * s_pos_est_v2_pending_x;
+            s_pos_est_v2_output_injection_y = alpha * s_pos_est_v2_pending_y;
+            injection_norm = sqrtf(s_pos_est_v2_output_injection_x *
+                                       s_pos_est_v2_output_injection_x +
+                                   s_pos_est_v2_output_injection_y *
+                                       s_pos_est_v2_output_injection_y);
+            injection_limit = POS_EST_V2_OUTPUT_CORRECTION_ACC_CMSS * dt;
+            if (injection_norm > injection_limit)
+            {
+                injection_scale = injection_limit / injection_norm;
+                s_pos_est_v2_output_injection_x *= injection_scale;
+                s_pos_est_v2_output_injection_y *= injection_scale;
+                s_pos_est_v2_status |= POS_EST_V2_STATUS_OUTPUT_LIMITED;
+            }
+            s_pos_est_v2_pending_x -= s_pos_est_v2_output_injection_x;
+            s_pos_est_v2_pending_y -= s_pos_est_v2_output_injection_y;
+            injection_norm = sqrtf(s_pos_est_v2_pending_x * s_pos_est_v2_pending_x +
+                                   s_pos_est_v2_pending_y * s_pos_est_v2_pending_y);
+            if (injection_norm > POS_EST_V2_OUTPUT_PENDING_UNRELIABLE_CMPS)
+            {
+                s_pos_est_v2_status |= POS_EST_V2_STATUS_UNRELIABLE;
+            }
+        }
+    }
+    s_pos_est_v2_output_vel_x = s_pos_est_v2_vel_x - s_pos_est_v2_pending_x;
+    s_pos_est_v2_output_vel_y = s_pos_est_v2_vel_y - s_pos_est_v2_pending_y;
+
+    if (s_pos_est_v2_has_accepted == 0U)
+    {
+        s_pos_est_v2_last_accept_age_ms = 65535.0f;
+        s_pos_est_v2_status |= POS_EST_V2_STATUS_UNRELIABLE;
+    }
+    else
+    {
+        s_pos_est_v2_last_accept_age_ms =
+            (float)(tick_1000us_cnt - s_pos_est_v2_last_accepted_ms);
+        if ((s_pos_est_v2_reacquire_active != 0U) ||
+            (s_pos_est_v2_last_accept_age_ms > (float)POS_EST_V2_REACQUIRE_MS))
+        {
+            s_pos_est_v2_status |= POS_EST_V2_STATUS_UNRELIABLE |
+                                   POS_EST_V2_STATUS_REACQUIRE;
+        }
+        else if ((s_pos_est_v2_last_accept_age_ms > (float)POS_EST_V2_DEGRADED_MS) &&
+                 ((s_pos_est_v2_status & POS_EST_V2_STATUS_UNRELIABLE) == 0U))
+        {
+            s_pos_est_v2_status |= POS_EST_V2_STATUS_DEGRADED;
+        }
+    }
 }
 
 /*
@@ -738,7 +883,11 @@ void Pos_Est_V2_Update_50HZ(void)
 {
     uint32_t flow_seq = lc302_data_seq;
     uint32_t seq_delta;
-    uint32_t status = 0U;
+    uint32_t status = s_pos_est_v2_status &
+                      (POS_EST_V2_STATUS_DEGRADED |
+                       POS_EST_V2_STATUS_UNRELIABLE |
+                       POS_EST_V2_STATUS_OUTPUT_LIMITED |
+                       POS_EST_V2_STATUS_REACQUIRE);
     uint16_t offset;
     uint16_t index;
     uint16_t measurement_index = 0U;
@@ -748,6 +897,7 @@ void Pos_Est_V2_Update_50HZ(void)
     uint8_t exposure_shock = 0U;
     uint8_t geometry_valid;
     uint8_t reacquiring;
+    uint8_t bias_frozen;
     uint8_t bias_left_clipped = 0U;
     uint8_t bias_forward_clipped = 0U;
     float now_ms;
@@ -761,6 +911,13 @@ void Pos_Est_V2_Update_50HZ(void)
     float cos_tilt;
     float rho_cm;
     float vertical_up_cmps;
+    float flow_velocity_x;
+    float flow_velocity_y;
+    float flow_velocity_delta;
+    float reacquire_yaw_cos;
+    float reacquire_yaw_sin;
+    float reacquire_pred_x;
+    float reacquire_pred_y;
     float h[2][4];
     float h_p[2][4];
     float innovation[2];
@@ -792,7 +949,7 @@ void Pos_Est_V2_Update_50HZ(void)
     Pos_Est_V2_History_t *measurement_sample;
     Pos_Est_V2_History_t *current_sample;
 
-    s_pos_est_v2_status = 0U;
+    s_pos_est_v2_status = status;
     if (flow_seq == s_pos_est_v2_last_flow_seq)
     {
         return;
@@ -811,6 +968,22 @@ void Pos_Est_V2_Update_50HZ(void)
     if (lc302_data.valid != 0U)
     {
         status |= POS_EST_V2_STATUS_FLOW_VALID;
+    }
+
+    if ((s_pos_est_v2_has_accepted == 0U) ||
+        ((tick_1000us_cnt - s_pos_est_v2_last_accepted_ms) > POS_EST_V2_REACQUIRE_MS))
+    {
+        if (s_pos_est_v2_reacquire_active == 0U)
+        {
+            s_pos_est_v2_reacquire_good_count = 0U;
+            s_pos_est_v2_reacquire_stable_count = 0U;
+        }
+        s_pos_est_v2_reacquire_active = 1U;
+    }
+    reacquiring = s_pos_est_v2_reacquire_active;
+    if (reacquiring != 0U)
+    {
+        status |= POS_EST_V2_STATUS_REACQUIRE;
     }
 
     now_ms = (float)tick_1000us_cnt;
@@ -921,6 +1094,11 @@ void Pos_Est_V2_Update_50HZ(void)
         (geometry_valid == 0U) ||
         (exposure_shock != 0U))
     {
+        if (reacquiring != 0U)
+        {
+            s_pos_est_v2_reacquire_good_count = 0U;
+            s_pos_est_v2_reacquire_stable_count = 0U;
+        }
         s_pos_est_v2_status = status;
         return;
     }
@@ -942,6 +1120,8 @@ void Pos_Est_V2_Update_50HZ(void)
     s_pos_est_v2_innovation_y = innovation[1] / h[1][1];
     s_pos_est_v2_innovation_x =
         (innovation[0] - h[0][1] * s_pos_est_v2_innovation_y) / h[0][0];
+    flow_velocity_x = measurement_sample->state[0] + s_pos_est_v2_innovation_x;
+    flow_velocity_y = measurement_sample->state[1] + s_pos_est_v2_innovation_y;
 
     tilt_deg = acosf(Pos_Est_ClampFloat(cos_tilt, -1.0f, 1.0f)) / POS_EST_DEG_TO_RAD;
     sigma_scale = 1.0f +
@@ -951,6 +1131,7 @@ void Pos_Est_V2_Update_50HZ(void)
                   0.020f * ((tilt_deg > 5.0f) ? (tilt_deg - 5.0f) : 0.0f) +
                   ((seq_delta > 1U) ? 0.50f : 0.0f);
     sigma = POS_EST_V2_SIGMA_FLOW_RADPS * sigma_scale;
+    s_pos_est_v2_sigma_flow_radps = sigma;
     r_variance = sigma * sigma;
 
     for (i = 0U; i < 2U; i++)
@@ -985,7 +1166,11 @@ void Pos_Est_V2_Update_50HZ(void)
     if (fabsf(determinant) < 1.0e-12f)
     {
         status |= POS_EST_V2_STATUS_REJECTED;
-        s_pos_est_v2_recovery_frames = 2U;
+        if (reacquiring != 0U)
+        {
+            s_pos_est_v2_reacquire_good_count = 0U;
+            s_pos_est_v2_reacquire_stable_count = 0U;
+        }
         s_pos_est_v2_status = status;
         return;
     }
@@ -1004,21 +1189,76 @@ void Pos_Est_V2_Update_50HZ(void)
         s_pos_est_v2_nis = 0.0f;
     }
 
-    reacquiring = ((s_pos_est_v2_has_accepted == 0U) ||
-                   ((tick_1000us_cnt - s_pos_est_v2_last_accepted_ms) > POS_EST_V2_REACQUIRE_MS) ||
-                   (s_pos_est_v2_recovery_frames > 0U))
-                      ? 1U
-                      : 0U;
-    if (reacquiring != 0U)
-    {
-        status |= POS_EST_V2_STATUS_REACQUIRE;
-    }
-    if (s_pos_est_v2_nis > POS_EST_V2_NIS_MAX)
+    if (((reacquiring == 0U) && (s_pos_est_v2_nis > POS_EST_V2_NIS_MAX)) ||
+        ((reacquiring != 0U) && (s_pos_est_v2_nis > POS_EST_V2_NIS_REACQUIRE_MAX)))
     {
         status |= POS_EST_V2_STATUS_REJECTED;
-        s_pos_est_v2_recovery_frames = 2U;
+        if (reacquiring != 0U)
+        {
+            s_pos_est_v2_reacquire_good_count = 0U;
+            s_pos_est_v2_reacquire_stable_count = 0U;
+        }
         s_pos_est_v2_status = status;
         return;
+    }
+
+    if (reacquiring != 0U)
+    {
+        if (s_pos_est_v2_nis <= POS_EST_V2_NIS_REACQUIRE)
+        {
+            if ((s_pos_est_v2_reacquire_good_count == 0U) || (seq_delta != 1U))
+            {
+                s_pos_est_v2_reacquire_good_count = 1U;
+                s_pos_est_v2_reacquire_stable_count = 0U;
+            }
+            else
+            {
+                flow_velocity_delta = measurement_sample->yaw_rate_rps *
+                                      POS_EST_V2_FLOW_DT_S;
+                reacquire_yaw_cos = cosf(flow_velocity_delta);
+                reacquire_yaw_sin = sinf(flow_velocity_delta);
+                reacquire_pred_x =
+                    reacquire_yaw_cos * s_pos_est_v2_reacquire_prev_x +
+                    reacquire_yaw_sin * s_pos_est_v2_reacquire_prev_y +
+                    (measurement_sample->accel_left_cmss - measurement_sample->state[2]) *
+                        POS_EST_V2_FLOW_DT_S;
+                reacquire_pred_y =
+                    -reacquire_yaw_sin * s_pos_est_v2_reacquire_prev_x +
+                    reacquire_yaw_cos * s_pos_est_v2_reacquire_prev_y +
+                    (measurement_sample->accel_forward_cmss - measurement_sample->state[3]) *
+                        POS_EST_V2_FLOW_DT_S;
+                flow_velocity_delta = sqrtf((flow_velocity_x - reacquire_pred_x) *
+                                                (flow_velocity_x - reacquire_pred_x) +
+                                            (flow_velocity_y - reacquire_pred_y) *
+                                                (flow_velocity_y - reacquire_pred_y));
+                if (flow_velocity_delta <= POS_EST_V2_REACQUIRE_CONSISTENCY_CMPS)
+                {
+                    if (s_pos_est_v2_reacquire_good_count <
+                        POS_EST_V2_REACQUIRE_GOOD_FRAMES)
+                    {
+                        s_pos_est_v2_reacquire_good_count++;
+                    }
+                }
+                else
+                {
+                    s_pos_est_v2_reacquire_good_count = 1U;
+                    s_pos_est_v2_reacquire_stable_count = 0U;
+                }
+            }
+            s_pos_est_v2_reacquire_prev_x = flow_velocity_x;
+            s_pos_est_v2_reacquire_prev_y = flow_velocity_y;
+            if (s_pos_est_v2_reacquire_good_count >= POS_EST_V2_REACQUIRE_GOOD_FRAMES)
+            {
+                status |= POS_EST_V2_STATUS_REACQUIRE_CONSISTENT;
+            }
+        }
+        else
+        {
+            s_pos_est_v2_reacquire_good_count = 0U;
+            s_pos_est_v2_reacquire_stable_count = 0U;
+            s_pos_est_v2_reacquire_prev_x = flow_velocity_x;
+            s_pos_est_v2_reacquire_prev_y = flow_velocity_y;
+        }
     }
 
     for (i = 0U; i < 4U; i++)
@@ -1039,20 +1279,20 @@ void Pos_Est_V2_Update_50HZ(void)
         gain[i][0] *= robust_scale;
         gain[i][1] *= robust_scale;
     }
-    if (reacquiring != 0U)
-    {
-        gain[2][0] = 0.0f;
-        gain[2][1] = 0.0f;
-        gain[3][0] = 0.0f;
-        gain[3][1] = 0.0f;
-    }
-
     for (i = 0U; i < 4U; i++)
     {
         delta[i] = gain[i][0] * innovation[0] + gain[i][1] * innovation[1];
     }
-    correction_limit = (reacquiring != 0U) ? POS_EST_V2_CORRECTION_REACQUIRE_CMPS
-                                            : POS_EST_V2_CORRECTION_NORMAL_CMPS;
+    if ((reacquiring != 0U) &&
+        (s_pos_est_v2_reacquire_good_count < POS_EST_V2_REACQUIRE_GOOD_FRAMES))
+    {
+        correction_limit = POS_EST_V2_CORRECTION_PROBE_CMPS;
+    }
+    else
+    {
+        correction_limit = (reacquiring != 0U) ? POS_EST_V2_CORRECTION_REACQUIRE_CMPS
+                                                : POS_EST_V2_CORRECTION_NORMAL_CMPS;
+    }
     correction_norm = sqrtf(delta[0] * delta[0] + delta[1] * delta[1]);
     correction_scale = correction_limit /
                        ((correction_norm > 1.0e-9f) ? correction_norm : 1.0e-9f);
@@ -1067,17 +1307,36 @@ void Pos_Est_V2_Update_50HZ(void)
         delta[i] *= correction_scale;
     }
 
-    bias_delta_limit = (reacquiring != 0U) ? 10.0f : 5.0f;
-    bias_delta_norm = sqrtf(delta[2] * delta[2] + delta[3] * delta[3]);
-    if (bias_delta_norm > bias_delta_limit)
+    bias_frozen = ((reacquiring != 0U) ||
+                   (robust_scale < 0.999f) ||
+                   (correction_scale < 0.999f) ||
+                   (s_pos_est_v2_nis > POS_EST_V2_NIS_NORMAL))
+                      ? 1U
+                      : 0U;
+    if (bias_frozen != 0U)
     {
-        float bias_scale = bias_delta_limit / bias_delta_norm;
-        gain[2][0] *= bias_scale;
-        gain[2][1] *= bias_scale;
-        gain[3][0] *= bias_scale;
-        gain[3][1] *= bias_scale;
-        delta[2] *= bias_scale;
-        delta[3] *= bias_scale;
+        gain[2][0] = 0.0f;
+        gain[2][1] = 0.0f;
+        gain[3][0] = 0.0f;
+        gain[3][1] = 0.0f;
+        delta[2] = 0.0f;
+        delta[3] = 0.0f;
+        status |= POS_EST_V2_STATUS_BIAS_FROZEN;
+    }
+    else
+    {
+        bias_delta_limit = 5.0f;
+        bias_delta_norm = sqrtf(delta[2] * delta[2] + delta[3] * delta[3]);
+        if (bias_delta_norm > bias_delta_limit)
+        {
+            float bias_scale = bias_delta_limit / bias_delta_norm;
+            gain[2][0] *= bias_scale;
+            gain[2][1] *= bias_scale;
+            gain[3][0] *= bias_scale;
+            gain[3][1] *= bias_scale;
+            delta[2] *= bias_scale;
+            delta[3] *= bias_scale;
+        }
     }
 
     for (i = 0U; i < 4U; i++)
@@ -1184,18 +1443,42 @@ void Pos_Est_V2_Update_50HZ(void)
     s_pos_est_v2_bias_y = current_sample->state[3];
     s_pos_est_v2_correction_x = current_sample->state[0] - current_before[0];
     s_pos_est_v2_correction_y = current_sample->state[1] - current_before[1];
+    s_pos_est_v2_pending_x += s_pos_est_v2_correction_x;
+    s_pos_est_v2_pending_y += s_pos_est_v2_correction_y;
+    correction_norm = sqrtf(s_pos_est_v2_pending_x * s_pos_est_v2_pending_x +
+                            s_pos_est_v2_pending_y * s_pos_est_v2_pending_y);
+    if (correction_norm > POS_EST_V2_OUTPUT_PENDING_MAX_CMPS)
+    {
+        correction_scale = POS_EST_V2_OUTPUT_PENDING_MAX_CMPS / correction_norm;
+        s_pos_est_v2_pending_x *= correction_scale;
+        s_pos_est_v2_pending_y *= correction_scale;
+        status |= POS_EST_V2_STATUS_UNRELIABLE |
+                  POS_EST_V2_STATUS_OUTPUT_LIMITED |
+                  POS_EST_V2_STATUS_PENDING_CLAMPED;
+    }
+    s_pos_est_v2_output_vel_x = s_pos_est_v2_vel_x - s_pos_est_v2_pending_x;
+    s_pos_est_v2_output_vel_y = s_pos_est_v2_vel_y - s_pos_est_v2_pending_y;
     s_pos_est_v2_last_accepted_ms = tick_1000us_cnt;
     s_pos_est_v2_has_accepted = 1U;
     status |= POS_EST_V2_STATUS_ACCEPTED;
-    if ((robust_scale < 0.999f) ||
-        (correction_scale < 0.999f) ||
-        (s_pos_est_v2_nis > POS_EST_V2_NIS_NORMAL))
+    if (reacquiring != 0U)
     {
-        s_pos_est_v2_recovery_frames = 2U;
-    }
-    else if (s_pos_est_v2_recovery_frames > 0U)
-    {
-        s_pos_est_v2_recovery_frames--;
+        if ((s_pos_est_v2_reacquire_good_count >= POS_EST_V2_REACQUIRE_GOOD_FRAMES) &&
+            (s_pos_est_v2_nis <= POS_EST_V2_NIS_NORMAL) &&
+            (s_pos_est_v2_reacquire_stable_count < POS_EST_V2_REACQUIRE_GOOD_FRAMES))
+        {
+            s_pos_est_v2_reacquire_stable_count++;
+        }
+        else if (s_pos_est_v2_nis > POS_EST_V2_NIS_NORMAL)
+        {
+            s_pos_est_v2_reacquire_stable_count = 0U;
+        }
+        if (s_pos_est_v2_reacquire_stable_count >= POS_EST_V2_REACQUIRE_GOOD_FRAMES)
+        {
+            s_pos_est_v2_reacquire_active = 0U;
+            s_pos_est_v2_reacquire_good_count = 0U;
+            s_pos_est_v2_reacquire_stable_count = 0U;
+        }
     }
     s_pos_est_v2_status = status;
 }
@@ -1360,8 +1643,6 @@ void Pos_Est_Update_1000HZ(void)
     /* IMU 冲击窗口内不让水平加速度污染后续速度积分 */
     if (g_imu_shock_flag != 0U)
     {
-        acc_x_temp = 0.0f;
-        acc_y_temp = 0.0f;
         acc_x_lp = 0.0f;
         acc_y_lp = 0.0f;
         s_raw_acc_lp_x = 0.0f;
@@ -1442,7 +1723,9 @@ void Pos_Est_Update_1000HZ(void)
 
     Pos_Est_V2_Update_1000HZ();
 
-    wifi_justfloat(acc_x_temp, acc_y_temp,
+    if ((tick_1000us_cnt & 1U) == 0U)
+    {
+        wifi_justfloat(acc_x_temp, acc_y_temp,
                 acc_x_lp, acc_y_lp,
                 Pos_Est_acc_bias_x_cmss, Pos_Est_acc_bias_y_cmss,
                 g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
@@ -1466,8 +1749,16 @@ void Pos_Est_Update_1000HZ(void)
                 s_pos_est_v2_nis, (float)s_pos_est_v2_status,
                 s_pos_est_v2_measurement_age_ms,
                 g_height_fused_vz_mps * 100.0f,
-                g_euler.yaw
+                g_euler.yaw,
+                s_pos_est_v2_output_vel_x, s_pos_est_v2_output_vel_y,
+                s_pos_est_v2_pending_x, s_pos_est_v2_pending_y,
+                s_pos_est_v2_last_accept_age_ms,
+                s_pos_est_v2_sigma_flow_radps,
+                (float)s_pos_est_v2_reacquire_good_count,
+                s_pos_est_v2_output_injection_x,
+                s_pos_est_v2_output_injection_y
                 );
+    }
     
     //                acc_x_temp, acc_y_temp,
     //                ICM42688.acc_x, ICM42688.acc_y, ICM42688.acc_z,

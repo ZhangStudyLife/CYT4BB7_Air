@@ -137,8 +137,8 @@ static void PixToDistance_Calc5thStretchXY(float cx, float cy, float *x_cm, floa
 
     gain_x = PixToDistance_CalcStrongGain(cx_abs);
     gain_y = PixToDistance_CalcStrongGain(cy_abs);
-    x = x * gain_x;
-    y = y * gain_y;
+    // x = x * gain_x;
+    // y = y * gain_y;
 
     x = PixToDistance_ClampF(x,
                              -PIX_TO_DISTANCE_OUTPUT_LIMIT_CM,

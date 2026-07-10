@@ -7,8 +7,11 @@
 #define CAR_PLAN_MIN_DIST_PX               (2.0f)
 #define CAR_PLAN_ANGLE_TO_RAD              (0.017453292519943295f)
 #define CAR_PLAN_CENTER_X_LIMIT_PX         (50.0f)
+#define CAR_PLAN_SIDE_SWITCH_AREA_RATIO    (1.6f)
 
 static car_plan_result_t s_car_plan_result;
+static uint8 s_side_lock_valid;
+static uint8 s_side_lock_camera;
 
 static void CarPlan_ClearResult(car_plan_result_t *result)
 {
@@ -124,30 +127,56 @@ static uint8 CarPlan_SelectSideBeacon0(uint8 *camera)
 
     if ((front_valid == 0U) && (back_valid == 0U))
     {
+        s_side_lock_valid = 0U;
         return 0U;
     }
 
     if ((front_valid != 0U) && (back_valid == 0U))
     {
         *camera = (uint8)Front;
+        s_side_lock_valid = 1U;
+        s_side_lock_camera = (uint8)Front;
         return 1U;
     }
 
     if ((front_valid == 0U) && (back_valid != 0U))
     {
         *camera = (uint8)Back;
+        s_side_lock_valid = 1U;
+        s_side_lock_camera = (uint8)Back;
+        return 1U;
+    }
+
+    if (s_side_lock_valid != 0U)
+    {
+        if ((s_side_lock_camera == (uint8)Front) &&
+            (back_beacon->area > front_beacon->area * CAR_PLAN_SIDE_SWITCH_AREA_RATIO))
+        {
+            s_side_lock_camera = (uint8)Back;
+        }
+        else if ((s_side_lock_camera == (uint8)Back) &&
+                 (front_beacon->area > back_beacon->area * CAR_PLAN_SIDE_SWITCH_AREA_RATIO))
+        {
+            s_side_lock_camera = (uint8)Front;
+        }
+
+        *camera = s_side_lock_camera;
         return 1U;
     }
 
     if (front_beacon->area > back_beacon->area)
     {
         *camera = (uint8)Front;
+        s_side_lock_valid = 1U;
+        s_side_lock_camera = (uint8)Front;
         return 1U;
     }
 
     if (back_beacon->area > front_beacon->area)
     {
         *camera = (uint8)Back;
+        s_side_lock_valid = 1U;
+        s_side_lock_camera = (uint8)Back;
         return 1U;
     }
 
@@ -155,16 +184,22 @@ static uint8 CarPlan_SelectSideBeacon0(uint8 *camera)
         (CarPlan_CarLampValid((uint8)Front) == 0U))
     {
         *camera = (uint8)Back;
+        s_side_lock_valid = 1U;
+        s_side_lock_camera = (uint8)Back;
         return 1U;
     }
 
     *camera = (uint8)Front;
+    s_side_lock_valid = 1U;
+    s_side_lock_camera = (uint8)Front;
     return 1U;
 }
 
 void CarPlan_Reset(void)
 {
     CarPlan_ClearResult(&s_car_plan_result);
+    s_side_lock_valid = 0U;
+    s_side_lock_camera = 0U;
 }
 
 uint8 CarPlan_Update(car_plan_result_t *result)

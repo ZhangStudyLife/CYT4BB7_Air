@@ -176,26 +176,14 @@
 #include "../Height_Est/Height_Est.h"
 // #include "HW_Drivers/PMW3901/PMW3901.h"
 #include "HW_Drivers/LC302/LC302.h"
-#include "HW_Drivers/LC302/LC302_Aux.h"
-#include "HW_Drivers/ICM42688/ICM42688.h"
-#include "filter.h"
-#include "FlightController/fc_mode.h"
-#include "FlightController/fc_params.h"
 #include "FlightController/fc_start_crsf.h"
 #include <math.h>
 #include <string.h>
 
 extern volatile uint32 tick_1000us_cnt;
 
-/* 50Hz 末端速度一阶低通截止频率约 15.1Hz，对应 alpha = 0.85 */
-#define POS_EST_VEL_OUT_LPF_ALPHA (0.85f)
-/* 50Hz 光流速度一阶低通截止频率约 15Hz，对应 alpha ≈ 0.8482 */
-#define POS_EST_OPFLOW_VEL_LPF_ALPHA (0.84816420f)
-
 /* 1000Hz 水平加速度相位补偿低通 alpha，截止频率 fc≈5.00Hz */
 #define POS_EST_RAW_ACC_LPF_ALPHA (0.06089863f)
-/* 1000Hz 加速度速度预测积分步长，单位 s */
-#define POS_EST_ACC_DT_S (0.001f)
 /* 前后轴水平加速度限幅，单位 cm/s^2 */
 #define POS_EST_ACC_FWD_LIMIT_CMSS (600.0f)
 /* 左右轴水平加速度限幅，单位 cm/s^2 */
@@ -223,7 +211,7 @@ extern volatile uint32 tick_1000us_cnt;
 /* V2允许的最大光流角速度，单位rad/s。 */
 #define POS_EST_V2_FLOW_RATE_MAX_RADPS (2.5f)
 /* V2加速度过程噪声标准差，单位cm/s^2/sqrt(Hz)。 */
-#define POS_EST_V2_SIGMA_ACC_CMSS (70.0f)
+#define POS_EST_V2_SIGMA_ACC_CMSS (30.0f)
 /* V2加速度偏置随机游走标准差，单位cm/s^3/sqrt(Hz)。 */
 #define POS_EST_V2_SIGMA_BIAS_CMSSS (0.2f)
 /* V2光流测量噪声标准差，单位rad/s。 */
@@ -251,9 +239,9 @@ extern volatile uint32 tick_1000us_cnt;
 /* V2相邻重捕获光流速度允许的最大差，单位cm/s。 */
 #define POS_EST_V2_REACQUIRE_CONSISTENCY_CMPS (100.0f)
 /* V2输出预测器修正注入时间常数，单位秒。 */
-#define POS_EST_V2_OUTPUT_TAU_S (0.020f)
+#define POS_EST_V2_OUTPUT_TAU_S (0.080f)
 /* V2输出预测器最大修正注入加速度，单位cm/s^2。 */
-#define POS_EST_V2_OUTPUT_CORRECTION_ACC_CMSS (1000.0f)
+#define POS_EST_V2_OUTPUT_CORRECTION_ACC_CMSS (500.0f)
 /* V2输出预测器允许积累的最大待注入修正，单位cm/s。 */
 #define POS_EST_V2_OUTPUT_PENDING_MAX_CMPS (200.0f)
 /* V2输出预测器超过该待注入修正时标记不可靠，单位cm/s。 */
@@ -326,41 +314,21 @@ typedef struct
 float opflow_vel_x = 0.0f;
 /* 光流解算得到的 Y 轴速度，单位 cm/s，往前飞为正，往后飞为负 */
 float opflow_vel_y = 0.0f;
-/* 光流解算得到的 X 轴速度，单位 cm/s，往左飞为正，往右飞为负 经过4HZ低通*/
+/* 保留旧调试接口，当前与最新有效光流速度测量一致。 */
 float opflow_vel_x_lpf = 0.0f;
-/* 光流解算得到的 Y 轴速度，单位 cm/s，往前飞为正，往后飞为负 经过4HZ低通*/
+/* 保留旧调试接口，当前与最新有效光流速度测量一致。 */
 float opflow_vel_y_lpf = 0.0f;
 /* 位置估计的 X 轴速度，单位 cm/s */
 float Pos_Est_vel_x = 0.0f;
-/* 位置估计的上一拍 X 轴速度，单位 cm/s */
-float Pos_Est_vel_x_last = 0.0f;
 /* 位置估计的 Y 轴速度，单位 cm/s */
 float Pos_Est_vel_y = 0.0f;
 float Pos_Est_vel_x_level = 0.0f;
 float Pos_Est_vel_y_level = 0.0f;
-/* 位置估计的上一拍 Y 轴速度，单位 cm/s */
-float Pos_Est_vel_y_last = 0.0f;
-
-/* 位置估计的 X 轴位置，单位 cm，往左飞为正，往右飞为负 */
-float Pos_Est_pos_x = 0.0f;
-/* 位置估计的上一拍 X 轴位置，单位 cm */
-float Pos_Est_pos_x_last = 0.0f;
-/* 位置估计的 Y 轴位置，单位 cm，往前飞为正，往后飞为负 */
-float Pos_Est_pos_y = 0.0f;
-/* 位置估计的上一拍 Y 轴位置，单位 cm */
-float Pos_Est_pos_y_last = 0.0f;
-
-/* X 轴光流速度一阶低通状态 */
-static LPF1_t s_opflow_vel_lp_x;
-/* Y 轴光流速度一阶低通状态 */
-static LPF1_t s_opflow_vel_lp_y;
-/* X 轴速度预测状态，单位 cm/s */
-static float s_vel_pred_x = 0.0f;
-/* Y 轴速度预测状态，单位 cm/s */
-static float s_vel_pred_y = 0.0f;
 static float s_raw_acc_lp_x = 0.0f;
 static float s_raw_acc_lp_y = 0.0f;
 static uint16_t s_static_sample_count = 0U;
+static uint32_t s_pos_est_last_update_ms = 0U;
+static uint8_t s_pos_est_update_time_ready = 0U;
 
 /* X 轴加速度 单位 cm/s^2，飞机往前加速为正，往后加速为负 */
 float acc_x_temp = 0.0f;
@@ -391,9 +359,9 @@ static uint8_t s_pos_est_v2_clock_phase_head = 0U;
 static uint8_t s_pos_est_v2_clock_phase_count = 0U;
 /* V2当前LC302时钟分段的起始帧序号。 */
 static uint32_t s_pos_est_v2_clock_base_seq = 0U;
-/* V2当前左向影子速度，单位cm/s。 */
+/* V2当前左向内部KF速度，单位cm/s。 */
 static float s_pos_est_v2_vel_x = 0.0f;
-/* V2当前前向影子速度，单位cm/s。 */
+/* V2当前前向内部KF速度，单位cm/s。 */
 static float s_pos_est_v2_vel_y = 0.0f;
 /* V2当前左向残余加速度偏置，单位cm/s^2。 */
 static float s_pos_est_v2_bias_x = 0.0f;
@@ -426,8 +394,6 @@ static float s_pos_est_v2_output_vel_x = 0.0f;
 static float s_pos_est_v2_output_vel_y = 0.0f;
 static float s_pos_est_v2_pending_x = 0.0f;
 static float s_pos_est_v2_pending_y = 0.0f;
-static float s_pos_est_v2_output_injection_x = 0.0f;
-static float s_pos_est_v2_output_injection_y = 0.0f;
 static float s_pos_est_v2_last_accept_age_ms = 0.0f;
 static float s_pos_est_v2_sigma_flow_radps = POS_EST_V2_SIGMA_FLOW_RADPS;
 
@@ -665,7 +631,7 @@ static void Pos_Est_V2_Propagate(Pos_Est_V2_History_t *current,
  * 输入参数: 无
  * 返回值: 无
  */
-void Pos_Est_V2_Init(void)
+static void Pos_Est_V2_Init(void)
 {
     memset(s_pos_est_v2_history, 0, sizeof(s_pos_est_v2_history));
     s_pos_est_v2_history_head = 0U;
@@ -699,8 +665,6 @@ void Pos_Est_V2_Init(void)
     s_pos_est_v2_output_vel_y = 0.0f;
     s_pos_est_v2_pending_x = 0.0f;
     s_pos_est_v2_pending_y = 0.0f;
-    s_pos_est_v2_output_injection_x = 0.0f;
-    s_pos_est_v2_output_injection_y = 0.0f;
     s_pos_est_v2_last_accept_age_ms = 0.0f;
     s_pos_est_v2_sigma_flow_radps = POS_EST_V2_SIGMA_FLOW_RADPS;
 }
@@ -711,11 +675,13 @@ void Pos_Est_V2_Init(void)
  * 输入参数: 无，使用当前IMU、姿态、高度和旧加速度预处理结果
  * 返回值: 无
  */
-void Pos_Est_V2_Update_1000HZ(void)
+static void Pos_Est_V2_Update_1000HZ(void)
 {
     Pos_Est_V2_History_t *current;
     Pos_Est_V2_History_t *previous = NULL;
+    uint32_t elapsed_ms = 0U;
     uint16_t current_index;
+    uint8_t time_gap = 0U;
     float yaw_cos_pitch;
     float dt;
     float dpsi;
@@ -723,6 +689,8 @@ void Pos_Est_V2_Update_1000HZ(void)
     float yaw_sin;
     float pending_x;
     float pending_y;
+    float injection_x;
+    float injection_y;
     float alpha;
     float injection_norm;
     float injection_limit;
@@ -735,6 +703,12 @@ void Pos_Est_V2_Update_1000HZ(void)
     else
     {
         previous = &s_pos_est_v2_history[s_pos_est_v2_history_head];
+        elapsed_ms = tick_1000us_cnt - previous->time_ms;
+        if (elapsed_ms == 0U)
+        {
+            return;
+        }
+        time_gap = (elapsed_ms > 50U) ? 1U : 0U;
         current_index = (uint16_t)((s_pos_est_v2_history_head + 1U) % POS_EST_V2_HISTORY_LEN);
     }
 
@@ -778,7 +752,18 @@ void Pos_Est_V2_Update_1000HZ(void)
     else
     {
         Pos_Est_V2_Propagate(current, previous);
-        if (s_pos_est_v2_history_count < POS_EST_V2_HISTORY_LEN)
+        if (time_gap != 0U)
+        {
+            s_pos_est_v2_history_count = 1U;
+            s_pos_est_v2_sensor_clock_ready = 0U;
+            s_pos_est_v2_clock_phase_count = 0U;
+            s_pos_est_v2_reacquire_active = 1U;
+            s_pos_est_v2_reacquire_good_count = 0U;
+            s_pos_est_v2_reacquire_stable_count = 0U;
+            s_pos_est_v2_reacquire_prev_x = 0.0f;
+            s_pos_est_v2_reacquire_prev_y = 0.0f;
+        }
+        else if (s_pos_est_v2_history_count < POS_EST_V2_HISTORY_LEN)
         {
             s_pos_est_v2_history_count++;
         }
@@ -794,8 +779,6 @@ void Pos_Est_V2_Update_1000HZ(void)
                              POS_EST_V2_STATUS_UNRELIABLE |
                              POS_EST_V2_STATUS_OUTPUT_LIMITED |
                              POS_EST_V2_STATUS_REACQUIRE);
-    s_pos_est_v2_output_injection_x = 0.0f;
-    s_pos_est_v2_output_injection_y = 0.0f;
     if ((previous == NULL) ||
         ((current->static_locked != 0U) && (current->height_m < POS_EST_V2_HEIGHT_MIN_M)))
     {
@@ -805,12 +788,20 @@ void Pos_Est_V2_Update_1000HZ(void)
     else
     {
         dt = (float)(current->time_ms - previous->time_ms) * 0.001f;
-        if ((dt <= 0.0f) || (dt > 0.050f))
+        if (dt > 0.050f)
         {
-            s_pos_est_v2_pending_x = 0.0f;
-            s_pos_est_v2_pending_y = 0.0f;
+            dpsi = current->yaw_rate_rps * ((dt < 1.0f) ? dt : 1.0f);
+            yaw_cos = cosf(dpsi);
+            yaw_sin = sinf(dpsi);
+            pending_x = yaw_cos * s_pos_est_v2_pending_x +
+                        yaw_sin * s_pos_est_v2_pending_y;
+            pending_y = -yaw_sin * s_pos_est_v2_pending_x +
+                        yaw_cos * s_pos_est_v2_pending_y;
+            s_pos_est_v2_pending_x = pending_x;
+            s_pos_est_v2_pending_y = pending_y;
+            s_pos_est_v2_status |= POS_EST_V2_STATUS_UNRELIABLE;
         }
-        else
+        else if (dt > 0.0f)
         {
             dpsi = current->yaw_rate_rps * dt;
             yaw_cos = cosf(dpsi);
@@ -823,22 +814,19 @@ void Pos_Est_V2_Update_1000HZ(void)
             s_pos_est_v2_pending_y = pending_y;
 
             alpha = dt / (POS_EST_V2_OUTPUT_TAU_S + dt);
-            s_pos_est_v2_output_injection_x = alpha * s_pos_est_v2_pending_x;
-            s_pos_est_v2_output_injection_y = alpha * s_pos_est_v2_pending_y;
-            injection_norm = sqrtf(s_pos_est_v2_output_injection_x *
-                                       s_pos_est_v2_output_injection_x +
-                                   s_pos_est_v2_output_injection_y *
-                                       s_pos_est_v2_output_injection_y);
+            injection_x = alpha * s_pos_est_v2_pending_x;
+            injection_y = alpha * s_pos_est_v2_pending_y;
+            injection_norm = sqrtf(injection_x * injection_x + injection_y * injection_y);
             injection_limit = POS_EST_V2_OUTPUT_CORRECTION_ACC_CMSS * dt;
             if (injection_norm > injection_limit)
             {
                 injection_scale = injection_limit / injection_norm;
-                s_pos_est_v2_output_injection_x *= injection_scale;
-                s_pos_est_v2_output_injection_y *= injection_scale;
+                injection_x *= injection_scale;
+                injection_y *= injection_scale;
                 s_pos_est_v2_status |= POS_EST_V2_STATUS_OUTPUT_LIMITED;
             }
-            s_pos_est_v2_pending_x -= s_pos_est_v2_output_injection_x;
-            s_pos_est_v2_pending_y -= s_pos_est_v2_output_injection_y;
+            s_pos_est_v2_pending_x -= injection_x;
+            s_pos_est_v2_pending_y -= injection_y;
             injection_norm = sqrtf(s_pos_est_v2_pending_x * s_pos_est_v2_pending_x +
                                    s_pos_est_v2_pending_y * s_pos_est_v2_pending_y);
             if (injection_norm > POS_EST_V2_OUTPUT_PENDING_UNRELIABLE_CMPS)
@@ -879,7 +867,7 @@ void Pos_Est_V2_Update_1000HZ(void)
  * 输入参数: 无，使用当前LC302、ToF和V2历史数据
  * 返回值: 无
  */
-void Pos_Est_V2_Update_50HZ(void)
+static void Pos_Est_V2_Update_50HZ(void)
 {
     uint32_t flow_seq = lc302_data_seq;
     uint32_t seq_delta;
@@ -1122,6 +1110,10 @@ void Pos_Est_V2_Update_50HZ(void)
         (innovation[0] - h[0][1] * s_pos_est_v2_innovation_y) / h[0][0];
     flow_velocity_x = measurement_sample->state[0] + s_pos_est_v2_innovation_x;
     flow_velocity_y = measurement_sample->state[1] + s_pos_est_v2_innovation_y;
+    opflow_vel_x = flow_velocity_x;
+    opflow_vel_y = flow_velocity_y;
+    opflow_vel_x_lpf = flow_velocity_x;
+    opflow_vel_y_lpf = flow_velocity_y;
 
     tilt_deg = acosf(Pos_Est_ClampFloat(cos_tilt, -1.0f, 1.0f)) / POS_EST_DEG_TO_RAD;
     sigma_scale = 1.0f +
@@ -1496,8 +1488,6 @@ void Pos_Est_Init(void)
     // LC302_Init_Aux();
     // FlowGyroDecoupler_Init();
     FlowGyroDecoupler_LC302_Init();
-    LPF1_Init(&s_opflow_vel_lp_x, POS_EST_OPFLOW_VEL_LPF_ALPHA);
-    LPF1_Init(&s_opflow_vel_lp_y, POS_EST_OPFLOW_VEL_LPF_ALPHA);
 
     opflow_vel_x = 0.0f;
     opflow_vel_y = 0.0f;
@@ -1507,19 +1497,13 @@ void Pos_Est_Init(void)
     Pos_Est_vel_y = 0.0f;
     Pos_Est_vel_x_level = 0.0f;
     Pos_Est_vel_y_level = 0.0f;
-    Pos_Est_vel_x_last = 0.0f;
-    Pos_Est_vel_y_last = 0.0f;
-    Pos_Est_pos_x = 0.0f;
-    Pos_Est_pos_y = 0.0f;
-    Pos_Est_pos_x_last = 0.0f;
-    Pos_Est_pos_y_last = 0.0f;
-    s_vel_pred_x = 0.0f;
-    s_vel_pred_y = 0.0f;
     s_raw_acc_lp_x = 0.0f;
     s_raw_acc_lp_y = 0.0f;
     Pos_Est_acc_bias_x_cmss = 0.0f;
     Pos_Est_acc_bias_y_cmss = 0.0f;
     s_static_sample_count = 0U;
+    s_pos_est_last_update_ms = 0U;
+    s_pos_est_update_time_ready = 0U;
     Pos_Est_V2_Init();
 }
 
@@ -1533,8 +1517,6 @@ void Pos_Est_Reinit(void)
 {
     // FlowGyroDecoupler_Reinit();
     FlowGyroDecoupler_LC302_Reinit();
-    LPF1_Reset(&s_opflow_vel_lp_x);
-    LPF1_Reset(&s_opflow_vel_lp_y);
 
     acc_x_temp = 0.0f;
     acc_y_temp = 0.0f;
@@ -1546,19 +1528,13 @@ void Pos_Est_Reinit(void)
     Pos_Est_vel_y = 0.0f;
     Pos_Est_vel_x_level = 0.0f;
     Pos_Est_vel_y_level = 0.0f;
-    Pos_Est_vel_x_last = 0.0f;
-    Pos_Est_vel_y_last = 0.0f;
-    Pos_Est_pos_x = 0.0f;
-    Pos_Est_pos_y = 0.0f;
-    Pos_Est_pos_x_last = 0.0f;
-    Pos_Est_pos_y_last = 0.0f;
-    s_vel_pred_x = 0.0f;
-    s_vel_pred_y = 0.0f;
     s_raw_acc_lp_x = 0.0f;
     s_raw_acc_lp_y = 0.0f;
     Pos_Est_acc_bias_x_cmss = 0.0f;
     Pos_Est_acc_bias_y_cmss = 0.0f;
     s_static_sample_count = 0U;
+    s_pos_est_last_update_ms = 0U;
+    s_pos_est_update_time_ready = 0U;
     Pos_Est_V2_Init();
 }
 
@@ -1585,6 +1561,14 @@ void Pos_Est_Update_1000HZ(void)
     float cr;
     uint8_t accel_bias_static;
     uint8_t accel_bias_locked = 0U;
+
+    if ((s_pos_est_update_time_ready != 0U) &&
+        (tick_1000us_cnt == s_pos_est_last_update_ms))
+    {
+        return;
+    }
+    s_pos_est_last_update_ms = tick_1000us_cnt;
+    s_pos_est_update_time_ready = 1U;
 
     // FlowGyroDecoupler_Push1000Hz(tick_1000us_cnt, g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy);
     FlowGyroDecoupler_LC302_Push1000Hz(tick_1000us_cnt, g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy);
@@ -1626,10 +1610,6 @@ void Pos_Est_Update_1000HZ(void)
             Pos_Est_acc_bias_y_cmss = Pos_Est_ClampFloat(Pos_Est_acc_bias_y_cmss,
                                                          -POS_EST_ACC_BIAS_LIMIT_CMSS,
                                                          POS_EST_ACC_BIAS_LIMIT_CMSS);
-            s_vel_pred_x = 0.0f;
-            s_vel_pred_y = 0.0f;
-            Pos_Est_vel_x = 0.0f;
-            Pos_Est_vel_y = 0.0f;
         }
     }
     else
@@ -1667,12 +1647,6 @@ void Pos_Est_Update_1000HZ(void)
         acc_y_lp = -POS_EST_ACC_RIGHT_LIMIT_CMSS;
     }
 
-    if ((g_imu_shock_flag == 0U) && (accel_bias_locked == 0U))
-    {
-        s_vel_pred_x -= acc_y_lp * POS_EST_ACC_DT_S;
-        s_vel_pred_y += acc_x_lp * POS_EST_ACC_DT_S;
-    }
-
     // float dec_x_pmw3901 = FlowGyroDecoupler_GetDecX();
     // float dec_y_pmw3901 = FlowGyroDecoupler_GetDecY();
     // float dec_x_lc302 = FlowGyroDecoupler_LC302_GetDecX();
@@ -1691,37 +1665,16 @@ void Pos_Est_Update_1000HZ(void)
     dec_x = FlowGyroDecoupler_LC302_GetDecX();
     dec_y = FlowGyroDecoupler_LC302_GetDecY();
 
-    FC_START_CRSF_flight_mode_e s_flight_mode = FC_START_CRSF_Get_Flight_Mode(); /* 检测遥控器的模式 */
-
-    float velx_target = 0.0f;
-    float vely_target = 0.0f;
-    pid_t zero_pid = {0};
-    pid_t *velx_pid = NULL;
-    pid_t *vely_pid = NULL;
-
-    if (s_flight_mode == FC_START_CRSF_FLIGHT_MODE_7){
-        velx_target = g_mode7_velx_target;
-        vely_target = g_mode7_vely_target;
-        velx_pid = &g_mode7_velx_pid;
-        vely_pid = &g_mode7_vely_pid;
-    }
-    else if (s_flight_mode == FC_START_CRSF_FLIGHT_MODE_8){
-        velx_target = g_mode8_velx_target;
-        vely_target = g_mode8_vely_target;
-        velx_pid = &g_mode8_velx_pid;
-        vely_pid = &g_mode8_vely_pid;
-    }
-
-    if (velx_pid == NULL)
-    {
-        velx_pid = &zero_pid;
-    }
-    if (vely_pid == NULL)
-    {
-        vely_pid = &zero_pid;
-    }
-
     Pos_Est_V2_Update_1000HZ();
+    Pos_Est_vel_x = s_pos_est_v2_output_vel_x;
+    Pos_Est_vel_y = s_pos_est_v2_output_vel_y;
+    {
+        float yaw_sin = sinf(g_euler.yaw * POS_EST_DEG_TO_RAD);
+        float yaw_cos = cosf(g_euler.yaw * POS_EST_DEG_TO_RAD);
+
+        Pos_Est_vel_x_level = yaw_cos * Pos_Est_vel_x - yaw_sin * Pos_Est_vel_y;
+        Pos_Est_vel_y_level = yaw_sin * Pos_Est_vel_x + yaw_cos * Pos_Est_vel_y;
+    }
 
     if ((tick_1000us_cnt & 1U) == 0U)
     {
@@ -1729,8 +1682,9 @@ void Pos_Est_Update_1000HZ(void)
                 acc_x_lp, acc_y_lp,
                 Pos_Est_acc_bias_x_cmss, Pos_Est_acc_bias_y_cmss,
                 g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
-                g_euler.pitch, g_euler.roll,
+                g_euler.pitch, g_euler.roll, g_euler.yaw,
                 g_tof_fused_height_mm * 0.001f,
+                g_height_fused_vz_mps * 100.0f,
                 (float)(((lc302_data_seq & 0x7FFFFU) << 5U) |
                         ((uint32)(lc302_data.valid != 0U)) |
                         ((uint32)(g_tof_fused_valid != 0U) << 1U) |
@@ -1739,8 +1693,6 @@ void Pos_Est_Update_1000HZ(void)
                         ((uint32)(accel_bias_locked != 0U) << 4U)),
                 lc302_data.flow_x_integral, lc302_data.flow_y_integral,
                 dec_x, dec_y,
-                opflow_vel_x_lpf, opflow_vel_y_lpf,
-                s_vel_pred_x, s_vel_pred_y,
                 Pos_Est_vel_x, Pos_Est_vel_y,
                 s_pos_est_v2_vel_x, s_pos_est_v2_vel_y,
                 s_pos_est_v2_bias_x, s_pos_est_v2_bias_y,
@@ -1748,15 +1700,10 @@ void Pos_Est_Update_1000HZ(void)
                 s_pos_est_v2_correction_x, s_pos_est_v2_correction_y,
                 s_pos_est_v2_nis, (float)s_pos_est_v2_status,
                 s_pos_est_v2_measurement_age_ms,
-                g_height_fused_vz_mps * 100.0f,
-                g_euler.yaw,
-                s_pos_est_v2_output_vel_x, s_pos_est_v2_output_vel_y,
-                s_pos_est_v2_pending_x, s_pos_est_v2_pending_y,
                 s_pos_est_v2_last_accept_age_ms,
+                s_pos_est_v2_pending_x, s_pos_est_v2_pending_y,
                 s_pos_est_v2_sigma_flow_radps,
-                (float)s_pos_est_v2_reacquire_good_count,
-                s_pos_est_v2_output_injection_x,
-                s_pos_est_v2_output_injection_y
+                (float)s_pos_est_v2_reacquire_good_count
                 );
     }
     
@@ -1784,119 +1731,16 @@ void Pos_Est_Update_1000HZ(void)
  */
 void Pos_Est_Update_50HZ(void)
 {
-    float dec_x;
-    float dec_y;
-    float height_mm;
-    float height_m;
-    float k_flow_eff;
-    uint8_t opflow_valid;
-    float vel_x_pred;
-    float vel_y_pred;
-    const float dt = 0.02f;
-    float innovation_x;
-    float innovation_y;
+    uint32_t previous_flow_seq = lc302_data_seq;
 
     // PMW3901_Update_50HZ();
     LC302_Update_50HZ();
     // LC302_Update_50HZ_Aux();
+    if (lc302_data_seq == previous_flow_seq)
+    {
+        return;
+    }
     // FlowGyroDecoupler_Update50Hz(tick_1000us_cnt, g_pmw3901_raw.deltaX, g_pmw3901_raw.deltaY);
     (void)FlowGyroDecoupler_LC302_Update50Hz(tick_1000us_cnt, lc302_data.flow_x_integral, lc302_data.flow_y_integral, lc302_data.valid);
-    dec_x = FlowGyroDecoupler_LC302_GetDecX();
-    dec_y = FlowGyroDecoupler_LC302_GetDecY();
     Pos_Est_V2_Update_50HZ();
-    height_mm = g_tof_fused_height_mm;
-    if (height_mm > VL53L1X_VALID_RANGE_MAX)
-    {
-        height_mm = VL53L1X_VALID_RANGE_MAX;
-    }
-    else if (height_mm < 200.0f)
-    {
-        height_mm = 200.0f;
-    }
-    height_m = height_mm * 0.001f;
-    if (height_m < 0.20f)
-    {
-        k_flow_eff = 0.0f;
-    }
-    else if (height_m < 0.50f)
-    {
-        k_flow_eff = g_fc_params.pos_est_k_flow * (height_m - 0.20f) / 0.30f;
-    }
-    else
-    {
-        k_flow_eff = g_fc_params.pos_est_k_flow;
-    }
-    opflow_valid = (height_mm >= 200.0f);
-
-    /* 计算光流速度，此刻加入高度补偿，单位 cm/s */
-    if (opflow_valid != 0U)
-    {
-        opflow_vel_x = (height_mm * 0.001f) * dec_x * 0.48076923f;
-        opflow_vel_y = (height_mm * 0.001f) * dec_y * 0.48076923f;
-        opflow_vel_x_lpf = LPF1_Update(&s_opflow_vel_lp_x, opflow_vel_x);
-        opflow_vel_y_lpf = LPF1_Update(&s_opflow_vel_lp_y, opflow_vel_y);
-    }
-    /* IMU 冲击窗口内冻结加速度预测，只保留光流校正 */
-    if (g_imu_shock_flag != 0U)
-    {
-        vel_x_pred = Pos_Est_vel_x;
-        vel_y_pred = Pos_Est_vel_y;
-    }
-    else
-    {
-        /* X: 光流左正右负，acc_y 右正左负，所以预测项取负 */
-        vel_x_pred = s_vel_pred_x;
-        /* Y: 光流前正后负，acc_x 前正后负，所以预测项同号 */
-        vel_y_pred = s_vel_pred_y;
-    }
-
-    Pos_Est_vel_x_last = Pos_Est_vel_x;
-    Pos_Est_vel_y_last = Pos_Est_vel_y;
-
-    if (opflow_valid != 0U)
-    {
-        innovation_x = opflow_vel_x_lpf - vel_x_pred;
-        innovation_y = opflow_vel_y_lpf - vel_y_pred;
-        if (innovation_x > 100.0f)
-        {
-            innovation_x = 100.0f;
-        }
-        else if (innovation_x < -100.0f)
-        {
-            innovation_x = -100.0f;
-        }
-
-        if (innovation_y > 100.0f)
-        {
-            innovation_y = 100.0f;
-        }
-        else if (innovation_y < -100.0f)
-        {
-            innovation_y = -100.0f;
-        }
-
-        Pos_Est_vel_x = vel_x_pred + k_flow_eff * innovation_x;
-        Pos_Est_vel_y = vel_y_pred + k_flow_eff * innovation_y;
-    }
-    else
-    {
-        Pos_Est_vel_x = vel_x_pred;
-        Pos_Est_vel_y = vel_y_pred;
-    }
-
-    s_vel_pred_x = Pos_Est_vel_x;
-    s_vel_pred_y = Pos_Est_vel_y;
-    {
-        float yaw_sin = sinf(g_euler.yaw * POS_EST_DEG_TO_RAD);
-        float yaw_cos = cosf(g_euler.yaw * POS_EST_DEG_TO_RAD);
-
-        Pos_Est_vel_x_level = yaw_cos * Pos_Est_vel_x - yaw_sin * Pos_Est_vel_y;
-        Pos_Est_vel_y_level = yaw_sin * Pos_Est_vel_x + yaw_cos * Pos_Est_vel_y;
-    }
-
-    Pos_Est_pos_x_last = Pos_Est_pos_x;
-    Pos_Est_pos_y_last = Pos_Est_pos_y;
-
-    Pos_Est_pos_x = Pos_Est_pos_x_last + 0.5f * (Pos_Est_vel_x_last + Pos_Est_vel_x) * dt;
-    Pos_Est_pos_y = Pos_Est_pos_y_last + 0.5f * (Pos_Est_vel_y_last + Pos_Est_vel_y) * dt;
 }

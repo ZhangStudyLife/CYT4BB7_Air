@@ -28,6 +28,7 @@ typedef struct
 
 // -------------------- 全局变量声明 --------------------
 extern OpticalFlowData  lc302_data;     // 最新有效帧数据
+extern volatile uint32 lc302_data_seq;  // 已发布LC302数据的帧序号，仅用于日志判断新旧帧
 
 
 // -------------------- 函数声明 --------------------

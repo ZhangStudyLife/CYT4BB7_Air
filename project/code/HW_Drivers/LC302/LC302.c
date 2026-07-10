@@ -22,6 +22,7 @@
 
 // -------------------- 全局变量 --------------------
 OpticalFlowData lc302_data    = {0};
+volatile uint32 lc302_data_seq = 0U;  // 已发布LC302数据的帧序号，仅用于日志判断新旧帧
 
 
 // -------------------- 内部常量 --------------------
@@ -38,6 +39,7 @@ static uint8        s_receiver_len = 0;                       // 当前已接收
 
 static OpticalFlowData s_isr_data  = {0};   // ISR 影子缓冲
 static volatile uint8  s_isr_ready = 0;     // ISR 新帧标志
+static volatile uint32 s_isr_seq = 0U;      // CRC正确的串口接收帧累计序号
 
 // -------------------- 串口接收核心（单字节处理）--------------------
 static void lc302_feed_byte(uint8 byte)
@@ -77,6 +79,7 @@ static void lc302_feed_byte(uint8 byte)
             s_isr_data.ground_distance      = (uint16)s_receiver_data[8] | ((uint16)s_receiver_data[9] << 8);
             s_isr_data.valid                = s_receiver_data[10];
             s_isr_data.version              = s_receiver_data[11];
+            s_isr_seq++;
             s_isr_ready = 1;
         }
 
@@ -101,6 +104,8 @@ void LC302_Init(void)
     s_isr_data                      = lc302_data;
     s_isr_ready                     = 0;
     s_receiver_len                  = 0;
+    s_isr_seq                       = 0U;
+    lc302_data_seq                  = 0U;
 
     system_delay_ms(100);
     uart_init(LC302_UART, LC302_BAUD, LC302_TX_PIN, LC302_RX_PIN);
@@ -120,6 +125,7 @@ void LC302_Update_50HZ(void)
     if (s_isr_ready)
     {
         lc302_data  = s_isr_data;
+        lc302_data_seq = s_isr_seq;
         s_isr_ready = 0;
     }
 

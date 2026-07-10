@@ -183,6 +183,7 @@
 #include "FlightController/fc_params.h"
 #include "FlightController/fc_start_crsf.h"
 #include <math.h>
+#include <string.h>
 
 extern volatile uint32 tick_1000us_cnt;
 
@@ -207,6 +208,90 @@ extern volatile uint32 tick_1000us_cnt;
 #define POS_EST_STATIC_LOCK_SAMPLES (300U)
 #define POS_EST_ACC_BIAS_ALPHA (0.001f)
 #define POS_EST_ACC_BIAS_LIMIT_CMSS (120.0f)
+/* V2固定延迟历史长度，覆盖96ms的1000Hz样本。 */
+#define POS_EST_V2_HISTORY_LEN (96U)
+/* V2 LC302时钟相位最小值窗口长度，覆盖约1.3秒。 */
+#define POS_EST_V2_CLOCK_WINDOW_LEN (64U)
+/* LC302光流帧固定周期，单位秒。 */
+#define POS_EST_V2_FLOW_DT_S (0.0208f)
+/* LC302传感器时钟到有效光流测量的延迟，单位毫秒。 */
+#define POS_EST_V2_FLOW_DELAY_MS (36.0f)
+/* LC302解耦量转换为视线角速度的比例。 */
+#define POS_EST_V2_FLOW_TO_RADPS (0.00480769231f)
+/* V2允许使用光流时的最小姿态余弦。 */
+#define POS_EST_V2_TILT_COS_MIN (0.71f)
+/* V2允许的最大光流角速度，单位rad/s。 */
+#define POS_EST_V2_FLOW_RATE_MAX_RADPS (2.5f)
+/* V2加速度过程噪声标准差，单位cm/s^2/sqrt(Hz)。 */
+#define POS_EST_V2_SIGMA_ACC_CMSS (70.0f)
+/* V2加速度偏置随机游走标准差，单位cm/s^3/sqrt(Hz)。 */
+#define POS_EST_V2_SIGMA_BIAS_CMSSS (0.2f)
+/* V2光流测量噪声标准差，单位rad/s。 */
+#define POS_EST_V2_SIGMA_FLOW_RADPS (0.18f)
+/* V2正常更新的二维NIS软门限。 */
+#define POS_EST_V2_NIS_NORMAL (11.83f)
+/* V2重捕获更新的二维NIS软门限。 */
+#define POS_EST_V2_NIS_REACQUIRE (25.0f)
+/* V2拒绝光流更新的二维NIS硬门限。 */
+#define POS_EST_V2_NIS_MAX (100.0f)
+/* V2正常更新允许的当前速度最大修正量，单位cm/s。 */
+#define POS_EST_V2_CORRECTION_NORMAL_CMPS (25.0f)
+/* V2重捕获允许的当前速度最大修正量，单位cm/s。 */
+#define POS_EST_V2_CORRECTION_REACQUIRE_CMPS (35.0f)
+/* V2进入重捕获状态的无有效光流时间，单位毫秒。 */
+#define POS_EST_V2_REACQUIRE_MS (200U)
+/* V2加速度偏置状态限幅，单位cm/s^2。 */
+#define POS_EST_V2_BIAS_LIMIT_CMSS (100.0f)
+/* V2光流有效高度下限，单位米。 */
+#define POS_EST_V2_HEIGHT_MIN_M (0.20f)
+/* V2光流有效高度上限，单位米。 */
+#define POS_EST_V2_HEIGHT_MAX_M (1.40f)
+/* V2光流曝光半窗口，单位毫秒。 */
+#define POS_EST_V2_EXPOSURE_HALF_MS (10.4f)
+/* V2允许进行历史光流更新的最大测量年龄，单位毫秒。 */
+#define POS_EST_V2_HISTORY_MAX_AGE_MS (75.0f)
+/* V2可连续推算的LC302最大序号跳变量。 */
+#define POS_EST_V2_SEQ_JUMP_MAX (10U)
+/* V2新光流帧状态位。 */
+#define POS_EST_V2_STATUS_NEW_FLOW (1U << 0U)
+/* V2历史测量时刻已找到状态位。 */
+#define POS_EST_V2_STATUS_HISTORY_READY (1U << 1U)
+/* V2光流原始有效状态位。 */
+#define POS_EST_V2_STATUS_FLOW_VALID (1U << 2U)
+/* V2延迟时刻ToF有效状态位。 */
+#define POS_EST_V2_STATUS_TOF_VALID (1U << 3U)
+/* V2光流几何条件有效状态位。 */
+#define POS_EST_V2_STATUS_GEOMETRY_VALID (1U << 4U)
+/* V2光流曝光区间存在冲击状态位。 */
+#define POS_EST_V2_STATUS_EXPOSURE_SHOCK (1U << 5U)
+/* V2本帧光流更新已接受状态位。 */
+#define POS_EST_V2_STATUS_ACCEPTED (1U << 6U)
+/* V2本帧光流更新被拒绝状态位。 */
+#define POS_EST_V2_STATUS_REJECTED (1U << 7U)
+/* V2当前处于光流重捕获状态位。 */
+#define POS_EST_V2_STATUS_REACQUIRE (1U << 8U)
+
+/* V2单个1000Hz历史样本，保存固定延迟更新和回放所需的全部数据。 */
+typedef struct
+{
+    float state[4];
+    float covariance[4][4];
+    float accel_left_cmss;
+    float accel_forward_cmss;
+    float yaw_rate_rps;
+    float height_m;
+    float vertical_up_cmps;
+    float sin_pitch;
+    float cos_pitch;
+    float sin_roll;
+    float cos_roll;
+    float gyro_norm_dps;
+    uint32_t time_ms;
+    uint8_t tof_valid;
+    uint8_t shock;
+    uint8_t static_locked;
+    uint8_t reserved;
+} Pos_Est_V2_History_t;
 /* 光流解算得到的 X 轴速度，单位 cm/s，往左飞为正，往右飞为负 */
 float opflow_vel_x = 0.0f;
 /* 光流解算得到的 Y 轴速度，单位 cm/s，往前飞为正，往后飞为负 */
@@ -256,6 +341,55 @@ float acc_y_lp = 0.0f;
 float Pos_Est_acc_bias_x_cmss = 0.0f;
 float Pos_Est_acc_bias_y_cmss = 0.0f;
 
+/* V2固定延迟状态、协方差和IMU输入历史。 */
+static Pos_Est_V2_History_t s_pos_est_v2_history[POS_EST_V2_HISTORY_LEN];
+/* V2历史缓冲当前最新样本下标。 */
+static uint16_t s_pos_est_v2_history_head = 0U;
+/* V2历史缓冲当前有效样本数量。 */
+static uint16_t s_pos_est_v2_history_count = 0U;
+/* V2上一次消费的LC302串口帧序号。 */
+static uint32_t s_pos_est_v2_last_flow_seq = 0U;
+/* V2最近一次接受光流更新的MCU时刻，单位毫秒。 */
+static uint32_t s_pos_est_v2_last_accepted_ms = 0U;
+/* V2在线重建的LC302传感器时刻，单位毫秒。 */
+static float s_pos_est_v2_sensor_time_ms = 0.0f;
+/* V2最近LC302帧的轮询相位候选值，单位毫秒。 */
+static float s_pos_est_v2_clock_phase[POS_EST_V2_CLOCK_WINDOW_LEN];
+/* V2 LC302时钟相位窗口最新下标。 */
+static uint8_t s_pos_est_v2_clock_phase_head = 0U;
+/* V2 LC302时钟相位窗口有效数量。 */
+static uint8_t s_pos_est_v2_clock_phase_count = 0U;
+/* V2当前LC302时钟分段的起始帧序号。 */
+static uint32_t s_pos_est_v2_clock_base_seq = 0U;
+/* V2当前左向影子速度，单位cm/s。 */
+static float s_pos_est_v2_vel_x = 0.0f;
+/* V2当前前向影子速度，单位cm/s。 */
+static float s_pos_est_v2_vel_y = 0.0f;
+/* V2当前左向残余加速度偏置，单位cm/s^2。 */
+static float s_pos_est_v2_bias_x = 0.0f;
+/* V2当前前向残余加速度偏置，单位cm/s^2。 */
+static float s_pos_est_v2_bias_y = 0.0f;
+/* V2最近新光流帧的左向速度创新，单位cm/s。 */
+static float s_pos_est_v2_innovation_x = 0.0f;
+/* V2最近新光流帧的前向速度创新，单位cm/s。 */
+static float s_pos_est_v2_innovation_y = 0.0f;
+/* V2最近光流更新传播到当前时刻后的左向修正量，单位cm/s。 */
+static float s_pos_est_v2_correction_x = 0.0f;
+/* V2最近光流更新传播到当前时刻后的前向修正量，单位cm/s。 */
+static float s_pos_est_v2_correction_y = 0.0f;
+/* V2最近新光流帧的二维NIS。 */
+static float s_pos_est_v2_nis = 0.0f;
+/* V2最近新光流帧选中的历史测量年龄，单位毫秒。 */
+static float s_pos_est_v2_measurement_age_ms = 0.0f;
+/* V2最近一次50Hz处理结果的压缩状态位。 */
+static uint32_t s_pos_est_v2_status = 0U;
+/* V2是否已经建立LC302传感器时钟。 */
+static uint8_t s_pos_est_v2_sensor_clock_ready = 0U;
+/* V2是否至少接受过一次光流更新。 */
+static uint8_t s_pos_est_v2_has_accepted = 0U;
+/* V2光流鲁棒更新后的剩余重捕获帧数。 */
+static uint8_t s_pos_est_v2_recovery_frames = 0U;
+
 static float Pos_Est_ClampFloat(float value, float min_value, float max_value)
 {
     if (value < min_value)
@@ -303,6 +437,770 @@ static uint8_t Pos_Est_IsStaticForAccelBias(void)
 }
 
 /*
+ * 函数名: Pos_Est_V2_Propagate
+ * 功能: 使用当前历史样本的IMU输入，将V2状态和协方差从上一样本传播到当前样本
+ * 输入参数: current-待写入的当前历史样本；previous-时间上相邻的上一历史样本
+ * 返回值: 无
+ */
+static void Pos_Est_V2_Propagate(Pos_Est_V2_History_t *current,
+                                 const Pos_Est_V2_History_t *previous)
+{
+    float dt;
+    float gap;
+    float dpsi;
+    float yaw_cos;
+    float yaw_sin;
+    float old_left;
+    float old_forward;
+    float qa2 = POS_EST_V2_SIGMA_ACC_CMSS * POS_EST_V2_SIGMA_ACC_CMSS;
+    float qb2 = POS_EST_V2_SIGMA_BIAS_CMSSS * POS_EST_V2_SIGMA_BIAS_CMSSS;
+    float a[4][4];
+    float temp[4][4];
+    float covariance[4][4];
+    uint8_t i;
+    uint8_t j;
+    uint8_t k;
+
+    dt = (float)(current->time_ms - previous->time_ms) * 0.001f;
+    if (dt <= 0.0f)
+    {
+        memcpy(current->state, previous->state, sizeof(current->state));
+        memcpy(current->covariance, previous->covariance, sizeof(current->covariance));
+        return;
+    }
+
+    old_left = previous->state[0];
+    old_forward = previous->state[1];
+    current->state[2] = previous->state[2];
+    current->state[3] = previous->state[3];
+
+    if (dt > 0.050f)
+    {
+        gap = (dt < 5.0f) ? dt : 5.0f;
+        dpsi = current->yaw_rate_rps * ((gap < 1.0f) ? gap : 1.0f);
+        yaw_cos = cosf(dpsi);
+        yaw_sin = sinf(dpsi);
+        current->state[0] = yaw_cos * old_left + yaw_sin * old_forward;
+        current->state[1] = -yaw_sin * old_left + yaw_cos * old_forward;
+
+        memset(a, 0, sizeof(a));
+        a[0][0] = yaw_cos;
+        a[0][1] = yaw_sin;
+        a[1][0] = -yaw_sin;
+        a[1][1] = yaw_cos;
+        a[2][2] = 1.0f;
+        a[3][3] = 1.0f;
+        for (i = 0U; i < 4U; i++)
+        {
+            for (j = 0U; j < 4U; j++)
+            {
+                temp[i][j] = 0.0f;
+                for (k = 0U; k < 4U; k++)
+                {
+                    temp[i][j] += a[i][k] * previous->covariance[k][j];
+                }
+            }
+        }
+        for (i = 0U; i < 4U; i++)
+        {
+            for (j = 0U; j < 4U; j++)
+            {
+                covariance[i][j] = 0.0f;
+                for (k = 0U; k < 4U; k++)
+                {
+                    covariance[i][j] += temp[i][k] * a[j][k];
+                }
+            }
+        }
+        for (i = 0U; i < 4U; i++)
+        {
+            for (j = 0U; j < 4U; j++)
+            {
+                current->covariance[i][j] =
+                    0.5f * (covariance[i][j] + covariance[j][i]);
+            }
+        }
+        current->covariance[0][0] += qa2 * gap + qb2 * gap * gap * gap / 3.0f;
+        current->covariance[1][1] += qa2 * gap + qb2 * gap * gap * gap / 3.0f;
+        current->covariance[0][2] -= qb2 * gap * gap * 0.5f;
+        current->covariance[2][0] = current->covariance[0][2];
+        current->covariance[1][3] -= qb2 * gap * gap * 0.5f;
+        current->covariance[3][1] = current->covariance[1][3];
+        current->covariance[2][2] += qb2 * gap;
+        current->covariance[3][3] += qb2 * gap;
+    }
+    else
+    {
+        dpsi = current->yaw_rate_rps * dt;
+        yaw_cos = cosf(dpsi);
+        yaw_sin = sinf(dpsi);
+        current->state[0] = yaw_cos * old_left + yaw_sin * old_forward +
+                            (current->accel_left_cmss - previous->state[2]) * dt;
+        current->state[1] = -yaw_sin * old_left + yaw_cos * old_forward +
+                            (current->accel_forward_cmss - previous->state[3]) * dt;
+
+        memset(a, 0, sizeof(a));
+        a[0][0] = yaw_cos;
+        a[0][1] = yaw_sin;
+        a[1][0] = -yaw_sin;
+        a[1][1] = yaw_cos;
+        a[0][2] = -dt;
+        a[1][3] = -dt;
+        a[2][2] = 1.0f;
+        a[3][3] = 1.0f;
+
+        for (i = 0U; i < 4U; i++)
+        {
+            for (j = 0U; j < 4U; j++)
+            {
+                temp[i][j] = 0.0f;
+                for (k = 0U; k < 4U; k++)
+                {
+                    temp[i][j] += a[i][k] * previous->covariance[k][j];
+                }
+            }
+        }
+        for (i = 0U; i < 4U; i++)
+        {
+            for (j = 0U; j < 4U; j++)
+            {
+                covariance[i][j] = 0.0f;
+                for (k = 0U; k < 4U; k++)
+                {
+                    covariance[i][j] += temp[i][k] * a[j][k];
+                }
+            }
+        }
+
+        covariance[0][0] += qa2 * dt + qb2 * dt * dt * dt / 3.0f;
+        covariance[1][1] += qa2 * dt + qb2 * dt * dt * dt / 3.0f;
+        covariance[0][2] -= qb2 * dt * dt * 0.5f;
+        covariance[2][0] -= qb2 * dt * dt * 0.5f;
+        covariance[1][3] -= qb2 * dt * dt * 0.5f;
+        covariance[3][1] -= qb2 * dt * dt * 0.5f;
+        covariance[2][2] += qb2 * dt;
+        covariance[3][3] += qb2 * dt;
+
+        for (i = 0U; i < 4U; i++)
+        {
+            for (j = 0U; j < 4U; j++)
+            {
+                current->covariance[i][j] = 0.5f * (covariance[i][j] + covariance[j][i]);
+            }
+        }
+    }
+
+    if ((current->static_locked != 0U) && (current->height_m < POS_EST_V2_HEIGHT_MIN_M))
+    {
+        float dt_static = (dt < 0.010f) ? dt : 0.010f;
+        float alpha = dt_static / (5.0f + dt_static);
+        float bias_left_cov = current->covariance[2][2];
+        float bias_forward_cov = current->covariance[3][3];
+
+        current->state[2] += alpha * (current->accel_left_cmss - current->state[2]);
+        current->state[3] += alpha * (current->accel_forward_cmss - current->state[3]);
+        current->state[0] = 0.0f;
+        current->state[1] = 0.0f;
+        for (i = 0U; i < 2U; i++)
+        {
+            for (j = 0U; j < 4U; j++)
+            {
+                current->covariance[i][j] = 0.0f;
+                current->covariance[j][i] = 0.0f;
+            }
+        }
+        current->covariance[0][0] = 0.25f;
+        current->covariance[1][1] = 0.25f;
+        current->covariance[2][2] = (bias_left_cov < 4.0f) ? bias_left_cov : 4.0f;
+        current->covariance[3][3] = (bias_forward_cov < 4.0f) ? bias_forward_cov : 4.0f;
+        current->covariance[2][3] = 0.0f;
+        current->covariance[3][2] = 0.0f;
+    }
+}
+
+/*
+ * 函数名: Pos_Est_V2_Init
+ * 功能: 初始化V2影子速度估计器的状态、协方差、固定延迟历史和诊断量
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void Pos_Est_V2_Init(void)
+{
+    memset(s_pos_est_v2_history, 0, sizeof(s_pos_est_v2_history));
+    s_pos_est_v2_history_head = 0U;
+    s_pos_est_v2_history_count = 0U;
+    s_pos_est_v2_last_flow_seq = lc302_data_seq;
+    s_pos_est_v2_last_accepted_ms = 0U;
+    s_pos_est_v2_sensor_time_ms = 0.0f;
+    memset(s_pos_est_v2_clock_phase, 0, sizeof(s_pos_est_v2_clock_phase));
+    s_pos_est_v2_clock_phase_head = 0U;
+    s_pos_est_v2_clock_phase_count = 0U;
+    s_pos_est_v2_clock_base_seq = lc302_data_seq;
+    s_pos_est_v2_vel_x = 0.0f;
+    s_pos_est_v2_vel_y = 0.0f;
+    s_pos_est_v2_bias_x = 0.0f;
+    s_pos_est_v2_bias_y = 0.0f;
+    s_pos_est_v2_innovation_x = 0.0f;
+    s_pos_est_v2_innovation_y = 0.0f;
+    s_pos_est_v2_correction_x = 0.0f;
+    s_pos_est_v2_correction_y = 0.0f;
+    s_pos_est_v2_nis = 0.0f;
+    s_pos_est_v2_measurement_age_ms = 0.0f;
+    s_pos_est_v2_status = 0U;
+    s_pos_est_v2_sensor_clock_ready = 0U;
+    s_pos_est_v2_has_accepted = 0U;
+    s_pos_est_v2_recovery_frames = 0U;
+}
+
+/*
+ * 函数名: Pos_Est_V2_Update_1000HZ
+ * 功能: 以1000Hz传播V2机体系速度和协方差，并保存固定延迟回放历史
+ * 输入参数: 无，使用当前IMU、姿态、高度和旧加速度预处理结果
+ * 返回值: 无
+ */
+void Pos_Est_V2_Update_1000HZ(void)
+{
+    Pos_Est_V2_History_t *current;
+    Pos_Est_V2_History_t *previous = NULL;
+    uint16_t current_index;
+    float yaw_cos_pitch;
+
+    if (s_pos_est_v2_history_count == 0U)
+    {
+        current_index = 0U;
+    }
+    else
+    {
+        previous = &s_pos_est_v2_history[s_pos_est_v2_history_head];
+        current_index = (uint16_t)((s_pos_est_v2_history_head + 1U) % POS_EST_V2_HISTORY_LEN);
+    }
+
+    current = &s_pos_est_v2_history[current_index];
+    memset(current, 0, sizeof(*current));
+    current->time_ms = tick_1000us_cnt;
+    current->accel_left_cmss = -acc_y_lp;
+    current->accel_forward_cmss = acc_x_lp;
+    current->height_m = g_tof_fused_height_mm * 0.001f;
+    current->vertical_up_cmps = g_height_fused_vz_mps * 100.0f;
+    current->sin_pitch = g_euler.sin_pitch;
+    current->cos_pitch = g_euler.cos_pitch;
+    current->sin_roll = g_euler.sin_roll;
+    current->cos_roll = g_euler.cos_roll;
+    current->gyro_norm_dps = sqrtf(g_imufilter_1000hz.gyrox * g_imufilter_1000hz.gyrox +
+                                   g_imufilter_1000hz.gyroy * g_imufilter_1000hz.gyroy +
+                                   g_imufilter_1000hz.gyroz * g_imufilter_1000hz.gyroz);
+    yaw_cos_pitch = current->cos_pitch;
+    if (yaw_cos_pitch < POS_EST_V2_TILT_COS_MIN)
+    {
+        yaw_cos_pitch = POS_EST_V2_TILT_COS_MIN;
+    }
+    current->yaw_rate_rps = (g_imufilter_1000hz.gyroy * current->sin_roll +
+                             g_imufilter_1000hz.gyroz * current->cos_roll) /
+                            yaw_cos_pitch * POS_EST_DEG_TO_RAD;
+    current->tof_valid = (g_tof_fused_valid != 0U) ? 1U : 0U;
+    current->shock = (g_imu_shock_flag != 0U) ? 1U : 0U;
+    current->static_locked = ((Pos_Est_IsStaticForAccelBias() != 0U) &&
+                              (s_static_sample_count >= POS_EST_STATIC_LOCK_SAMPLES))
+                                 ? 1U
+                                 : 0U;
+
+    if (previous == NULL)
+    {
+        current->covariance[0][0] = 400.0f;
+        current->covariance[1][1] = 400.0f;
+        current->covariance[2][2] = 100.0f;
+        current->covariance[3][3] = 100.0f;
+        s_pos_est_v2_history_count = 1U;
+    }
+    else
+    {
+        Pos_Est_V2_Propagate(current, previous);
+        if (s_pos_est_v2_history_count < POS_EST_V2_HISTORY_LEN)
+        {
+            s_pos_est_v2_history_count++;
+        }
+    }
+
+    s_pos_est_v2_history_head = current_index;
+    s_pos_est_v2_vel_x = current->state[0];
+    s_pos_est_v2_vel_y = current->state[1];
+    s_pos_est_v2_bias_x = current->state[2];
+    s_pos_est_v2_bias_y = current->state[3];
+}
+
+/*
+ * 函数名: Pos_Est_V2_Update_50HZ
+ * 功能: 对新的LC302帧执行延迟LOS卡尔曼更新，并将修正后的历史状态回放到当前时刻
+ * 输入参数: 无，使用当前LC302、ToF和V2历史数据
+ * 返回值: 无
+ */
+void Pos_Est_V2_Update_50HZ(void)
+{
+    uint32_t flow_seq = lc302_data_seq;
+    uint32_t seq_delta;
+    uint32_t status = 0U;
+    uint16_t offset;
+    uint16_t index;
+    uint16_t measurement_index = 0U;
+    uint16_t replay_index;
+    uint16_t next_index;
+    uint8_t history_found = 0U;
+    uint8_t exposure_shock = 0U;
+    uint8_t geometry_valid;
+    uint8_t reacquiring;
+    uint8_t bias_left_clipped = 0U;
+    uint8_t bias_forward_clipped = 0U;
+    float now_ms;
+    float nominal_elapsed_ms;
+    float phase_candidate_ms;
+    float phase_min_ms;
+    float measurement_time_ms;
+    float sample_time_ms;
+    float q_measured[2];
+    float flow_rate;
+    float cos_tilt;
+    float rho_cm;
+    float vertical_up_cmps;
+    float h[2][4];
+    float h_p[2][4];
+    float innovation[2];
+    float offset_q[2];
+    float s_matrix[2][2];
+    float s_inverse[2][2];
+    float determinant;
+    float nis_limit;
+    float sigma_scale;
+    float sigma;
+    float r_variance;
+    float tilt_deg;
+    float gain[4][2];
+    float robust_scale;
+    float correction_scale;
+    float correction_limit;
+    float correction_norm;
+    float bias_delta_limit;
+    float bias_delta_norm;
+    float delta[4];
+    float state_after[4];
+    float kh[4][4];
+    float temp[4][4];
+    float covariance_after[4][4];
+    float current_before[2];
+    uint8_t i;
+    uint8_t j;
+    uint8_t k;
+    Pos_Est_V2_History_t *measurement_sample;
+    Pos_Est_V2_History_t *current_sample;
+
+    s_pos_est_v2_status = 0U;
+    if (flow_seq == s_pos_est_v2_last_flow_seq)
+    {
+        return;
+    }
+
+    seq_delta = flow_seq - s_pos_est_v2_last_flow_seq;
+    s_pos_est_v2_last_flow_seq = flow_seq;
+    status |= POS_EST_V2_STATUS_NEW_FLOW;
+    s_pos_est_v2_innovation_x = 0.0f;
+    s_pos_est_v2_innovation_y = 0.0f;
+    s_pos_est_v2_correction_x = 0.0f;
+    s_pos_est_v2_correction_y = 0.0f;
+    s_pos_est_v2_nis = 0.0f;
+    s_pos_est_v2_measurement_age_ms = 0.0f;
+
+    if (lc302_data.valid != 0U)
+    {
+        status |= POS_EST_V2_STATUS_FLOW_VALID;
+    }
+
+    now_ms = (float)tick_1000us_cnt;
+    if ((s_pos_est_v2_sensor_clock_ready == 0U) ||
+        (seq_delta > POS_EST_V2_SEQ_JUMP_MAX) ||
+        ((now_ms - s_pos_est_v2_sensor_time_ms) > 500.0f))
+    {
+        s_pos_est_v2_clock_base_seq = flow_seq;
+        s_pos_est_v2_clock_phase_head = 0U;
+        s_pos_est_v2_clock_phase_count = 1U;
+        s_pos_est_v2_clock_phase[0] = now_ms;
+        s_pos_est_v2_sensor_time_ms = now_ms;
+        s_pos_est_v2_sensor_clock_ready = 1U;
+    }
+    else
+    {
+        nominal_elapsed_ms = (float)(flow_seq - s_pos_est_v2_clock_base_seq) *
+                             POS_EST_V2_FLOW_DT_S * 1000.0f;
+        phase_candidate_ms = now_ms - nominal_elapsed_ms;
+        s_pos_est_v2_clock_phase_head =
+            (uint8_t)((s_pos_est_v2_clock_phase_head + 1U) % POS_EST_V2_CLOCK_WINDOW_LEN);
+        s_pos_est_v2_clock_phase[s_pos_est_v2_clock_phase_head] = phase_candidate_ms;
+        if (s_pos_est_v2_clock_phase_count < POS_EST_V2_CLOCK_WINDOW_LEN)
+        {
+            s_pos_est_v2_clock_phase_count++;
+        }
+        phase_min_ms = s_pos_est_v2_clock_phase[0];
+        for (i = 1U; i < s_pos_est_v2_clock_phase_count; i++)
+        {
+            if (s_pos_est_v2_clock_phase[i] < phase_min_ms)
+            {
+                phase_min_ms = s_pos_est_v2_clock_phase[i];
+            }
+        }
+        s_pos_est_v2_sensor_time_ms = phase_min_ms + nominal_elapsed_ms;
+        if (s_pos_est_v2_sensor_time_ms > now_ms)
+        {
+            s_pos_est_v2_sensor_time_ms = now_ms;
+        }
+    }
+    measurement_time_ms = s_pos_est_v2_sensor_time_ms - POS_EST_V2_FLOW_DELAY_MS;
+
+    for (offset = 0U; offset < s_pos_est_v2_history_count; offset++)
+    {
+        index = (uint16_t)((s_pos_est_v2_history_head + POS_EST_V2_HISTORY_LEN - offset) %
+                           POS_EST_V2_HISTORY_LEN);
+        if ((float)s_pos_est_v2_history[index].time_ms <= measurement_time_ms)
+        {
+            measurement_index = index;
+            history_found = 1U;
+            break;
+        }
+    }
+    if (history_found == 0U)
+    {
+        s_pos_est_v2_status = status;
+        return;
+    }
+
+    measurement_sample = &s_pos_est_v2_history[measurement_index];
+    s_pos_est_v2_measurement_age_ms = now_ms - (float)measurement_sample->time_ms;
+    if (s_pos_est_v2_measurement_age_ms > POS_EST_V2_HISTORY_MAX_AGE_MS)
+    {
+        s_pos_est_v2_status = status;
+        return;
+    }
+    status |= POS_EST_V2_STATUS_HISTORY_READY;
+    if (measurement_sample->tof_valid != 0U)
+    {
+        status |= POS_EST_V2_STATUS_TOF_VALID;
+    }
+
+    q_measured[0] = FlowGyroDecoupler_LC302_GetDecX() * POS_EST_V2_FLOW_TO_RADPS;
+    q_measured[1] = FlowGyroDecoupler_LC302_GetDecY() * POS_EST_V2_FLOW_TO_RADPS;
+    flow_rate = sqrtf(q_measured[0] * q_measured[0] + q_measured[1] * q_measured[1]);
+    cos_tilt = measurement_sample->cos_pitch * measurement_sample->cos_roll;
+    geometry_valid = ((measurement_sample->height_m >= POS_EST_V2_HEIGHT_MIN_M) &&
+                      (measurement_sample->height_m <= POS_EST_V2_HEIGHT_MAX_M) &&
+                      (cos_tilt >= POS_EST_V2_TILT_COS_MIN) &&
+                      (flow_rate <= POS_EST_V2_FLOW_RATE_MAX_RADPS))
+                         ? 1U
+                         : 0U;
+    if (geometry_valid != 0U)
+    {
+        status |= POS_EST_V2_STATUS_GEOMETRY_VALID;
+    }
+
+    for (offset = 0U; offset < s_pos_est_v2_history_count; offset++)
+    {
+        index = (uint16_t)((s_pos_est_v2_history_head + POS_EST_V2_HISTORY_LEN - offset) %
+                           POS_EST_V2_HISTORY_LEN);
+        sample_time_ms = (float)s_pos_est_v2_history[index].time_ms;
+        if ((sample_time_ms >= measurement_time_ms - POS_EST_V2_EXPOSURE_HALF_MS) &&
+            (sample_time_ms <= measurement_time_ms + POS_EST_V2_EXPOSURE_HALF_MS) &&
+            (s_pos_est_v2_history[index].shock != 0U))
+        {
+            exposure_shock = 1U;
+            break;
+        }
+    }
+    if (exposure_shock != 0U)
+    {
+        status |= POS_EST_V2_STATUS_EXPOSURE_SHOCK;
+    }
+
+    if (((status & POS_EST_V2_STATUS_FLOW_VALID) == 0U) ||
+        ((status & POS_EST_V2_STATUS_TOF_VALID) == 0U) ||
+        (geometry_valid == 0U) ||
+        (exposure_shock != 0U))
+    {
+        s_pos_est_v2_status = status;
+        return;
+    }
+
+    rho_cm = measurement_sample->height_m * 100.0f / cos_tilt;
+    vertical_up_cmps = measurement_sample->vertical_up_cmps;
+    memset(h, 0, sizeof(h));
+    h[0][0] = measurement_sample->cos_roll / rho_cm;
+    h[0][1] = -measurement_sample->sin_roll * measurement_sample->sin_pitch / rho_cm;
+    h[1][1] = measurement_sample->cos_pitch / rho_cm;
+    offset_q[0] = measurement_sample->sin_roll * measurement_sample->cos_pitch *
+                  vertical_up_cmps / rho_cm;
+    offset_q[1] = measurement_sample->sin_pitch * vertical_up_cmps / rho_cm;
+    innovation[0] = q_measured[0] -
+                    (h[0][0] * measurement_sample->state[0] +
+                     h[0][1] * measurement_sample->state[1] + offset_q[0]);
+    innovation[1] = q_measured[1] -
+                    (h[1][1] * measurement_sample->state[1] + offset_q[1]);
+    s_pos_est_v2_innovation_y = innovation[1] / h[1][1];
+    s_pos_est_v2_innovation_x =
+        (innovation[0] - h[0][1] * s_pos_est_v2_innovation_y) / h[0][0];
+
+    tilt_deg = acosf(Pos_Est_ClampFloat(cos_tilt, -1.0f, 1.0f)) / POS_EST_DEG_TO_RAD;
+    sigma_scale = 1.0f +
+                  0.004f * ((measurement_sample->gyro_norm_dps > 10.0f)
+                                ? (measurement_sample->gyro_norm_dps - 10.0f)
+                                : 0.0f) +
+                  0.020f * ((tilt_deg > 5.0f) ? (tilt_deg - 5.0f) : 0.0f) +
+                  ((seq_delta > 1U) ? 0.50f : 0.0f);
+    sigma = POS_EST_V2_SIGMA_FLOW_RADPS * sigma_scale;
+    r_variance = sigma * sigma;
+
+    for (i = 0U; i < 2U; i++)
+    {
+        for (j = 0U; j < 4U; j++)
+        {
+            h_p[i][j] = 0.0f;
+            for (k = 0U; k < 4U; k++)
+            {
+                h_p[i][j] += h[i][k] * measurement_sample->covariance[k][j];
+            }
+        }
+    }
+    for (i = 0U; i < 2U; i++)
+    {
+        for (j = 0U; j < 2U; j++)
+        {
+            s_matrix[i][j] = 0.0f;
+            for (k = 0U; k < 4U; k++)
+            {
+                s_matrix[i][j] += h_p[i][k] * h[j][k];
+            }
+            if (i == j)
+            {
+                s_matrix[i][j] += r_variance;
+            }
+        }
+    }
+
+    determinant = s_matrix[0][0] * s_matrix[1][1] -
+                  s_matrix[0][1] * s_matrix[1][0];
+    if (fabsf(determinant) < 1.0e-12f)
+    {
+        status |= POS_EST_V2_STATUS_REJECTED;
+        s_pos_est_v2_recovery_frames = 2U;
+        s_pos_est_v2_status = status;
+        return;
+    }
+    s_inverse[0][0] = s_matrix[1][1] / determinant;
+    s_inverse[0][1] = -s_matrix[0][1] / determinant;
+    s_inverse[1][0] = -s_matrix[1][0] / determinant;
+    s_inverse[1][1] = s_matrix[0][0] / determinant;
+    s_pos_est_v2_nis = innovation[0] *
+                           (s_inverse[0][0] * innovation[0] +
+                            s_inverse[0][1] * innovation[1]) +
+                       innovation[1] *
+                           (s_inverse[1][0] * innovation[0] +
+                            s_inverse[1][1] * innovation[1]);
+    if (s_pos_est_v2_nis < 0.0f)
+    {
+        s_pos_est_v2_nis = 0.0f;
+    }
+
+    reacquiring = ((s_pos_est_v2_has_accepted == 0U) ||
+                   ((tick_1000us_cnt - s_pos_est_v2_last_accepted_ms) > POS_EST_V2_REACQUIRE_MS) ||
+                   (s_pos_est_v2_recovery_frames > 0U))
+                      ? 1U
+                      : 0U;
+    if (reacquiring != 0U)
+    {
+        status |= POS_EST_V2_STATUS_REACQUIRE;
+    }
+    if (s_pos_est_v2_nis > POS_EST_V2_NIS_MAX)
+    {
+        status |= POS_EST_V2_STATUS_REJECTED;
+        s_pos_est_v2_recovery_frames = 2U;
+        s_pos_est_v2_status = status;
+        return;
+    }
+
+    for (i = 0U; i < 4U; i++)
+    {
+        gain[i][0] = h_p[0][i] * s_inverse[0][0] + h_p[1][i] * s_inverse[1][0];
+        gain[i][1] = h_p[0][i] * s_inverse[0][1] + h_p[1][i] * s_inverse[1][1];
+    }
+    nis_limit = (reacquiring != 0U) ? POS_EST_V2_NIS_REACQUIRE : POS_EST_V2_NIS_NORMAL;
+    robust_scale = sqrtf(nis_limit / ((s_pos_est_v2_nis > 1.0e-9f)
+                                          ? s_pos_est_v2_nis
+                                          : 1.0e-9f));
+    if (robust_scale > 1.0f)
+    {
+        robust_scale = 1.0f;
+    }
+    for (i = 0U; i < 4U; i++)
+    {
+        gain[i][0] *= robust_scale;
+        gain[i][1] *= robust_scale;
+    }
+    if (reacquiring != 0U)
+    {
+        gain[2][0] = 0.0f;
+        gain[2][1] = 0.0f;
+        gain[3][0] = 0.0f;
+        gain[3][1] = 0.0f;
+    }
+
+    for (i = 0U; i < 4U; i++)
+    {
+        delta[i] = gain[i][0] * innovation[0] + gain[i][1] * innovation[1];
+    }
+    correction_limit = (reacquiring != 0U) ? POS_EST_V2_CORRECTION_REACQUIRE_CMPS
+                                            : POS_EST_V2_CORRECTION_NORMAL_CMPS;
+    correction_norm = sqrtf(delta[0] * delta[0] + delta[1] * delta[1]);
+    correction_scale = correction_limit /
+                       ((correction_norm > 1.0e-9f) ? correction_norm : 1.0e-9f);
+    if (correction_scale > 1.0f)
+    {
+        correction_scale = 1.0f;
+    }
+    for (i = 0U; i < 4U; i++)
+    {
+        gain[i][0] *= correction_scale;
+        gain[i][1] *= correction_scale;
+        delta[i] *= correction_scale;
+    }
+
+    bias_delta_limit = (reacquiring != 0U) ? 10.0f : 5.0f;
+    bias_delta_norm = sqrtf(delta[2] * delta[2] + delta[3] * delta[3]);
+    if (bias_delta_norm > bias_delta_limit)
+    {
+        float bias_scale = bias_delta_limit / bias_delta_norm;
+        gain[2][0] *= bias_scale;
+        gain[2][1] *= bias_scale;
+        gain[3][0] *= bias_scale;
+        gain[3][1] *= bias_scale;
+        delta[2] *= bias_scale;
+        delta[3] *= bias_scale;
+    }
+
+    for (i = 0U; i < 4U; i++)
+    {
+        state_after[i] = measurement_sample->state[i] + delta[i];
+    }
+    if (state_after[2] > POS_EST_V2_BIAS_LIMIT_CMSS)
+    {
+        state_after[2] = POS_EST_V2_BIAS_LIMIT_CMSS;
+        bias_left_clipped = 1U;
+    }
+    else if (state_after[2] < -POS_EST_V2_BIAS_LIMIT_CMSS)
+    {
+        state_after[2] = -POS_EST_V2_BIAS_LIMIT_CMSS;
+        bias_left_clipped = 1U;
+    }
+    if (state_after[3] > POS_EST_V2_BIAS_LIMIT_CMSS)
+    {
+        state_after[3] = POS_EST_V2_BIAS_LIMIT_CMSS;
+        bias_forward_clipped = 1U;
+    }
+    else if (state_after[3] < -POS_EST_V2_BIAS_LIMIT_CMSS)
+    {
+        state_after[3] = -POS_EST_V2_BIAS_LIMIT_CMSS;
+        bias_forward_clipped = 1U;
+    }
+
+    for (i = 0U; i < 4U; i++)
+    {
+        for (j = 0U; j < 4U; j++)
+        {
+            kh[i][j] = (i == j) ? 1.0f : 0.0f;
+            kh[i][j] -= gain[i][0] * h[0][j] + gain[i][1] * h[1][j];
+        }
+    }
+    for (i = 0U; i < 4U; i++)
+    {
+        for (j = 0U; j < 4U; j++)
+        {
+            temp[i][j] = 0.0f;
+            for (k = 0U; k < 4U; k++)
+            {
+                temp[i][j] += kh[i][k] * measurement_sample->covariance[k][j];
+            }
+        }
+    }
+    for (i = 0U; i < 4U; i++)
+    {
+        for (j = 0U; j < 4U; j++)
+        {
+            covariance_after[i][j] = 0.0f;
+            for (k = 0U; k < 4U; k++)
+            {
+                covariance_after[i][j] += temp[i][k] * kh[j][k];
+            }
+            covariance_after[i][j] += r_variance *
+                                      (gain[i][0] * gain[j][0] + gain[i][1] * gain[j][1]);
+        }
+    }
+    for (i = 0U; i < 4U; i++)
+    {
+        for (j = 0U; j < 4U; j++)
+        {
+            measurement_sample->covariance[i][j] =
+                0.5f * (covariance_after[i][j] + covariance_after[j][i]);
+        }
+        measurement_sample->state[i] = state_after[i];
+    }
+    if (bias_left_clipped != 0U)
+    {
+        for (i = 0U; i < 4U; i++)
+        {
+            measurement_sample->covariance[2][i] = 0.0f;
+            measurement_sample->covariance[i][2] = 0.0f;
+        }
+        measurement_sample->covariance[2][2] = 25.0f;
+    }
+    if (bias_forward_clipped != 0U)
+    {
+        for (i = 0U; i < 4U; i++)
+        {
+            measurement_sample->covariance[3][i] = 0.0f;
+            measurement_sample->covariance[i][3] = 0.0f;
+        }
+        measurement_sample->covariance[3][3] = 25.0f;
+    }
+
+    current_sample = &s_pos_est_v2_history[s_pos_est_v2_history_head];
+    current_before[0] = current_sample->state[0];
+    current_before[1] = current_sample->state[1];
+    replay_index = measurement_index;
+    while (replay_index != s_pos_est_v2_history_head)
+    {
+        next_index = (uint16_t)((replay_index + 1U) % POS_EST_V2_HISTORY_LEN);
+        Pos_Est_V2_Propagate(&s_pos_est_v2_history[next_index],
+                             &s_pos_est_v2_history[replay_index]);
+        replay_index = next_index;
+    }
+
+    current_sample = &s_pos_est_v2_history[s_pos_est_v2_history_head];
+    s_pos_est_v2_vel_x = current_sample->state[0];
+    s_pos_est_v2_vel_y = current_sample->state[1];
+    s_pos_est_v2_bias_x = current_sample->state[2];
+    s_pos_est_v2_bias_y = current_sample->state[3];
+    s_pos_est_v2_correction_x = current_sample->state[0] - current_before[0];
+    s_pos_est_v2_correction_y = current_sample->state[1] - current_before[1];
+    s_pos_est_v2_last_accepted_ms = tick_1000us_cnt;
+    s_pos_est_v2_has_accepted = 1U;
+    status |= POS_EST_V2_STATUS_ACCEPTED;
+    if ((robust_scale < 0.999f) ||
+        (correction_scale < 0.999f) ||
+        (s_pos_est_v2_nis > POS_EST_V2_NIS_NORMAL))
+    {
+        s_pos_est_v2_recovery_frames = 2U;
+    }
+    else if (s_pos_est_v2_recovery_frames > 0U)
+    {
+        s_pos_est_v2_recovery_frames--;
+    }
+    s_pos_est_v2_status = status;
+}
+
+/*
  * 函数名: Pos_Est_Init
  * 功能: 初始化光流位置估计模块和相关滤波器
  * 输入参数: 无
@@ -339,6 +1237,7 @@ void Pos_Est_Init(void)
     Pos_Est_acc_bias_x_cmss = 0.0f;
     Pos_Est_acc_bias_y_cmss = 0.0f;
     s_static_sample_count = 0U;
+    Pos_Est_V2_Init();
 }
 
 /*
@@ -377,6 +1276,7 @@ void Pos_Est_Reinit(void)
     Pos_Est_acc_bias_x_cmss = 0.0f;
     Pos_Est_acc_bias_y_cmss = 0.0f;
     s_static_sample_count = 0U;
+    Pos_Est_V2_Init();
 }
 
 /*
@@ -539,6 +1439,35 @@ void Pos_Est_Update_1000HZ(void)
     {
         vely_pid = &zero_pid;
     }
+
+    Pos_Est_V2_Update_1000HZ();
+
+    wifi_justfloat(acc_x_temp, acc_y_temp,
+                acc_x_lp, acc_y_lp,
+                Pos_Est_acc_bias_x_cmss, Pos_Est_acc_bias_y_cmss,
+                g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
+                g_euler.pitch, g_euler.roll,
+                g_tof_fused_height_mm * 0.001f,
+                (float)(((lc302_data_seq & 0x7FFFFU) << 5U) |
+                        ((uint32)(lc302_data.valid != 0U)) |
+                        ((uint32)(g_tof_fused_valid != 0U) << 1U) |
+                        ((uint32)(g_imu_shock_flag != 0U) << 2U) |
+                        ((uint32)(accel_bias_static != 0U) << 3U) |
+                        ((uint32)(accel_bias_locked != 0U) << 4U)),
+                lc302_data.flow_x_integral, lc302_data.flow_y_integral,
+                dec_x, dec_y,
+                opflow_vel_x_lpf, opflow_vel_y_lpf,
+                s_vel_pred_x, s_vel_pred_y,
+                Pos_Est_vel_x, Pos_Est_vel_y,
+                s_pos_est_v2_vel_x, s_pos_est_v2_vel_y,
+                s_pos_est_v2_bias_x, s_pos_est_v2_bias_y,
+                s_pos_est_v2_innovation_x, s_pos_est_v2_innovation_y,
+                s_pos_est_v2_correction_x, s_pos_est_v2_correction_y,
+                s_pos_est_v2_nis, (float)s_pos_est_v2_status,
+                s_pos_est_v2_measurement_age_ms,
+                g_height_fused_vz_mps * 100.0f,
+                g_euler.yaw
+                );
     
     //                acc_x_temp, acc_y_temp,
     //                ICM42688.acc_x, ICM42688.acc_y, ICM42688.acc_z,
@@ -583,6 +1512,7 @@ void Pos_Est_Update_50HZ(void)
     (void)FlowGyroDecoupler_LC302_Update50Hz(tick_1000us_cnt, lc302_data.flow_x_integral, lc302_data.flow_y_integral, lc302_data.valid);
     dec_x = FlowGyroDecoupler_LC302_GetDecX();
     dec_y = FlowGyroDecoupler_LC302_GetDecY();
+    Pos_Est_V2_Update_50HZ();
     height_mm = g_tof_fused_height_mm;
     if (height_mm > VL53L1X_VALID_RANGE_MAX)
     {

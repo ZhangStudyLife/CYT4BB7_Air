@@ -1,6 +1,8 @@
 #include "fc_mode.h"
 #include "../Estimation/Pos_Est/Pos_Est.h"
 
+#define FC_MODE7_KFF_LPF_ALPHA (0.672624f) /* 10 Hz at 50 Hz */
+
 pid_t g_mode7_velx_pid;
 pid_t g_mode7_vely_pid;
 float g_mode7_velx_target = 0.0f;
@@ -8,6 +10,8 @@ float g_mode7_vely_target = 0.0f;
 
 static float s_mode7_prev_velx_target = 0.0f;
 static float s_mode7_prev_vely_target = 0.0f;
+static float s_mode7_velx_ff_lpf = 0.0f;
+static float s_mode7_vely_ff_lpf = 0.0f;
 
 static float FC_Mode7_StickToSpeed(float v)
 {
@@ -46,6 +50,8 @@ void FC_Mode7_Reset(void)
     g_mode7_vely_target = 0.0f;
     s_mode7_prev_velx_target = 0.0f;
     s_mode7_prev_vely_target = 0.0f;
+    s_mode7_velx_ff_lpf = 0.0f;
+    s_mode7_vely_ff_lpf = 0.0f;
     roll_angle_target = FC_Mode_Get_Roll_Mech_Trim_Deg();
     pitch_angle_target = FC_Mode_Get_Pitch_Mech_Trim_Deg();
 }
@@ -93,6 +99,10 @@ void FC_Mode7_50Hz(float dt)
                             -FC_MODE_XY_ANGLE_LIMIT_DEG, FC_MODE_XY_ANGLE_LIMIT_DEG);
     vely_ff = FC_Mode_Clamp(g_fc_params.mode7_vel_y_kff * vely_target_rate,
                             -FC_MODE_XY_ANGLE_LIMIT_DEG, FC_MODE_XY_ANGLE_LIMIT_DEG);
+    s_mode7_velx_ff_lpf += FC_MODE7_KFF_LPF_ALPHA * (velx_ff - s_mode7_velx_ff_lpf);
+    s_mode7_vely_ff_lpf += FC_MODE7_KFF_LPF_ALPHA * (vely_ff - s_mode7_vely_ff_lpf);
+    velx_ff = s_mode7_velx_ff_lpf;
+    vely_ff = s_mode7_vely_ff_lpf;
 
     g_mode7_velx_pid.output_min = -FC_MODE_XY_ANGLE_LIMIT_DEG - roll_trim - velx_ff;
     g_mode7_velx_pid.output_max = FC_MODE_XY_ANGLE_LIMIT_DEG - roll_trim - velx_ff;

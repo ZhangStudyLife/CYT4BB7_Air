@@ -6,7 +6,121 @@
 
 #include "fc_params.h"
 
+#include <stddef.h>
 #include <string.h>
+#include "zf_common_headfile.h"
+
+#define FC_PARAMS_FLASH_MAGIC                  (0x46504346UL)
+#define FC_PARAMS_FLASH_VERSION                (8U)
+#define FC_PARAMS_FLASH_MIN_COMPAT_VERSION     (5U)
+
+#define FC_PARAMS_FLASH_V5_V6_SIZE_BYTES       (340U)
+#define FC_PARAMS_FLASH_V7_SIZE_BYTES          (388U)
+#define FC_PARAMS_FLASH_V8_SIZE_BYTES          (596U)
+
+typedef struct
+{
+    uint32_t magic;
+    uint16_t version;
+    uint16_t size;
+    uint32_t checksum;
+    fc_params_t params;
+} fc_params_flash_blob_t;
+
+/* 固化旧版参数前缀布局，并确保完整参数块不超过单个 Flash 页。 */
+typedef char fc_params_v5_v6_layout_must_match[
+    (offsetof(fc_params_t, mode8_img_x_kp) == FC_PARAMS_FLASH_V5_V6_SIZE_BYTES) ? 1 : -1];
+typedef char fc_params_v7_layout_must_match[
+    (offsetof(fc_params_t, mode5_img_x_kp) == FC_PARAMS_FLASH_V7_SIZE_BYTES) ? 1 : -1];
+typedef char fc_params_v8_layout_must_match[
+    (sizeof(fc_params_t) == FC_PARAMS_FLASH_V8_SIZE_BYTES) ? 1 : -1];
+typedef char fc_params_blob_must_fit_flash_page[
+    (sizeof(fc_params_flash_blob_t) <= FLASH_PAGE_SIZE) ? 1 : -1];
+typedef char fc_params_flash_page_must_exist[
+    (FC_PARAMS_FLASH_PAGE < FLASH_PAGE_NUM) ? 1 : -1];
+
+static uint32_t fc_params_checksum_calc(const void *data, uint32_t size)
+{
+    const uint8_t *bytes = (const uint8_t *)data;
+    uint32_t hash = 2166136261UL;
+    uint32_t i;
+
+    for (i = 0U; i < size; i++)
+    {
+        hash ^= (uint32_t)bytes[i];
+        hash *= 16777619UL;
+    }
+
+    return hash;
+}
+
+static uint8_t fc_params_flash_size_is_valid(uint16_t version, uint16_t size)
+{
+    switch (version)
+    {
+        case 5U:
+        case 6U:
+            return (size == FC_PARAMS_FLASH_V5_V6_SIZE_BYTES) ? 1U : 0U;
+
+        case 7U:
+            return (size == FC_PARAMS_FLASH_V7_SIZE_BYTES) ? 1U : 0U;
+
+        case FC_PARAMS_FLASH_VERSION:
+            return (size == FC_PARAMS_FLASH_V8_SIZE_BYTES) ? 1U : 0U;
+
+        default:
+            return 0U;
+    }
+}
+
+static uint8_t fc_params_blob_is_valid(const fc_params_flash_blob_t *blob)
+{
+    uint32_t checksum;
+
+    if (NULL == blob)
+    {
+        return 0U;
+    }
+
+    if (blob->magic != FC_PARAMS_FLASH_MAGIC)
+    {
+        return 0U;
+    }
+
+    if ((blob->version < FC_PARAMS_FLASH_MIN_COMPAT_VERSION) ||
+        (blob->version > FC_PARAMS_FLASH_VERSION))
+    {
+        return 0U;
+    }
+
+    if (0U == fc_params_flash_size_is_valid(blob->version, blob->size))
+    {
+        return 0U;
+    }
+
+    checksum = fc_params_checksum_calc(&blob->params, (uint32_t)blob->size);
+    return (checksum == blob->checksum) ? 1U : 0U;
+}
+
+static void fc_params_migrate_loaded(fc_params_t *params, uint16_t version)
+{
+    if (NULL == params)
+    {
+        return;
+    }
+
+    /* 版本 5 已保留 Yaw 角度字段，但当时这些字段尚无有效默认值。 */
+    if ((version < 6U) &&
+        (params->yaw_angle_kp == 0.0f) &&
+        (params->yaw_angle_ki == 0.0f) &&
+        (params->yaw_angle_kd == 0.0f) &&
+        (params->yaw_angle_kff == 0.0f))
+    {
+        params->yaw_angle_kp = 1.5f;
+        params->yaw_angle_i_limit = 0.0f;
+        params->yaw_angle_d_lpf = 0.0f;
+    }
+}
 
 /* 飞控参数全局实例：集中保存控制周期、油门基准和各控制环 PID 参数 */
 fc_params_t g_fc_params;
@@ -229,20 +343,59 @@ void FC_Params_Init(void)
     fc_params_fill_defaults(&g_fc_params);
 }
 
-/* Current build does not load flight-control parameters from Flash. */
 uint8_t FC_Params_LoadFromFlash(void)
 {
-    return 0U;
+    fc_params_flash_blob_t blob;
+    const uint32_t words =
+        (uint32_t)((sizeof(blob) + sizeof(uint32_t) - 1U) / sizeof(uint32_t));
+
+    flash_init();
+
+    memset(&blob, 0, sizeof(blob));
+    flash_read_page(0U, FC_PARAMS_FLASH_PAGE, (uint32 *)&blob, words);
+    if (0U == fc_params_blob_is_valid(&blob))
+    {
+        return 0U;
+    }
+
+    fc_params_fill_defaults(&g_fc_params);
+    memcpy(&g_fc_params, &blob.params, (size_t)blob.size);
+    fc_params_migrate_loaded(&g_fc_params, blob.version);
+    return 1U;
 }
 
-/* Current build does not save flight-control parameters to Flash. */
 uint8_t FC_Params_SaveToFlash(void)
 {
-    return 0U;
+    fc_params_flash_blob_t blob;
+    const uint32_t words =
+        (uint32_t)((sizeof(blob) + sizeof(uint32_t) - 1U) / sizeof(uint32_t));
+
+    flash_init();
+
+    memset(&blob, 0, sizeof(blob));
+    blob.magic = FC_PARAMS_FLASH_MAGIC;
+    blob.version = FC_PARAMS_FLASH_VERSION;
+    blob.size = (uint16_t)sizeof(fc_params_t);
+    memcpy(&blob.params, &g_fc_params, sizeof(blob.params));
+    blob.checksum = fc_params_checksum_calc(&blob.params, (uint32_t)sizeof(blob.params));
+
+    flash_write_page(0U, FC_PARAMS_FLASH_PAGE, (const uint32 *)&blob, words);
+
+    memset(&blob, 0, sizeof(blob));
+    flash_read_page(0U, FC_PARAMS_FLASH_PAGE, (uint32 *)&blob, words);
+    if ((0U == fc_params_blob_is_valid(&blob)) ||
+        (blob.version != FC_PARAMS_FLASH_VERSION) ||
+        (blob.size != (uint16_t)sizeof(fc_params_t)))
+    {
+        return 0U;
+    }
+
+    return (0 == memcmp(&blob.params, &g_fc_params, sizeof(g_fc_params))) ? 1U : 0U;
 }
 
-/* Current build has no flight-control Flash parameters to clear. */
 uint8_t FC_Params_ClearFlash(void)
 {
-    return 1U;
+    flash_init();
+    flash_erase_page(0U, FC_PARAMS_FLASH_PAGE);
+    return (0U == flash_check(0U, FC_PARAMS_FLASH_PAGE)) ? 1U : 0U;
 }

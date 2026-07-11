@@ -4,6 +4,8 @@
 #include "FlightController/fc_params.h"
 #include "FlightController/fc_start_crsf.h"
 
+#include <math.h>
+
 #define AIR_COMM_MSG_GET_PARAM               (0x07U)
 #define AIR_COMM_MSG_ACK_GET_PARAM           (0x08U)
 
@@ -17,7 +19,8 @@
 #define AIR_COMM_FRAME_OVERHEAD              (9U)    /* 帧开销：4帧头 + type + seq + len + 2crc */
 #define AIR_COMM_MAX_FRAME                   (AIR_COMM_MAX_PAYLOAD + AIR_COMM_FRAME_OVERHEAD)
 #define AIR_COMM_RX_QUEUE_SIZE               (512U)  /* 接收环形队列大小（字节） */
-#define AIR_COMM_PARAM_TABLE_MAX             (100U)  /* 最多注册参数个数 */
+#define AIR_COMM_PARAM_TABLE_MAX             (128U)  /* 最多注册参数个数 */
+#define AIR_COMM_DEFAULT_PARAM_COUNT         (123U)
 #define AIR_COMM_COMMAND_TABLE_MAX           (8U)    /* 最多注册远程命令个数 */
 
 /* 消息类型定义 */
@@ -48,11 +51,27 @@ typedef struct
     air_comm_air_command_fn run;
 } air_comm_air_command_t;
 
-#define AIR_COMM_REGISTER_FLOAT(member, min_v, max_v) \
-    (void)air_comm_air_register_param(#member, &g_fc_params.member, AIR_COMM_AIR_PARAM_TYPE_FLOAT, (min_v), (max_v))
+#define AIR_COMM_REGISTER_FLOAT(member, min_v, max_v)                                      \
+    do                                                                                     \
+    {                                                                                      \
+        if(air_comm_air_register_param(#member, &g_fc_params.member,                       \
+                                       AIR_COMM_AIR_PARAM_TYPE_FLOAT,                       \
+                                       (min_v), (max_v)) == 0U)                             \
+        {                                                                                  \
+            s_air_comm_registration_ok = 0U;                                               \
+        }                                                                                  \
+    } while(0)
 
-#define AIR_COMM_REGISTER_INT32(member, min_v, max_v) \
-    (void)air_comm_air_register_param(#member, &g_fc_params.member, AIR_COMM_AIR_PARAM_TYPE_INT32, (float)(min_v), (float)(max_v))
+#define AIR_COMM_REGISTER_INT32(member, min_v, max_v)                                      \
+    do                                                                                     \
+    {                                                                                      \
+        if(air_comm_air_register_param(#member, &g_fc_params.member,                       \
+                                       AIR_COMM_AIR_PARAM_TYPE_INT32,                       \
+                                       (float)(min_v), (float)(max_v)) == 0U)               \
+        {                                                                                  \
+            s_air_comm_registration_ok = 0U;                                               \
+        }                                                                                  \
+    } while(0)
 
 /*
  * 接收解析器状态机。
@@ -113,6 +132,7 @@ static uint8 s_air_comm_screen_ready;
 static uint8 s_air_comm_last_done_valid;
 static uint8 s_air_comm_last_done_seq;
 static uint8 s_air_comm_param_count = 0U;  /* 已注册参数数 */
+static uint8 s_air_comm_registration_ok;
 
 /*
  * CRC-16/CCITT-FALSE 计算。
@@ -231,14 +251,20 @@ static void air_comm_stop_active_command(void)
     s_air_comm_active_command = NULL;
 }
 
+static uint8 air_comm_remote_operation_allowed(void)
+{
+    return ((FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_STANDBY) &&
+            (FC_START_CRSF_Is_Armed() == 0U)) ? 1U : 0U;
+}
+
 static void air_comm_beep(void)
 {
     Beep_Play(50U, 0.2f, 3U);
 }
 
-static void air_comm_register_default_commands(void)
+static uint8 air_comm_register_default_commands(void)
 {
-    (void)air_comm_air_register_instant_command("beep", air_comm_beep);
+    return air_comm_air_register_instant_command("beep", air_comm_beep);
 }
 
 /*
@@ -508,7 +534,9 @@ static void air_comm_handle_set_param(uint8 seq, const uint8 *payload, uint8 len
     {
         status = AIR_COMM_AIR_STATUS_NOT_FOUND;
     }
-    else if(FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
+    else if((isnan(value) != 0) ||
+            (isinf(value) != 0) ||
+            (air_comm_remote_operation_allowed() == 0U))
     {
         actual = air_comm_param_read(param);
         status = AIR_COMM_AIR_STATUS_ERROR;
@@ -635,6 +663,14 @@ static void air_comm_handle_exec_command(uint8 seq, const uint8 *payload, uint8 
     {
         (void)air_comm_air_send_command_ack_text(seq, "ACK_EXIT_OK");
         s_air_comm_stats.command_ok_count++;
+        return;
+    }
+
+    if(air_comm_remote_operation_allowed() == 0U)
+    {
+        air_comm_stop_active_command();
+        (void)air_comm_air_send_command_ack_text(seq, "ACK_ERROR 3 state");
+        s_air_comm_stats.command_fail_count++;
         return;
     }
 
@@ -992,10 +1028,10 @@ void air_comm_air_init(void)
     s_air_comm_screen_ready = 0U;
     s_air_comm_last_done_valid = 0U;
     s_air_comm_last_done_seq = 0U;
+    s_air_comm_registration_ok = 1U;
 
     AIR_COMM_REGISTER_FLOAT(gyro_dt, 0.0001f, 0.1f);
     AIR_COMM_REGISTER_FLOAT(angle_dt, 0.0001f, 0.1f);
-    AIR_COMM_REGISTER_FLOAT(pos_xy_dt, 0.0001f, 0.2f);
     AIR_COMM_REGISTER_FLOAT(pos_z_dt, 0.0001f, 0.2f);
     AIR_COMM_REGISTER_FLOAT(vel_xy_dt, 0.0001f, 0.2f);
     AIR_COMM_REGISTER_FLOAT(vel_z_dt, 0.0001f, 0.2f);
@@ -1041,25 +1077,6 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(yaw_angle_i_limit, 0.0f, 5000.0f);
     AIR_COMM_REGISTER_FLOAT(yaw_angle_d_lpf, 0.0f, 500.0f);
 
-    AIR_COMM_REGISTER_FLOAT(pos_x_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(pos_x_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(pos_x_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(pos_x_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(pos_x_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(pos_x_d_lpf, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(pos_y_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(pos_y_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(pos_y_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(pos_y_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(pos_y_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(pos_y_d_lpf, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(pos_z_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(pos_z_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(pos_z_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(pos_z_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(pos_z_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(pos_z_d_lpf, 0.0f, 500.0f);
-
     AIR_COMM_REGISTER_FLOAT(vel_x_kp, 0.0f, 3000.0f);
     AIR_COMM_REGISTER_FLOAT(vel_x_ki, 0.0f, 3000.0f);
     AIR_COMM_REGISTER_FLOAT(vel_x_kd, 0.0f, 3000.0f);
@@ -1072,16 +1089,8 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(vel_y_kff, 0.0f, 3000.0f);
     AIR_COMM_REGISTER_FLOAT(vel_y_i_limit, 0.0f, 5000.0f);
     AIR_COMM_REGISTER_FLOAT(vel_y_d_lpf, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(vel_z_kp, 0.0f, 3000.0f);
     AIR_COMM_REGISTER_FLOAT(vel_z_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(vel_z_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(vel_z_kff, 0.0f, 3000.0f);
     AIR_COMM_REGISTER_FLOAT(vel_z_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(vel_z_d_lpf, 0.0f, 500.0f);
-
-    AIR_COMM_REGISTER_FLOAT(mode1_track_ff_deg_per_cmps, 0.0f, 1.0f);
-    AIR_COMM_REGISTER_FLOAT(mode1_brake_kp, 0.0f, 50.0f);
-    AIR_COMM_REGISTER_FLOAT(mode1_brake_exit_vel_cmps, 0.0f, 300.0f);
     AIR_COMM_REGISTER_FLOAT(mode7_vel_x_kp, 0.0f, 3000.0f);
     AIR_COMM_REGISTER_FLOAT(mode7_vel_x_ki, 0.0f, 3000.0f);
     AIR_COMM_REGISTER_FLOAT(mode7_vel_x_kd, 0.0f, 3000.0f);
@@ -1095,6 +1104,33 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(mode7_vel_y_i_limit, 0.0f, 5000.0f);
     AIR_COMM_REGISTER_FLOAT(mode7_vel_y_d_lpf, 0.0f, 500.0f);
     AIR_COMM_REGISTER_FLOAT(pos_est_k_flow, 0.0f, 1.0f);
+
+    AIR_COMM_REGISTER_FLOAT(mode5_img_x_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_x_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_x_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_x_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_x_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_x_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_y_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_y_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_y_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_y_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_y_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_y_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_x_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_x_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_x_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_x_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_x_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_x_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_y_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_y_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_y_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_y_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_y_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_y_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_kp_car_x, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_kp_car_y, 0.0f, 3000.0f);
 
     AIR_COMM_REGISTER_FLOAT(mode8_img_x_kp, 0.0f, 3000.0f);
     AIR_COMM_REGISTER_FLOAT(mode8_img_x_ki, 0.0f, 3000.0f);
@@ -1120,7 +1156,19 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(mode8_vel_y_kff, 0.0f, 3000.0f);
     AIR_COMM_REGISTER_FLOAT(mode8_vel_y_i_limit, 0.0f, 5000.0f);
     AIR_COMM_REGISTER_FLOAT(mode8_vel_y_d_lpf, 0.0f, 500.0f);
-    air_comm_register_default_commands();
+    AIR_COMM_REGISTER_FLOAT(mode8_kp_car_x, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_kp_car_y, 0.0f, 3000.0f);
+
+    if((s_air_comm_param_count != AIR_COMM_DEFAULT_PARAM_COUNT) ||
+       (air_comm_register_default_commands() == 0U))
+    {
+        s_air_comm_registration_ok = 0U;
+    }
+
+    if(s_air_comm_registration_ok == 0U)
+    {
+        return;
+    }
 
     /* 配置 UART_2：波特率 1152000，TX=P10_1，RX=P10_0，开接收中断 */
     uart_init(UART_2, AIR_COMM_AIR_BAUDRATE, UART2_TX_P10_1, UART2_RX_P10_0);
@@ -1178,7 +1226,17 @@ void air_comm_air_update_100HZ(void)
         s_air_comm_last_heartbeat_ms = s_air_comm_tick_ms;
     }
 
-    if(s_air_comm_active_command != NULL)
+    if((s_air_comm_active_command != NULL) &&
+       (air_comm_remote_operation_allowed() == 0U))
+    {
+        uint8 active_seq = s_air_comm_active_seq;
+
+        air_comm_stop_active_command();
+        s_air_comm_last_done_valid = 0U;
+        (void)air_comm_air_send_command_ack_text(active_seq, "ACK_ERROR 3 state");
+        s_air_comm_stats.command_fail_count++;
+    }
+    else if(s_air_comm_active_command != NULL)
     {
         if((s_air_comm_active_command->mode == AIR_COMM_AIR_COMMAND_MODE_POLLING) &&
            (s_air_comm_active_command->run != NULL))

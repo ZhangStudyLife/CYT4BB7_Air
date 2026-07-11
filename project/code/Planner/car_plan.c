@@ -6,7 +6,7 @@
 #define CAR_PLAN_BEACON0_INDEX             (0U)
 #define CAR_PLAN_MIN_DIST_PX               (2.0f)
 #define CAR_PLAN_ANGLE_TO_RAD              (0.017453292519943295f)
-#define CAR_PLAN_CENTER_X_LIMIT_PX         (50.0f)
+#define CAR_PLAN_CENTER_MAX_DIST_PX        (65.0f)
 
 static car_plan_result_t s_car_plan_result;
 
@@ -169,13 +169,16 @@ void CarPlan_Reset(void)
 
 uint8 CarPlan_Update(car_plan_result_t *result)
 {
+    const car_lamp_data *center_lamp = &image_data[Center].car_lamp_data[0];
     const beacon_data *center_beacon = &image_data[Center].beacon_data[CAR_PLAN_BEACON0_INDEX];
     car_plan_result_t candidate;
     uint8 side_camera;
 
     if ((CarPlan_CarLampValid((uint8)Center) != 0U) &&
         (CarPlan_BeaconValid((uint8)Center) != 0U) &&
-        (fabsf(center_beacon->x) <= CAR_PLAN_CENTER_X_LIMIT_PX) &&
+        (((center_beacon->x - center_lamp->cx) * (center_beacon->x - center_lamp->cx) +
+          (center_beacon->y - center_lamp->cy) * (center_beacon->y - center_lamp->cy)) <
+         (CAR_PLAN_CENTER_MAX_DIST_PX * CAR_PLAN_CENTER_MAX_DIST_PX)) &&
         (CarPlan_MakeGeometryResult((uint8)Center, &candidate) != 0U))
     {
         s_car_plan_result = candidate;

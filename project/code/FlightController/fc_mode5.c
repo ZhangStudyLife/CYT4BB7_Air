@@ -7,7 +7,6 @@
 #include "../Planner/car_plan.h"
 #include "../Planner/ProjectionCenter.h"
 #include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
-#include <math.h>
 
 pid_t g_mode5_imgx_pid; /* 模式5图像X轴位置环PID状态，供控制与调试访问。 */
 pid_t g_mode5_imgy_pid; /* 模式5图像Y轴位置环PID状态，供控制与调试访问。 */
@@ -16,26 +15,10 @@ pid_t g_mode5_vely_pid;
 float g_mode5_velx_target = 0.0f;
 float g_mode5_vely_target = 0.0f;
 
-static const float s_mode5_img_fb_limit_cmps = 200.0f;
-static const float s_mode5_vel_limit_cmps = 200.0f;
-static const float s_mode5_vel_accel_cmps2 = 250.0f;
-static const float s_mode5_vel_jerk_cmps3 = 1800.0f;
-static const float s_mode5_angle_limit_deg = 15.0f;
-static float s_mode5_accel_x = 0.0f;
-static float s_mode5_accel_y = 0.0f;
+static float s_mode5_prev_velx_target = 0.0f;
+static float s_mode5_prev_vely_target = 0.0f;
 static uint16_t s_mode5_yaw_tick = 0U;
 static uint8_t s_mode5_yaw_index = 0U;
-
-static void FC_Mode5_LimitVector(float *x, float *y, float limit)
-{
-    float mag = sqrtf((*x) * (*x) + (*y) * (*y));
-    if (mag > limit)
-    {
-        float scale = limit / mag;
-        *x *= scale;
-        *y *= scale;
-    }
-}
 
 static void FC_Mode5_UpdateYawTarget(void)
 {
@@ -88,8 +71,8 @@ void FC_Mode5_Reset(void)
     PID_Reset(&g_mode5_vely_pid);
     g_mode5_velx_target = 0.0f;
     g_mode5_vely_target = 0.0f;
-    s_mode5_accel_x = 0.0f;
-    s_mode5_accel_y = 0.0f;
+    s_mode5_prev_velx_target = 0.0f;
+    s_mode5_prev_vely_target = 0.0f;
     s_mode5_yaw_tick = 0U;
     s_mode5_yaw_index = 0U;
     YawAlign_Reset();
@@ -116,12 +99,10 @@ void FC_Mode5_50Hz(float dt)
 {
     float velx_sp = 0.0f;
     float vely_sp = 0.0f;
-    float velx_sp_raw = 0.0f;
-    float vely_sp_raw = 0.0f;
-    float accx_sp;
-    float accy_sp;
     float velx_ff;
     float vely_ff;
+    float velx_target_rate;
+    float vely_target_rate;
     float velx_out;
     float vely_out;
     float img_err_x = 0.0f;
@@ -162,7 +143,8 @@ void FC_Mode5_50Hz(float dt)
         Beep_Enable();
     }
 
-    tof_height_valid = ((0U != g_tof_fused_valid) && (g_tof_fused_height_mm > 500.0f)) ? 1U : 0U;
+    tof_height_valid = ((0U != g_tof_fused_valid) &&
+                        (g_tof_fused_height_mm > FC_MODE_IMAGE_MIN_HEIGHT_MM)) ? 1U : 0U;
 
     if ((fused_lamp_valid != 0U) && (tof_height_valid != 0U))
     {
@@ -170,8 +152,8 @@ void FC_Mode5_50Hz(float dt)
         img_err_y = fused_lamp_cy - g_projection_center.cy;
         img_fb_x = PID_Update(&g_mode5_imgx_pid, 0.0f, -img_err_x, dt);
         img_fb_y = PID_Update(&g_mode5_imgy_pid, 0.0f, -img_err_y, dt);
-        img_fb_x = FC_Mode_Clamp(img_fb_x, -s_mode5_img_fb_limit_cmps, s_mode5_img_fb_limit_cmps);
-        img_fb_y = FC_Mode_Clamp(img_fb_y, -s_mode5_img_fb_limit_cmps, s_mode5_img_fb_limit_cmps);
+        img_fb_x = FC_Mode_Clamp(img_fb_x, -FC_MODE_IMAGE_VEL_LIMIT_CMPS, FC_MODE_IMAGE_VEL_LIMIT_CMPS);
+        img_fb_y = FC_Mode_Clamp(img_fb_y, -FC_MODE_IMAGE_VEL_LIMIT_CMPS, FC_MODE_IMAGE_VEL_LIMIT_CMPS);
     }
     else
     {
@@ -192,49 +174,32 @@ void FC_Mode5_50Hz(float dt)
     //                velx_sp, vely_sp,
     //                g_mode5_velx_target, g_mode5_vely_target,
     //                roll_angle_target, pitch_angle_target);
-    velx_sp_raw = velx_sp;
-    vely_sp_raw = vely_sp;
-    FC_Mode5_LimitVector(&velx_sp, &vely_sp, s_mode5_vel_limit_cmps);
-
-    accx_sp = (velx_sp - g_mode5_velx_target) / dt;
-    accy_sp = (vely_sp - g_mode5_vely_target) / dt;
-    FC_Mode5_LimitVector(&accx_sp, &accy_sp, s_mode5_vel_accel_cmps2);
-    accx_sp -= s_mode5_accel_x;
-    accy_sp -= s_mode5_accel_y;
-    FC_Mode5_LimitVector(&accx_sp, &accy_sp, s_mode5_vel_jerk_cmps3 * dt);
-    s_mode5_accel_x += accx_sp;
-    s_mode5_accel_y += accy_sp;
-    g_mode5_velx_target += s_mode5_accel_x * dt;
-    g_mode5_vely_target += s_mode5_accel_y * dt;
-
-    if (((velx_sp - (g_mode5_velx_target - s_mode5_accel_x * dt)) * (velx_sp - g_mode5_velx_target) +
-         (vely_sp - (g_mode5_vely_target - s_mode5_accel_y * dt)) * (vely_sp - g_mode5_vely_target)) <= 0.0f)
-    {
-        g_mode5_velx_target = velx_sp;
-        g_mode5_vely_target = vely_sp;
-        s_mode5_accel_x = 0.0f;
-        s_mode5_accel_y = 0.0f;
-    }
+    velx_target_rate = (velx_sp - s_mode5_prev_velx_target) / dt;
+    vely_target_rate = (vely_sp - s_mode5_prev_vely_target) / dt;
+    g_mode5_velx_target = velx_sp;
+    g_mode5_vely_target = vely_sp;
+    s_mode5_prev_velx_target = g_mode5_velx_target;
+    s_mode5_prev_vely_target = g_mode5_vely_target;
 
     roll_trim = FC_Mode_Get_Roll_Mech_Trim_Deg();
     pitch_trim = FC_Mode_Get_Pitch_Mech_Trim_Deg();
-    velx_ff = FC_Mode_Clamp(g_fc_params.mode5_vel_x_kff * s_mode5_accel_x,
-                            -s_mode5_angle_limit_deg, s_mode5_angle_limit_deg);
-    vely_ff = FC_Mode_Clamp(g_fc_params.mode5_vel_y_kff * s_mode5_accel_y,
-                            -s_mode5_angle_limit_deg, s_mode5_angle_limit_deg);
+    velx_ff = FC_Mode_Clamp(g_fc_params.mode5_vel_x_kff * velx_target_rate,
+                            -FC_MODE_XY_ANGLE_LIMIT_DEG, FC_MODE_XY_ANGLE_LIMIT_DEG);
+    vely_ff = FC_Mode_Clamp(g_fc_params.mode5_vel_y_kff * vely_target_rate,
+                            -FC_MODE_XY_ANGLE_LIMIT_DEG, FC_MODE_XY_ANGLE_LIMIT_DEG);
 
-    g_mode5_velx_pid.output_min = -s_mode5_angle_limit_deg - roll_trim - velx_ff;
-    g_mode5_velx_pid.output_max = s_mode5_angle_limit_deg - roll_trim - velx_ff;
-    g_mode5_vely_pid.output_min = -s_mode5_angle_limit_deg - pitch_trim - vely_ff;
-    g_mode5_vely_pid.output_max = s_mode5_angle_limit_deg - pitch_trim - vely_ff;
+    g_mode5_velx_pid.output_min = -FC_MODE_XY_ANGLE_LIMIT_DEG - roll_trim - velx_ff;
+    g_mode5_velx_pid.output_max = FC_MODE_XY_ANGLE_LIMIT_DEG - roll_trim - velx_ff;
+    g_mode5_vely_pid.output_min = -FC_MODE_XY_ANGLE_LIMIT_DEG - pitch_trim - vely_ff;
+    g_mode5_vely_pid.output_max = FC_MODE_XY_ANGLE_LIMIT_DEG - pitch_trim - vely_ff;
 
     velx_out = PID_Update(&g_mode5_velx_pid, g_mode5_velx_target, -Pos_Est_vel_x, dt) + velx_ff;
     vely_out = PID_Update(&g_mode5_vely_pid, g_mode5_vely_target, -Pos_Est_vel_y, dt) + vely_ff;
     g_mode5_velx_pid.ff_term = velx_ff;
     g_mode5_vely_pid.ff_term = vely_ff;
 
-    roll_angle_target = FC_Mode_Clamp(velx_out + roll_trim, -s_mode5_angle_limit_deg, s_mode5_angle_limit_deg);
-    pitch_angle_target = FC_Mode_Clamp(vely_out + pitch_trim, -s_mode5_angle_limit_deg, s_mode5_angle_limit_deg);
+    roll_angle_target = FC_Mode_Clamp(velx_out + roll_trim, -FC_MODE_XY_ANGLE_LIMIT_DEG, FC_MODE_XY_ANGLE_LIMIT_DEG);
+    pitch_angle_target = FC_Mode_Clamp(vely_out + pitch_trim, -FC_MODE_XY_ANGLE_LIMIT_DEG, FC_MODE_XY_ANGLE_LIMIT_DEG);
     YawAlign_GetDebug(&yaw_debug);
 
     // wifi_justfloat(g_car_vel_x,                 /* I1 */
@@ -247,14 +212,14 @@ void FC_Mode5_50Hz(float dt)
     //              img_err_y,                     /* I8 */
     //              img_fb_x,                      /* I9 */
     //              img_fb_y,                      /* I10 */
-    //              velx_sp_raw,                   /* I11 */
-    //              vely_sp_raw,                   /* I12 */
+    //              car_ff_x,                      /* I11 */
+    //              car_ff_y,                      /* I12 */
     //              velx_sp,                       /* I13 */
     //              vely_sp,                       /* I14 */
     //              g_mode5_velx_target,           /* I15 */
     //              g_mode5_vely_target,           /* I16 */
-    //              s_mode5_accel_x,               /* I17 */
-    //              s_mode5_accel_y,               /* I18 */
+    //              velx_target_rate,              /* I17 */
+    //              vely_target_rate,              /* I18 */
     //              roll_angle_target,             /* I19 */
     //              pitch_angle_target,            /* I20 */
     //              g_euler.roll,                  /* I21 */

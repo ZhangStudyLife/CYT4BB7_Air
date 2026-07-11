@@ -32,6 +32,19 @@
 
 #include "fc_loop.h"
 
+/* 图像位置环输出速度限幅，单位 cm/s。 */
+#define FC_MODE_IMAGE_VEL_LIMIT_CMPS (400.0f)
+/* 图像控制允许工作的最低融合高度，单位 mm。 */
+#define FC_MODE_IMAGE_MIN_HEIGHT_MM (400.0f)
+/* 水平速度控制允许输出的最大 Roll/Pitch 目标角，单位 deg。 */
+#define FC_MODE_XY_ANGLE_LIMIT_DEG (30.0f)
+/* 模式7摇杆满量程对应的最大水平目标速度，单位 cm/s。 */
+#define FC_MODE7_VEL_LIMIT_CMPS (250.0f)
+/* 模式7归一化摇杆死区。 */
+#define FC_MODE7_STICK_DEADZONE (0.03f)
+/* 模式7三次速度曲线占比。 */
+#define FC_MODE7_STICK_EXPO (0.35f)
+
 #ifdef __cplusplus
 extern "C"
 {

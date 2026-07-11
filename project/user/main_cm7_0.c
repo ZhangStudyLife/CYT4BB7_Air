@@ -256,8 +256,8 @@ int main(void)
                 div10 = 0U;
                 FC_START_CRSF_Update();
 
-                if (g_euler.roll > 35.0f || g_euler.roll < -35.0f ||
-                    g_euler.pitch > 35.0f || g_euler.pitch < -35.0f)
+                if (g_euler.roll > 45.0f || g_euler.roll < -45.0f ||
+                    g_euler.pitch > 45.0f || g_euler.pitch < -45.0f)
                 {
                     FC_START_CRSF_Trigger_Emergency_Stop();
                 }

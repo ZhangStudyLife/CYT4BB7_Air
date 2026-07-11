@@ -669,21 +669,21 @@ void FC_Loop_500Hz(void)
         float roll_ctrl;
         float pitch_ctrl;
 
-        if (roll_angle_target > 20.0f)
+        if (roll_angle_target > FC_MODE_XY_ANGLE_LIMIT_DEG)
         {
-            roll_angle_target = 20.0f;
+            roll_angle_target = FC_MODE_XY_ANGLE_LIMIT_DEG;
         }
-        if (roll_angle_target < -20.0f)
+        if (roll_angle_target < -FC_MODE_XY_ANGLE_LIMIT_DEG)
         {
-            roll_angle_target = -20.0f;
+            roll_angle_target = -FC_MODE_XY_ANGLE_LIMIT_DEG;
         }
-        if (pitch_angle_target > 20.0f)
+        if (pitch_angle_target > FC_MODE_XY_ANGLE_LIMIT_DEG)
         {
-            pitch_angle_target = 20.0f;
+            pitch_angle_target = FC_MODE_XY_ANGLE_LIMIT_DEG;
         }
-        if (pitch_angle_target < -20.0f)
+        if (pitch_angle_target < -FC_MODE_XY_ANGLE_LIMIT_DEG)
         {
-            pitch_angle_target = -20.0f;
+            pitch_angle_target = -FC_MODE_XY_ANGLE_LIMIT_DEG;
         }
 
         /* 控制量限幅 */
@@ -728,7 +728,7 @@ void FC_Loop_500Hz(void)
 
     wifi_justfloat(
         roll_angle_target, pitch_angle_target, yaw_angle_target, /* I1-I3: 姿态角目标，单位 deg */
-        roll_angle_meas, pitch_angle_meas, yaw_angle_meas,       /* I4-I6: 姿态角反馈，单位 deg */
+        g_euler.roll, g_euler.pitch, g_euler.yaw,                /* I4-I6: 姿态角反馈，单位 deg */
         Pos_Est_vel_x, Pos_Est_vel_y,                            /* I7-I8: X/Y轴速度反馈，单位 cm/s */
         g_mode7_velx_pid.p_term, g_mode7_velx_pid.i_term,        /* I9-I10: 模式7 X轴速度环 P/I */
         g_mode7_velx_pid.d_term, g_mode7_velx_pid.output,        /* I11-I12: 模式7 X轴速度环 D/总输出 */

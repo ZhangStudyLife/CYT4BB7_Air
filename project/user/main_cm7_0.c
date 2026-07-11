@@ -168,7 +168,7 @@ int main(void)
             (void)CarPlan_Update(&car_plan);
             car_plan_send_valid = ((car_plan.valid != 0U) && (g_tof_fused_height_mm > 500.0f)) ? 1U : 0U;
 
-            float air_data[24];
+            float air_data[25];
             air_data[0] = g_tof_fused_height_mm;
             air_data[1] = g_euler.roll;
             air_data[2] = g_euler.pitch;
@@ -193,7 +193,8 @@ int main(void)
             air_data[21] = (float)car_plan.beacon_index;
             air_data[22] = car_plan.dist_px;
             air_data[23] = (float)BeaconLostDetector_GetFlag();
-            air_comm_send_run_data(air_data, 24);
+            air_data[24] = (float)CRSF_STD[8];
+            air_comm_send_run_data(air_data, 25);
 
             // wifi_justfloat(image_data[Front].car_lamp_data[0].cx,
             //                 image_data[Front].car_lamp_data[0].cy,

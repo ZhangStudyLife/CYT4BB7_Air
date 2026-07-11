@@ -1749,6 +1749,18 @@
                 <name>$PROJ_DIR$\..\..\code\Planner\beacon_lost_detector.h</name>
             </file>
             <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\lightsequence\light_sequence.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\lightsequence\light_sequence.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\lightsequence\light_sequence_config.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\lightsequence\light_sequence_config.h</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\..\..\code\Planner\car_lamp_fused.c</name>
             </file>
             <file>

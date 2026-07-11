@@ -17,14 +17,25 @@ static uint8 s_ipc_flying_retry_div = 0U; /* 飞行状态 IPC 通知失败后的
 float g_car_vel_x = 0.0f; // 这个是车的速度 这个变量大于0 , 车往右
 float g_car_vel_y = 0.0f; // 这个是车的速度 这个变量大于0 , 车往前
 
+float g_car_position_x = 0.0f; /* 小车最新全局X坐标，单位m */
+float g_car_position_y = 0.0f; /* 小车最新全局Y坐标，单位m */
+
 float g_car_sync_time_ms = 0.0f; /* Last car-side sync timestamp, unit: ms */
 
+/**
+ * @brief 接收并保存小车实时运行数据。
+ * @param data 小车发送的float数据数组。
+ * @param count 数组中的float数量，当前协议固定为11。
+ * @return 无。
+ */
 static void on_car_data(const float *data, uint8 count)
 {
     if (count == 11U)
     {
         g_car_vel_x = data[0];
         g_car_vel_y = data[1];
+        g_car_position_x = data[3];
+        g_car_position_y = data[4];
         g_car_sync_time_ms = data[10];
     }
 }
@@ -50,6 +61,7 @@ int main(void)
     Pos_Est_Init();
     FC_Loop_Init();
     BeaconLostDetector_Init();
+    LightSequence_Reset();
     wifi_justfloat_Init();
     wifi_params_Init();
     wifi_cal_imu_Init();
@@ -148,6 +160,8 @@ int main(void)
 
         if (g_tick_100HZ > 0U)
         {
+            uint8 beacon_lost_flag;
+
             g_tick_100HZ--;
             Height_Est_update_100HZ();
             CRSF_Update_100HZ();
@@ -155,7 +169,10 @@ int main(void)
             FC_Loop_100Hz();
             air_comm_air_update_100HZ();
             ipc_image_poll();
-            (void)BeaconLostDetector_Update();
+            beacon_lost_flag = BeaconLostDetector_Update();
+            LightSequence_Update(beacon_lost_flag,
+                                 g_car_position_x,
+                                 g_car_position_y);
 
             car_plan_result_t car_plan;
             uint8 car_plan_send_valid;

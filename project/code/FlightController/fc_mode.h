@@ -38,6 +38,8 @@
 #define FC_MODE_IMAGE_MIN_HEIGHT_MM (400.0f)
 /* 水平速度控制允许输出的最大 Roll/Pitch 目标角，单位 deg。 */
 #define FC_MODE_XY_ANGLE_LIMIT_DEG (30.0f)
+/* 水平速度前馈一阶低通系数：50 Hz 更新、10 Hz 截止。 */
+#define FC_MODE_VEL_KFF_LPF_ALPHA (0.672624f)
 /* 模式7摇杆满量程对应的最大水平目标速度，单位 cm/s。 */
 #define FC_MODE7_VEL_LIMIT_CMPS (250.0f)
 /* 模式7归一化摇杆死区。 */

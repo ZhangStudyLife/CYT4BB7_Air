@@ -17,6 +17,8 @@ float g_mode5_vely_target = 0.0f;
 
 static float s_mode5_prev_velx_target = 0.0f;
 static float s_mode5_prev_vely_target = 0.0f;
+static float s_mode5_velx_ff_lpf = 0.0f;
+static float s_mode5_vely_ff_lpf = 0.0f;
 static uint16_t s_mode5_yaw_tick = 0U;
 static uint8_t s_mode5_yaw_index = 0U;
 
@@ -73,6 +75,8 @@ void FC_Mode5_Reset(void)
     g_mode5_vely_target = 0.0f;
     s_mode5_prev_velx_target = 0.0f;
     s_mode5_prev_vely_target = 0.0f;
+    s_mode5_velx_ff_lpf = 0.0f;
+    s_mode5_vely_ff_lpf = 0.0f;
     s_mode5_yaw_tick = 0U;
     s_mode5_yaw_index = 0U;
     YawAlign_Reset();
@@ -187,6 +191,10 @@ void FC_Mode5_50Hz(float dt)
                             -FC_MODE_XY_ANGLE_LIMIT_DEG, FC_MODE_XY_ANGLE_LIMIT_DEG);
     vely_ff = FC_Mode_Clamp(g_fc_params.mode5_vel_y_kff * vely_target_rate,
                             -FC_MODE_XY_ANGLE_LIMIT_DEG, FC_MODE_XY_ANGLE_LIMIT_DEG);
+    s_mode5_velx_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA * (velx_ff - s_mode5_velx_ff_lpf);
+    s_mode5_vely_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA * (vely_ff - s_mode5_vely_ff_lpf);
+    velx_ff = s_mode5_velx_ff_lpf;
+    vely_ff = s_mode5_vely_ff_lpf;
 
     g_mode5_velx_pid.output_min = -FC_MODE_XY_ANGLE_LIMIT_DEG - roll_trim - velx_ff;
     g_mode5_velx_pid.output_max = FC_MODE_XY_ANGLE_LIMIT_DEG - roll_trim - velx_ff;

@@ -195,10 +195,14 @@ extern float g_mode7_velx_target;
 extern float g_mode7_vely_target;
 extern pid_t g_mode2_velx_pid;
 extern pid_t g_mode2_vely_pid;
+extern pid_t g_mode2_imgx_pid;
+extern pid_t g_mode2_imgy_pid;
 extern float g_mode2_velx_target;
 extern float g_mode2_vely_target;
 extern pid_t g_mode5_velx_pid;
 extern pid_t g_mode5_vely_pid;
+extern pid_t g_mode5_imgx_pid;
+extern pid_t g_mode5_imgy_pid;
 extern float g_mode5_velx_target;
 extern float g_mode5_vely_target;
 
@@ -208,6 +212,8 @@ extern float g_mode5_vely_target;
  */
 extern pid_t g_mode8_velx_pid;
 extern pid_t g_mode8_vely_pid;
+extern pid_t g_mode8_imgx_pid;
+extern pid_t g_mode8_imgy_pid;
 extern float g_mode8_velx_target;
 extern float g_mode8_vely_target;
 

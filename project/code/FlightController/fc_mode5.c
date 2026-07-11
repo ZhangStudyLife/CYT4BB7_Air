@@ -9,8 +9,8 @@
 #include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
 #include <math.h>
 
-static pid_t s_mode5_imgx_pid;
-static pid_t s_mode5_imgy_pid;
+pid_t g_mode5_imgx_pid; /* 模式5图像X轴位置环PID状态，供控制与调试访问。 */
+pid_t g_mode5_imgy_pid; /* 模式5图像Y轴位置环PID状态，供控制与调试访问。 */
 pid_t g_mode5_velx_pid;
 pid_t g_mode5_vely_pid;
 float g_mode5_velx_target = 0.0f;
@@ -57,11 +57,11 @@ static void FC_Mode5_UpdateYawTarget(void)
 
 void FC_Mode5_Init(void)
 {
-    PID_Init(&s_mode5_imgx_pid,
+    PID_Init(&g_mode5_imgx_pid,
              g_fc_params.mode5_img_x_kp, g_fc_params.mode5_img_x_ki, g_fc_params.mode5_img_x_kd,
              g_fc_params.mode5_img_x_kff, g_fc_params.vel_xy_dt,
              g_fc_params.mode5_img_x_i_limit, g_fc_params.mode5_img_x_d_lpf);
-    PID_Init(&s_mode5_imgy_pid,
+    PID_Init(&g_mode5_imgy_pid,
              g_fc_params.mode5_img_y_kp, g_fc_params.mode5_img_y_ki, g_fc_params.mode5_img_y_kd,
              g_fc_params.mode5_img_y_kff, g_fc_params.vel_xy_dt,
              g_fc_params.mode5_img_y_i_limit, g_fc_params.mode5_img_y_d_lpf);
@@ -82,8 +82,8 @@ void FC_Mode5_Init(void)
 
 void FC_Mode5_Reset(void)
 {
-    PID_Reset(&s_mode5_imgx_pid);
-    PID_Reset(&s_mode5_imgy_pid);
+    PID_Reset(&g_mode5_imgx_pid);
+    PID_Reset(&g_mode5_imgy_pid);
     PID_Reset(&g_mode5_velx_pid);
     PID_Reset(&g_mode5_vely_pid);
     g_mode5_velx_target = 0.0f;
@@ -168,15 +168,15 @@ void FC_Mode5_50Hz(float dt)
     {
         img_err_x = fused_lamp_cx - g_projection_center.cx;
         img_err_y = fused_lamp_cy - g_projection_center.cy;
-        img_fb_x = PID_Update(&s_mode5_imgx_pid, 0.0f, -img_err_x, dt);
-        img_fb_y = PID_Update(&s_mode5_imgy_pid, 0.0f, -img_err_y, dt);
+        img_fb_x = PID_Update(&g_mode5_imgx_pid, 0.0f, -img_err_x, dt);
+        img_fb_y = PID_Update(&g_mode5_imgy_pid, 0.0f, -img_err_y, dt);
         img_fb_x = FC_Mode_Clamp(img_fb_x, -s_mode5_img_fb_limit_cmps, s_mode5_img_fb_limit_cmps);
         img_fb_y = FC_Mode_Clamp(img_fb_y, -s_mode5_img_fb_limit_cmps, s_mode5_img_fb_limit_cmps);
     }
     else
     {
-        PID_Reset(&s_mode5_imgx_pid);
-        PID_Reset(&s_mode5_imgy_pid);
+        PID_Reset(&g_mode5_imgx_pid);
+        PID_Reset(&g_mode5_imgy_pid);
     }
 
     CarPlan_GetResult(&car_plan);

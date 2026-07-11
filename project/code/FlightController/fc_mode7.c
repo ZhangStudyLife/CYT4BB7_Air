@@ -13,7 +13,7 @@ static const float s_mode7_vel_deadzone_cmps = 6.0f;
 static const float s_mode7_vel_expo = 0.60f;
 static const float s_mode7_vel_accel_cmps2 = 250.0f;
 static const float s_mode7_vel_jerk_cmps3 = 1800.0f;
-static const float s_mode7_angle_limit_deg = 15.0f;
+static const float s_mode7_angle_limit_deg = 25.0f;
 static float s_mode7_accel_x = 0.0f;
 static float s_mode7_accel_y = 0.0f;
 

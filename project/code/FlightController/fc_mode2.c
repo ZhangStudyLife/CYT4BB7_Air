@@ -9,8 +9,8 @@
 extern float g_car_vel_x;
 extern float g_car_vel_y;
 
-static pid_t s_mode2_imgx_pid;
-static pid_t s_mode2_imgy_pid;
+pid_t g_mode2_imgx_pid; /* 模式2图像X轴位置环PID状态，供控制与调试访问。 */
+pid_t g_mode2_imgy_pid; /* 模式2图像Y轴位置环PID状态，供控制与调试访问。 */
 pid_t g_mode2_velx_pid;
 pid_t g_mode2_vely_pid;
 float g_mode2_velx_target = 0.0f;
@@ -43,11 +43,11 @@ static void FC_Mode2_UpdateYawTarget(void)
 
 void FC_Mode2_Init(void)
 {
-    PID_Init(&s_mode2_imgx_pid,
+    PID_Init(&g_mode2_imgx_pid,
              g_fc_params.mode2_img_x_kp, g_fc_params.mode2_img_x_ki, g_fc_params.mode2_img_x_kd,
              g_fc_params.mode2_img_x_kff, g_fc_params.vel_xy_dt,
              g_fc_params.mode2_img_x_i_limit, g_fc_params.mode2_img_x_d_lpf);
-    PID_Init(&s_mode2_imgy_pid,
+    PID_Init(&g_mode2_imgy_pid,
              g_fc_params.mode2_img_y_kp, g_fc_params.mode2_img_y_ki, g_fc_params.mode2_img_y_kd,
              g_fc_params.mode2_img_y_kff, g_fc_params.vel_xy_dt,
              g_fc_params.mode2_img_y_i_limit, g_fc_params.mode2_img_y_d_lpf);
@@ -68,8 +68,8 @@ void FC_Mode2_Init(void)
 
 void FC_Mode2_Reset(void)
 {
-    PID_Reset(&s_mode2_imgx_pid);
-    PID_Reset(&s_mode2_imgy_pid);
+    PID_Reset(&g_mode2_imgx_pid);
+    PID_Reset(&g_mode2_imgy_pid);
     PID_Reset(&g_mode2_velx_pid);
     PID_Reset(&g_mode2_vely_pid);
     g_mode2_velx_target = 0.0f;
@@ -147,15 +147,15 @@ void FC_Mode2_50Hz(float dt)
     {
         img_err_x = g_car_lamp_fused_distance_projectioncenter_2.x_cm;
         img_err_y = g_car_lamp_fused_distance_projectioncenter_2.y_cm;
-        img_fb_x = PID_Update(&s_mode2_imgx_pid, 0.0f, -img_err_x, dt);
-        img_fb_y = PID_Update(&s_mode2_imgy_pid, 0.0f, -img_err_y, dt);
+        img_fb_x = PID_Update(&g_mode2_imgx_pid, 0.0f, -img_err_x, dt);
+        img_fb_y = PID_Update(&g_mode2_imgy_pid, 0.0f, -img_err_y, dt);
         img_fb_x = FC_Mode_Clamp(img_fb_x, -s_mode2_img_fb_limit_cmps, s_mode2_img_fb_limit_cmps);
         img_fb_y = FC_Mode_Clamp(img_fb_y, -s_mode2_img_fb_limit_cmps, s_mode2_img_fb_limit_cmps);
     }
     else
     {
-        PID_Reset(&s_mode2_imgx_pid);
-        PID_Reset(&s_mode2_imgy_pid);
+        PID_Reset(&g_mode2_imgx_pid);
+        PID_Reset(&g_mode2_imgy_pid);
     }
 
     car_ff_x = g_car_vel_x * g_fc_params.mode2_kp_car_x;

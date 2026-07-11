@@ -10,8 +10,8 @@
 extern float g_car_vel_x;
 extern float g_car_vel_y;
 
-static pid_t s_mode8_imgx_pid;
-static pid_t s_mode8_imgy_pid;
+pid_t g_mode8_imgx_pid; /* 模式8图像X轴位置环PID状态，供控制与调试访问。 */
+pid_t g_mode8_imgy_pid; /* 模式8图像Y轴位置环PID状态，供控制与调试访问。 */
 pid_t g_mode8_velx_pid;
 pid_t g_mode8_vely_pid;
 float g_mode8_velx_target = 0.0f;
@@ -79,11 +79,11 @@ static void FC_Mode8_UpdateYawTarget(void)
 
 void FC_Mode8_Init(void)
 {
-    PID_Init(&s_mode8_imgx_pid,
+    PID_Init(&g_mode8_imgx_pid,
              g_fc_params.mode8_img_x_kp, g_fc_params.mode8_img_x_ki, g_fc_params.mode8_img_x_kd,
              g_fc_params.mode8_img_x_kff, g_fc_params.vel_xy_dt,
              g_fc_params.mode8_img_x_i_limit, g_fc_params.mode8_img_x_d_lpf);
-    PID_Init(&s_mode8_imgy_pid,
+    PID_Init(&g_mode8_imgy_pid,
              g_fc_params.mode8_img_y_kp, g_fc_params.mode8_img_y_ki, g_fc_params.mode8_img_y_kd,
              g_fc_params.mode8_img_y_kff, g_fc_params.vel_xy_dt,
              g_fc_params.mode8_img_y_i_limit, g_fc_params.mode8_img_y_d_lpf);
@@ -104,8 +104,8 @@ void FC_Mode8_Init(void)
 
 void FC_Mode8_Reset(void)
 {
-    PID_Reset(&s_mode8_imgx_pid);
-    PID_Reset(&s_mode8_imgy_pid);
+    PID_Reset(&g_mode8_imgx_pid);
+    PID_Reset(&g_mode8_imgy_pid);
     PID_Reset(&g_mode8_velx_pid);
     PID_Reset(&g_mode8_vely_pid);
     g_mode8_velx_target = 0.0f;
@@ -185,15 +185,15 @@ void FC_Mode8_50Hz(float dt)
     {
         img_err_x = g_car_lamp_fused_distance_projectioncenter_2.x_cm;
         img_err_y = g_car_lamp_fused_distance_projectioncenter_2.y_cm;
-        img_fb_x = PID_Update(&s_mode8_imgx_pid, 0.0f, -img_err_x, dt);
-        img_fb_y = PID_Update(&s_mode8_imgy_pid, 0.0f, -img_err_y, dt);
+        img_fb_x = PID_Update(&g_mode8_imgx_pid, 0.0f, -img_err_x, dt);
+        img_fb_y = PID_Update(&g_mode8_imgy_pid, 0.0f, -img_err_y, dt);
         img_fb_x = FC_Mode_Clamp(img_fb_x, -s_mode8_img_fb_limit_cmps, s_mode8_img_fb_limit_cmps);
         img_fb_y = FC_Mode_Clamp(img_fb_y, -s_mode8_img_fb_limit_cmps, s_mode8_img_fb_limit_cmps);
     }
     else
     {
-        PID_Reset(&s_mode8_imgx_pid);
-        PID_Reset(&s_mode8_imgy_pid);
+        PID_Reset(&g_mode8_imgx_pid);
+        PID_Reset(&g_mode8_imgy_pid);
     }
 
     car_ff_x = g_car_vel_x * g_fc_params.mode8_kp_car_x;
@@ -307,12 +307,12 @@ void FC_Mode8_50Hz(float dt)
     //                g_car_lamp_fused.cy,                               /* I2 */
     //                g_car_lamp_fused_distance_projectioncenter_2.x_cm, /* I3 */
     //                g_car_lamp_fused_distance_projectioncenter_2.y_cm, /* I4 */
-    //                s_mode8_imgx_pid.p_term,                               /* I5 */
-    //                  s_mode8_imgx_pid.i_term,                               /* I6 */
-    //                s_mode8_imgx_pid.d_term,                               /* I7 */
-    //                  s_mode8_imgy_pid.p_term,                               /* I8 */
-    //                     s_mode8_imgy_pid.i_term,                               /* I9 */
-    //                  s_mode8_imgy_pid.d_term,                               /* I10 */
+    //                g_mode8_imgx_pid.p_term,                               /* I5 */
+    //                  g_mode8_imgx_pid.i_term,                               /* I6 */
+    //                g_mode8_imgx_pid.d_term,                               /* I7 */
+    //                  g_mode8_imgy_pid.p_term,                               /* I8 */
+    //                     g_mode8_imgy_pid.i_term,                               /* I9 */
+    //                  g_mode8_imgy_pid.d_term,                               /* I10 */
     //                  velx_sp,
     //                  vely_sp,
     //                  g_mode8_velx_target,

@@ -118,6 +118,7 @@ static uint8 LightSequence_FindNearestBeacon(float car_position_x,
  */
 static void LightSequence_RefreshResult(void)
 {
+    uint16 candidate_mask = 0U;
     uint8 candidate_count = 0U;
     uint8 sequence_id = LIGHT_SEQUENCE_SEQUENCE_ID_UNKNOWN;
     uint8 sequence_index;
@@ -126,11 +127,14 @@ static void LightSequence_RefreshResult(void)
     {
         if(s_candidates[sequence_index].valid != 0U)
         {
+            candidate_mask =
+                (uint16)(candidate_mask | (uint16)(1U << sequence_index));
             candidate_count++;
             sequence_id = (uint8)(sequence_index + 1U);
         }
     }
 
+    s_result.candidate_mask = candidate_mask;
     s_result.candidate_count = candidate_count;
     if(candidate_count == 0U)
     {
@@ -182,8 +186,7 @@ void LightSequence_Reset(void)
         return;
     }
 
-    s_result.status = LIGHT_SEQUENCE_STATUS_IDENTIFYING;
-    s_result.candidate_count = LIGHT_SEQUENCE_PRESET_COUNT;
+    LightSequence_RefreshResult();
 }
 
 /**

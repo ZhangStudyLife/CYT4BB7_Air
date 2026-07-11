@@ -26,6 +26,7 @@ typedef struct
     uint8 last_beacon_id;      /* 最近一次熄灯上升沿匹配的灯号，范围1至7，0表示未匹配 */
     uint8 sequence_id;         /* 唯一确定的序列编号，范围1至10，0表示未确定 */
     uint8 candidate_count;     /* 当前剩余候选序列数量 */
+    uint16 candidate_mask;     /* 当前候选位掩码，bit0至bit9分别对应序列1至10 */
 } light_sequence_result_t;
 
 /**

@@ -625,7 +625,25 @@ void FC_Loop_100Hz(void)
     //                     // g_car_lamp_fused_distance_projectioncenter_2.x_cm,
     //                     // g_car_lamp_fused_distance_projectioncenter_2.y_cm
     //                     );
+    {
+        light_sequence_result_t light_sequence_result;
 
+        LightSequence_GetResult(&light_sequence_result);
+        wifi_justfloat((float)light_sequence_result.status,             /* I1: 识别状态 */
+                       (float)light_sequence_result.last_beacon_id,     /* I2: 最近熄灭灯号 */
+                       (float)light_sequence_result.sequence_id,        /* I3: 唯一序列号 */
+                       (float)light_sequence_result.candidate_count,    /* I4: 剩余候选数量 */
+                       ((light_sequence_result.candidate_mask & 0x001U) != 0U) ? 1.0f : 0.0f, /* I5: 序列1 */
+                       ((light_sequence_result.candidate_mask & 0x002U) != 0U) ? 1.0f : 0.0f, /* I6: 序列2 */
+                       ((light_sequence_result.candidate_mask & 0x004U) != 0U) ? 1.0f : 0.0f, /* I7: 序列3 */
+                       ((light_sequence_result.candidate_mask & 0x008U) != 0U) ? 1.0f : 0.0f, /* I8: 序列4 */
+                       ((light_sequence_result.candidate_mask & 0x010U) != 0U) ? 1.0f : 0.0f, /* I9: 序列5 */
+                       ((light_sequence_result.candidate_mask & 0x020U) != 0U) ? 1.0f : 0.0f, /* I10: 序列6 */
+                       ((light_sequence_result.candidate_mask & 0x040U) != 0U) ? 1.0f : 0.0f, /* I11: 序列7 */
+                       ((light_sequence_result.candidate_mask & 0x080U) != 0U) ? 1.0f : 0.0f, /* I12: 序列8 */
+                       ((light_sequence_result.candidate_mask & 0x100U) != 0U) ? 1.0f : 0.0f, /* I13: 序列9 */
+                       ((light_sequence_result.candidate_mask & 0x200U) != 0U) ? 1.0f : 0.0f); /* I14: 序列10 */
+    }
     // wifi_justfloat(g_car_lamp_fused.cx,                               /* I1 */
     //                g_car_lamp_fused.cy,                               /* I2 */
     //                g_projection_center.cx,

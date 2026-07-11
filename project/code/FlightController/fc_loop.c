@@ -4,6 +4,7 @@
 #include "../Estimation/Attitude/IMU_TOP.h"
 #include "../Estimation/Height_Est/Height_Est.h"
 #include "../IPC/ipc_image_data.h"
+#include "../Planner/beacon_lost_detector.h"
 #include "../Planner/car_lamp_fused.h"
 #include "../Planner/pix_to_distance.h"
 #include "../Planner/ProjectionCenter.h"
@@ -37,6 +38,8 @@ static float height_pos_out = 0.0f;
 /* 目标高度，单位米 */
 extern volatile uint32 tick_1000us_cnt;
 extern float g_car_sync_time_ms;
+extern float g_car_position_x;
+extern float g_car_position_y;
 extern float g_car_vel_x;
 extern float g_car_vel_y;
 extern float img_err_x_old;
@@ -642,7 +645,10 @@ void FC_Loop_100Hz(void)
                        ((light_sequence_result.candidate_mask & 0x040U) != 0U) ? 1.0f : 0.0f, /* I11: 序列7 */
                        ((light_sequence_result.candidate_mask & 0x080U) != 0U) ? 1.0f : 0.0f, /* I12: 序列8 */
                        ((light_sequence_result.candidate_mask & 0x100U) != 0U) ? 1.0f : 0.0f, /* I13: 序列9 */
-                       ((light_sequence_result.candidate_mask & 0x200U) != 0U) ? 1.0f : 0.0f); /* I14: 序列10 */
+                       ((light_sequence_result.candidate_mask & 0x200U) != 0U) ? 1.0f : 0.0f, /* I14: 序列10 */
+                       g_car_position_x,                                      /* I15: 小车全局X坐标，单位m */
+                       g_car_position_y,                                      /* I16: 小车全局Y坐标，单位m */
+                       (float)BeaconLostDetector_GetFlag());                  /* I17: 检测到灭灯事件标志 */
     }
     // wifi_justfloat(g_car_lamp_fused.cx,                               /* I1 */
     //                g_car_lamp_fused.cy,                               /* I2 */

@@ -23,6 +23,12 @@ static light_sequence_result_t s_result;
 /* 上一次100Hz更新时的熄灯标志，用于检测0到1上升沿。 */
 static uint8 s_last_beacon_lost_flag;
 
+/* 7盏灯最近一次被正式接受的时间戳，单位ms。 */
+static uint32 s_last_accepted_time_ms[LIGHT_SEQUENCE_BEACON_COUNT];
+
+/* 最近接受时间有效位，bit0至bit6分别对应1号至7号灯。 */
+static uint8 s_accepted_time_valid_mask;
+
 /**
  * @brief 统计一个灯位掩码中置位的数量。
  * @param mask 待统计的灯位掩码。
@@ -65,6 +71,12 @@ static uint8 LightSequence_PresetValid(const light_sequence_preset_t *preset)
         if((round_mask == 0U) ||
            ((round_mask & (uint8)(~LIGHT_SEQUENCE_VALID_BEACON_MASK)) != 0U) ||
            (light_count > LIGHT_SEQUENCE_MAX_LIGHTS_PER_ROUND))
+        {
+            return 0U;
+        }
+
+        if((round_index > 0U) &&
+           ((round_mask & preset->round_mask[round_index - 1U]) != 0U))
         {
             return 0U;
         }
@@ -165,7 +177,9 @@ void LightSequence_Reset(void)
 
     memset(s_candidates, 0, sizeof(s_candidates));
     memset(&s_result, 0, sizeof(s_result));
+    memset(s_last_accepted_time_ms, 0, sizeof(s_last_accepted_time_ms));
     s_last_beacon_lost_flag = 0U;
+    s_accepted_time_valid_mask = 0U;
 
     for(sequence_index = 0U; sequence_index < LIGHT_SEQUENCE_PRESET_COUNT; sequence_index++)
     {
@@ -194,14 +208,18 @@ void LightSequence_Reset(void)
  * @param beacon_lost_flag 当前熄灯标志，0表示未熄灯，非0表示检测到熄灯。
  * @param car_position_x 车辆最新全局X坐标，单位m。
  * @param car_position_y 车辆最新全局Y坐标，单位m。
+ * @param current_time_ms 当前Air端时间戳，单位ms。
  * @return 无。
  */
 void LightSequence_Update(uint8 beacon_lost_flag,
                           float car_position_x,
-                          float car_position_y)
+                          float car_position_y,
+                          uint32 current_time_ms)
 {
+    uint8 event_accepted = 0U;
     uint8 beacon_id;
     uint8 beacon_bit;
+    uint8 beacon_index;
     uint8 sequence_index;
 
     beacon_lost_flag = (beacon_lost_flag != 0U) ? 1U : 0U;
@@ -226,33 +244,68 @@ void LightSequence_Update(uint8 beacon_lost_flag,
     }
 
     beacon_bit = (uint8)(1U << (beacon_id - 1U));
+    beacon_index = (uint8)(beacon_id - 1U);
+    if(((s_accepted_time_valid_mask & beacon_bit) != 0U) &&
+       ((uint32)(current_time_ms - s_last_accepted_time_ms[beacon_index]) <
+        LIGHT_SEQUENCE_DUPLICATE_WINDOW_MS))
+    {
+        return;
+    }
+
     for(sequence_index = 0U; sequence_index < LIGHT_SEQUENCE_PRESET_COUNT; sequence_index++)
     {
         light_sequence_candidate_t *candidate = &s_candidates[sequence_index];
         const light_sequence_preset_t *preset = &g_light_sequence_presets[sequence_index];
+        uint8 previous_round_mask;
+        uint8 consumed_mask;
 
         if(candidate->valid == 0U)
         {
             continue;
         }
 
-        if((candidate->round_index >= preset->round_count) ||
-           ((candidate->remaining_mask & beacon_bit) == 0U))
+        if(candidate->round_index >= preset->round_count)
         {
-            candidate->valid = 0U;
+            previous_round_mask = preset->round_mask[preset->round_count - 1U];
+            if((previous_round_mask & beacon_bit) == 0U)
+            {
+                candidate->valid = 0U;
+            }
             continue;
         }
 
-        candidate->remaining_mask =
-            (uint8)(candidate->remaining_mask & (uint8)(~beacon_bit));
-        if(candidate->remaining_mask == 0U)
+        consumed_mask =
+            (uint8)(preset->round_mask[candidate->round_index] &
+                    (uint8)(~candidate->remaining_mask));
+        previous_round_mask = (candidate->round_index > 0U)
+                                  ? preset->round_mask[candidate->round_index - 1U]
+                                  : 0U;
+
+        if((candidate->remaining_mask & beacon_bit) != 0U)
         {
-            candidate->round_index++;
-            if(candidate->round_index < preset->round_count)
+            event_accepted = 1U;
+            candidate->remaining_mask =
+                (uint8)(candidate->remaining_mask & (uint8)(~beacon_bit));
+            if(candidate->remaining_mask == 0U)
             {
-                candidate->remaining_mask = preset->round_mask[candidate->round_index];
+                candidate->round_index++;
+                if(candidate->round_index < preset->round_count)
+                {
+                    candidate->remaining_mask = preset->round_mask[candidate->round_index];
+                }
             }
         }
+        else if(((consumed_mask | previous_round_mask) & beacon_bit) == 0U)
+        {
+            candidate->valid = 0U;
+        }
+    }
+
+    if(event_accepted != 0U)
+    {
+        s_last_accepted_time_ms[beacon_index] = current_time_ms;
+        s_accepted_time_valid_mask =
+            (uint8)(s_accepted_time_valid_mask | beacon_bit);
     }
 
     LightSequence_RefreshResult();

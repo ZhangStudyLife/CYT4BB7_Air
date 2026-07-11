@@ -41,11 +41,13 @@ void LightSequence_Reset(void);
  * @param beacon_lost_flag 当前熄灯标志，0表示未熄灯，非0表示检测到熄灯。
  * @param car_position_x 车辆最新全局X坐标，单位m。
  * @param car_position_y 车辆最新全局Y坐标，单位m。
+ * @param current_time_ms 当前Air端时间戳，单位ms。
  * @return 无。
  */
 void LightSequence_Update(uint8 beacon_lost_flag,
                           float car_position_x,
-                          float car_position_y);
+                          float car_position_y,
+                          uint32 current_time_ms);
 
 /**
  * @brief 获取当前灯号与序列识别结果。

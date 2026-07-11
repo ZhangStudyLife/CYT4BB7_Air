@@ -7,6 +7,7 @@
 #define LIGHT_SEQUENCE_PRESET_COUNT       (10U)   /* 预设亮灯序列数量 */
 #define LIGHT_SEQUENCE_MAX_ROUNDS         (40U)   /* 单套序列最多保存的轮数 */
 #define LIGHT_SEQUENCE_MATCH_RADIUS_M     (0.5f)  /* 熄灯事件坐标匹配半径，单位m */
+#define LIGHT_SEQUENCE_DUPLICATE_WINDOW_MS (1000U) /* 同一灯号的时间去重窗口，单位ms */
 
 /**
  * @brief 二维场地坐标。

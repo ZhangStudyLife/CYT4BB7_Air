@@ -172,7 +172,8 @@ int main(void)
             beacon_lost_flag = BeaconLostDetector_Update();
             LightSequence_Update(beacon_lost_flag,
                                  g_car_position_x,
-                                 g_car_position_y);
+                                 g_car_position_y,
+                                 tick_1000us_cnt);
 
             car_plan_result_t car_plan;
             uint8 car_plan_send_valid;

@@ -6,6 +6,7 @@
 #include "../Planner/car_lamp_fused.h"
 #include "../Planner/pix_to_distance.h"
 #include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
+#include <math.h>
 
 extern float g_car_vel_x;
 extern float g_car_vel_y;
@@ -25,6 +26,56 @@ static float s_mode8_velx_ff_lpf = 0.0f;
 static float s_mode8_vely_ff_lpf = 0.0f;
 static uint16_t s_mode8_yaw_tick = 0U;
 static uint8_t s_mode8_yaw_index = 0U;
+
+static void FC_Mode8_UpdateImgYKp(float dt, uint8_t reset)
+{
+    static float hold_time_s = 0.0f;
+    float speed_y;
+    float kp_target;
+
+    if (reset != 0U)
+    {
+        hold_time_s = 0.0f;
+        g_mode8_imgy_pid.kp = 2.2f;
+        return;
+    }
+
+    speed_y = fabsf(g_car_vel_y);
+    if (speed_y <= 0.6f)
+    {
+        kp_target = 2.2f;
+    }
+    else if (speed_y < 1.4f)
+    {
+        kp_target = 2.2f + (speed_y - 0.6f) * 0.25f;
+    }
+    else if (speed_y < 1.6f)
+    {
+        kp_target = 2.4f + (speed_y - 1.4f);
+    }
+    else
+    {
+        kp_target = 2.6f;
+    }
+
+    if (kp_target >= g_mode8_imgy_pid.kp)
+    {
+        g_mode8_imgy_pid.kp = kp_target;
+        hold_time_s = 0.6f;
+    }
+    else if (hold_time_s > 0.0f)
+    {
+        hold_time_s -= dt;
+    }
+    else
+    {
+        g_mode8_imgy_pid.kp -= 0.5f * dt;
+        if (g_mode8_imgy_pid.kp < kp_target)
+        {
+            g_mode8_imgy_pid.kp = kp_target;
+        }
+    }
+}
 
 static void img_err_compare(void)
 {
@@ -106,6 +157,7 @@ void FC_Mode8_Reset(void)
 {
     PID_Reset(&g_mode8_imgx_pid);
     PID_Reset(&g_mode8_imgy_pid);
+    FC_Mode8_UpdateImgYKp(0.0f, 1U);
     PID_Reset(&g_mode8_velx_pid);
     PID_Reset(&g_mode8_vely_pid);
     g_mode8_velx_target = 0.0f;
@@ -184,6 +236,7 @@ void FC_Mode8_50Hz(float dt)
     tof_height_valid = ((0U != g_tof_fused_valid) &&
                         (g_tof_fused_height_mm > FC_MODE_IMAGE_MIN_HEIGHT_MM)) ? 1U : 0U;
 
+    FC_Mode8_UpdateImgYKp(dt, 0U);
     if ((fused_lamp_valid != 0U) && (tof_height_valid != 0U))
     {
         img_err_x = g_car_lamp_fused_distance_projectioncenter_2.x_cm;

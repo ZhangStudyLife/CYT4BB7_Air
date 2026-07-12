@@ -408,6 +408,27 @@ void FC_Loop_50Hz(void)
         FC_Mode0_50Hz(dt);
         break;
     }
+
+    wifi_justfloat(
+        g_car_lamp_fused_distance_projectioncenter_2.x_cm,
+        g_car_lamp_fused_distance_projectioncenter_2.y_cm,
+        g_mode8_imgx_pid.p_term, g_mode8_imgx_pid.i_term,
+        g_mode8_imgx_pid.d_term, g_mode8_imgx_pid.output,
+        g_mode8_imgy_pid.p_term, g_mode8_imgy_pid.i_term,
+        g_mode8_imgy_pid.d_term, g_mode8_imgy_pid.output,
+        g_car_vel_x, g_car_vel_y,
+        g_car_vel_x * g_fc_params.mode8_kp_car_x,
+        -g_car_vel_y * g_fc_params.mode8_kp_car_y,
+        fc_clampf(g_mode8_imgx_pid.output, -FC_MODE_IMAGE_VEL_LIMIT_CMPS, FC_MODE_IMAGE_VEL_LIMIT_CMPS),
+        fc_clampf(g_mode8_imgy_pid.output, -FC_MODE_IMAGE_VEL_LIMIT_CMPS, FC_MODE_IMAGE_VEL_LIMIT_CMPS),
+        g_mode8_velx_target, g_mode8_vely_target,
+        Pos_Est_vel_x, Pos_Est_vel_y,
+        roll_angle_target, pitch_angle_target, yaw_angle_target,
+        g_euler.roll, g_euler.pitch, g_euler.yaw,
+        g_tof_fused_height_mm,
+        (float)g_car_lamp_fused_distance_projectioncenter_2.valid,
+        (float)g_tof_fused_valid,
+        g_car_sync_time_ms);
 }
 
 /*
@@ -421,9 +442,13 @@ void FC_Loop_100Hz(void)
 {
     static uint32 tick_1000us_cnt_last = 0;
     FC_START_CRSF_state_e fc_state;
+    air_comm_air_stats_t air_stats;
+    float car_data[11] = {0.0f};
     uint32 tick_now = tick_1000us_cnt;
     uint32 diff = tick_now - tick_1000us_cnt_last;
     float dt = diff * 0.001f;
+    uint8 car_data_count = 0U;
+    uint8 car_data_valid;
 
     tick_1000us_cnt_last = tick_now;
     if (dt < 0.0001f)
@@ -726,16 +751,17 @@ void FC_Loop_500Hz(void)
     }
 
 
-    wifi_justfloat(
-        roll_angle_target, pitch_angle_target, yaw_angle_target, /* I1-I3: 姿态角目标，单位 deg */
-        g_euler.roll, g_euler.pitch, g_euler.yaw,                /* I4-I6: 姿态角反馈，单位 deg */
-        Pos_Est_vel_x, Pos_Est_vel_y,                            /* I7-I8: X/Y轴速度反馈，单位 cm/s */
-        g_mode7_velx_pid.p_term, g_mode7_velx_pid.i_term,        /* I9-I10: 模式7 X轴速度环 P/I */
-        g_mode7_velx_pid.d_term, g_mode7_velx_pid.output,        /* I11-I12: 模式7 X轴速度环 D/总输出 */
-        g_mode7_vely_pid.p_term, g_mode7_vely_pid.i_term,        /* I13-I14: 模式7 Y轴速度环 P/I */
-        g_mode7_vely_pid.d_term, g_mode7_vely_pid.output,        /* I15-I16: 模式7 Y轴速度环 D/总输出 */
-        g_mode7_velx_target, g_mode7_vely_target,                /* I17-I18: 模式7 X/Y轴目标速度，单位 cm/s */
-        g_tof_fused_height_mm);                                 /* I19: 飞机融合高度，单位 mm */
+    // wifi_justfloat(
+    //     roll_angle_target, pitch_angle_target, yaw_angle_target,
+    //     g_euler.roll, g_euler.pitch, g_euler.yaw,
+    //     Pos_Est_vel_x, Pos_Est_vel_y,
+    //     g_mode7_velx_pid.p_term, g_mode7_velx_pid.i_term,
+    //     g_mode7_velx_pid.d_term, g_mode7_velx_pid.output,
+    //     g_mode7_vely_pid.p_term, g_mode7_vely_pid.i_term,
+    //     g_mode7_vely_pid.d_term, g_mode7_vely_pid.output,
+    //     g_mode7_velx_target, g_mode7_vely_target,
+    //     g_tof_fused_height_mm);
+
 }
 
 void FC_Loop_1000Hz(void)

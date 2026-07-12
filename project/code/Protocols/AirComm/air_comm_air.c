@@ -51,10 +51,10 @@ typedef struct
     air_comm_air_command_fn run;
 } air_comm_air_command_t;
 
-#define AIR_COMM_REGISTER_FLOAT(member, min_v, max_v)                                      \
+#define AIR_COMM_REGISTER_FLOAT(name, variable, min_v, max_v)                              \
     do                                                                                     \
     {                                                                                      \
-        if(air_comm_air_register_param(#member, &g_fc_params.member,                       \
+        if(air_comm_air_register_param(#name, &(variable),                                 \
                                        AIR_COMM_AIR_PARAM_TYPE_FLOAT,                       \
                                        (min_v), (max_v)) == 0U)                             \
         {                                                                                  \
@@ -62,10 +62,10 @@ typedef struct
         }                                                                                  \
     } while(0)
 
-#define AIR_COMM_REGISTER_INT32(member, min_v, max_v)                                      \
+#define AIR_COMM_REGISTER_INT32(name, variable, min_v, max_v)                              \
     do                                                                                     \
     {                                                                                      \
-        if(air_comm_air_register_param(#member, &g_fc_params.member,                       \
+        if(air_comm_air_register_param(#name, &(variable),                                 \
                                        AIR_COMM_AIR_PARAM_TYPE_INT32,                       \
                                        (float)(min_v), (float)(max_v)) == 0U)               \
         {                                                                                  \
@@ -1030,134 +1030,134 @@ void air_comm_air_init(void)
     s_air_comm_last_done_seq = 0U;
     s_air_comm_registration_ok = 1U;
 
-    AIR_COMM_REGISTER_FLOAT(gyro_dt, 0.0001f, 0.1f);
-    AIR_COMM_REGISTER_FLOAT(angle_dt, 0.0001f, 0.1f);
-    AIR_COMM_REGISTER_FLOAT(pos_z_dt, 0.0001f, 0.2f);
-    AIR_COMM_REGISTER_FLOAT(vel_xy_dt, 0.0001f, 0.2f);
-    AIR_COMM_REGISTER_FLOAT(vel_z_dt, 0.0001f, 0.2f);
-    AIR_COMM_REGISTER_INT32(base_throttle, 0, 6000);
-    AIR_COMM_REGISTER_FLOAT(roll_mech_trim_deg, -30.0f, 30.0f);
-    AIR_COMM_REGISTER_FLOAT(pitch_mech_trim_deg, -30.0f, 30.0f);
+    AIR_COMM_REGISTER_FLOAT(gyro_dt, g_fc_params.gyro_dt, 0.0001f, 0.1f);
+    AIR_COMM_REGISTER_FLOAT(angle_dt, g_fc_params.angle_dt, 0.0001f, 0.1f);
+    AIR_COMM_REGISTER_FLOAT(pos_z_dt, g_fc_params.pos_z_dt, 0.0001f, 0.2f);
+    AIR_COMM_REGISTER_FLOAT(vel_xy_dt, g_fc_params.vel_xy_dt, 0.0001f, 0.2f);
+    AIR_COMM_REGISTER_FLOAT(vel_z_dt, g_fc_params.vel_z_dt, 0.0001f, 0.2f);
+    AIR_COMM_REGISTER_INT32(base_throttle, g_fc_params.base_throttle, 0, 6000);
+    AIR_COMM_REGISTER_FLOAT(roll_mech_trim_deg, g_fc_params.roll_mech_trim_deg, -30.0f, 30.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_mech_trim_deg, g_fc_params.pitch_mech_trim_deg, -30.0f, 30.0f);
 
-    AIR_COMM_REGISTER_FLOAT(roll_gyro_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(roll_gyro_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(roll_gyro_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(roll_gyro_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(roll_gyro_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(roll_gyro_d_lpf, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(pitch_gyro_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(pitch_gyro_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(pitch_gyro_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(pitch_gyro_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(pitch_gyro_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(pitch_gyro_d_lpf, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(yaw_gyro_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(yaw_gyro_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(yaw_gyro_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(yaw_gyro_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(yaw_gyro_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(yaw_gyro_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_gyro_kp, g_fc_params.roll_gyro_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_gyro_ki, g_fc_params.roll_gyro_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_gyro_kd, g_fc_params.roll_gyro_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_gyro_kff, g_fc_params.roll_gyro_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_gyro_i_limit, g_fc_params.roll_gyro_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_gyro_d_lpf, g_fc_params.roll_gyro_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_gyro_kp, g_fc_params.pitch_gyro_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_gyro_ki, g_fc_params.pitch_gyro_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_gyro_kd, g_fc_params.pitch_gyro_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_gyro_kff, g_fc_params.pitch_gyro_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_gyro_i_limit, g_fc_params.pitch_gyro_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_gyro_d_lpf, g_fc_params.pitch_gyro_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_gyro_kp, g_fc_params.yaw_gyro_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_gyro_ki, g_fc_params.yaw_gyro_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_gyro_kd, g_fc_params.yaw_gyro_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_gyro_kff, g_fc_params.yaw_gyro_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_gyro_i_limit, g_fc_params.yaw_gyro_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_gyro_d_lpf, g_fc_params.yaw_gyro_d_lpf, 0.0f, 500.0f);
 
-    AIR_COMM_REGISTER_FLOAT(roll_angle_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(roll_angle_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(roll_angle_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(roll_angle_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(roll_angle_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(roll_angle_d_lpf, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(pitch_angle_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(pitch_angle_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(pitch_angle_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(pitch_angle_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(pitch_angle_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(pitch_angle_d_lpf, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(yaw_angle_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(yaw_angle_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(yaw_angle_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(yaw_angle_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(yaw_angle_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(yaw_angle_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_angle_kp, g_fc_params.roll_angle_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_angle_ki, g_fc_params.roll_angle_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_angle_kd, g_fc_params.roll_angle_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_angle_kff, g_fc_params.roll_angle_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_angle_i_limit, g_fc_params.roll_angle_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(roll_angle_d_lpf, g_fc_params.roll_angle_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_angle_kp, g_fc_params.pitch_angle_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_angle_ki, g_fc_params.pitch_angle_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_angle_kd, g_fc_params.pitch_angle_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_angle_kff, g_fc_params.pitch_angle_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_angle_i_limit, g_fc_params.pitch_angle_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(pitch_angle_d_lpf, g_fc_params.pitch_angle_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_angle_kp, g_fc_params.yaw_angle_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_angle_ki, g_fc_params.yaw_angle_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_angle_kd, g_fc_params.yaw_angle_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_angle_kff, g_fc_params.yaw_angle_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_angle_i_limit, g_fc_params.yaw_angle_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_angle_d_lpf, g_fc_params.yaw_angle_d_lpf, 0.0f, 500.0f);
 
-    AIR_COMM_REGISTER_FLOAT(vel_x_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(vel_x_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(vel_x_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(vel_x_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(vel_x_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(vel_x_d_lpf, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(vel_y_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(vel_y_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(vel_y_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(vel_y_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(vel_y_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(vel_y_d_lpf, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(vel_z_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(vel_z_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode7_vel_x_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode7_vel_x_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode7_vel_x_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode7_vel_x_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode7_vel_x_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode7_vel_x_d_lpf, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(mode7_vel_y_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode7_vel_y_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode7_vel_y_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode7_vel_y_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode7_vel_y_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode7_vel_y_d_lpf, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(pos_est_k_flow, 0.0f, 1.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_x_kp, g_fc_params.vel_x_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_x_ki, g_fc_params.vel_x_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_x_kd, g_fc_params.vel_x_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_x_kff, g_fc_params.vel_x_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_x_i_limit, g_fc_params.vel_x_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_x_d_lpf, g_fc_params.vel_x_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_y_kp, g_fc_params.vel_y_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_y_ki, g_fc_params.vel_y_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_y_kd, g_fc_params.vel_y_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_y_kff, g_fc_params.vel_y_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_y_i_limit, g_fc_params.vel_y_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_y_d_lpf, g_fc_params.vel_y_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_z_ki, g_fc_params.vel_z_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_z_i_limit, g_fc_params.vel_z_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode7_vel_x_kp, g_fc_params.mode7_vel_x_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode7_vel_x_ki, g_fc_params.mode7_vel_x_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode7_vel_x_kd, g_fc_params.mode7_vel_x_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode7_vel_x_kff, g_fc_params.mode7_vel_x_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode7_vel_x_i_limit, g_fc_params.mode7_vel_x_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode7_vel_x_d_lpf, g_fc_params.mode7_vel_x_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(mode7_vel_y_kp, g_fc_params.mode7_vel_y_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode7_vel_y_ki, g_fc_params.mode7_vel_y_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode7_vel_y_kd, g_fc_params.mode7_vel_y_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode7_vel_y_kff, g_fc_params.mode7_vel_y_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode7_vel_y_i_limit, g_fc_params.mode7_vel_y_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode7_vel_y_d_lpf, g_fc_params.mode7_vel_y_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(pos_est_k_flow, g_fc_params.pos_est_k_flow, 0.0f, 1.0f);
 
-    AIR_COMM_REGISTER_FLOAT(mode5_img_x_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_img_x_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_img_x_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_img_x_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_img_x_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_img_x_d_lpf, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_img_y_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_img_y_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_img_y_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_img_y_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_img_y_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_img_y_d_lpf, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_vel_x_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_vel_x_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_vel_x_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_vel_x_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_vel_x_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_vel_x_d_lpf, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_vel_y_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_vel_y_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_vel_y_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_vel_y_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_vel_y_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_vel_y_d_lpf, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_kp_car_x, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode5_kp_car_y, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_x_kp, g_fc_params.mode5_img_x_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_x_ki, g_fc_params.mode5_img_x_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_x_kd, g_fc_params.mode5_img_x_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_x_kff, g_fc_params.mode5_img_x_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_x_i_limit, g_fc_params.mode5_img_x_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_x_d_lpf, g_fc_params.mode5_img_x_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_y_kp, g_fc_params.mode5_img_y_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_y_ki, g_fc_params.mode5_img_y_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_y_kd, g_fc_params.mode5_img_y_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_y_kff, g_fc_params.mode5_img_y_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_y_i_limit, g_fc_params.mode5_img_y_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_img_y_d_lpf, g_fc_params.mode5_img_y_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_x_kp, g_fc_params.mode5_vel_x_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_x_ki, g_fc_params.mode5_vel_x_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_x_kd, g_fc_params.mode5_vel_x_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_x_kff, g_fc_params.mode5_vel_x_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_x_i_limit, g_fc_params.mode5_vel_x_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_x_d_lpf, g_fc_params.mode5_vel_x_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_y_kp, g_fc_params.mode5_vel_y_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_y_ki, g_fc_params.mode5_vel_y_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_y_kd, g_fc_params.mode5_vel_y_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_y_kff, g_fc_params.mode5_vel_y_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_y_i_limit, g_fc_params.mode5_vel_y_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_vel_y_d_lpf, g_fc_params.mode5_vel_y_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_kp_car_x, g_fc_params.mode5_kp_car_x, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode5_kp_car_y, g_fc_params.mode5_kp_car_y, 0.0f, 3000.0f);
 
-    AIR_COMM_REGISTER_FLOAT(mode8_img_x_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_img_x_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_img_x_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_img_x_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_img_x_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_img_x_d_lpf, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_img_y_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_img_y_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_img_y_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_img_y_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_img_y_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_img_y_d_lpf, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_vel_x_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_vel_x_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_vel_x_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_vel_x_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_vel_x_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_vel_x_d_lpf, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_vel_y_kp, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_vel_y_ki, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_vel_y_kd, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_vel_y_kff, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_vel_y_i_limit, 0.0f, 5000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_vel_y_d_lpf, 0.0f, 500.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_kp_car_x, 0.0f, 3000.0f);
-    AIR_COMM_REGISTER_FLOAT(mode8_kp_car_y, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_x_kp, g_fc_params.mode8_img_x_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_x_ki, g_fc_params.mode8_img_x_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_x_kd, g_fc_params.mode8_img_x_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_x_kff, g_fc_params.mode8_img_x_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_x_i_limit, g_fc_params.mode8_img_x_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_x_d_lpf, g_fc_params.mode8_img_x_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_y_kp, g_fc_params.mode8_img_y_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_y_ki, g_fc_params.mode8_img_y_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_y_kd, g_fc_params.mode8_img_y_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_y_kff, g_fc_params.mode8_img_y_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_y_i_limit, g_fc_params.mode8_img_y_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_img_y_d_lpf, g_fc_params.mode8_img_y_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_x_kp, g_fc_params.mode8_vel_x_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_x_ki, g_fc_params.mode8_vel_x_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_x_kd, g_fc_params.mode8_vel_x_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_x_kff, g_fc_params.mode8_vel_x_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_x_i_limit, g_fc_params.mode8_vel_x_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_x_d_lpf, g_fc_params.mode8_vel_x_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_y_kp, g_fc_params.mode8_vel_y_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_y_ki, g_fc_params.mode8_vel_y_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_y_kd, g_fc_params.mode8_vel_y_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_y_kff, g_fc_params.mode8_vel_y_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_y_i_limit, g_fc_params.mode8_vel_y_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_vel_y_d_lpf, g_fc_params.mode8_vel_y_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_kp_car_x, g_fc_params.mode8_kp_car_x, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode8_kp_car_y, g_fc_params.mode8_kp_car_y, 0.0f, 3000.0f);
 
     if((s_air_comm_param_count != AIR_COMM_DEFAULT_PARAM_COUNT) ||
        (air_comm_register_default_commands() == 0U))

@@ -37,7 +37,7 @@
 #define AIR_COMM_AIR_PARAM_NAME_MAX          (32U)   /* 参数名最大长度（不含 '\0'） */
 #define AIR_COMM_AIR_COMMAND_NAME_MAX        (32U)   /* 远程命令名最大长度，不含 '\0' */
 #define AIR_COMM_AIR_ACK_TEXT_MAX            (96U)   /* 远程命令 ACK 文本最大长度，不含 '\0' */
-#define AIR_COMM_AIR_RUN_DATA_MAX_FLOATS     (32U)   /* 单次实时数据最多 float 个数 */
+#define AIR_COMM_AIR_RUN_DATA_MAX_FLOATS     (48U)   /* 单次实时数据最多 float 个数 */
 #define AIR_COMM_AIR_BAUDRATE                (1152000U) /* UART 波特率 */
 
 /* 参数/远程命令操作返回状态 */

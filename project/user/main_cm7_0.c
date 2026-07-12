@@ -1,5 +1,6 @@
 #include "zf_common_headfile.h"
 #include "../code/Planner/beacon_lost_detector.h"
+#include "../code/Estimation/Pos_Est/FlowGyroDecoupler_LC302.h"
 
 volatile uint32 tick_1000us_cnt = 0U;
 volatile uint16 g_tick_1000HZ = 0U;
@@ -168,7 +169,7 @@ int main(void)
             (void)CarPlan_Update(&car_plan);
             car_plan_send_valid = ((car_plan.valid != 0U) && (g_tof_fused_height_mm > 500.0f)) ? 1U : 0U;
 
-            float air_data[25];
+            float air_data[45];
             air_data[0] = g_tof_fused_height_mm;
             air_data[1] = g_euler.roll;
             air_data[2] = g_euler.pitch;
@@ -194,7 +195,23 @@ int main(void)
             air_data[22] = car_plan.dist_px;
             air_data[23] = (float)BeaconLostDetector_GetFlag();
             air_data[24] = (float)CRSF_STD[8];
-            air_comm_send_run_data(air_data, 25);
+            air_data[25] = g_tof1_height_mm;
+            air_data[26] = g_tof2_height_mm;
+            air_data[27] = g_tof3_height_mm;
+            air_data[28] = g_tof4_height_mm;
+            air_data[29] = (float)lc302_data.flow_x_integral;
+            air_data[30] = (float)lc302_data.flow_y_integral;
+            air_data[31] = FlowGyroDecoupler_LC302_GetDecX();
+            air_data[32] = FlowGyroDecoupler_LC302_GetDecY();
+            IMU_GetRawSampleForCalibration(&air_data[33], &air_data[34], &air_data[35],
+                                           &air_data[36], &air_data[37], &air_data[38]);
+            air_data[39] = g_imufilter_1000hz.gyrox;
+            air_data[40] = g_imufilter_1000hz.gyroy;
+            air_data[41] = g_imufilter_1000hz.gyroz;
+            air_data[42] = g_imufilter_1000hz.accx;
+            air_data[43] = g_imufilter_1000hz.accy;
+            air_data[44] = g_imufilter_1000hz.accz;
+            air_comm_send_run_data(air_data, 45U);
 
             // wifi_justfloat(image_data[Front].car_lamp_data[0].cx,
             //                 image_data[Front].car_lamp_data[0].cy,

@@ -22,6 +22,7 @@ volatile ipc_remote_param_mailbox_t g_ipc_remote_param_response;
 #define IPC_FLIGHT_STATE_MAGIC   (0xA5000000UL)
 #define IPC_FLIGHT_STATE_MASK    (0xFFFF0000UL)
 #define IPC_FLIGHT_STATE_FLYING  (0x00000001UL)
+#define IPC_FLIGHT_STATE_SCREEN_REFRESH_ENABLE (0x00000002UL)
 /* 图传发送模式在 IPC 数据低 16 位中的偏移 */
 #define IPC_IMAGE_SEND_SHIFT     (8U)
 /* 图传发送模式在 IPC 数据低 16 位中的掩码 */
@@ -70,6 +71,8 @@ static uint32 s_tx_seq = 0U;
 static volatile uint8 s_core0_flying = 0U;
 /* 核0同步过来的 2BL3 图传发送模式 */
 static volatile uint8 s_core0_image_send_enable = 0U;
+/* 核1上电默认禁止刷屏，收到核0明确许可后才初始化IPS114。 */
+static volatile uint8 s_core0_screen_refresh_enable = 0U;
 static volatile uint8 s_remote_param_hint = 0U;
 static uint32 s_remote_param_last_transaction = 0U;
 static uint32 s_remote_param_last_checksum = 0U;
@@ -201,7 +204,9 @@ static void ipc_remote_param_publish_response(const ipc_remote_param_mailbox_t *
 #endif
 }
 
-uint8 ipc_flight_state_send(uint8 flying, uint8 image_send_enable)
+uint8 ipc_flight_state_send(uint8 flying,
+                            uint8 image_send_enable,
+                            uint8 screen_refresh_enable)
 {
 #if defined(CY_CORE_CM7_0)
     uint32 ipc_data = IPC_FLIGHT_STATE_MAGIC;
@@ -215,12 +220,17 @@ uint8 ipc_flight_state_send(uint8 flying, uint8 image_send_enable)
     {
         ipc_data |= IPC_FLIGHT_STATE_FLYING;
     }
+    if(0U != screen_refresh_enable)
+    {
+        ipc_data |= IPC_FLIGHT_STATE_SCREEN_REFRESH_ENABLE;
+    }
     ipc_data |= (((uint32)image_send_enable << IPC_IMAGE_SEND_SHIFT) & IPC_IMAGE_SEND_MASK);
 
     return ipc_send_data(ipc_data);
 #else
     (void)flying;
     (void)image_send_enable;
+    (void)screen_refresh_enable;
     return 1U;
 #endif
 }
@@ -238,6 +248,15 @@ uint8 ipc_core0_image_send_enable(void)
 {
 #if defined(CY_CORE_CM7_1)
     return s_core0_image_send_enable;
+#else
+    return 0U;
+#endif
+}
+
+uint8 ipc_core0_screen_refresh_enable(void)
+{
+#if defined(CY_CORE_CM7_1)
+    return s_core0_screen_refresh_enable;
 #else
     return 0U;
 #endif
@@ -662,6 +681,8 @@ void ipc_image_callback(uint32 ipc_data)
     else if ((ipc_data & IPC_FLIGHT_STATE_MASK) == IPC_FLIGHT_STATE_MAGIC)
     {
         s_core0_flying = (0U != (ipc_data & IPC_FLIGHT_STATE_FLYING)) ? 1U : 0U;
+        s_core0_screen_refresh_enable =
+            (0U != (ipc_data & IPC_FLIGHT_STATE_SCREEN_REFRESH_ENABLE)) ? 1U : 0U;
         s_core0_image_send_enable = (uint8)((ipc_data & IPC_IMAGE_SEND_MASK) >> IPC_IMAGE_SEND_SHIFT);
         if(s_core0_image_send_enable > 2U)
         {

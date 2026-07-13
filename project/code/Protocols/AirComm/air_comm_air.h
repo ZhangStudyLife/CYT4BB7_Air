@@ -102,6 +102,9 @@ extern float air_y_bias;    /* 信标 Y 方向偏差补偿（像素） */
  */
 extern int32 c1_beacon_thr;  /* 核1信标二值化阈值的核0菜单镜像，不参与核0飞控计算 */
 extern int32 bl3_beacon_thr; /* 两颗2BL3信标二值化阈值的核0菜单镜像，不参与核0飞控计算 */
+extern int32 c1_exp_time;    /* 核1摄像头曝光时间的核0菜单镜像，不参与核0飞控计算 */
+extern int32 bl3_exp_time;   /* 两颗2BL3曝光时间的核0菜单镜像，不参与核0飞控计算 */
+extern int32 c1_screen_mode; /* 核1屏幕显示模式的核0菜单镜像，不参与核0飞控计算 */
 
 void air_comm_air_init(void);
 

@@ -42,6 +42,8 @@ extern "C" {
 
 /* 首批图像参数 ID。不同目标拥有独立 ID 空间。 */
 #define IPC_REMOTE_PARAM_ID_BEACON_THRESHOLD   (1U)
+#define IPC_REMOTE_PARAM_ID_EXP_TIME           (2U)
+#define IPC_REMOTE_PARAM_ID_SCREEN_MODE        (3U)
 
 /* 固定64字节共享邮箱，reserved用于后续兼容扩展。 */
 typedef struct
@@ -98,9 +100,12 @@ void ipc_image_callback(uint32 ipc_data);
 void ipc_image_publish(void);
 void ipc_image_poll(void);
 
-uint8 ipc_flight_state_send(uint8 flying, uint8 image_send_enable);
+uint8 ipc_flight_state_send(uint8 flying,
+                            uint8 image_send_enable,
+                            uint8 screen_refresh_enable);
 uint8 ipc_core0_is_flying(void);
 uint8 ipc_core0_image_send_enable(void);
+uint8 ipc_core0_screen_refresh_enable(void);
 void ipc_camera_spi_log_publish(const ipc_camera_spi_log_t *log);
 void ipc_camera_spi_log_get(ipc_camera_spi_log_t *out);
 

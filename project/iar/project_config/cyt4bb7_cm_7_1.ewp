@@ -1117,6 +1117,15 @@
     </configuration>
     <group>
         <name>code</name>
+        <group>
+            <name>Display</name>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Display\image_debug_screen.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Display\image_debug_screen.h</name>
+            </file>
+        </group>
         <file>
             <name>$PROJ_DIR$\..\..\code\Estimation\Pos_Est\image_down.c</name>
         </file>

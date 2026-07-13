@@ -20,12 +20,17 @@
 #define AIR_COMM_MAX_FRAME                   (AIR_COMM_MAX_PAYLOAD + AIR_COMM_FRAME_OVERHEAD)
 #define AIR_COMM_RX_QUEUE_SIZE               (512U)  /* 接收环形队列大小（字节） */
 #define AIR_COMM_PARAM_TABLE_MAX             (128U)  /* 最多注册参数个数 */
-#define AIR_COMM_DEFAULT_PARAM_COUNT         (125U)
+#define AIR_COMM_DEFAULT_PARAM_COUNT         (128U)
 #define AIR_COMM_REMOTE_CANCEL_MS            (400U)
 #define AIR_COMM_REMOTE_TIMEOUT_MS           (700U)
+#define AIR_COMM_REMOTE_EXP_CANCEL_MS        (800U)
+#define AIR_COMM_REMOTE_EXP_TIMEOUT_MS       (1200U)
 #define AIR_COMM_PARAM_ACK_CACHE_MS          (1000U)
 #define AIR_COMM_PARAM_TARGET_LOCAL          (0U)
 #define AIR_COMM_COMMAND_TABLE_MAX           (8U)    /* 最多注册远程命令个数 */
+
+typedef char air_comm_default_param_count_must_fit_table[
+    (AIR_COMM_DEFAULT_PARAM_COUNT <= AIR_COMM_PARAM_TABLE_MAX) ? 1 : -1];
 
 /* 消息类型定义 */
 #define AIR_COMM_MSG_SET_PARAM               (0x01U) /* 小车→无人机：设置参数 */
@@ -159,6 +164,12 @@ static air_comm_air_param_t s_air_comm_params[AIR_COMM_PARAM_TABLE_MAX]; /* 参�
 int32 c1_beacon_thr = 120;
 /* 两颗2BL3共同阈值在核0的菜单镜像，仅在两板确认一致后更新。 */
 int32 bl3_beacon_thr = 120;
+/* 核1摄像头曝光时间的核0菜单镜像，仅在下游确认成功后更新。 */
+int32 c1_exp_time = 400;
+/* 两颗2BL3共同曝光时间的核0菜单镜像，仅在两板确认一致后更新。 */
+int32 bl3_exp_time = 500;
+/* 核1屏幕显示模式的核0菜单镜像，仅在核1读回成功后更新。 */
+int32 c1_screen_mode = 0;
 
 static air_comm_run_data_fn s_air_comm_run_data_callback;
 static air_comm_air_command_t s_air_comm_commands[AIR_COMM_COMMAND_TABLE_MAX];
@@ -172,7 +183,7 @@ static uint8 s_air_comm_active_seq;
 static uint8 s_air_comm_screen_ready;
 static uint8 s_air_comm_last_done_valid;
 static uint8 s_air_comm_last_done_seq;
-static uint8 s_air_comm_param_count = 0U;  /* 已注册参数数 */
+static uint16 s_air_comm_param_count = 0U; /* 128项参数不能使用uint8计数。 */
 static uint8 s_air_comm_registration_ok;
 static air_comm_remote_param_pending_t s_air_comm_remote_pending;
 static air_comm_param_ack_cache_t s_air_comm_param_ack_cache;
@@ -498,7 +509,7 @@ static void air_comm_mark_car_online(void)
 /* 按名字在参数表中查找，找不到返回 NULL */
 static air_comm_air_param_t *air_comm_find_param(const uint8 *name, uint8 name_len)
 {
-    uint8 i;
+    uint16 i;
 
     for(i = 0U; i < s_air_comm_param_count; i++)
     {
@@ -703,6 +714,8 @@ static void air_comm_remote_poll(void)
     air_comm_remote_param_pending_t pending;
     float actual;
     uint8 status;
+    uint32 cancel_ms;
+    uint32 timeout_ms;
 
     if(s_air_comm_remote_pending.active == 0U)
     {
@@ -710,6 +723,10 @@ static void air_comm_remote_poll(void)
     }
 
     pending = s_air_comm_remote_pending;
+    cancel_ms = (pending.param->param_id == IPC_REMOTE_PARAM_ID_EXP_TIME) ?
+                AIR_COMM_REMOTE_EXP_CANCEL_MS : AIR_COMM_REMOTE_CANCEL_MS;
+    timeout_ms = (pending.param->param_id == IPC_REMOTE_PARAM_ID_EXP_TIME) ?
+                 AIR_COMM_REMOTE_EXP_TIMEOUT_MS : AIR_COMM_REMOTE_TIMEOUT_MS;
     if(ipc_remote_param_core0_poll(&response) != 0U)
     {
         status = response.status;
@@ -750,7 +767,7 @@ static void air_comm_remote_poll(void)
     else if((pending.cancel_requested == 0U) &&
             (((pending.op == IPC_REMOTE_PARAM_OP_SET) &&
               (air_comm_remote_operation_allowed() == 0U)) ||
-             ((s_air_comm_tick_ms - pending.start_tick_ms) >= AIR_COMM_REMOTE_CANCEL_MS)))
+             ((s_air_comm_tick_ms - pending.start_tick_ms) >= cancel_ms)))
     {
         if(ipc_remote_param_core0_request_cancel(pending.transaction) != 0U)
         {
@@ -758,7 +775,7 @@ static void air_comm_remote_poll(void)
         }
         return;
     }
-    else if((s_air_comm_tick_ms - pending.start_tick_ms) >= AIR_COMM_REMOTE_TIMEOUT_MS)
+    else if((s_air_comm_tick_ms - pending.start_tick_ms) >= timeout_ms)
     {
         ipc_remote_param_core0_cancel(pending.transaction);
         status = AIR_COMM_AIR_STATUS_TIMEOUT;
@@ -1448,6 +1465,9 @@ void air_comm_air_init(void)
     s_air_comm_registration_ok = 1U;
     c1_beacon_thr = 120;
     bl3_beacon_thr = 120;
+    c1_exp_time = 400;
+    bl3_exp_time = 500;
+    c1_screen_mode = 0;
 
     AIR_COMM_REGISTER_FLOAT(gyro_dt, g_fc_params.gyro_dt, 0.0001f, 0.1f);
     AIR_COMM_REGISTER_FLOAT(angle_dt, g_fc_params.angle_dt, 0.0001f, 0.1f);
@@ -1595,6 +1615,36 @@ void air_comm_air_init(void)
                                       255.0f,
                                       IPC_REMOTE_PARAM_TARGET_2BL3,
                                       IPC_REMOTE_PARAM_ID_BEACON_THRESHOLD) == 0U)
+    {
+        s_air_comm_registration_ok = 0U;
+    }
+    if(air_comm_register_remote_param("c1_exp_time",
+                                      &c1_exp_time,
+                                      AIR_COMM_AIR_PARAM_TYPE_INT32,
+                                      0.0f,
+                                      636.0f,
+                                      IPC_REMOTE_PARAM_TARGET_CORE1,
+                                      IPC_REMOTE_PARAM_ID_EXP_TIME) == 0U)
+    {
+        s_air_comm_registration_ok = 0U;
+    }
+    if(air_comm_register_remote_param("bl3_exp_time",
+                                      &bl3_exp_time,
+                                      AIR_COMM_AIR_PARAM_TYPE_INT32,
+                                      0.0f,
+                                      636.0f,
+                                      IPC_REMOTE_PARAM_TARGET_2BL3,
+                                      IPC_REMOTE_PARAM_ID_EXP_TIME) == 0U)
+    {
+        s_air_comm_registration_ok = 0U;
+    }
+    if(air_comm_register_remote_param("c1_screen_mode",
+                                      &c1_screen_mode,
+                                      AIR_COMM_AIR_PARAM_TYPE_INT32,
+                                      0.0f,
+                                      2.0f,
+                                      IPC_REMOTE_PARAM_TARGET_CORE1,
+                                      IPC_REMOTE_PARAM_ID_SCREEN_MODE) == 0U)
     {
         s_air_comm_registration_ok = 0U;
     }
@@ -1759,7 +1809,7 @@ uint8 air_comm_air_is_car_online(void)
  */
 uint8 air_comm_air_register_param(const char *name, void *var, uint8 type, float min, float max)
 {
-    uint8 i;
+    uint16 i;
 
     if((name == NULL) || (var == NULL) || (min > max) || (type > AIR_COMM_AIR_PARAM_TYPE_INT32))
     {
@@ -1812,7 +1862,7 @@ static uint8 air_comm_register_remote_param(const char *name,
                                             uint8 target,
                                             uint16 param_id)
 {
-    uint8 index;
+    uint16 index;
 
     if(((target != IPC_REMOTE_PARAM_TARGET_CORE1) &&
         (target != IPC_REMOTE_PARAM_TARGET_2BL3)) ||

@@ -41,6 +41,7 @@
 #define CAMERA_SPI_PARAM_ACK_MAGIC          (0x3CU)
 #define CAMERA_SPI_PARAM_VERSION            (1U)
 #define CAMERA_SPI_PARAM_MAX_CYCLES         (12U)
+#define CAMERA_SPI_PARAM_EXP_MAX_CYCLES     (30U)
 #define CAMERA_SPI_PARAM_PREFLIGHT_TXN_MASK (0x40000000UL)
 #define CAMERA_SPI_PARAM_ROLLBACK_TXN_MASK  (0x80000000UL)
 #define CAMERA_SPI_PARAM_ORIGINAL_TXN_MASK  (0xC0000000UL)
@@ -619,6 +620,7 @@ static void camera_spi_param_evaluate(void)
     uint8 required_mask;
     uint8 success_mask = 0U;
     uint8 board_id;
+    uint8 max_cycles;
 
     if((s_param_transaction.state != CAMERA_SPI_PARAM_PREFLIGHT) &&
        (s_param_transaction.state != CAMERA_SPI_PARAM_ACTIVE) &&
@@ -628,6 +630,8 @@ static void camera_spi_param_evaluate(void)
     }
 
     required_mask = s_param_transaction.command_mask;
+    max_cycles = (s_param_transaction.param_id == IPC_REMOTE_PARAM_ID_EXP_TIME) ?
+                 CAMERA_SPI_PARAM_EXP_MAX_CYCLES : CAMERA_SPI_PARAM_MAX_CYCLES;
     for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
     {
         uint8 board_mask = (uint8)(1U << board_id);
@@ -736,7 +740,7 @@ static void camera_spi_param_evaluate(void)
     }
 
     s_param_transaction.cycle_count++;
-    if(s_param_transaction.cycle_count < CAMERA_SPI_PARAM_MAX_CYCLES)
+    if(s_param_transaction.cycle_count < max_cycles)
     {
         return;
     }

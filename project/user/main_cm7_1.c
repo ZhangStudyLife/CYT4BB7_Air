@@ -81,6 +81,7 @@ int main(void)
 
     ImageDebugScreen_Init();
     ipc_communicate_init(IPC_PORT_2, ipc_image_callback);
+    ipc_remote_param_core1_init();
     image_data_clear(&image_data[Front]);
     image_data_clear(&image_data[Center]);
     image_data_clear(&image_data[Back]);
@@ -93,7 +94,9 @@ int main(void)
         if(g_image_tick_100hz > 0U)
         {
             g_image_tick_100hz--;
+            ipc_remote_param_core1_poll();
             Get_Image_data();
+            ipc_remote_param_core1_poll();
             ipc_image_publish();
             ImageDebugScreen_Update();
         }

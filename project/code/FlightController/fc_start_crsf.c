@@ -146,7 +146,8 @@ static void FC_START_CRSF_StateMachine_Update(void)
         break;
 
     case FC_START_CRSF_STATE_STANDBY:
-        if (FC_START_CRSF_IsUnlockStickCommand() != 0U)
+        if ((FC_START_CRSF_IsUnlockStickCommand() != 0U) &&
+            (air_comm_air_remote_param_busy() == 0U))
         {
             s_unlock_timer_tick++;
         }

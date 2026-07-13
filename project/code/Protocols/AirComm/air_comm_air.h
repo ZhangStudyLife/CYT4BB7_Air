@@ -47,6 +47,11 @@
 #define AIR_COMM_AIR_STATUS_ERROR            (3U)    /* 通用错误（payload 长度不对等） */
 #define AIR_COMM_AIR_STATUS_BUSY             (4U)    /* 远程命令忙，已有命令正在执行 */
 
+#define AIR_COMM_AIR_STATUS_TIMEOUT          (5U)    /* 远端参数事务超时 */
+#define AIR_COMM_AIR_STATUS_MISMATCH         (6U)    /* 两颗2BL3读回值不一致 */
+#define AIR_COMM_AIR_STATUS_PARTIAL          (7U)    /* 两板部分成功，已完成回滚 */
+#define AIR_COMM_AIR_STATUS_ROLLBACK_FAIL    (8U)    /* 两板部分成功且回滚失败 */
+
 #define AIR_COMM_AIR_PARAM_TYPE_FLOAT        (0U)
 #define AIR_COMM_AIR_PARAM_TYPE_INT32        (1U)
 
@@ -95,6 +100,9 @@ extern float air_y_bias;    /* 信标 Y 方向偏差补偿（像素） */
  * 初始化模块，清零所有状态，注册默认参数，配置 UART_2。
  * 在系统启动时调用一次。
  */
+extern int32 c1_beacon_thr;  /* 核1信标二值化阈值的核0菜单镜像，不参与核0飞控计算 */
+extern int32 bl3_beacon_thr; /* 两颗2BL3信标二值化阈值的核0菜单镜像，不参与核0飞控计算 */
+
 void air_comm_air_init(void);
 
 /*
@@ -109,6 +117,9 @@ void air_comm_air_tick_1MS(void);
  * 同时检查小车在线状态。
  */
 void air_comm_air_poll(void);
+
+/* 远端参数设置或取消回滚尚未收敛时返回1，用于阻止进入起飞流程。 */
+uint8 air_comm_air_remote_param_busy(void);
 
 /*
  * 100Hz 周期更新，负责定时发送心跳（每 200ms 一次）和检查在线超时。

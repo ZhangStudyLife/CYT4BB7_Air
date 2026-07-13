@@ -62,6 +62,7 @@ int main(void)
     wifi_cal_imu_Init();
     Motor_Init();
     ipc_communicate_init(IPC_PORT_1, ipc_image_callback);
+    ipc_remote_param_core0_init();
     FC_START_CRSF_Init();
     air_comm_air_init();
     wifi_justfloat_SetStandbyContext((0U == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));

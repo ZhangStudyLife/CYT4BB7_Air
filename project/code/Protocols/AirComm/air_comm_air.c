@@ -20,7 +20,11 @@
 #define AIR_COMM_MAX_FRAME                   (AIR_COMM_MAX_PAYLOAD + AIR_COMM_FRAME_OVERHEAD)
 #define AIR_COMM_RX_QUEUE_SIZE               (512U)  /* 接收环形队列大小（字节） */
 #define AIR_COMM_PARAM_TABLE_MAX             (128U)  /* 最多注册参数个数 */
-#define AIR_COMM_DEFAULT_PARAM_COUNT         (123U)
+#define AIR_COMM_DEFAULT_PARAM_COUNT         (125U)
+#define AIR_COMM_REMOTE_CANCEL_MS            (400U)
+#define AIR_COMM_REMOTE_TIMEOUT_MS           (700U)
+#define AIR_COMM_PARAM_ACK_CACHE_MS          (1000U)
+#define AIR_COMM_PARAM_TARGET_LOCAL          (0U)
 #define AIR_COMM_COMMAND_TABLE_MAX           (8U)    /* 最多注册远程命令个数 */
 
 /* 消息类型定义 */
@@ -40,9 +44,41 @@ typedef struct
     const char *name;
     void *var;
     uint8 type;
+    uint8 target;
+    uint16 param_id;
     float min;
     float max;
 } air_comm_air_param_t;
+
+typedef struct
+{
+    uint8 active;
+    uint8 message_type;
+    uint8 seq;
+    uint8 name_len;
+    uint8 requested_status;
+    uint8 op;
+    uint8 cancel_requested;
+    uint32 request_value_bits;
+    uint32 expected_value_bits;
+    uint32 transaction;
+    uint32 start_tick_ms;
+    air_comm_air_param_t *param;
+    char name[AIR_COMM_AIR_PARAM_NAME_MAX + 1U];
+} air_comm_remote_param_pending_t;
+
+typedef struct
+{
+    uint8 valid;
+    uint8 message_type;
+    uint8 seq;
+    uint8 name_len;
+    uint8 status;
+    uint32 request_value_bits;
+    uint32 completed_tick_ms;
+    float actual;
+    char name[AIR_COMM_AIR_PARAM_NAME_MAX + 1U];
+} air_comm_param_ack_cache_t;
 
 typedef struct
 {
@@ -119,6 +155,11 @@ static air_comm_air_rx_parser_t s_air_comm_rx;          /* 接收解析器 */
 static air_comm_air_rx_queue_t s_air_comm_rx_queue;     /* 接收环形队列 */
 static air_comm_air_stats_t s_air_comm_stats;           /* 统计计数器 */
 static air_comm_air_param_t s_air_comm_params[AIR_COMM_PARAM_TABLE_MAX]; /* 参数表 */
+/* 核1阈值在核0的菜单镜像，仅在下游确认成功后更新。 */
+int32 c1_beacon_thr = 120;
+/* 两颗2BL3共同阈值在核0的菜单镜像，仅在两板确认一致后更新。 */
+int32 bl3_beacon_thr = 120;
+
 static air_comm_run_data_fn s_air_comm_run_data_callback;
 static air_comm_air_command_t s_air_comm_commands[AIR_COMM_COMMAND_TABLE_MAX];
 static const air_comm_air_command_t *s_air_comm_active_command;
@@ -133,6 +174,16 @@ static uint8 s_air_comm_last_done_valid;
 static uint8 s_air_comm_last_done_seq;
 static uint8 s_air_comm_param_count = 0U;  /* 已注册参数数 */
 static uint8 s_air_comm_registration_ok;
+static air_comm_remote_param_pending_t s_air_comm_remote_pending;
+static air_comm_param_ack_cache_t s_air_comm_param_ack_cache;
+
+static uint8 air_comm_register_remote_param(const char *name,
+                                            void *var,
+                                            uint8 type,
+                                            float min,
+                                            float max,
+                                            uint8 target,
+                                            uint16 param_id);
 
 /*
  * CRC-16/CCITT-FALSE 计算。
@@ -492,6 +543,254 @@ static void air_comm_param_write(air_comm_air_param_t *param, float value)
     }
 }
 
+/* 将参数值转换为跨核协议的32位位模式。 */
+static uint32 air_comm_param_value_bits(const air_comm_air_param_t *param, float value)
+{
+    uint32 bits;
+
+    if((param != NULL) && (param->type == AIR_COMM_AIR_PARAM_TYPE_INT32))
+    {
+        return (uint32)(int32)value;
+    }
+    memcpy(&bits, &value, sizeof(bits));
+    return bits;
+}
+
+/* 将目标端读回位模式转换为空地协议使用的float数值。 */
+static float air_comm_param_bits_value(const air_comm_air_param_t *param, uint32 bits)
+{
+    float value;
+
+    if((param != NULL) && (param->type == AIR_COMM_AIR_PARAM_TYPE_INT32))
+    {
+        return (float)(int32)bits;
+    }
+    memcpy(&value, &bits, sizeof(value));
+    return value;
+}
+
+/* 判断收到的参数帧是否为最近一笔已完成帧的UART重传。 */
+static uint8 air_comm_param_cache_match(uint8 message_type,
+                                        uint8 seq,
+                                        const uint8 *name,
+                                        uint8 name_len,
+                                        uint32 request_value_bits)
+{
+    if((s_air_comm_param_ack_cache.valid == 0U) ||
+       ((s_air_comm_tick_ms - s_air_comm_param_ack_cache.completed_tick_ms) >
+        AIR_COMM_PARAM_ACK_CACHE_MS) ||
+       (s_air_comm_param_ack_cache.message_type != message_type) ||
+       (s_air_comm_param_ack_cache.seq != seq) ||
+       (s_air_comm_param_ack_cache.name_len != name_len) ||
+       (s_air_comm_param_ack_cache.request_value_bits != request_value_bits))
+    {
+        return 0U;
+    }
+
+    return (memcmp(s_air_comm_param_ack_cache.name, name, name_len) == 0) ? 1U : 0U;
+}
+
+/* 重新发送缓存ACK，避免同序号重传重复修改下游参数。 */
+static void air_comm_param_cache_send(void)
+{
+    if(s_air_comm_param_ack_cache.message_type == AIR_COMM_MSG_SET_PARAM)
+    {
+        (void)air_comm_send_ack_param(s_air_comm_param_ack_cache.seq,
+                                      s_air_comm_param_ack_cache.status,
+                                      (const uint8 *)s_air_comm_param_ack_cache.name,
+                                      s_air_comm_param_ack_cache.name_len,
+                                      s_air_comm_param_ack_cache.actual);
+    }
+    else
+    {
+        (void)air_comm_send_ack_get_param(s_air_comm_param_ack_cache.seq,
+                                          s_air_comm_param_ack_cache.status,
+                                          (const uint8 *)s_air_comm_param_ack_cache.name,
+                                          s_air_comm_param_ack_cache.name_len,
+                                          s_air_comm_param_ack_cache.actual);
+    }
+}
+
+/* 保存最近一笔最终ACK，缓存窗口内相同UART帧直接复用。 */
+static void air_comm_param_cache_store(uint8 message_type,
+                                       uint8 seq,
+                                       const uint8 *name,
+                                       uint8 name_len,
+                                       uint32 request_value_bits,
+                                       uint8 status,
+                                       float actual)
+{
+    memset(&s_air_comm_param_ack_cache, 0, sizeof(s_air_comm_param_ack_cache));
+    s_air_comm_param_ack_cache.valid = 1U;
+    s_air_comm_param_ack_cache.message_type = message_type;
+    s_air_comm_param_ack_cache.seq = seq;
+    s_air_comm_param_ack_cache.name_len = name_len;
+    s_air_comm_param_ack_cache.status = status;
+    s_air_comm_param_ack_cache.request_value_bits = request_value_bits;
+    s_air_comm_param_ack_cache.completed_tick_ms = s_air_comm_tick_ms;
+    s_air_comm_param_ack_cache.actual = actual;
+    memcpy(s_air_comm_param_ack_cache.name, name, name_len);
+    s_air_comm_param_ack_cache.name[name_len] = '\0';
+}
+
+/* 判断UART重传是否对应当前仍在执行的远端事务。 */
+static uint8 air_comm_remote_pending_match(uint8 message_type,
+                                           uint8 seq,
+                                           const uint8 *name,
+                                           uint8 name_len,
+                                           uint32 request_value_bits)
+{
+    if((s_air_comm_remote_pending.active == 0U) ||
+       (s_air_comm_remote_pending.message_type != message_type) ||
+       (s_air_comm_remote_pending.seq != seq) ||
+       (s_air_comm_remote_pending.name_len != name_len) ||
+       (s_air_comm_remote_pending.request_value_bits != request_value_bits))
+    {
+        return 0U;
+    }
+
+    return (memcmp(s_air_comm_remote_pending.name, name, name_len) == 0) ? 1U : 0U;
+}
+
+/* 启动核0到核1的异步请求，最终ACK由高频轮询收到目标读回值后发送。 */
+static uint8 air_comm_remote_start(uint8 message_type,
+                                   uint8 seq,
+                                   const uint8 *name,
+                                   uint8 name_len,
+                                   air_comm_air_param_t *param,
+                                   uint8 op,
+                                   float value,
+                                   uint8 requested_status,
+                                   uint32 request_value_bits)
+{
+    uint32 transaction;
+    uint32 value_bits = air_comm_param_value_bits(param, value);
+    uint32 previous_bits = air_comm_param_value_bits(param, air_comm_param_read(param));
+
+    if((param == NULL) || (s_air_comm_remote_pending.active != 0U) ||
+       (ipc_remote_param_core0_start(param->target,
+                                     op,
+                                     param->type,
+                                     param->param_id,
+                                     value_bits,
+                                     previous_bits,
+                                     &transaction) == 0U))
+    {
+        return 0U;
+    }
+
+    memset(&s_air_comm_remote_pending, 0, sizeof(s_air_comm_remote_pending));
+    s_air_comm_remote_pending.active = 1U;
+    s_air_comm_remote_pending.message_type = message_type;
+    s_air_comm_remote_pending.seq = seq;
+    s_air_comm_remote_pending.name_len = name_len;
+    s_air_comm_remote_pending.requested_status = requested_status;
+    s_air_comm_remote_pending.op = op;
+    s_air_comm_remote_pending.request_value_bits = request_value_bits;
+    s_air_comm_remote_pending.expected_value_bits = value_bits;
+    s_air_comm_remote_pending.transaction = transaction;
+    s_air_comm_remote_pending.start_tick_ms = s_air_comm_tick_ms;
+    s_air_comm_remote_pending.param = param;
+    memcpy(s_air_comm_remote_pending.name, name, name_len);
+    s_air_comm_remote_pending.name[name_len] = '\0';
+    return 1U;
+}
+
+/* 高频轮询远端事务；仅目标端最终读回一致后更新代理变量并回复车端。 */
+static void air_comm_remote_poll(void)
+{
+    ipc_remote_param_mailbox_t response;
+    air_comm_remote_param_pending_t pending;
+    float actual;
+    uint8 status;
+
+    if(s_air_comm_remote_pending.active == 0U)
+    {
+        return;
+    }
+
+    pending = s_air_comm_remote_pending;
+    if(ipc_remote_param_core0_poll(&response) != 0U)
+    {
+        status = response.status;
+        actual = air_comm_param_read(pending.param);
+        if(status > AIR_COMM_AIR_STATUS_ROLLBACK_FAIL)
+        {
+            status = AIR_COMM_AIR_STATUS_ERROR;
+        }
+        if((response.transaction != pending.transaction) ||
+           (response.op != pending.op) ||
+           (response.target != pending.param->target) ||
+           (response.type != pending.param->type) ||
+           (response.param_id != pending.param->param_id))
+        {
+            status = AIR_COMM_AIR_STATUS_ERROR;
+        }
+        else if(status == AIR_COMM_AIR_STATUS_OUT_OF_RANGE)
+        {
+            /* 核0已完成限幅，下游再次报越界说明固件约束不一致。 */
+            status = AIR_COMM_AIR_STATUS_MISMATCH;
+        }
+        else if((status == AIR_COMM_AIR_STATUS_OK) &&
+                (pending.op == IPC_REMOTE_PARAM_OP_SET) &&
+                (response.value_bits != pending.expected_value_bits))
+        {
+            status = AIR_COMM_AIR_STATUS_MISMATCH;
+        }
+        else if(status == AIR_COMM_AIR_STATUS_OK)
+        {
+            actual = air_comm_param_bits_value(pending.param, response.value_bits);
+            air_comm_param_write(pending.param, actual);
+            if(pending.requested_status == AIR_COMM_AIR_STATUS_OUT_OF_RANGE)
+            {
+                status = AIR_COMM_AIR_STATUS_OUT_OF_RANGE;
+            }
+        }
+    }
+    else if((pending.cancel_requested == 0U) &&
+            (((pending.op == IPC_REMOTE_PARAM_OP_SET) &&
+              (air_comm_remote_operation_allowed() == 0U)) ||
+             ((s_air_comm_tick_ms - pending.start_tick_ms) >= AIR_COMM_REMOTE_CANCEL_MS)))
+    {
+        if(ipc_remote_param_core0_request_cancel(pending.transaction) != 0U)
+        {
+            s_air_comm_remote_pending.cancel_requested = 1U;
+        }
+        return;
+    }
+    else if((s_air_comm_tick_ms - pending.start_tick_ms) >= AIR_COMM_REMOTE_TIMEOUT_MS)
+    {
+        ipc_remote_param_core0_cancel(pending.transaction);
+        status = AIR_COMM_AIR_STATUS_TIMEOUT;
+        actual = air_comm_param_read(pending.param);
+    }
+    else
+    {
+        return;
+    }
+
+    s_air_comm_remote_pending.active = 0U;
+    air_comm_param_cache_store(pending.message_type,
+                               pending.seq,
+                               (const uint8 *)pending.name,
+                               pending.name_len,
+                               pending.request_value_bits,
+                               status,
+                               actual);
+    air_comm_param_cache_send();
+    if(pending.message_type == AIR_COMM_MSG_SET_PARAM)
+    {
+        if(status == AIR_COMM_AIR_STATUS_OK)
+        {
+            s_air_comm_stats.set_param_ok_count++;
+        }
+        else
+        {
+            s_air_comm_stats.set_param_fail_count++;
+        }
+    }
+}
+
 /*
  * 处理 SET_PARAM 消息。
  * payload 格式：name_len(1B) + name(name_len B) + value(4B float, 小端)
@@ -505,6 +804,7 @@ static void air_comm_handle_set_param(uint8 seq, const uint8 *payload, uint8 len
     float value;
     float actual = 0.0f;
     uint8 status = AIR_COMM_AIR_STATUS_ERROR;
+    uint32 request_value_bits = 0U;
     air_comm_air_param_t *param = NULL;
 
     /* payload 长度不够至少 5 字节（name_len + name至少0 + 4字节float），直接报错 */
@@ -529,6 +829,34 @@ static void air_comm_handle_set_param(uint8 seq, const uint8 *payload, uint8 len
 
     /* 读取要设置的值，按名字查找参数，然后检查范围并写入 */
     value = air_comm_read_float(&payload[1U + name_len]);
+    memcpy(&request_value_bits, &payload[1U + name_len], sizeof(request_value_bits));
+    if(air_comm_param_cache_match(AIR_COMM_MSG_SET_PARAM,
+                                  seq,
+                                  name,
+                                  name_len,
+                                  request_value_bits) != 0U)
+    {
+        air_comm_param_cache_send();
+        return;
+    }
+    if(air_comm_remote_pending_match(AIR_COMM_MSG_SET_PARAM,
+                                     seq,
+                                     name,
+                                     name_len,
+                                     request_value_bits) != 0U)
+    {
+        return;
+    }
+    if(s_air_comm_remote_pending.active != 0U)
+    {
+        s_air_comm_stats.set_param_fail_count++;
+        (void)air_comm_send_ack_param(seq,
+                                      AIR_COMM_AIR_STATUS_BUSY,
+                                      name,
+                                      name_len,
+                                      0.0f);
+        return;
+    }
     param = air_comm_find_param(name, name_len);
     if(param == NULL)
     {
@@ -544,27 +872,56 @@ static void air_comm_handle_set_param(uint8 seq, const uint8 *payload, uint8 len
     else if(value < param->min)
     {
         actual = param->min;
-        air_comm_param_write(param, actual);
+        if(param->target == AIR_COMM_PARAM_TARGET_LOCAL)
+        {
+            air_comm_param_write(param, actual);
+        }
         status = AIR_COMM_AIR_STATUS_OUT_OF_RANGE;
     }
     else if(value > param->max)
     {
         actual = param->max;
-        air_comm_param_write(param, actual);
+        if(param->target == AIR_COMM_PARAM_TARGET_LOCAL)
+        {
+            air_comm_param_write(param, actual);
+        }
         status = AIR_COMM_AIR_STATUS_OUT_OF_RANGE;
     }
     else
     {
         actual = value;
-        air_comm_param_write(param, actual);
+        if(param->target == AIR_COMM_PARAM_TARGET_LOCAL)
+        {
+            air_comm_param_write(param, actual);
+        }
         status = AIR_COMM_AIR_STATUS_OK;
     }
 
     if((param != NULL) &&
        (status != AIR_COMM_AIR_STATUS_ERROR))
     {
-        actual = air_comm_param_read(param);
-        FC_Loop_Init();
+        if(param->target != AIR_COMM_PARAM_TARGET_LOCAL)
+        {
+            if(air_comm_remote_start(AIR_COMM_MSG_SET_PARAM,
+                                     seq,
+                                     name,
+                                     name_len,
+                                     param,
+                                     IPC_REMOTE_PARAM_OP_SET,
+                                     actual,
+                                     status,
+                                     request_value_bits) != 0U)
+            {
+                return;
+            }
+            status = AIR_COMM_AIR_STATUS_BUSY;
+            actual = air_comm_param_read(param);
+        }
+        else
+        {
+            actual = air_comm_param_read(param);
+            FC_Loop_Init();
+        }
     }
 
     if(status == AIR_COMM_AIR_STATUS_OK)
@@ -576,7 +933,14 @@ static void air_comm_handle_set_param(uint8 seq, const uint8 *payload, uint8 len
         s_air_comm_stats.set_param_fail_count++;
     }
 
-    (void)air_comm_send_ack_param(seq, status, name, name_len, actual);
+    air_comm_param_cache_store(AIR_COMM_MSG_SET_PARAM,
+                               seq,
+                               name,
+                               name_len,
+                               request_value_bits,
+                               status,
+                               actual);
+    air_comm_param_cache_send();
 }
 
 static void air_comm_handle_get_param(uint8 seq, const uint8 *payload, uint8 len)
@@ -603,10 +967,54 @@ static void air_comm_handle_get_param(uint8 seq, const uint8 *payload, uint8 len
         return;
     }
 
+    if(air_comm_param_cache_match(AIR_COMM_MSG_GET_PARAM,
+                                  seq,
+                                  name,
+                                  name_len,
+                                  0U) != 0U)
+    {
+        air_comm_param_cache_send();
+        return;
+    }
+    if(air_comm_remote_pending_match(AIR_COMM_MSG_GET_PARAM,
+                                     seq,
+                                     name,
+                                     name_len,
+                                     0U) != 0U)
+    {
+        return;
+    }
+    if(s_air_comm_remote_pending.active != 0U)
+    {
+        (void)air_comm_send_ack_get_param(seq,
+                                          AIR_COMM_AIR_STATUS_BUSY,
+                                          name,
+                                          name_len,
+                                          0.0f);
+        return;
+    }
+
     param = air_comm_find_param(name, name_len);
     if(param == NULL)
     {
         status = AIR_COMM_AIR_STATUS_NOT_FOUND;
+    }
+    else if(param->target != AIR_COMM_PARAM_TARGET_LOCAL)
+    {
+        actual = air_comm_param_read(param);
+        if(air_comm_remote_start(AIR_COMM_MSG_GET_PARAM,
+                                 seq,
+                                 name,
+                                 name_len,
+                                 param,
+                                 IPC_REMOTE_PARAM_OP_GET,
+                                 actual,
+                                 AIR_COMM_AIR_STATUS_OK,
+                                 0U) != 0U)
+        {
+            return;
+        }
+        status = AIR_COMM_AIR_STATUS_BUSY;
     }
     else
     {
@@ -614,7 +1022,14 @@ static void air_comm_handle_get_param(uint8 seq, const uint8 *payload, uint8 len
         status = AIR_COMM_AIR_STATUS_OK;
     }
 
-    (void)air_comm_send_ack_get_param(seq, status, name, name_len, actual);
+    air_comm_param_cache_store(AIR_COMM_MSG_GET_PARAM,
+                               seq,
+                               name,
+                               name_len,
+                               0U,
+                               status,
+                               actual);
+    air_comm_param_cache_send();
 }
 
 /*
@@ -1012,6 +1427,8 @@ void air_comm_air_init(void)
     memset(s_air_comm_commands, 0, sizeof(s_air_comm_commands));
     memset(s_air_comm_last_run_data, 0, sizeof(s_air_comm_last_run_data));
     memset(s_air_comm_last_done_name, 0, sizeof(s_air_comm_last_done_name));
+    memset(&s_air_comm_remote_pending, 0, sizeof(s_air_comm_remote_pending));
+    memset(&s_air_comm_param_ack_cache, 0, sizeof(s_air_comm_param_ack_cache));
 
     s_air_comm_initialized = 0U;
     s_air_comm_seq = 0U;
@@ -1029,6 +1446,8 @@ void air_comm_air_init(void)
     s_air_comm_last_done_valid = 0U;
     s_air_comm_last_done_seq = 0U;
     s_air_comm_registration_ok = 1U;
+    c1_beacon_thr = 120;
+    bl3_beacon_thr = 120;
 
     AIR_COMM_REGISTER_FLOAT(gyro_dt, g_fc_params.gyro_dt, 0.0001f, 0.1f);
     AIR_COMM_REGISTER_FLOAT(angle_dt, g_fc_params.angle_dt, 0.0001f, 0.1f);
@@ -1159,6 +1578,27 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(mode8_kp_car_x, g_fc_params.mode8_kp_car_x, 0.0f, 3000.0f);
     AIR_COMM_REGISTER_FLOAT(mode8_kp_car_y, g_fc_params.mode8_kp_car_y, 0.0f, 3000.0f);
 
+    if(air_comm_register_remote_param("c1_beacon_thr",
+                                      &c1_beacon_thr,
+                                      AIR_COMM_AIR_PARAM_TYPE_INT32,
+                                      0.0f,
+                                      255.0f,
+                                      IPC_REMOTE_PARAM_TARGET_CORE1,
+                                      IPC_REMOTE_PARAM_ID_BEACON_THRESHOLD) == 0U)
+    {
+        s_air_comm_registration_ok = 0U;
+    }
+    if(air_comm_register_remote_param("bl3_beacon_thr",
+                                      &bl3_beacon_thr,
+                                      AIR_COMM_AIR_PARAM_TYPE_INT32,
+                                      0.0f,
+                                      255.0f,
+                                      IPC_REMOTE_PARAM_TARGET_2BL3,
+                                      IPC_REMOTE_PARAM_ID_BEACON_THRESHOLD) == 0U)
+    {
+        s_air_comm_registration_ok = 0U;
+    }
+
     if((s_air_comm_param_count != AIR_COMM_DEFAULT_PARAM_COUNT) ||
        (air_comm_register_default_commands() == 0U))
     {
@@ -1202,6 +1642,8 @@ void air_comm_air_poll(void)
     {
         return;
     }
+
+    air_comm_remote_poll();
 
     while((guard > 0U) && (air_comm_rx_queue_pop(&byte) != 0U))
     {
@@ -1267,6 +1709,12 @@ void air_comm_air_update_100HZ(void)
     air_comm_task_online();
 }
 
+uint8 air_comm_air_remote_param_busy(void)
+{
+    return ((s_air_comm_remote_pending.active != 0U) ||
+            (ipc_remote_param_core0_is_busy() != 0U)) ? 1U : 0U;
+}
+
 /*
  * UART 中断回调：收到一个字节就入队。
  * 只做入队操作，不解析、不阻塞，中断安全。
@@ -1325,6 +1773,8 @@ uint8 air_comm_air_register_param(const char *name, void *var, uint8 type, float
         {
             s_air_comm_params[i].var = var;
             s_air_comm_params[i].type = type;
+            s_air_comm_params[i].target = AIR_COMM_PARAM_TARGET_LOCAL;
+            s_air_comm_params[i].param_id = 0U;
             s_air_comm_params[i].min = min;
             s_air_comm_params[i].max = max;
             return 1U;
@@ -1344,11 +1794,45 @@ uint8 air_comm_air_register_param(const char *name, void *var, uint8 type, float
     s_air_comm_params[s_air_comm_param_count].name = name;
     s_air_comm_params[s_air_comm_param_count].var = var;
     s_air_comm_params[s_air_comm_param_count].type = type;
+    s_air_comm_params[s_air_comm_param_count].target = AIR_COMM_PARAM_TARGET_LOCAL;
+    s_air_comm_params[s_air_comm_param_count].param_id = 0U;
     s_air_comm_params[s_air_comm_param_count].min = min;
     s_air_comm_params[s_air_comm_param_count].max = max;
     s_air_comm_param_count++;
 
     return 1U;
+}
+
+/* 注册只作为核0菜单镜像、实际由核1或2BL3执行的参数。 */
+static uint8 air_comm_register_remote_param(const char *name,
+                                            void *var,
+                                            uint8 type,
+                                            float min,
+                                            float max,
+                                            uint8 target,
+                                            uint16 param_id)
+{
+    uint8 index;
+
+    if(((target != IPC_REMOTE_PARAM_TARGET_CORE1) &&
+        (target != IPC_REMOTE_PARAM_TARGET_2BL3)) ||
+       (param_id == 0U) ||
+       (air_comm_air_register_param(name, var, type, min, max) == 0U))
+    {
+        return 0U;
+    }
+
+    for(index = 0U; index < s_air_comm_param_count; index++)
+    {
+        if(strcmp(s_air_comm_params[index].name, name) == 0)
+        {
+            s_air_comm_params[index].target = target;
+            s_air_comm_params[index].param_id = param_id;
+            return 1U;
+        }
+    }
+
+    return 0U;
 }
 
 /*

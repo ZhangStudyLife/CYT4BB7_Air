@@ -8,6 +8,8 @@
 #define CAMERA_SPI_TRANSFER_LEN             (97U)
 #define CAMERA_SPI_APP_DATA_CAPACITY        (77U)
 #define CAMERA_SPI_DOWNLINK_APP_LEN         (9U)
+#define CAMERA_SPI_PARAM_APP_LEN            (24U)
+#define CAMERA_SPI_PARAM_ACK_APP_LEN        (20U)
 
 #define CAMERA_SPI_FRAME_HEAD_0             (0xAAU)
 #define CAMERA_SPI_FRAME_HEAD_1             (0x55U)
@@ -33,6 +35,16 @@
 #define CAMERA_SPI_CPU_IRQ                  CPUIntIdx5_IRQn
 #define CAMERA_SPI_PERI_FREQ                CY_INITIAL_TARGET_PERI_FREQ
 #define CAMERA_SPI_IMAGE_DISPLAY_ENABLE     (0U)
+
+/* 2BL3参数命令与ACK协议固定字段。 */
+#define CAMERA_SPI_PARAM_MAGIC              (0xC3U)
+#define CAMERA_SPI_PARAM_ACK_MAGIC          (0x3CU)
+#define CAMERA_SPI_PARAM_VERSION            (1U)
+#define CAMERA_SPI_PARAM_MAX_CYCLES         (12U)
+#define CAMERA_SPI_PARAM_PREFLIGHT_TXN_MASK (0x40000000UL)
+#define CAMERA_SPI_PARAM_ROLLBACK_TXN_MASK  (0x80000000UL)
+#define CAMERA_SPI_PARAM_ORIGINAL_TXN_MASK  (0xC0000000UL)
+#define CAMERA_SPI_PARAM_ACK_REQUEST        (0x01U)
 
 #define CAMERA_SPI_IMAGE_VERSION_OFFSET        (0U)
 #define CAMERA_SPI_IMAGE_BEACON_COUNT_OFFSET   (1U)
@@ -89,6 +101,46 @@ typedef struct
     car_lamp_data car_lamps[CAMERA_SPI_MAX_CAR_LAMPS];
 } camera_spi_board_state_t;
 
+typedef enum
+{
+    CAMERA_SPI_PARAM_IDLE = 0,
+    CAMERA_SPI_PARAM_PREFLIGHT,
+    CAMERA_SPI_PARAM_ACTIVE,
+    CAMERA_SPI_PARAM_ROLLBACK,
+    CAMERA_SPI_PARAM_COMPLETE
+} camera_spi_param_state_t;
+
+typedef struct
+{
+    camera_spi_param_state_t state;
+    uint8 op;
+    uint8 type;
+    uint8 command_mask;
+    uint8 command_due_mask;
+    uint8 sent_command_mask;
+    uint8 ack_mask;
+    uint8 set_sent_mask;
+    uint8 cycle_count;
+    uint8 final_status;
+    uint8 cancel_requested;
+    uint16 param_id;
+    uint32 transaction;
+    uint32 value_bits;
+    uint32 fallback_bits;
+    uint32 previous_bits[CAMERA_SPI_BOARD_COUNT];
+    uint32 actual_bits[CAMERA_SPI_BOARD_COUNT];
+    uint8 board_status[CAMERA_SPI_BOARD_COUNT];
+} camera_spi_param_transaction_t;
+
+typedef struct
+{
+    uint8 valid;
+    uint8 type;
+    uint16 param_id;
+    uint32 transaction;
+    uint32 previous_bits[CAMERA_SPI_BOARD_COUNT];
+} camera_spi_param_rollback_cache_t;
+
 static camera_spi_board_state_t s_boards[CAMERA_SPI_BOARD_COUNT];
 static cy_stc_scb_spi_context_t s_spi_context;
 static uint8 s_tx_frame[CAMERA_SPI_TRANSFER_LEN];
@@ -103,6 +155,10 @@ static uint8 s_ready_mask;
 static uint8 s_polled_mask;
 static uint32 s_active_poll_count;
 static uint32 s_log_seq;
+/* 两颗2BL3广播参数事务状态，仅由核1的100Hz主循环访问。 */
+static camera_spi_param_transaction_t s_param_transaction;
+/* 最近一次已被上层消费的成功SET回滚快照，用于处理迟到取消。 */
+static camera_spi_param_rollback_cache_t s_param_rollback_cache;
 
 static void camera_spi_write_u16_be(uint8 *buffer, uint16 value)
 {
@@ -197,9 +253,12 @@ static uint8 camera_spi_ready_mask(void)
     return mask;
 }
 
-static void camera_spi_build_downlink_app(uint8 board_id, uint8 *app)
+static uint16 camera_spi_build_downlink_app(uint8 board_id, uint8 *app)
 {
     camera_spi_board_state_t *board = &s_boards[board_id];
+    uint8 board_mask = (uint8)(1U << board_id);
+    uint32 transaction;
+    uint32 value_bits;
 
     memset(app, 0, CAMERA_SPI_APP_DATA_CAPACITY);
     app[0] = CAMERA_SPI_DOWNLINK_MAGIC;
@@ -209,6 +268,50 @@ static void camera_spi_build_downlink_app(uint8 board_id, uint8 *app)
     app[7] = ((s_image_send_enable == 2U) ||
               ((s_image_send_enable == 1U) && (s_flight_state == 0U))) ? 1U : 0U;
     app[8] = (s_flight_state == 0U) ? CAMERA_SPI_IMAGE_DISPLAY_ENABLE : 0U;
+
+    if(((s_param_transaction.state == CAMERA_SPI_PARAM_PREFLIGHT) ||
+        (s_param_transaction.state == CAMERA_SPI_PARAM_ACTIVE) ||
+        (s_param_transaction.state == CAMERA_SPI_PARAM_ROLLBACK)) &&
+       ((s_param_transaction.command_mask & board_mask) != 0U))
+    {
+        transaction = s_param_transaction.transaction;
+        value_bits = s_param_transaction.value_bits;
+        if(s_param_transaction.state == CAMERA_SPI_PARAM_PREFLIGHT)
+        {
+            transaction ^= CAMERA_SPI_PARAM_PREFLIGHT_TXN_MASK;
+            value_bits = 0U;
+        }
+        else if(s_param_transaction.state == CAMERA_SPI_PARAM_ROLLBACK)
+        {
+            transaction ^= CAMERA_SPI_PARAM_ROLLBACK_TXN_MASK;
+            value_bits = s_param_transaction.previous_bits[board_id];
+        }
+        else if(s_param_transaction.op == IPC_REMOTE_PARAM_OP_SET)
+        {
+            s_param_transaction.set_sent_mask |= board_mask;
+        }
+
+        app[9] = CAMERA_SPI_PARAM_MAGIC;
+        app[10] = CAMERA_SPI_PARAM_VERSION;
+        app[11] = (s_param_transaction.state == CAMERA_SPI_PARAM_PREFLIGHT) ?
+                  IPC_REMOTE_PARAM_OP_GET :
+                  ((s_param_transaction.state == CAMERA_SPI_PARAM_ROLLBACK) ?
+                   IPC_REMOTE_PARAM_OP_SET : s_param_transaction.op);
+        app[12] = s_param_transaction.type;
+        camera_spi_write_u16_le(&app[13], s_param_transaction.param_id);
+        app[15] = ((s_param_transaction.command_due_mask & board_mask) != 0U) ?
+                  CAMERA_SPI_PARAM_ACK_REQUEST : 0U;
+        camera_spi_write_u32_le(&app[16], transaction);
+        camera_spi_write_u32_le(&app[20], value_bits);
+        if((s_param_transaction.command_due_mask & board_mask) != 0U)
+        {
+            s_param_transaction.command_due_mask &= (uint8)(~board_mask);
+            s_param_transaction.sent_command_mask |= board_mask;
+        }
+        return CAMERA_SPI_PARAM_APP_LEN;
+    }
+
+    return CAMERA_SPI_DOWNLINK_APP_LEN;
 }
 
 static void camera_spi_refresh_flight_state(void)
@@ -238,6 +341,7 @@ static void camera_spi_refresh_flight_state(void)
 static void camera_spi_build_request_frame(uint8 board_id)
 {
     uint16 crc;
+    uint16 app_len;
     uint8 *payload;
     camera_spi_board_state_t *board = &s_boards[board_id];
 
@@ -249,8 +353,8 @@ static void camera_spi_build_request_frame(uint8 board_id)
 
     payload = &s_tx_frame[5];
     camera_spi_write_u32_le(&payload[0], board->tx_sequence);
-    camera_spi_write_u16_le(&payload[4], CAMERA_SPI_DOWNLINK_APP_LEN);
-    camera_spi_build_downlink_app(board_id, &payload[6]);
+    app_len = camera_spi_build_downlink_app(board_id, &payload[6]);
+    camera_spi_write_u16_le(&payload[4], app_len);
 
     crc = camera_spi_crc16(&s_tx_frame[2], (uint16)(3U + CAMERA_SPI_REQ_PAYLOAD_SIZE));
     s_tx_frame[5U + CAMERA_SPI_REQ_PAYLOAD_SIZE] = (uint8)(crc & 0xFFU);
@@ -334,9 +438,74 @@ static void camera_spi_parse_image_payload(uint8 board_id, const uint8 *data)
     }
 }
 
+/* 解析2BL3主循环应用参数后生成的20字节ACK。 */
+static uint8 camera_spi_parse_param_ack(uint8 board_id, const uint8 *data)
+{
+    uint8 board_mask = (uint8)(1U << board_id);
+    uint32 expected_transaction;
+    uint32 transaction;
+    uint8 expected_op;
+    uint8 status;
+
+    if((data[0] != CAMERA_SPI_PARAM_MAGIC) ||
+       (data[1] != CAMERA_SPI_PARAM_ACK_MAGIC) ||
+       (data[2] != CAMERA_SPI_PARAM_VERSION))
+    {
+        return CAMERA_SPI_ERR_APP_LEN;
+    }
+
+    transaction = camera_spi_read_u32_le(&data[12]);
+    if((s_param_transaction.state != CAMERA_SPI_PARAM_PREFLIGHT) &&
+       (s_param_transaction.state != CAMERA_SPI_PARAM_ACTIVE) &&
+       (s_param_transaction.state != CAMERA_SPI_PARAM_ROLLBACK))
+    {
+        return CAMERA_SPI_ERR_OK;
+    }
+
+    expected_transaction = s_param_transaction.transaction;
+    expected_op = s_param_transaction.op;
+    if(s_param_transaction.state == CAMERA_SPI_PARAM_PREFLIGHT)
+    {
+        expected_transaction ^= CAMERA_SPI_PARAM_PREFLIGHT_TXN_MASK;
+        expected_op = IPC_REMOTE_PARAM_OP_GET;
+    }
+    else if(s_param_transaction.state == CAMERA_SPI_PARAM_ROLLBACK)
+    {
+        expected_transaction ^= CAMERA_SPI_PARAM_ROLLBACK_TXN_MASK;
+        expected_op = IPC_REMOTE_PARAM_OP_SET;
+    }
+    if(transaction != expected_transaction)
+    {
+        return CAMERA_SPI_ERR_OK;
+    }
+
+    if((data[3] != expected_op) ||
+       (data[5] != s_param_transaction.type) ||
+       (camera_spi_read_u16_le(&data[6]) != s_param_transaction.param_id) ||
+       (data[8] != board_id) ||
+       ((s_param_transaction.command_mask & board_mask) == 0U))
+    {
+        s_param_transaction.board_status[board_id] = IPC_REMOTE_PARAM_STATUS_ERROR;
+        s_param_transaction.actual_bits[board_id] = camera_spi_read_u32_le(&data[16]);
+        s_param_transaction.ack_mask |= board_mask;
+        return CAMERA_SPI_ERR_OK;
+    }
+
+    status = data[4];
+    if(status > IPC_REMOTE_PARAM_STATUS_ROLLBACK_FAIL)
+    {
+        status = IPC_REMOTE_PARAM_STATUS_ERROR;
+    }
+    s_param_transaction.board_status[board_id] = status;
+    s_param_transaction.actual_bits[board_id] = camera_spi_read_u32_le(&data[16]);
+    s_param_transaction.ack_mask |= board_mask;
+    return CAMERA_SPI_ERR_OK;
+}
+
 static uint8 camera_spi_parse_response(uint8 board_id)
 {
     uint16 payload_len;
+    uint16 app_len;
     uint16 crc_calc;
     uint16 crc_recv;
     const uint8 *payload;
@@ -376,22 +545,232 @@ static uint8 camera_spi_parse_response(uint8 board_id)
     }
 
     payload = &s_rx_frame[5];
-    if(camera_spi_read_u16_le(&payload[8]) != CAMERA_SPI_APP_DATA_CAPACITY)
-    {
-        return CAMERA_SPI_ERR_APP_LEN;
-    }
-
     board = &s_boards[board_id];
     board->rx_sequence = camera_spi_read_u32_le(&payload[0]);
     board->ack_sequence = camera_spi_read_u32_le(&payload[4]);
     board->flags = payload[10];
     board->peer_last_error = payload[11];
-    camera_spi_parse_image_payload(board_id, &payload[12]);
+    app_len = camera_spi_read_u16_le(&payload[8]);
+    if(app_len == CAMERA_SPI_PARAM_ACK_APP_LEN)
+    {
+        uint8 ack_error = camera_spi_parse_param_ack(board_id, &payload[12]);
+        if(ack_error != CAMERA_SPI_ERR_OK)
+        {
+            return ack_error;
+        }
+    }
+    else if(app_len == CAMERA_SPI_APP_DATA_CAPACITY)
+    {
+        camera_spi_parse_image_payload(board_id, &payload[12]);
+    }
+    else
+    {
+        return CAMERA_SPI_ERR_APP_LEN;
+    }
     board->online = 1U;
     board->last_error = CAMERA_SPI_ERR_OK;
     board->rx_ok_count++;
 
     return CAMERA_SPI_ERR_OK;
+}
+
+/* 将两板参数事务置为完成态，等待核1 IPC层读取。 */
+static void camera_spi_param_complete(uint8 status, uint32 actual_bits)
+{
+    s_param_transaction.final_status = status;
+    s_param_transaction.actual_bits[0] = actual_bits;
+    s_param_transaction.state = CAMERA_SPI_PARAM_COMPLETE;
+}
+
+/* 进入回滚态，向已成功或尚未确认写入结果的板发送各自真实旧值。 */
+static void camera_spi_param_start_rollback(uint8 board_mask)
+{
+    s_param_transaction.state = CAMERA_SPI_PARAM_ROLLBACK;
+    s_param_transaction.command_mask = board_mask;
+    s_param_transaction.command_due_mask = board_mask;
+    s_param_transaction.sent_command_mask = 0U;
+    s_param_transaction.ack_mask = 0U;
+    s_param_transaction.cycle_count = 0U;
+    s_param_transaction.board_status[0] = IPC_REMOTE_PARAM_STATUS_TIMEOUT;
+    s_param_transaction.board_status[1] = IPC_REMOTE_PARAM_STATUS_TIMEOUT;
+}
+
+/* 每轮两板SPI结束后汇总ACK，并在12个100Hz周期内完成或进入回滚。 */
+/* ACK_REQUEST按1、0交替；未收到ACK的板在下一轮重新置1。 */
+static void camera_spi_param_schedule_next(void)
+{
+    uint8 pending_mask;
+
+    if((s_param_transaction.state != CAMERA_SPI_PARAM_PREFLIGHT) &&
+       (s_param_transaction.state != CAMERA_SPI_PARAM_ACTIVE) &&
+       (s_param_transaction.state != CAMERA_SPI_PARAM_ROLLBACK))
+    {
+        return;
+    }
+
+    pending_mask = s_param_transaction.command_mask &
+                   (uint8)(~s_param_transaction.ack_mask);
+    s_param_transaction.command_due_mask |=
+        pending_mask & (uint8)(~s_param_transaction.sent_command_mask);
+}
+
+static void camera_spi_param_evaluate(void)
+{
+    uint8 required_mask;
+    uint8 success_mask = 0U;
+    uint8 board_id;
+
+    if((s_param_transaction.state != CAMERA_SPI_PARAM_PREFLIGHT) &&
+       (s_param_transaction.state != CAMERA_SPI_PARAM_ACTIVE) &&
+       (s_param_transaction.state != CAMERA_SPI_PARAM_ROLLBACK))
+    {
+        return;
+    }
+
+    required_mask = s_param_transaction.command_mask;
+    for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
+    {
+        uint8 board_mask = (uint8)(1U << board_id);
+        if(((required_mask & board_mask) != 0U) &&
+           ((s_param_transaction.ack_mask & board_mask) != 0U) &&
+           (s_param_transaction.board_status[board_id] == IPC_REMOTE_PARAM_STATUS_OK))
+        {
+            success_mask |= board_mask;
+        }
+    }
+
+    if((s_param_transaction.ack_mask & required_mask) == required_mask)
+    {
+        if(s_param_transaction.state == CAMERA_SPI_PARAM_ROLLBACK)
+        {
+            uint8 rollback_ok = (success_mask == required_mask) ? 1U : 0U;
+            for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
+            {
+                uint8 board_mask = (uint8)(1U << board_id);
+                if(((required_mask & board_mask) != 0U) &&
+                   (s_param_transaction.actual_bits[board_id] !=
+                    s_param_transaction.previous_bits[board_id]))
+                {
+                    rollback_ok = 0U;
+                }
+            }
+            camera_spi_param_complete((rollback_ok != 0U) ?
+                                      ((s_param_transaction.cancel_requested != 0U) ?
+                                       IPC_REMOTE_PARAM_STATUS_TIMEOUT :
+                                       IPC_REMOTE_PARAM_STATUS_PARTIAL) :
+                                      IPC_REMOTE_PARAM_STATUS_ROLLBACK_FAIL,
+                                      s_param_transaction.fallback_bits);
+            return;
+        }
+
+        if(s_param_transaction.state == CAMERA_SPI_PARAM_PREFLIGHT)
+        {
+            if(success_mask == 0x03U)
+            {
+                s_param_transaction.previous_bits[0] = s_param_transaction.actual_bits[0];
+                s_param_transaction.previous_bits[1] = s_param_transaction.actual_bits[1];
+                s_param_transaction.state = CAMERA_SPI_PARAM_ACTIVE;
+                s_param_transaction.command_mask = 0x03U;
+                s_param_transaction.command_due_mask = 0x03U;
+                s_param_transaction.sent_command_mask = 0U;
+                s_param_transaction.set_sent_mask = 0U;
+                s_param_transaction.ack_mask = 0U;
+                s_param_transaction.cycle_count = 0U;
+                s_param_transaction.board_status[0] = IPC_REMOTE_PARAM_STATUS_TIMEOUT;
+                s_param_transaction.board_status[1] = IPC_REMOTE_PARAM_STATUS_TIMEOUT;
+            }
+            else
+            {
+                uint8 status = (s_param_transaction.board_status[0] ==
+                                s_param_transaction.board_status[1]) ?
+                               s_param_transaction.board_status[0] :
+                               IPC_REMOTE_PARAM_STATUS_ERROR;
+                camera_spi_param_complete(status, s_param_transaction.fallback_bits);
+            }
+            return;
+        }
+
+        if(s_param_transaction.op == IPC_REMOTE_PARAM_OP_GET)
+        {
+            if(success_mask != 0x03U)
+            {
+                uint8 status = (s_param_transaction.board_status[0] ==
+                                s_param_transaction.board_status[1]) ?
+                               s_param_transaction.board_status[0] :
+                               IPC_REMOTE_PARAM_STATUS_ERROR;
+                camera_spi_param_complete(status, s_param_transaction.fallback_bits);
+            }
+            else if(s_param_transaction.actual_bits[0] != s_param_transaction.actual_bits[1])
+            {
+                camera_spi_param_complete(IPC_REMOTE_PARAM_STATUS_MISMATCH,
+                                          s_param_transaction.fallback_bits);
+            }
+            else
+            {
+                camera_spi_param_complete(IPC_REMOTE_PARAM_STATUS_OK,
+                                          s_param_transaction.actual_bits[0]);
+            }
+            return;
+        }
+
+        if((success_mask == 0x03U) &&
+           (s_param_transaction.actual_bits[0] == s_param_transaction.actual_bits[1]) &&
+           (s_param_transaction.actual_bits[0] == s_param_transaction.value_bits))
+        {
+            camera_spi_param_complete(IPC_REMOTE_PARAM_STATUS_OK,
+                                      s_param_transaction.actual_bits[0]);
+        }
+        else if(success_mask != 0U)
+        {
+            camera_spi_param_start_rollback(success_mask);
+        }
+        else
+        {
+            uint8 status = (s_param_transaction.board_status[0] ==
+                            s_param_transaction.board_status[1]) ?
+                           s_param_transaction.board_status[0] :
+                           IPC_REMOTE_PARAM_STATUS_ERROR;
+            camera_spi_param_complete(status, s_param_transaction.fallback_bits);
+        }
+        return;
+    }
+
+    s_param_transaction.cycle_count++;
+    if(s_param_transaction.cycle_count < CAMERA_SPI_PARAM_MAX_CYCLES)
+    {
+        return;
+    }
+
+    if(s_param_transaction.state == CAMERA_SPI_PARAM_PREFLIGHT)
+    {
+        camera_spi_param_complete(IPC_REMOTE_PARAM_STATUS_TIMEOUT,
+                                  s_param_transaction.fallback_bits);
+    }
+    else if(s_param_transaction.state == CAMERA_SPI_PARAM_ROLLBACK)
+    {
+        camera_spi_param_complete(IPC_REMOTE_PARAM_STATUS_ROLLBACK_FAIL,
+                                  s_param_transaction.fallback_bits);
+    }
+    else if(s_param_transaction.op == IPC_REMOTE_PARAM_OP_SET)
+    {
+        uint8 possible_write_mask = success_mask |
+            (s_param_transaction.command_mask &
+             (uint8)(~s_param_transaction.ack_mask));
+        if(possible_write_mask != 0U)
+        {
+            camera_spi_param_start_rollback(possible_write_mask);
+        }
+        else
+        {
+            camera_spi_param_complete(IPC_REMOTE_PARAM_STATUS_TIMEOUT,
+                                      s_param_transaction.fallback_bits);
+        }
+    }
+    else
+    {
+        camera_spi_param_complete(IPC_REMOTE_PARAM_STATUS_TIMEOUT,
+                                  s_param_transaction.fallback_bits);
+    }
 }
 
 static void camera_spi_irq_handler(void)
@@ -593,6 +972,9 @@ void CameraSpi_Init(void)
     memset(s_tx_frame, 0, sizeof(s_tx_frame));
     memset(s_rx_frame, 0, sizeof(s_rx_frame));
     memset(&s_spi_context, 0, sizeof(s_spi_context));
+    memset(&s_param_transaction, 0, sizeof(s_param_transaction));
+    memset(&s_param_rollback_cache, 0, sizeof(s_param_rollback_cache));
+    memset(&s_param_rollback_cache, 0, sizeof(s_param_rollback_cache));
     s_initialized = 0U;
     s_active = 0U;
     s_active_board = 0U;
@@ -638,11 +1020,14 @@ void CameraSpi_Update(void)
     camera_spi_refresh_flight_state();
     s_ready_mask = camera_spi_ready_mask();
     s_polled_mask = 0U;
+    s_param_transaction.sent_command_mask = 0U;
     for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
     {
         camera_spi_poll_board(board_id);
     }
 
+    camera_spi_param_schedule_next();
+    camera_spi_param_evaluate();
     camera_spi_publish_log();
 }
 
@@ -664,4 +1049,147 @@ void CameraSpi_GetSnapshot(struct image_data camera[IMAGE_CAMERA_COUNT])
         memcpy(camera[camera_id].beacon_data, state->beacons, sizeof(state->beacons));
         memcpy(camera[camera_id].car_lamp_data, state->car_lamps, sizeof(state->car_lamps));
     }
+}
+
+/* 启动同时发往两颗2BL3的SET/GET参数事务。 */
+uint8 CameraSpi_RemoteParamStart(uint8 op,
+                                 uint8 type,
+                                 uint16 param_id,
+                                 uint32 transaction,
+                                 uint32 value_bits,
+                                 uint32 previous_bits)
+{
+    if((s_initialized == 0U) ||
+       (s_param_transaction.state != CAMERA_SPI_PARAM_IDLE) ||
+       ((op != IPC_REMOTE_PARAM_OP_SET) && (op != IPC_REMOTE_PARAM_OP_GET)) ||
+       (type > IPC_REMOTE_PARAM_TYPE_INT32) ||
+       (param_id == 0U) ||
+       (transaction == 0U) ||
+       ((transaction & CAMERA_SPI_PARAM_ORIGINAL_TXN_MASK) != 0U))
+    {
+        return 0U;
+    }
+
+    s_param_rollback_cache.valid = 0U;
+    memset(&s_param_transaction, 0, sizeof(s_param_transaction));
+    s_param_transaction.state = (op == IPC_REMOTE_PARAM_OP_SET) ?
+                                CAMERA_SPI_PARAM_PREFLIGHT :
+                                CAMERA_SPI_PARAM_ACTIVE;
+    s_param_transaction.op = op;
+    s_param_transaction.type = type;
+    s_param_transaction.command_mask = 0x03U;
+    s_param_transaction.command_due_mask = 0x03U;
+    s_param_transaction.param_id = param_id;
+    s_param_transaction.transaction = transaction;
+    s_param_transaction.value_bits = value_bits;
+    s_param_transaction.fallback_bits = previous_bits;
+    s_param_transaction.previous_bits[0] = previous_bits;
+    s_param_transaction.previous_bits[1] = previous_bits;
+    s_param_transaction.board_status[0] = IPC_REMOTE_PARAM_STATUS_TIMEOUT;
+    s_param_transaction.board_status[1] = IPC_REMOTE_PARAM_STATUS_TIMEOUT;
+    return 1U;
+}
+
+/* 读取并消费两板参数事务最终结果。 */
+uint8 CameraSpi_RemoteParamTakeResult(camera_spi_remote_param_result_t *result)
+{
+    if((result == NULL) || (s_param_transaction.state != CAMERA_SPI_PARAM_COMPLETE))
+    {
+        return 0U;
+    }
+
+    result->transaction = s_param_transaction.transaction;
+    result->actual_bits = s_param_transaction.actual_bits[0];
+    result->param_id = s_param_transaction.param_id;
+    result->op = s_param_transaction.op;
+    result->type = s_param_transaction.type;
+    result->status = s_param_transaction.final_status;
+    if((s_param_transaction.op == IPC_REMOTE_PARAM_OP_SET) &&
+       (s_param_transaction.final_status == IPC_REMOTE_PARAM_STATUS_OK))
+    {
+        s_param_rollback_cache.valid = 1U;
+        s_param_rollback_cache.type = s_param_transaction.type;
+        s_param_rollback_cache.param_id = s_param_transaction.param_id;
+        s_param_rollback_cache.transaction = s_param_transaction.transaction;
+        s_param_rollback_cache.previous_bits[0] = s_param_transaction.previous_bits[0];
+        s_param_rollback_cache.previous_bits[1] = s_param_transaction.previous_bits[1];
+    }
+    memset(&s_param_transaction, 0, sizeof(s_param_transaction));
+    return 1U;
+}
+
+/* 取消指定事务；已经下发SET时必须先恢复两板各自的真实旧值。 */
+uint8 CameraSpi_RemoteParamCancel(uint32 transaction)
+{
+    uint8 rollback_mask;
+
+    if(transaction == 0U)
+    {
+        return 0U;
+    }
+
+    if(s_param_transaction.state == CAMERA_SPI_PARAM_IDLE)
+    {
+        if((s_param_rollback_cache.valid == 0U) ||
+           (s_param_rollback_cache.transaction != transaction))
+        {
+            return 0U;
+        }
+
+        memset(&s_param_transaction, 0, sizeof(s_param_transaction));
+        s_param_transaction.op = IPC_REMOTE_PARAM_OP_SET;
+        s_param_transaction.type = s_param_rollback_cache.type;
+        s_param_transaction.param_id = s_param_rollback_cache.param_id;
+        s_param_transaction.transaction = s_param_rollback_cache.transaction;
+        s_param_transaction.fallback_bits = s_param_rollback_cache.previous_bits[0];
+        s_param_transaction.previous_bits[0] = s_param_rollback_cache.previous_bits[0];
+        s_param_transaction.previous_bits[1] = s_param_rollback_cache.previous_bits[1];
+        s_param_transaction.cancel_requested = 1U;
+        s_param_rollback_cache.valid = 0U;
+        camera_spi_param_start_rollback(0x03U);
+        return 1U;
+    }
+
+    if(s_param_transaction.transaction != transaction)
+    {
+        return 0U;
+    }
+
+    if(s_param_transaction.state == CAMERA_SPI_PARAM_COMPLETE)
+    {
+        if((s_param_transaction.op == IPC_REMOTE_PARAM_OP_SET) &&
+           (s_param_transaction.final_status == IPC_REMOTE_PARAM_STATUS_OK))
+        {
+            s_param_transaction.cancel_requested = 1U;
+            camera_spi_param_start_rollback(0x03U);
+        }
+        return 1U;
+    }
+
+    if((s_param_transaction.state == CAMERA_SPI_PARAM_PREFLIGHT) ||
+       ((s_param_transaction.state == CAMERA_SPI_PARAM_ACTIVE) &&
+        (s_param_transaction.op == IPC_REMOTE_PARAM_OP_GET)))
+    {
+        camera_spi_param_complete(IPC_REMOTE_PARAM_STATUS_TIMEOUT,
+                                  s_param_transaction.fallback_bits);
+        return 1U;
+    }
+
+    s_param_transaction.cancel_requested = 1U;
+    if(s_param_transaction.state == CAMERA_SPI_PARAM_ROLLBACK)
+    {
+        return 1U;
+    }
+
+    rollback_mask = s_param_transaction.set_sent_mask;
+    if(rollback_mask == 0U)
+    {
+        camera_spi_param_complete(IPC_REMOTE_PARAM_STATUS_TIMEOUT,
+                                  s_param_transaction.fallback_bits);
+    }
+    else
+    {
+        camera_spi_param_start_rollback(rollback_mask);
+    }
+    return 1U;
 }

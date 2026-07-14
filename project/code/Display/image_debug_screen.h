@@ -1,0 +1,30 @@
+#ifndef IMAGE_DEBUG_SCREEN_H_
+#define IMAGE_DEBUG_SCREEN_H_
+
+#include "zf_common_typedef.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define IMAGE_DEBUG_SCREEN_MODE_DATA    (0U)
+#define IMAGE_DEBUG_SCREEN_MODE_RAW     (1U)
+#define IMAGE_DEBUG_SCREEN_MODE_BINARY  (2U)
+
+/* 只初始化软件状态；IPS114硬件在核0允许刷屏后延迟初始化。 */
+void ImageDebugScreen_Init(void);
+
+/* 主循环每消费一个10ms任务节拍调用一次，仅推进显示调度时钟。 */
+void ImageDebugScreen_Tick10ms(void);
+
+uint8 ImageDebugScreen_SetMode(uint8 mode);
+uint8 ImageDebugScreen_GetMode(void);
+
+/* 新帧到达时启动Raw/Binary显示，已启动帧分两个100Hz阶段完成。 */
+void ImageDebugScreen_Update(uint8 image_frame_updated);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* IMAGE_DEBUG_SCREEN_H_ */

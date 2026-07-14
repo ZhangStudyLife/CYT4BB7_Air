@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "zf_device_mt9v03x.h"
+#include "Display/image_debug_screen.h"
 
 #define BEACON_IMAGE_W 188
 #define BEACON_IMAGE_H 120
@@ -29,7 +30,6 @@ typedef struct
 #define BEACON_MIN_COMPONENT_AREA       10
 #define BEACON_MAX_COMPONENT_AREA       5000
 #define CAR_LAMP_BINARY_THRESHOLD       200
-#define BEACON_BINARY_THRESHOLD         120
 #define LAMP_MASK_PAD                   2
 #define LAMP_NEAR_BEACON_PAD            8
 #define LAMP_NEAR_BEACON_MIN_AREA       45
@@ -58,6 +58,10 @@ typedef struct
 #define CLOSE_MERGED_CORE_MIN_AREA      115
 #define CLOSE_MERGED_CORE_MAX_AREA      150
 #define CLOSE_MERGED_CORE_MIN_BBOX_W    16
+
+/* 核1信标二值化运行时阈值，车端远程设置后从下一帧开始使用。 */
+int32 g_image_down_beacon_binary_threshold = 120;
+static uint8 s_mt9v03x_initialized;
 #define CLOSE_MERGED_CORE_MIN_BBOX_H    14
 #define CAR_LAMP_MIN_AREA               24
 #define CAR_LAMP_MAX_AREA               1200
@@ -214,7 +218,7 @@ static void threshold_beacon_image(
                 (x < BEACON_SIDE_EDGE_MARGIN ||
                  x >= BEACON_IMAGE_W - BEACON_SIDE_EDGE_MARGIN)
                     ? BEACON_SIDE_EDGE_THRESHOLD
-                    : BEACON_BINARY_THRESHOLD;
+                    : (unsigned char)g_image_down_beacon_binary_threshold;
             g_binary[y][x] = (image[y][x] >= threshold) ? 255 : 0;
         }
     }
@@ -1518,7 +1522,7 @@ static unsigned char find_temporal_car_lamp(component_t *best_lamp)
     if (max_x >= BEACON_IMAGE_W) max_x = BEACON_IMAGE_W - 1;
     if (max_y >= BEACON_IMAGE_H) max_y = BEACON_IMAGE_H - 1;
 
-    threshold_image(g_current_image, BEACON_BINARY_THRESHOLD);
+    threshold_image(g_current_image, (unsigned char)g_image_down_beacon_binary_threshold);
     begin_visit_pass();
     for (y = (unsigned char)min_y; y <= (unsigned char)max_y; y++)
     {
@@ -1848,7 +1852,7 @@ void image_down_init(void)
     image_down_clear_results();
     beacon_image_init();
     mt9v03x_finish_flag = 0U;
-    (void)mt9v03x_init();
+    s_mt9v03x_initialized = (mt9v03x_init() == 0U) ? 1U : 0U;
 }
 
 uint8 image_down_update(void)
@@ -1868,4 +1872,131 @@ uint8 image_down_update(void)
 uint8 *image_down_get_frame_buffer(void)
 {
     return g_image_frame[0];
+}
+
+const uint8 *image_down_get_binary_buffer(void)
+{
+    return g_binary[0];
+}
+
+/*
+ * 函数功能: 在核1图像帧边界执行图像参数SET/GET，并返回实际读回值。
+ * 输入参数: op操作码；type数值类型；param_id参数ID；value_bits目标值位模式；actual_bits实际值位模式输出。
+ * 返回值: IPC_REMOTE_PARAM_STATUS_*统一状态码。
+ */
+uint8 image_down_remote_param_execute(uint8 op,
+                                      uint8 type,
+                                      uint16 param_id,
+                                      uint32 value_bits,
+                                      uint32 *actual_bits)
+{
+    int32 value;
+
+    if(actual_bits == NULL)
+    {
+        return IPC_REMOTE_PARAM_STATUS_ERROR;
+    }
+    if(type != IPC_REMOTE_PARAM_TYPE_INT32)
+    {
+        *actual_bits = 0U;
+        return IPC_REMOTE_PARAM_STATUS_NOT_FOUND;
+    }
+
+    if(param_id == IPC_REMOTE_PARAM_ID_BEACON_THRESHOLD)
+    {
+        if(op == IPC_REMOTE_PARAM_OP_SET)
+        {
+            value = (int32)value_bits;
+            if((value < 0) || (value > 255))
+            {
+                *actual_bits = (uint32)g_image_down_beacon_binary_threshold;
+                return IPC_REMOTE_PARAM_STATUS_OUT_OF_RANGE;
+            }
+            g_image_down_beacon_binary_threshold = value;
+        }
+        else if(op != IPC_REMOTE_PARAM_OP_GET)
+        {
+            *actual_bits = (uint32)g_image_down_beacon_binary_threshold;
+            return IPC_REMOTE_PARAM_STATUS_ERROR;
+        }
+
+        *actual_bits = (uint32)g_image_down_beacon_binary_threshold;
+        return IPC_REMOTE_PARAM_STATUS_OK;
+    }
+
+    if(param_id == IPC_REMOTE_PARAM_ID_EXP_TIME)
+    {
+        uint16 old_value = g_mt9v03x_exp_time;
+
+        if(op == IPC_REMOTE_PARAM_OP_SET)
+        {
+            value = (int32)value_bits;
+            if((value < 0) || (value > 636))
+            {
+                *actual_bits = (uint32)g_mt9v03x_exp_time;
+                return IPC_REMOTE_PARAM_STATUS_OUT_OF_RANGE;
+            }
+            if(((uint16)value == old_value) &&
+               (s_mt9v03x_initialized != 0U))
+            {
+                *actual_bits = (uint32)g_mt9v03x_exp_time;
+                return IPC_REMOTE_PARAM_STATUS_OK;
+            }
+
+            if(((uint16)value != old_value) ||
+               (s_mt9v03x_initialized == 0U))
+            {
+                g_mt9v03x_exp_time = (uint16)value;
+                s_mt9v03x_initialized = 0U;
+                if(mt9v03x_init() != 0U)
+                {
+                    g_mt9v03x_exp_time = old_value;
+                    if(mt9v03x_init() != 0U)
+                    {
+                        *actual_bits = (uint32)g_mt9v03x_exp_time;
+                        return IPC_REMOTE_PARAM_STATUS_ROLLBACK_FAIL;
+                    }
+                    s_mt9v03x_initialized = 1U;
+                    *actual_bits = (uint32)g_mt9v03x_exp_time;
+                    return IPC_REMOTE_PARAM_STATUS_ERROR;
+                }
+                s_mt9v03x_initialized = 1U;
+            }
+        }
+        else if(op != IPC_REMOTE_PARAM_OP_GET)
+        {
+            *actual_bits = (uint32)g_mt9v03x_exp_time;
+            return IPC_REMOTE_PARAM_STATUS_ERROR;
+        }
+
+        *actual_bits = (uint32)g_mt9v03x_exp_time;
+        return (s_mt9v03x_initialized != 0U) ?
+               IPC_REMOTE_PARAM_STATUS_OK : IPC_REMOTE_PARAM_STATUS_ERROR;
+    }
+
+    if(param_id == IPC_REMOTE_PARAM_ID_SCREEN_MODE)
+    {
+        if(op == IPC_REMOTE_PARAM_OP_SET)
+        {
+            value = (int32)value_bits;
+            if((value < (int32)IMAGE_DEBUG_SCREEN_MODE_DATA) ||
+               (value > (int32)IMAGE_DEBUG_SCREEN_MODE_BINARY))
+            {
+                *actual_bits = (uint32)ImageDebugScreen_GetMode();
+                return IPC_REMOTE_PARAM_STATUS_OUT_OF_RANGE;
+            }
+            (void)ImageDebugScreen_SetMode((uint8)value);
+        }
+        else if(op != IPC_REMOTE_PARAM_OP_GET)
+        {
+            *actual_bits = (uint32)ImageDebugScreen_GetMode();
+            return IPC_REMOTE_PARAM_STATUS_ERROR;
+        }
+
+        *actual_bits = (uint32)ImageDebugScreen_GetMode();
+        return IPC_REMOTE_PARAM_STATUS_OK;
+    }
+
+    *actual_bits = 0U;
+    return IPC_REMOTE_PARAM_STATUS_NOT_FOUND;
 }

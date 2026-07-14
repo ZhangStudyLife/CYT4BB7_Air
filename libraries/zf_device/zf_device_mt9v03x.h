@@ -79,8 +79,6 @@
                                                                                 // 一一一一一一   如果自动曝光开启  EXP_TIME命令设置自动曝光时间的上限
                                                                                 // 一一一一一一   一般情况是不需要开启自动曝光设置 如果遇到光线非常不均匀的情况可以尝试设置自动曝光，增加图像稳定性
 
-#define MT9V03X_EXP_TIME_DEF    ( 400 )                                         // 曝光时间设置   摄像头收到后会自动计算出最大曝光时间，如果设置过大则设置为计算出来的最大曝光值
-
 #define MT9V03X_FPS_DEF         ( 50 )                                         // 图像帧率设置   摄像头收到后会自动计算出最大FPS，如果过大则设置为计算出来的最大FPS
 
 #define MT9V03X_LR_OFFSET_DEF   ( 0   )                                         // 图像左右偏移   正值 右偏移   负值 左偏移  列为188 376 752时无法设置偏移
@@ -131,6 +129,7 @@ typedef enum
 
 extern vuint8   mt9v03x_finish_flag;                                            // 一场图像采集完成标志位
 extern uint8    mt9v03x_image[MT9V03X_H][MT9V03X_W];
+extern uint16   g_mt9v03x_exp_time;                                             // 运行时曝光时间，重新初始化摄像头后生效
 
 uint8       mt9v03x_set_exposure_time   (uint16 light);
 uint8       mt9v03x_init                (void);

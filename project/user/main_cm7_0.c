@@ -1,5 +1,6 @@
 #include "zf_common_headfile.h"
 #include "../code/Planner/beacon_lost_detector.h"
+#include "../code/Estimation/Pos_Est/FlowGyroDecoupler_LC302.h"
 
 volatile uint32 tick_1000us_cnt = 0U;
 volatile uint16 g_tick_1000HZ = 0U;
@@ -12,7 +13,9 @@ static uint8 div10 = 0U;
 static uint8 s_ipc_last_flying = 0xFFU;   /* 上一次成功通知给核1的飞行状态 */
 /* 上一次成功通知给核1的 2BL3 图传发送模式 */
 static uint8 s_ipc_last_image_send_enable = 0xFFU;
+static uint8 s_ipc_last_screen_refresh_enable = 0xFFU;
 static uint8 s_ipc_flying_retry_div = 0U; /* 飞行状态 IPC 通知失败后的 100Hz 重试分频 */
+static uint8 s_ipc_state_periodic_div = 0U;
 
 float g_car_vel_x = 0.0f; // 这个是车的速度 这个变量大于0 , 车往右
 float g_car_vel_y = 0.0f; // 这个是车的速度 这个变量大于0 , 车往前
@@ -20,6 +23,12 @@ float g_car_vel_y = 0.0f; // 这个是车的速度 这个变量大于0 , 车往�
 float g_car_yaw = 0.0f;          /* Car yaw angle, deg. */
 float g_car_sync_time_ms = 0.0f; /* Last car-side sync timestamp, unit: ms */
 
+/**
+ * @brief 接收并保存小车实时运行数据。
+ * @param data 小车发送的float数据数组。
+ * @param count 数组中的float数量，当前协议固定为11。
+ * @return 无。
+ */
 static void on_car_data(const float *data, uint8 count)
 {
     if (count == 11U)
@@ -57,6 +66,7 @@ int main(void)
     wifi_cal_imu_Init();
     Motor_Init();
     ipc_communicate_init(IPC_PORT_1, ipc_image_callback);
+    ipc_remote_param_core0_init();
     FC_START_CRSF_Init();
     air_comm_air_init();
     wifi_justfloat_SetStandbyContext((0U == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
@@ -164,7 +174,7 @@ int main(void)
             (void)CarPlan_Update(&car_plan);
             car_plan_send_valid = ((car_plan.valid != 0U) && (g_tof_fused_height_mm > 500.0f)) ? 1U : 0U;
 
-            float air_data[24];
+            float air_data[45];
             air_data[0] = g_tof_fused_height_mm;
             air_data[1] = g_euler.roll;
             air_data[2] = g_euler.pitch;
@@ -189,7 +199,24 @@ int main(void)
             air_data[21] = (float)car_plan.beacon_index;
             air_data[22] = car_plan.dist_px;
             air_data[23] = (float)BeaconLostDetector_GetFlag();
-            air_comm_send_run_data(air_data, 24);
+            air_data[24] = (float)CRSF_STD[8];
+            air_data[25] = g_tof1_height_mm;
+            air_data[26] = g_tof2_height_mm;
+            air_data[27] = g_tof3_height_mm;
+            air_data[28] = g_tof4_height_mm;
+            air_data[29] = (float)lc302_data.flow_x_integral;
+            air_data[30] = (float)lc302_data.flow_y_integral;
+            air_data[31] = FlowGyroDecoupler_LC302_GetDecX();
+            air_data[32] = FlowGyroDecoupler_LC302_GetDecY();
+            IMU_GetRawSampleForCalibration(&air_data[33], &air_data[34], &air_data[35],
+                                           &air_data[36], &air_data[37], &air_data[38]);
+            air_data[39] = g_imufilter_1000hz.gyrox;
+            air_data[40] = g_imufilter_1000hz.gyroy;
+            air_data[41] = g_imufilter_1000hz.gyroz;
+            air_data[42] = g_imufilter_1000hz.accx;
+            air_data[43] = g_imufilter_1000hz.accy;
+            air_data[44] = g_imufilter_1000hz.accz;
+            air_comm_send_run_data(air_data, 45U);
 
             // wifi_justfloat(image_data[Front].car_lamp_data[0].cx,
             //                 image_data[Front].car_lamp_data[0].cy,
@@ -209,22 +236,36 @@ int main(void)
             {
                 uint8 flying = (FC_START_CRSF_STATE_FLYING == FC_START_CRSF_Get_State()) ? 1U : 0U;
                 uint8 image_send_enable = g_2bl3_image_send_enable;
+                uint8 screen_refresh_enable =
+                    ((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) &&
+                     (0U == FC_START_CRSF_Is_Armed())) ? 1U : 0U;
 
                 if(image_send_enable > 2U)
                 {
                     image_send_enable = 0U;
                 }
 
-                if ((flying != s_ipc_last_flying) || (image_send_enable != s_ipc_last_image_send_enable))
+                if ((flying != s_ipc_last_flying) ||
+                    (image_send_enable != s_ipc_last_image_send_enable) ||
+                    (screen_refresh_enable != s_ipc_last_screen_refresh_enable) ||
+                    (0U == s_ipc_state_periodic_div))
                 {
                     if (0U == s_ipc_flying_retry_div)
                     {
-                        if (0U == ipc_flight_state_send(flying, image_send_enable))
+                        if (0U == ipc_flight_state_send(flying,
+                                                       image_send_enable,
+                                                       screen_refresh_enable))
                         {
                             s_ipc_last_flying = flying;
                             s_ipc_last_image_send_enable = image_send_enable;
+                            s_ipc_last_screen_refresh_enable = screen_refresh_enable;
+                            s_ipc_state_periodic_div = 100U;
+                            s_ipc_flying_retry_div = 0U;
                         }
-                        s_ipc_flying_retry_div = 10U;
+                        else
+                        {
+                            s_ipc_flying_retry_div = 10U;
+                        }
                     }
                     else
                     {
@@ -234,6 +275,7 @@ int main(void)
                 else
                 {
                     s_ipc_flying_retry_div = 0U;
+                    s_ipc_state_periodic_div--;
                 }
             }
             slot50 = div50;

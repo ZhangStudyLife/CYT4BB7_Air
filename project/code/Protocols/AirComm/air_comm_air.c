@@ -23,8 +23,8 @@
 #define AIR_COMM_DEFAULT_PARAM_COUNT         (128U)
 #define AIR_COMM_REMOTE_CANCEL_MS            (400U)
 #define AIR_COMM_REMOTE_TIMEOUT_MS           (700U)
-#define AIR_COMM_REMOTE_EXP_CANCEL_MS        (800U)
-#define AIR_COMM_REMOTE_EXP_TIMEOUT_MS       (1200U)
+#define AIR_COMM_REMOTE_EXP_CANCEL_MS        (1800U)
+#define AIR_COMM_REMOTE_EXP_TIMEOUT_MS       (2600U)
 #define AIR_COMM_PARAM_ACK_CACHE_MS          (1000U)
 #define AIR_COMM_PARAM_TARGET_LOCAL          (0U)
 #define AIR_COMM_COMMAND_TABLE_MAX           (8U)    /* 最多注册远程命令个数 */

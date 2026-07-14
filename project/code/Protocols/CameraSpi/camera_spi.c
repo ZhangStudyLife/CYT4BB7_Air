@@ -41,7 +41,7 @@
 #define CAMERA_SPI_PARAM_ACK_MAGIC          (0x3CU)
 #define CAMERA_SPI_PARAM_VERSION            (1U)
 #define CAMERA_SPI_PARAM_MAX_CYCLES         (12U)
-#define CAMERA_SPI_PARAM_EXP_MAX_CYCLES     (30U)
+#define CAMERA_SPI_PARAM_EXP_MAX_CYCLES     (80U)
 #define CAMERA_SPI_PARAM_PREFLIGHT_TXN_MASK (0x40000000UL)
 #define CAMERA_SPI_PARAM_ROLLBACK_TXN_MASK  (0x80000000UL)
 #define CAMERA_SPI_PARAM_ORIGINAL_TXN_MASK  (0xC0000000UL)
@@ -593,7 +593,7 @@ static void camera_spi_param_start_rollback(uint8 board_mask)
     s_param_transaction.board_status[1] = IPC_REMOTE_PARAM_STATUS_TIMEOUT;
 }
 
-/* 每轮两板SPI结束后汇总ACK，并在12个100Hz周期内完成或进入回滚。 */
+/* 每轮两板SPI结束后汇总ACK；普通参数等待12周期，曝光参数等待80周期。 */
 /* 未收到ACK的板每轮都请求ACK，避免从机主循环错过首个请求帧。 */
 static void camera_spi_param_schedule_next(void)
 {

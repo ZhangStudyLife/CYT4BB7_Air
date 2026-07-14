@@ -16,16 +16,19 @@ static uint8 s_ipc_flying_retry_div = 0U; /* 飞行状态 IPC 通知失败后的
 
 float g_car_vel_x = 0.0f; // 这个是车的速度 这个变量大于0 , 车往右
 float g_car_vel_y = 0.0f; // 这个是车的速度 这个变量大于0 , 车往前
-
+float g_car_yaw = 0.0f; /* Car yaw angle, unit: deg */
+float g_car_yaw_rate_dps = 0.0f; /* 10Hz low-pass car yaw rate, unit: deg/s */
 float g_car_sync_time_ms = 0.0f; /* Last car-side sync timestamp, unit: ms */
 
 static void on_car_data(const float *data, uint8 count)
 {
-    if (count == 11U)
+    if (count == 5U)
     {
         g_car_vel_x = data[0];
         g_car_vel_y = data[1];
-        g_car_sync_time_ms = data[10];
+        g_car_yaw = data[2];
+        g_car_yaw_rate_dps = data[3];
+        g_car_sync_time_ms = data[4];
     }
 }
 
@@ -162,32 +165,22 @@ int main(void)
             (void)CarPlan_Update(&car_plan);
             car_plan_send_valid = ((car_plan.valid != 0U) && (g_tof_fused_height_mm > 500.0f)) ? 1U : 0U;
 
-            float air_data[24];
-            air_data[0] = g_tof_fused_height_mm;
-            air_data[1] = g_euler.roll;
-            air_data[2] = g_euler.pitch;
-            air_data[3] = g_euler.yaw;
-            air_data[4] = Pos_Est_vel_x;
-            air_data[5] = Pos_Est_vel_y;
-            air_data[6] = (float)FC_START_CRSF_Get_State();
-            air_data[7] = (float)CRSF_STD[0];
-            air_data[8] = (float)CRSF_STD[1];
-            air_data[9] = (float)CRSF_STD[2];
-            air_data[10] = (float)CRSF_STD[3];
-            air_data[11] = (float)CRSF_STD[4];
-            air_data[12] = (float)CRSF_STD[5];
-            air_data[13] = (float)CRSF_STD[6];
-            air_data[14] = (float)CRSF_STD[7];
-            air_data[15] = yaw_angle_target;
-            air_data[16] = (float)tick_1000us_cnt;
-            air_data[17] = (float)car_plan_send_valid;
-            air_data[18] = (car_plan_send_valid != 0U) ? car_plan.target_strafe_mps : 0.0f;
-            air_data[19] = (car_plan_send_valid != 0U) ? car_plan.target_forward_mps : 0.0f;
-            air_data[20] = (float)car_plan.camera;
-            air_data[21] = (float)car_plan.beacon_index;
-            air_data[22] = car_plan.dist_px;
-            air_data[23] = (float)BeaconLostDetector_GetFlag();
-            air_comm_send_run_data(air_data, 24);
+            float air_data[14];
+            air_data[0] = (float)CRSF_STD[0];
+            air_data[1] = (float)CRSF_STD[1];
+            air_data[2] = (float)CRSF_STD[2];
+            air_data[3] = (float)CRSF_STD[3];
+            air_data[4] = (float)CRSF_STD[4];
+            air_data[5] = (float)CRSF_STD[5];
+            air_data[6] = (float)CRSF_STD[6];
+            air_data[7] = (float)CRSF_STD[7];
+            air_data[8] = (float)FC_START_CRSF_Get_State();
+            air_data[9] = yaw_angle_target;
+            air_data[10] = (float)car_plan_send_valid;
+            air_data[11] = (car_plan_send_valid != 0U) ? car_plan.target_strafe_mps : 0.0f;
+            air_data[12] = (car_plan_send_valid != 0U) ? car_plan.target_forward_mps : 0.0f;
+            air_data[13] = (float)BeaconLostDetector_GetFlag();
+            air_comm_send_run_data(air_data, 14);
 
             // wifi_justfloat(image_data[Front].car_lamp_data[0].cx,
             //                 image_data[Front].car_lamp_data[0].cy,

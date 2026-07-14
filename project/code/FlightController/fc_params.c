@@ -189,13 +189,13 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode8_kp_car_y = 65.0f;
 
     /* ===== Mode 2 image and velocity params ===== */
-    params->mode2_img_x_kp = 2.4f;
+    params->mode2_img_x_kp = 2.8f;
     params->mode2_img_x_ki = 0.0f;
     params->mode2_img_x_kd = 0.0f;
     params->mode2_img_x_kff = 0.0f;
     params->mode2_img_x_i_limit = 0.0f;
     params->mode2_img_x_d_lpf = 0.0f;
-    params->mode2_img_y_kp = 2.2f;
+    params->mode2_img_y_kp = 2.22747306f;
     params->mode2_img_y_ki = 0.0f;
     params->mode2_img_y_kd = 0.0f;
     params->mode2_img_y_kff = 0.0f;
@@ -207,14 +207,14 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode2_vel_x_kff = 0.008f;
     params->mode2_vel_x_i_limit = 3.0f;
     params->mode2_vel_x_d_lpf = 10.0f;
-    params->mode2_vel_y_kp = 0.2f;
-    params->mode2_vel_y_ki = 0.015f;
-    params->mode2_vel_y_kd = 0.0025f;
-    params->mode2_vel_y_kff = 0.006f;
+    params->mode2_vel_y_kp = 0.20588431f;
+    params->mode2_vel_y_ki = 0.01852211f;
+    params->mode2_vel_y_kd = 0.00347757f;
+    params->mode2_vel_y_kff = 0.00243343f;
     params->mode2_vel_y_i_limit = 3.0f;
     params->mode2_vel_y_d_lpf = 10.0f;
     params->mode2_kp_car_x = 50.0f;
-    params->mode2_kp_car_y = 65.0f;
+    params->mode2_kp_car_y = 86.0f;
 
     /* ===== Mode 5 image and velocity params ===== */
     params->mode5_img_x_kp = 2.2f;

@@ -4,6 +4,8 @@
 
 #define FC_START_CRSF_TASK_PERIOD_MS (100U)
 #define FC_START_CRSF_LANDING_HOLD_TICKS_100HZ (20U)
+#define FC_START_CRSF_LANDING_REQUEST_HOLD_TICKS_100HZ (50U) /* CRSF_STD[3]低位触发降落所需连续周期数 */
+#define FC_START_CRSF_LANDING_CH3_LOW_THR (-333) /* CRSF_STD[3]标准范围底部三分之一阈值 */
 #define FC_START_CRSF_LANDING_STOP_HEIGHT_MM (180.0f)
 #define FC_START_CRSF_TAKEOFF_PAIR1_RAMP_MS (800U)
 #define FC_START_CRSF_TAKEOFF_PAIR2_RAMP_MS (800U)
@@ -223,13 +225,13 @@ void FC_START_CRSF_Update(void)
 
 void FC_START_CRSF_UpdateLandingButton100Hz(void)
 {
-    if ((s_fc_start_state == FC_START_CRSF_STATE_FLYING) && (CRSF_STD[8] == 1))
+    if ((s_fc_start_state == FC_START_CRSF_STATE_FLYING) && (CRSF_STD[3] <= FC_START_CRSF_LANDING_CH3_LOW_THR))
     {
-        if (s_landing_button_tick < FC_START_CRSF_LANDING_HOLD_TICKS_100HZ)
+        if (s_landing_button_tick < FC_START_CRSF_LANDING_REQUEST_HOLD_TICKS_100HZ)
         {
             s_landing_button_tick++;
         }
-        if (s_landing_button_tick >= FC_START_CRSF_LANDING_HOLD_TICKS_100HZ)
+        if (s_landing_button_tick >= FC_START_CRSF_LANDING_REQUEST_HOLD_TICKS_100HZ)
         {
             FC_START_CRSF_Request_Landing();
         }

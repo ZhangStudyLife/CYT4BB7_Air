@@ -1772,6 +1772,12 @@
             <file>
                 <name>$PROJ_DIR$\..\..\code\Planner\ProjectionCenter.h</name>
             </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\pull_detect.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\pull_detect.h</name>
+            </file>
         </group>
         <group>
             <name>FlightController</name>

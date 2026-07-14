@@ -9,6 +9,8 @@
 
 extern float g_car_vel_x;
 extern float g_car_vel_y;
+extern float g_car_yaw;
+extern float g_car_sync_time_ms;
 
 pid_t g_mode2_imgx_pid; /* 模式2图像X轴位置环PID状态，供控制与调试访问。 */
 pid_t g_mode2_imgy_pid; /* 模式2图像Y轴位置环PID状态，供控制与调试访问。 */
@@ -27,32 +29,35 @@ static uint8_t s_mode2_yaw_index = 0U;
 static void FC_Mode2_UpdateImgYKp(float dt, uint8_t reset)
 {
     static float hold_time_s = 0.0f;
+    const float kp_base = g_fc_params.mode2_img_y_kp;
+    const float kp_max = 2.31948906f;
     float speed_y;
     float kp_target;
 
     if (reset != 0U)
     {
         hold_time_s = 0.0f;
-        g_mode2_imgy_pid.kp = 2.2f;
+        g_mode2_imgy_pid.kp = kp_base;
         return;
     }
 
     speed_y = fabsf(g_car_vel_y);
     if (speed_y <= 0.6f)
     {
-        kp_target = 2.2f;
+        kp_target = kp_base;
     }
     else if (speed_y < 1.4f)
     {
-        kp_target = 2.2f + (speed_y - 0.6f) * 0.25f;
+        kp_target = kp_base + (kp_max - kp_base) * 0.5f * (speed_y - 0.6f) / 0.8f;
     }
     else if (speed_y < 1.6f)
     {
-        kp_target = 2.4f + (speed_y - 1.4f);
+        kp_target = kp_base + (kp_max - kp_base) *
+                                  (0.5f + 0.5f * (speed_y - 1.4f) / 0.2f);
     }
     else
     {
-        kp_target = 2.6f;
+        kp_target = kp_max;
     }
 
     if (kp_target >= g_mode2_imgy_pid.kp)
@@ -215,7 +220,8 @@ void FC_Mode2_50Hz(float dt)
     }
 
     car_ff_x = g_car_vel_x * g_fc_params.mode2_kp_car_x;
-    car_ff_y = -g_car_vel_y * g_fc_params.mode2_kp_car_y;
+    car_ff_y = FC_Mode_Clamp(-g_car_vel_y * g_fc_params.mode2_kp_car_y,
+                             -87.670937f, 87.670937f);
     velx_sp = img_fb_x + car_ff_x;
     vely_sp = img_fb_y + car_ff_y;
     // wifi_justfloat(g_car_vel_x, g_car_vel_y,
@@ -326,6 +332,25 @@ void FC_Mode2_50Hz(float dt)
     //                yaw_angle_target,                       /* I37 */
     //                yaw_gyro_target,                        /* I38 */
     //                yaw_gyro_pid.output);                   /* I39 */
+    wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw,
+                   roll_angle_target, pitch_angle_target, yaw_angle_target,
+                   g_tof_fused_height_mm,g_height_fused_vz_mps,
+                   g_car_vel_x, g_car_vel_y,g_car_yaw,
+                   Pos_Est_vel_x, Pos_Est_vel_y,
+                   g_mode2_velx_target, g_mode2_vely_target,
+                   g_car_lamp_fused_distance_projectioncenter_2.x_cm,
+                   g_car_lamp_fused_distance_projectioncenter_2.y_cm,
+                   velx_ff, vely_ff,
+                   g_mode2_velx_pid.p_term, g_mode2_velx_pid.i_term,
+                   g_mode2_vely_pid.p_term, g_mode2_vely_pid.i_term,
+                   g_mode2_imgx_pid.p_term, g_mode2_imgx_pid.i_term,g_mode2_imgx_pid.d_term,
+                   g_mode2_imgy_pid.p_term, g_mode2_imgy_pid.i_term,g_mode2_imgy_pid.d_term,
+                   car_ff_x, car_ff_y,
+                   (float)g_car_lamp_fused_distance_projectioncenter_2.valid,
+                   g_mode2_imgy_pid.kp,
+                   g_mode2_velx_pid.d_term, g_mode2_vely_pid.d_term,
+                   g_car_sync_time_ms
+                   );
 }
 
 float FC_Mode2_Get_Fixed_Height_M(void)

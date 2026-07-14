@@ -7,6 +7,7 @@
 #include "../Planner/car_lamp_fused.h"
 #include "../Planner/pix_to_distance.h"
 #include "../Planner/ProjectionCenter.h"
+#include "../Planner/pull_detect.h"
 #include "../Protocols/AirComm/air_comm_air.h"
 #include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
 
@@ -284,6 +285,7 @@ void FC_Loop_Init(void)
     CarLampFused_Init();
     PixToDistance_Init();
     ProjectionCenter_Init();
+    PullDetect_Init();
     s_hover_throttle = (float)g_fc_params.base_throttle;
 }
 
@@ -307,6 +309,7 @@ void FC_Loop_Reset(void)
     CarLampFused_Init();
     PixToDistance_Init();
     ProjectionCenter_Init();
+    PullDetect_Init();
     roll_gyro_target = 0.0f;
     pitch_gyro_target = 0.0f;
     yaw_gyro_target = 0.0f;
@@ -365,6 +368,16 @@ void FC_Loop_50Hz(void)
     CarLampFused_Update50Hz();
     ProjectionCenter_Update();
     PixToDistance_Update_ProjectionCenter_2();
+    if ((fc_state == FC_START_CRSF_STATE_FLYING) || (fc_state == FC_START_CRSF_STATE_LANDING))
+    {
+        PullDetect_Update(g_car_lamp_fused_distance_projectioncenter_2.valid,
+                          g_car_lamp_fused_distance_projectioncenter_2.x_cm,
+                          g_car_lamp_fused_distance_projectioncenter_2.y_cm);
+    }
+    else
+    {
+        PullDetect_Init();
+    }
 
     switch (s_flight_mode)
     {
@@ -409,26 +422,26 @@ void FC_Loop_50Hz(void)
         break;
     }
 
-    wifi_justfloat(
-        g_car_lamp_fused_distance_projectioncenter_2.x_cm,
-        g_car_lamp_fused_distance_projectioncenter_2.y_cm,
-        g_mode8_imgx_pid.p_term, g_mode8_imgx_pid.i_term,
-        g_mode8_imgx_pid.d_term, g_mode8_imgx_pid.output,
-        g_mode8_imgy_pid.p_term, g_mode8_imgy_pid.i_term,
-        g_mode8_imgy_pid.d_term, g_mode8_imgy_pid.output,
-        g_car_vel_x, g_car_vel_y,
-        g_car_vel_x * g_fc_params.mode8_kp_car_x,
-        -g_car_vel_y * g_fc_params.mode8_kp_car_y,
-        fc_clampf(g_mode8_imgx_pid.output, -FC_MODE_IMAGE_VEL_LIMIT_CMPS, FC_MODE_IMAGE_VEL_LIMIT_CMPS),
-        fc_clampf(g_mode8_imgy_pid.output, -FC_MODE_IMAGE_VEL_LIMIT_CMPS, FC_MODE_IMAGE_VEL_LIMIT_CMPS),
-        g_mode8_velx_target, g_mode8_vely_target,
-        Pos_Est_vel_x, Pos_Est_vel_y,
-        roll_angle_target, pitch_angle_target, yaw_angle_target,
-        g_euler.roll, g_euler.pitch, g_euler.yaw,
-        g_tof_fused_height_mm,
-        (float)g_car_lamp_fused_distance_projectioncenter_2.valid,
-        (float)g_tof_fused_valid,
-        g_car_sync_time_ms);
+    // wifi_justfloat(
+    //     g_car_lamp_fused_distance_projectioncenter_2.x_cm,
+    //     g_car_lamp_fused_distance_projectioncenter_2.y_cm,
+    //     g_mode8_imgx_pid.p_term, g_mode8_imgx_pid.i_term,
+    //     g_mode8_imgx_pid.d_term, g_mode8_imgx_pid.output,
+    //     g_mode8_imgy_pid.p_term, g_mode8_imgy_pid.i_term,
+    //     g_mode8_imgy_pid.d_term, g_mode8_imgy_pid.output,
+    //     g_car_vel_x, g_car_vel_y,
+    //     g_car_vel_x * g_fc_params.mode8_kp_car_x,
+    //     -g_car_vel_y * g_fc_params.mode8_kp_car_y,
+    //     fc_clampf(g_mode8_imgx_pid.output, -FC_MODE_IMAGE_VEL_LIMIT_CMPS, FC_MODE_IMAGE_VEL_LIMIT_CMPS),
+    //     fc_clampf(g_mode8_imgy_pid.output, -FC_MODE_IMAGE_VEL_LIMIT_CMPS, FC_MODE_IMAGE_VEL_LIMIT_CMPS),
+    //     g_mode8_velx_target, g_mode8_vely_target,
+    //     Pos_Est_vel_x, Pos_Est_vel_y,
+    //     roll_angle_target, pitch_angle_target, yaw_angle_target,
+    //     g_euler.roll, g_euler.pitch, g_euler.yaw,
+    //     g_tof_fused_height_mm,
+    //     (float)g_car_lamp_fused_distance_projectioncenter_2.valid,
+    //     (float)g_tof_fused_valid,
+    //     g_car_sync_time_ms);
 }
 
 /*
@@ -644,11 +657,14 @@ void FC_Loop_100Hz(void)
     //                     g_euler.pitch,                              /* I34 */
     //                     g_euler.roll,                               /* I35 */
     //                     g_euler.yaw,                                /* I36 */
-    //                     g_car_sync_time_ms                         /* I37 */
+    //                     g_car_sync_time_ms,                         /* I37 */
     //                     // g_car_lamp_fused.cx,                        /* I38 */
     //                     // g_car_lamp_fused.cy,                        /* I39 */
-    //                     // g_car_lamp_fused_distance_projectioncenter_2.x_cm,
-    //                     // g_car_lamp_fused_distance_projectioncenter_2.y_cm
+    //                     g_car_lamp_fused_distance_projectioncenter_2.x_cm,
+    //                     g_car_lamp_fused_distance_projectioncenter_2.y_cm
+    //                     // g_tof_fused_height_mm,
+    //                     // g_height_fused_vz_mps,
+    //                     // CRSF_STD[8]
     //                     );
 
     // wifi_justfloat(g_car_lamp_fused.cx,                               /* I1 */
@@ -664,6 +680,40 @@ void FC_Loop_100Hz(void)
     //                g_euler.yaw,                                       /* I7 */
     //                lc302_data.flow_x_integral,
     //                lc302_data.flow_y_integral);
+
+    //    wifi_justfloat(  image_data[Front].car_lamp_data[0].cx,       /* I19 */
+    //                     image_data[Front].car_lamp_data[0].cy,       /* I20 */
+    //                     image_data[Front].car_lamp_data[0].angle,    /* I21 */
+    //                     image_data[Front].car_lamp_data[0].width,    /* I22 */
+    //                     image_data[Front].car_lamp_data[0].length,   /* I23 */
+    //                     image_data[Center].car_lamp_data[0].cx,      /* I24 */
+    //                     image_data[Center].car_lamp_data[0].cy,      /* I25 */
+    //                     image_data[Center].car_lamp_data[0].angle,   /* I26 */
+    //                     image_data[Center].car_lamp_data[0].width,   /* I27 */
+    //                     image_data[Center].car_lamp_data[0].length,  /* I28 */
+    //                     image_data[Back].car_lamp_data[0].cx,        /* I29 */
+    //                     image_data[Back].car_lamp_data[0].cy,        /* I30 */
+    //                     image_data[Back].car_lamp_data[0].angle,     /* I31 */
+    //                     image_data[Back].car_lamp_data[0].width,     /* I32 */
+    //                     image_data[Back].car_lamp_data[0].length,    /* I33 */
+    //                     g_euler.pitch,                              /* I34 */
+    //                     g_euler.roll,                               /* I35 */
+    //                     g_euler.yaw,                                /* I36 */
+    //                     g_car_sync_time_ms,                         /* I37 */
+    //                     // g_car_lamp_fused.cx,                        /* I38 */
+    //                     // g_car_lamp_fused.cy,                        /* I39 */
+    //                     g_car_lamp_fused_distance_projectioncenter_2.x_cm,
+    //                     g_car_lamp_fused_distance_projectioncenter_2.y_cm,
+    //                     g_tof_fused_height_mm,
+    //                     g_height_fused_vz_mps,
+    //                     Pos_Est_vel_x, Pos_Est_vel_y,
+    //                     g_car_vel_x, g_car_vel_y,
+    //                     CRSF_STD[8],
+    //                     g_pull_detect_result.danger
+    //                     );
+
+
+
 
 
 }

@@ -17,6 +17,7 @@ static uint8 s_ipc_flying_retry_div = 0U; /* 飞行状态 IPC 通知失败后的
 float g_car_vel_x = 0.0f; // 这个是车的速度 这个变量大于0 , 车往右
 float g_car_vel_y = 0.0f; // 这个是车的速度 这个变量大于0 , 车往前
 
+float g_car_yaw = 0.0f;          /* Car yaw angle, deg. */
 float g_car_sync_time_ms = 0.0f; /* Last car-side sync timestamp, unit: ms */
 
 static void on_car_data(const float *data, uint8 count)
@@ -25,6 +26,7 @@ static void on_car_data(const float *data, uint8 count)
     {
         g_car_vel_x = data[0];
         g_car_vel_y = data[1];
+        g_car_yaw = data[3];
         g_car_sync_time_ms = data[10];
     }
 }

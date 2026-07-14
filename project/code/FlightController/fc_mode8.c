@@ -30,32 +30,35 @@ static uint8_t s_mode8_yaw_index = 0U;
 static void FC_Mode8_UpdateImgYKp(float dt, uint8_t reset)
 {
     static float hold_time_s = 0.0f;
+    const float kp_base = g_fc_params.mode8_img_y_kp;
+    const float kp_max = 2.31948906f;
     float speed_y;
     float kp_target;
 
     if (reset != 0U)
     {
         hold_time_s = 0.0f;
-        g_mode8_imgy_pid.kp = 2.2f;
+        g_mode8_imgy_pid.kp = kp_base;
         return;
     }
 
     speed_y = fabsf(g_car_vel_y);
     if (speed_y <= 0.6f)
     {
-        kp_target = 2.2f;
+        kp_target = kp_base;
     }
     else if (speed_y < 1.4f)
     {
-        kp_target = 2.2f + (speed_y - 0.6f) * 0.25f;
+        kp_target = kp_base + (kp_max - kp_base) * 0.5f * (speed_y - 0.6f) / 0.8f;
     }
     else if (speed_y < 1.6f)
     {
-        kp_target = 2.4f + (speed_y - 1.4f);
+        kp_target = kp_base + (kp_max - kp_base) *
+                                  (0.5f + 0.5f * (speed_y - 1.4f) / 0.2f);
     }
     else
     {
-        kp_target = 2.6f;
+        kp_target = kp_max;
     }
 
     if (kp_target >= g_mode8_imgy_pid.kp)
@@ -253,7 +256,8 @@ void FC_Mode8_50Hz(float dt)
     }
 
     car_ff_x = g_car_vel_x * g_fc_params.mode8_kp_car_x;
-    car_ff_y = -g_car_vel_y * g_fc_params.mode8_kp_car_y;
+    car_ff_y = FC_Mode_Clamp(-g_car_vel_y * g_fc_params.mode8_kp_car_y,
+                             -87.670937f, 87.670937f);
     velx_sp = img_fb_x + car_ff_x;
     vely_sp = img_fb_y + car_ff_y;
     // wifi_justfloat(g_car_vel_x, g_car_vel_y,

@@ -19,8 +19,8 @@
 #define AIR_COMM_FRAME_OVERHEAD              (9U)    /* 帧开销：4帧头 + type + seq + len + 2crc */
 #define AIR_COMM_MAX_FRAME                   (AIR_COMM_MAX_PAYLOAD + AIR_COMM_FRAME_OVERHEAD)
 #define AIR_COMM_RX_QUEUE_SIZE               (512U)  /* 接收环形队列大小（字节） */
-#define AIR_COMM_PARAM_TABLE_MAX             (128U)  /* 最多注册参数个数 */
-#define AIR_COMM_DEFAULT_PARAM_COUNT         (128U)
+#define AIR_COMM_PARAM_TABLE_MAX             (156U)  /* 最多注册参数个数 */
+#define AIR_COMM_DEFAULT_PARAM_COUNT         (156U)
 #define AIR_COMM_REMOTE_CANCEL_MS            (400U)
 #define AIR_COMM_REMOTE_TIMEOUT_MS           (700U)
 #define AIR_COMM_REMOTE_EXP_CANCEL_MS        (1800U)
@@ -155,6 +155,7 @@ static uint8 s_air_comm_seq = 0U;               /* 发送帧序列号，每发�
 static uint32 s_air_comm_tick_ms = 0U;          /* 1ms 累加计数器 */
 static uint32 s_air_comm_last_heartbeat_ms = 0U; /* 上次发心跳的 tick */
 static uint32 s_air_comm_last_car_ms = 0U;      /* 上次收到小车心跳的 tick */
+static uint32 s_air_comm_last_run_data_ms = 0U; /* 上次收到小车运行数据的 tick，单位 ms */
 
 static air_comm_air_rx_parser_t s_air_comm_rx;          /* 接收解析器 */
 static air_comm_air_rx_queue_t s_air_comm_rx_queue;     /* 接收环形队列 */
@@ -1189,6 +1190,7 @@ static void air_comm_handle_run_data(const uint8 *payload, uint8 len)
     }
     s_air_comm_last_run_data_count = count;
     s_air_comm_last_run_data_valid = 1U;
+    s_air_comm_last_run_data_ms = s_air_comm_tick_ms;
 
     if(s_air_comm_run_data_callback != NULL)
     {
@@ -1452,6 +1454,7 @@ void air_comm_air_init(void)
     s_air_comm_tick_ms = 0U;
     s_air_comm_last_heartbeat_ms = 0U;
     s_air_comm_last_car_ms = 0U;
+    s_air_comm_last_run_data_ms = 0U;
     s_air_comm_run_data_callback = NULL;
     s_air_comm_active_command = NULL;
     s_air_comm_last_run_data_count = 0U;
@@ -1649,6 +1652,35 @@ void air_comm_air_init(void)
         s_air_comm_registration_ok = 0U;
     }
 
+    AIR_COMM_REGISTER_FLOAT(mode2_img_x_kp, g_fc_params.mode2_img_x_kp, 1.0f, 4.5f);
+    AIR_COMM_REGISTER_FLOAT(mode2_img_x_ki, g_fc_params.mode2_img_x_ki, 0.0f, 0.05f);
+    AIR_COMM_REGISTER_FLOAT(mode2_img_x_kd, g_fc_params.mode2_img_x_kd, 0.0f, 0.25f);
+    AIR_COMM_REGISTER_FLOAT(mode2_img_x_kff, g_fc_params.mode2_img_x_kff, 0.0f, 0.05f);
+    AIR_COMM_REGISTER_FLOAT(mode2_img_x_i_limit, g_fc_params.mode2_img_x_i_limit, 0.0f, 20.0f);
+    AIR_COMM_REGISTER_FLOAT(mode2_img_x_d_lpf, g_fc_params.mode2_img_x_d_lpf, 0.0f, 20.0f);
+    AIR_COMM_REGISTER_FLOAT(mode2_img_y_kp, g_fc_params.mode2_img_y_kp, 1.0f, 4.0f);
+    AIR_COMM_REGISTER_FLOAT(mode2_img_y_kp_max, g_fc_params.mode2_img_y_kp_max, 1.0f, 4.5f);
+    AIR_COMM_REGISTER_FLOAT(mode2_img_y_ki, g_fc_params.mode2_img_y_ki, 0.0f, 0.05f);
+    AIR_COMM_REGISTER_FLOAT(mode2_img_y_kd, g_fc_params.mode2_img_y_kd, 0.0f, 0.25f);
+    AIR_COMM_REGISTER_FLOAT(mode2_img_y_kff, g_fc_params.mode2_img_y_kff, 0.0f, 0.05f);
+    AIR_COMM_REGISTER_FLOAT(mode2_img_y_i_limit, g_fc_params.mode2_img_y_i_limit, 0.0f, 20.0f);
+    AIR_COMM_REGISTER_FLOAT(mode2_img_y_d_lpf, g_fc_params.mode2_img_y_d_lpf, 0.0f, 20.0f);
+    AIR_COMM_REGISTER_FLOAT(mode2_vel_x_kp, g_fc_params.mode2_vel_x_kp, 0.08f, 0.35f);
+    AIR_COMM_REGISTER_FLOAT(mode2_vel_x_ki, g_fc_params.mode2_vel_x_ki, 0.0f, 0.06f);
+    AIR_COMM_REGISTER_FLOAT(mode2_vel_x_kd, g_fc_params.mode2_vel_x_kd, 0.0f, 0.008f);
+    AIR_COMM_REGISTER_FLOAT(mode2_vel_x_kff, g_fc_params.mode2_vel_x_kff, 0.0f, 0.05f);
+    AIR_COMM_REGISTER_FLOAT(mode2_vel_x_i_limit, g_fc_params.mode2_vel_x_i_limit, 0.0f, 20.0f);
+    AIR_COMM_REGISTER_FLOAT(mode2_vel_x_d_lpf, g_fc_params.mode2_vel_x_d_lpf, 0.0f, 30.0f);
+    AIR_COMM_REGISTER_FLOAT(mode2_vel_y_kp, g_fc_params.mode2_vel_y_kp, 0.08f, 0.35f);
+    AIR_COMM_REGISTER_FLOAT(mode2_vel_y_ki, g_fc_params.mode2_vel_y_ki, 0.0f, 0.06f);
+    AIR_COMM_REGISTER_FLOAT(mode2_vel_y_kd, g_fc_params.mode2_vel_y_kd, 0.0f, 0.008f);
+    AIR_COMM_REGISTER_FLOAT(mode2_vel_y_kff, g_fc_params.mode2_vel_y_kff, 0.0f, 0.05f);
+    AIR_COMM_REGISTER_FLOAT(mode2_vel_y_i_limit, g_fc_params.mode2_vel_y_i_limit, 0.0f, 20.0f);
+    AIR_COMM_REGISTER_FLOAT(mode2_vel_y_d_lpf, g_fc_params.mode2_vel_y_d_lpf, 0.0f, 30.0f);
+    AIR_COMM_REGISTER_FLOAT(mode2_kp_car_x, g_fc_params.mode2_kp_car_x, 0.0f, 100.0f);
+    AIR_COMM_REGISTER_FLOAT(mode2_kp_car_y, g_fc_params.mode2_kp_car_y, 60.0f, 100.0f);
+    AIR_COMM_REGISTER_FLOAT(mode2_car_ff_y_limit_cmps, g_fc_params.mode2_car_ff_y_limit_cmps, 50.0f, 140.0f);
+
     if((s_air_comm_param_count != AIR_COMM_DEFAULT_PARAM_COUNT) ||
        (air_comm_register_default_commands() == 0U))
     {
@@ -1800,6 +1832,17 @@ void air_comm_air_rx_byte(uint8 byte)
 uint8 air_comm_air_is_car_online(void)
 {
     return (s_air_comm_stats.online_status == 1U) ? 1U : 0U;
+}
+
+/**
+ * @brief 查询小车运行数据是否仍在指定超时范围内。
+ * @param timeout_ms 最大允许未更新时间，单位 ms。
+ * @return 1 表示运行数据有效且未超时，0 表示从未收到或已经超时。
+ */
+uint8 air_comm_air_is_run_data_fresh(uint32 timeout_ms)
+{
+    return ((s_air_comm_last_run_data_valid != 0U) &&
+            ((s_air_comm_tick_ms - s_air_comm_last_run_data_ms) <= timeout_ms)) ? 1U : 0U;
 }
 
 /*

@@ -3,7 +3,7 @@
 
 #include "zf_common_headfile.h"
 
-#define CAR_PLAN_SPEED_MPS                 (1.5f)
+#define CAR_PLAN_SPEED_MPS                 (1.2f)
 #define CAR_PLAN_LOCK_SWITCH_MARGIN_PX     (25.0f)
 #define CAR_PLAN_LOCK_LOST_HOLD_TICKS      (30U)
 

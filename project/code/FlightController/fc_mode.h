@@ -40,6 +40,8 @@
 #define FC_MODE_XY_ANGLE_LIMIT_DEG (30.0f)
 /* 水平速度前馈一阶低通系数：50 Hz 更新、10 Hz 截止。 */
 #define FC_MODE_VEL_KFF_LPF_ALPHA (0.672624f)
+/* 小车运行数据用于 yaw 坐标转换的最大未更新时间，单位 ms。 */
+#define FC_MODE_CAR_RUN_DATA_TIMEOUT_MS (200U)
 /* 模式7摇杆满量程对应的最大水平目标速度，单位 cm/s。 */
 #define FC_MODE7_VEL_LIMIT_CMPS (250.0f)
 /* 模式7归一化摇杆死区。 */

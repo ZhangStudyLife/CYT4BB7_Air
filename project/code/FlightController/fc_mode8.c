@@ -10,6 +10,7 @@
 
 extern float g_car_vel_x;
 extern float g_car_vel_y;
+extern float g_car_yaw;
 
 pid_t g_mode8_imgx_pid; /* 模式8图像X轴位置环PID状态，供控制与调试访问。 */
 pid_t g_mode8_imgy_pid; /* 模式8图像Y轴位置环PID状态，供控制与调试访问。 */
@@ -209,6 +210,8 @@ void FC_Mode8_50Hz(float dt)
     float pitch_trim;
     float car_ff_x = 0.0f;
     float car_ff_y = 0.0f;
+    float car_vel_right;
+    float car_vel_forward;
     uint8_t fused_lamp_valid;
     uint8_t tof_height_valid;
     uint8_t yaw_align_active;
@@ -255,8 +258,21 @@ void FC_Mode8_50Hz(float dt)
         PID_Reset(&g_mode8_imgy_pid);
     }
 
-    car_ff_x = g_car_vel_x * g_fc_params.mode8_kp_car_x;
-    car_ff_y = FC_Mode_Clamp(-g_car_vel_y * g_fc_params.mode8_kp_car_y,
+    car_vel_right = g_car_vel_x;
+    car_vel_forward = g_car_vel_y;
+    if (air_comm_air_is_run_data_fresh(FC_MODE_CAR_RUN_DATA_TIMEOUT_MS) != 0U)
+    {
+        float yaw_delta_rad = (g_car_yaw - g_euler.yaw) * 0.01745329252f;
+        float yaw_cos = cosf(yaw_delta_rad);
+        float yaw_sin = sinf(yaw_delta_rad);
+
+        /* 将车体右前速度旋转到飞机当前体坐标系。 */
+        car_vel_right = g_car_vel_x * yaw_cos + g_car_vel_y * yaw_sin;
+        car_vel_forward = g_car_vel_y * yaw_cos - g_car_vel_x * yaw_sin;
+    }
+
+    car_ff_x = car_vel_right * g_fc_params.mode8_kp_car_x;
+    car_ff_y = FC_Mode_Clamp(-car_vel_forward * g_fc_params.mode8_kp_car_y,
                              -87.670937f, 87.670937f);
     velx_sp = img_fb_x + car_ff_x;
     vely_sp = img_fb_y + car_ff_y;

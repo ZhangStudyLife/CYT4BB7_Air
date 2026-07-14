@@ -30,7 +30,7 @@ static void FC_Mode2_UpdateImgYKp(float dt, uint8_t reset)
 {
     static float hold_time_s = 0.0f;
     const float kp_base = g_fc_params.mode2_img_y_kp;
-    const float kp_max = 2.31948906f;
+    const float kp_max = (g_fc_params.mode2_img_y_kp_max > kp_base) ? g_fc_params.mode2_img_y_kp_max : kp_base;
     float speed_y;
     float kp_target;
 
@@ -175,6 +175,8 @@ void FC_Mode2_50Hz(float dt)
     float pitch_trim;
     float car_ff_x = 0.0f;
     float car_ff_y = 0.0f;
+    float car_vel_right;
+    float car_vel_forward;
     uint8_t fused_lamp_valid;
     uint8_t tof_height_valid;
     uint8_t yaw_align_active;
@@ -219,9 +221,23 @@ void FC_Mode2_50Hz(float dt)
         PID_Reset(&g_mode2_imgy_pid);
     }
 
-    car_ff_x = g_car_vel_x * g_fc_params.mode2_kp_car_x;
-    car_ff_y = FC_Mode_Clamp(-g_car_vel_y * g_fc_params.mode2_kp_car_y,
-                             -87.670937f, 87.670937f);
+    car_vel_right = g_car_vel_x;
+    car_vel_forward = g_car_vel_y;
+    if (air_comm_air_is_run_data_fresh(FC_MODE_CAR_RUN_DATA_TIMEOUT_MS) != 0U)
+    {
+        float yaw_delta_rad = (g_car_yaw - g_euler.yaw) * 0.01745329252f;
+        float yaw_cos = cosf(yaw_delta_rad);
+        float yaw_sin = sinf(yaw_delta_rad);
+
+        /* 将车体右前速度旋转到飞机当前体坐标系。 */
+        car_vel_right = g_car_vel_x * yaw_cos + g_car_vel_y * yaw_sin;
+        car_vel_forward = g_car_vel_y * yaw_cos - g_car_vel_x * yaw_sin;
+    }
+
+    car_ff_x = car_vel_right * g_fc_params.mode2_kp_car_x;
+    car_ff_y = FC_Mode_Clamp(-car_vel_forward * g_fc_params.mode2_kp_car_y,
+                             -g_fc_params.mode2_car_ff_y_limit_cmps,
+                             g_fc_params.mode2_car_ff_y_limit_cmps);
     velx_sp = img_fb_x + car_ff_x;
     vely_sp = img_fb_y + car_ff_y;
     // wifi_justfloat(g_car_vel_x, g_car_vel_y,
@@ -332,25 +348,25 @@ void FC_Mode2_50Hz(float dt)
     //                yaw_angle_target,                       /* I37 */
     //                yaw_gyro_target,                        /* I38 */
     //                yaw_gyro_pid.output);                   /* I39 */
-//     wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw,
-//                    roll_angle_target, pitch_angle_target, yaw_angle_target,
-//                    g_tof_fused_height_mm,g_height_fused_vz_mps,
-//                    g_car_vel_x, g_car_vel_y,g_car_yaw,
-//                    Pos_Est_vel_x, Pos_Est_vel_y,
-//                    g_mode2_velx_target, g_mode2_vely_target,
-//                    g_car_lamp_fused_distance_projectioncenter_2.x_cm,
-//                    g_car_lamp_fused_distance_projectioncenter_2.y_cm,
-//                    velx_ff, vely_ff,
-//                    g_mode2_velx_pid.p_term, g_mode2_velx_pid.i_term,
-//                    g_mode2_vely_pid.p_term, g_mode2_vely_pid.i_term,
-//                    g_mode2_imgx_pid.p_term, g_mode2_imgx_pid.i_term,g_mode2_imgx_pid.d_term,
-//                    g_mode2_imgy_pid.p_term, g_mode2_imgy_pid.i_term,g_mode2_imgy_pid.d_term,
-//                    car_ff_x, car_ff_y,
-//                    (float)g_car_lamp_fused_distance_projectioncenter_2.valid,
-//                    g_mode2_imgy_pid.kp,
-//                    g_mode2_velx_pid.d_term, g_mode2_vely_pid.d_term,
-//                    g_car_sync_time_ms
-//                    );
+    wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw,
+                   roll_angle_target, pitch_angle_target, yaw_angle_target,
+                   g_tof_fused_height_mm,g_height_fused_vz_mps,
+                   g_car_vel_x, g_car_vel_y,g_car_yaw,
+                   Pos_Est_vel_x, Pos_Est_vel_y,
+                   g_mode2_velx_target, g_mode2_vely_target,
+                   g_car_lamp_fused_distance_projectioncenter_2.x_cm,
+                   g_car_lamp_fused_distance_projectioncenter_2.y_cm,
+                   velx_ff, vely_ff,
+                   g_mode2_velx_pid.p_term, g_mode2_velx_pid.i_term,
+                   g_mode2_vely_pid.p_term, g_mode2_vely_pid.i_term,
+                   g_mode2_imgx_pid.p_term, g_mode2_imgx_pid.i_term,g_mode2_imgx_pid.d_term,
+                   g_mode2_imgy_pid.p_term, g_mode2_imgy_pid.i_term,g_mode2_imgy_pid.d_term,
+                   car_ff_x, car_ff_y,
+                   (float)g_car_lamp_fused_distance_projectioncenter_2.valid,
+                   g_mode2_imgy_pid.kp,
+                   g_mode2_velx_pid.d_term, g_mode2_vely_pid.d_term,
+                   g_car_sync_time_ms
+                   );
 }
 
 float FC_Mode2_Get_Fixed_Height_M(void)

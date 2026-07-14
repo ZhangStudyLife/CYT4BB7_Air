@@ -138,6 +138,13 @@ void air_comm_air_rx_byte(uint8 byte);
 /* 查询小车是否在线。返回 1=在线，0=离线或从未连接。 */
 uint8 air_comm_air_is_car_online(void);
 
+/**
+ * @brief 查询小车运行数据是否仍在指定超时范围内。
+ * @param timeout_ms 最大允许未更新时间，单位 ms。
+ * @return 1 表示运行数据有效且未超时，0 表示从未收到或已经超时。
+ */
+uint8 air_comm_air_is_run_data_fresh(uint32 timeout_ms);
+
 /*
  * 注册一个可被远程设置的参数。
  * name: 参数名字符串（小车通过这个名字查找）

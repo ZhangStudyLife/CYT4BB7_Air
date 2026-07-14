@@ -152,6 +152,7 @@ typedef struct
     float mode2_img_x_i_limit;
     float mode2_img_x_d_lpf;
     float mode2_img_y_kp;
+    float mode2_img_y_kp_max;              /* 模式2图像Y动态Kp上限 */
     float mode2_img_y_ki;
     float mode2_img_y_kd;
     float mode2_img_y_kff;
@@ -171,6 +172,7 @@ typedef struct
     float mode2_vel_y_d_lpf;
     float mode2_kp_car_x;
     float mode2_kp_car_y;
+    float mode2_car_ff_y_limit_cmps;       /* 模式2车速Y前馈限幅，单位cm/s */
     /* ===== Mode 5 image and velocity params ===== */
     float mode5_img_x_kp;
     float mode5_img_x_ki;

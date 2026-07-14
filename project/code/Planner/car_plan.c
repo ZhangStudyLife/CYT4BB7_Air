@@ -8,6 +8,8 @@
 #define CAR_PLAN_ANGLE_TO_RAD              (0.017453292519943295f)
 #define CAR_PLAN_CENTER_MAX_DIST_PX        (65.0f)
 
+float Car_Speed = 1.2f; /* 车模规划速度，单位 m/s，可由车机通过 AirComm 修改 */
+
 static car_plan_result_t s_car_plan_result;
 
 static void CarPlan_ClearResult(car_plan_result_t *result)
@@ -91,8 +93,8 @@ static uint8 CarPlan_MakeGeometryResult(uint8 camera, car_plan_result_t *out)
     out->valid = 1U;
     out->camera = camera;
     out->beacon_index = CAR_PLAN_BEACON0_INDEX;
-    out->target_strafe_mps = strafe * CAR_PLAN_SPEED_MPS;
-    out->target_forward_mps = forward * CAR_PLAN_SPEED_MPS;
+    out->target_strafe_mps = strafe * Car_Speed;
+    out->target_forward_mps = forward * Car_Speed;
     out->dist_px = dist;
     out->along = along;
     out->perp = perp;
@@ -204,8 +206,8 @@ uint8 CarPlan_Update(car_plan_result_t *result)
 
         CarPlan_SetForcedForwardResult(side_camera,
                                        (side_camera == (uint8)Back)
-                                           ? -CAR_PLAN_SPEED_MPS
-                                           : CAR_PLAN_SPEED_MPS,
+                                           ? -Car_Speed
+                                           : Car_Speed,
                                        &candidate);
         s_car_plan_result = candidate;
         CarPlan_CopyResult(result, &s_car_plan_result);

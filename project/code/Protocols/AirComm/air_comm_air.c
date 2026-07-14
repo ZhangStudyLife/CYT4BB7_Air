@@ -19,8 +19,8 @@
 #define AIR_COMM_FRAME_OVERHEAD              (9U)    /* 帧开销：4帧头 + type + seq + len + 2crc */
 #define AIR_COMM_MAX_FRAME                   (AIR_COMM_MAX_PAYLOAD + AIR_COMM_FRAME_OVERHEAD)
 #define AIR_COMM_RX_QUEUE_SIZE               (512U)  /* 接收环形队列大小（字节） */
-#define AIR_COMM_PARAM_TABLE_MAX             (156U)  /* 最多注册参数个数 */
-#define AIR_COMM_DEFAULT_PARAM_COUNT         (156U)
+#define AIR_COMM_PARAM_TABLE_MAX             (157U)  /* 最多注册参数个数 */
+#define AIR_COMM_DEFAULT_PARAM_COUNT         (157U)
 #define AIR_COMM_REMOTE_CANCEL_MS            (400U)
 #define AIR_COMM_REMOTE_TIMEOUT_MS           (700U)
 #define AIR_COMM_REMOTE_EXP_CANCEL_MS        (1800U)
@@ -1680,6 +1680,7 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(mode2_kp_car_x, g_fc_params.mode2_kp_car_x, 0.0f, 100.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_kp_car_y, g_fc_params.mode2_kp_car_y, 60.0f, 100.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_car_ff_y_limit_cmps, g_fc_params.mode2_car_ff_y_limit_cmps, 50.0f, 140.0f);
+    AIR_COMM_REGISTER_FLOAT(Car_Speed, Car_Speed, 0.0f, 3.0f);
 
     if((s_air_comm_param_count != AIR_COMM_DEFAULT_PARAM_COUNT) ||
        (air_comm_register_default_commands() == 0U))

@@ -118,7 +118,6 @@ typedef struct
     uint8 type;
     uint8 command_mask;
     uint8 command_due_mask;
-    uint8 sent_command_mask;
     uint8 ack_mask;
     uint8 set_sent_mask;
     uint8 cycle_count;
@@ -307,7 +306,6 @@ static uint16 camera_spi_build_downlink_app(uint8 board_id, uint8 *app)
         if((s_param_transaction.command_due_mask & board_mask) != 0U)
         {
             s_param_transaction.command_due_mask &= (uint8)(~board_mask);
-            s_param_transaction.sent_command_mask |= board_mask;
         }
         return CAMERA_SPI_PARAM_APP_LEN;
     }
@@ -589,7 +587,6 @@ static void camera_spi_param_start_rollback(uint8 board_mask)
     s_param_transaction.state = CAMERA_SPI_PARAM_ROLLBACK;
     s_param_transaction.command_mask = board_mask;
     s_param_transaction.command_due_mask = board_mask;
-    s_param_transaction.sent_command_mask = 0U;
     s_param_transaction.ack_mask = 0U;
     s_param_transaction.cycle_count = 0U;
     s_param_transaction.board_status[0] = IPC_REMOTE_PARAM_STATUS_TIMEOUT;
@@ -597,7 +594,7 @@ static void camera_spi_param_start_rollback(uint8 board_mask)
 }
 
 /* 每轮两板SPI结束后汇总ACK，并在12个100Hz周期内完成或进入回滚。 */
-/* ACK_REQUEST按1、0交替；未收到ACK的板在下一轮重新置1。 */
+/* 未收到ACK的板每轮都请求ACK，避免从机主循环错过首个请求帧。 */
 static void camera_spi_param_schedule_next(void)
 {
     uint8 pending_mask;
@@ -611,8 +608,7 @@ static void camera_spi_param_schedule_next(void)
 
     pending_mask = s_param_transaction.command_mask &
                    (uint8)(~s_param_transaction.ack_mask);
-    s_param_transaction.command_due_mask |=
-        pending_mask & (uint8)(~s_param_transaction.sent_command_mask);
+    s_param_transaction.command_due_mask = pending_mask;
 }
 
 static void camera_spi_param_evaluate(void)
@@ -676,7 +672,6 @@ static void camera_spi_param_evaluate(void)
                 s_param_transaction.state = CAMERA_SPI_PARAM_ACTIVE;
                 s_param_transaction.command_mask = 0x03U;
                 s_param_transaction.command_due_mask = 0x03U;
-                s_param_transaction.sent_command_mask = 0U;
                 s_param_transaction.set_sent_mask = 0U;
                 s_param_transaction.ack_mask = 0U;
                 s_param_transaction.cycle_count = 0U;
@@ -1024,7 +1019,6 @@ void CameraSpi_Update(void)
     camera_spi_refresh_flight_state();
     s_ready_mask = camera_spi_ready_mask();
     s_polled_mask = 0U;
-    s_param_transaction.sent_command_mask = 0U;
     for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
     {
         camera_spi_poll_board(board_id);

@@ -57,8 +57,10 @@
 
 vuint8 mt9v03x_finish_flag = 0;                                                 // 一场图像采集完成标志位
 uint8 mt9v03x_image[MT9V03X_H][MT9V03X_W];     
+uint16 g_mt9v03x_exp_time = 400U;                                                // 运行时曝光时间
 
 static uint8 perfect_proportion = 0;
+static uint8 s_mt9v03x_trig_initialized = 0U;
 
 #pragma location = 0x28026024                                                   // 将下面这个数组定义到指定的RAM地址
 __no_init uint8  mt9v03x_image_temp[MT9V03X_H][MT9V03X_W];                      
@@ -78,34 +80,63 @@ void camera_finish_callback(void)
     mt9v03x_finish_flag = 1;
 }
 
+static void mt9v03x_trig_stop(void)
+{
+    uint32 lock;
+
+    if(0U == s_mt9v03x_trig_initialized)
+    {
+        mt9v03x_finish_flag = 0U;
+        return;
+    }
+
+    lock = interrupt_global_disable();
+    Cy_Tcpwm_Counter_Disable(TCPWM0_GRP0_CNT59);
+    Cy_Tcpwm_Counter_ClearTC_Intr(TCPWM0_GRP0_CNT59);
+    mt9v03x_finish_flag = 0U;
+    interrupt_global_enable(lock);
+}
+
 static void mt9v03x_trig_init(void)
-{   
-    Cy_SysClk_PeriphAssignDivider(PCLK_TCPWM0_CLOCKS59, (cy_en_divider_types_t)CY_SYSCLK_DIV_16_BIT, 0ul);
-    Cy_SysClk_PeriphSetDivider(Cy_SysClk_GetClockGroup(PCLK_TCPWM0_CLOCKS59), (cy_en_divider_types_t)CY_SYSCLK_DIV_16_BIT, 0ul, 9u); // 80Mhz时钟被10分频为8Mhz
-    Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup(PCLK_TCPWM0_CLOCKS59), (cy_en_divider_types_t)CY_SYSCLK_DIV_16_BIT, 0ul);
+{
+    uint32 lock;
 
-    cy_stc_sysint_irq_t mt9v03x_trig_irq_cfg;
-    mt9v03x_trig_irq_cfg.sysIntSrc  = tcpwm_0_interrupts_59_IRQn; 
-    mt9v03x_trig_irq_cfg.intIdx     = CPUIntIdx3_IRQn;
-    mt9v03x_trig_irq_cfg.isEnabled  = true;
-    interrupt_init(&mt9v03x_trig_irq_cfg, camera_finish_callback, 0);
+    if(0U == s_mt9v03x_trig_initialized)
+    {
+        cy_stc_sysint_irq_t mt9v03x_trig_irq_cfg;
+        cy_stc_tcpwm_counter_config_t tcpwm_camera_config;
 
-    cy_stc_tcpwm_counter_config_t tcpwm_camera_config;
-    memset(&tcpwm_camera_config, 0, sizeof(tcpwm_camera_config));
-    tcpwm_camera_config.period             = 0x0                                ;        // pit周期计算
-    tcpwm_camera_config.clockPrescaler     = CY_TCPWM_PRESCALER_DIVBY_1         ;
-    tcpwm_camera_config.runMode            = CY_TCPWM_COUNTER_ONESHOT           ; 
-    tcpwm_camera_config.countDirection     = CY_TCPWM_COUNTER_COUNT_UP          ;
-    tcpwm_camera_config.compareOrCapture   = CY_TCPWM_COUNTER_MODE_COMPARE      ;
-    tcpwm_camera_config.countInputMode     = CY_TCPWM_INPUT_LEVEL               ;
-    tcpwm_camera_config.countInput         = 1uL                                ;
-    tcpwm_camera_config.trigger0EventCfg   = CY_TCPWM_COUNTER_OVERFLOW          ;
-    tcpwm_camera_config.trigger1EventCfg   = CY_TCPWM_COUNTER_OVERFLOW          ;
-        
-    Cy_Tcpwm_Counter_Init(TCPWM0_GRP0_CNT59, &tcpwm_camera_config);
+        Cy_SysClk_PeriphAssignDivider(PCLK_TCPWM0_CLOCKS59, (cy_en_divider_types_t)CY_SYSCLK_DIV_16_BIT, 0ul);
+        Cy_SysClk_PeriphSetDivider(Cy_SysClk_GetClockGroup(PCLK_TCPWM0_CLOCKS59), (cy_en_divider_types_t)CY_SYSCLK_DIV_16_BIT, 0ul, 9u); // 80Mhz时钟被10分频为8Mhz
+        Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup(PCLK_TCPWM0_CLOCKS59), (cy_en_divider_types_t)CY_SYSCLK_DIV_16_BIT, 0ul);
+
+        mt9v03x_trig_irq_cfg.sysIntSrc  = tcpwm_0_interrupts_59_IRQn;
+        mt9v03x_trig_irq_cfg.intIdx     = CPUIntIdx3_IRQn;
+        mt9v03x_trig_irq_cfg.isEnabled  = true;
+        interrupt_init(&mt9v03x_trig_irq_cfg, camera_finish_callback, 0);
+
+        memset(&tcpwm_camera_config, 0, sizeof(tcpwm_camera_config));
+        tcpwm_camera_config.period             = 0x0                                ;        // pit周期计算
+        tcpwm_camera_config.clockPrescaler     = CY_TCPWM_PRESCALER_DIVBY_1         ;
+        tcpwm_camera_config.runMode            = CY_TCPWM_COUNTER_ONESHOT           ;
+        tcpwm_camera_config.countDirection     = CY_TCPWM_COUNTER_COUNT_UP          ;
+        tcpwm_camera_config.compareOrCapture   = CY_TCPWM_COUNTER_MODE_COMPARE      ;
+        tcpwm_camera_config.countInputMode     = CY_TCPWM_INPUT_LEVEL               ;
+        tcpwm_camera_config.countInput         = 1uL                                ;
+        tcpwm_camera_config.trigger0EventCfg   = CY_TCPWM_COUNTER_OVERFLOW          ;
+        tcpwm_camera_config.trigger1EventCfg   = CY_TCPWM_COUNTER_OVERFLOW          ;
+
+        Cy_Tcpwm_Counter_Init(TCPWM0_GRP0_CNT59, &tcpwm_camera_config);
+        Cy_Tcpwm_Counter_SetTC_IntrMask(TCPWM0_GRP0_CNT59);
+        s_mt9v03x_trig_initialized = 1U;
+    }
+
+    lock = interrupt_global_disable();
+    Cy_Tcpwm_Counter_ClearTC_Intr(TCPWM0_GRP0_CNT59);
+    mt9v03x_finish_flag = 0U;
     Cy_Tcpwm_Counter_Enable(TCPWM0_GRP0_CNT59);
-    Cy_Tcpwm_Counter_SetTC_IntrMask(TCPWM0_GRP0_CNT59);
     Cy_Tcpwm_TriggerStart(TCPWM0_GRP0_CNT60);
+    interrupt_global_enable(lock);
 }
 
 
@@ -154,7 +185,7 @@ uint8 mt9v03x_sccb_init (void)
             {MT9V03X_INIT,              0},                                     // 摄像头开始初始化
 
             {MT9V03X_AUTO_EXP,          MT9V03X_AUTO_EXP_DEF},                  // 自动曝光设置
-            {MT9V03X_EXP_TIME,          MT9V03X_EXP_TIME_DEF},                  // 曝光时间
+            {MT9V03X_EXP_TIME,          (int16)g_mt9v03x_exp_time},             // 曝光时间
             {MT9V03X_FPS,               MT9V03X_FPS_DEF},                       // 图像帧率
             {MT9V03X_SET_COL,           MT9V03X_W * (perfect_proportion + 1)},  // 图像列数量
             {MT9V03X_SET_ROW,           MT9V03X_H * (perfect_proportion + 1)},  // 图像行数量
@@ -179,6 +210,9 @@ uint8 mt9v03x_sccb_init (void)
 uint8 mt9v03x_init (void)
 {
     uint8 return_state  = 0;
+
+    /* 重复初始化前停止采集并丢弃残帧，避免旧帧在新曝光设置后被处理。 */
+    mt9v03x_trig_stop();
     
     SCB_DisableICache();
     SCB_DisableDCache(); 

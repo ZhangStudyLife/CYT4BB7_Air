@@ -8,7 +8,8 @@
 #define CAR_PLAN_ANGLE_TO_RAD              (0.017453292519943295f)
 #define CAR_PLAN_CENTER_MAX_DIST_PX        (65.0f)
 
-float Car_Speed = CAR_PLAN_SPEED_MPS_FAST; /* 车模规划速度，单位 m/s，可由车机通过 AirComm 修改 */
+float Car_Speed = 1.5f; /* 车模规划速度，单位 m/s，可由车机通过 AirComm 修改 */
+float Car_Speed_Fast = 1.8f; /* 车模固定前进速度，单位 m/s，可由车机通过 AirComm 修改 */
 
 static car_plan_result_t s_car_plan_result;
 
@@ -206,8 +207,8 @@ uint8 CarPlan_Update(car_plan_result_t *result)
 
         CarPlan_SetForcedForwardResult(side_camera,
                                        (side_camera == (uint8)Back)
-                                           ? -Car_Speed
-                                           : Car_Speed,
+                                           ? -Car_Speed_Fast
+                                           : Car_Speed_Fast,
                                        &candidate);
         s_car_plan_result = candidate;
         CarPlan_CopyResult(result, &s_car_plan_result);

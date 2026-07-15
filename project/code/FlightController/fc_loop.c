@@ -409,26 +409,26 @@ void FC_Loop_50Hz(void)
         break;
     }
 
-    wifi_justfloat(
-        g_car_lamp_fused_distance_projectioncenter_2.x_cm,
-        g_car_lamp_fused_distance_projectioncenter_2.y_cm,
-        g_mode8_imgx_pid.p_term, g_mode8_imgx_pid.i_term,
-        g_mode8_imgx_pid.d_term, g_mode8_imgx_pid.output,
-        g_mode8_imgy_pid.p_term, g_mode8_imgy_pid.i_term,
-        g_mode8_imgy_pid.d_term, g_mode8_imgy_pid.output,
-        g_car_vel_x, g_car_vel_y,
-        g_car_vel_x * g_fc_params.mode8_kp_car_x,
-        -g_car_vel_y * g_fc_params.mode8_kp_car_y,
-        fc_clampf(g_mode8_imgx_pid.output, -FC_MODE_IMAGE_VEL_LIMIT_CMPS, FC_MODE_IMAGE_VEL_LIMIT_CMPS),
-        fc_clampf(g_mode8_imgy_pid.output, -FC_MODE_IMAGE_VEL_LIMIT_CMPS, FC_MODE_IMAGE_VEL_LIMIT_CMPS),
-        g_mode8_velx_target, g_mode8_vely_target,
-        Pos_Est_vel_x, Pos_Est_vel_y,
-        roll_angle_target, pitch_angle_target, yaw_angle_target,
-        g_euler.roll, g_euler.pitch, g_euler.yaw,
-        g_tof_fused_height_mm,
-        (float)g_car_lamp_fused_distance_projectioncenter_2.valid,
-        (float)g_tof_fused_valid,
-        g_car_sync_time_ms);
+//     wifi_justfloat(
+//         g_car_lamp_fused_distance_projectioncenter_2.x_cm,
+//         g_car_lamp_fused_distance_projectioncenter_2.y_cm,
+//         g_mode8_imgx_pid.p_term, g_mode8_imgx_pid.i_term,
+//         g_mode8_imgx_pid.d_term, g_mode8_imgx_pid.output,
+//         g_mode8_imgy_pid.p_term, g_mode8_imgy_pid.i_term,
+//         g_mode8_imgy_pid.d_term, g_mode8_imgy_pid.output,
+//         g_car_vel_x, g_car_vel_y,
+//         g_car_vel_x * g_fc_params.mode8_kp_car_x,
+//         -g_car_vel_y * g_fc_params.mode8_kp_car_y,
+//         fc_clampf(g_mode8_imgx_pid.output, -FC_MODE_IMAGE_VEL_LIMIT_CMPS, FC_MODE_IMAGE_VEL_LIMIT_CMPS),
+//         fc_clampf(g_mode8_imgy_pid.output, -FC_MODE_IMAGE_VEL_LIMIT_CMPS, FC_MODE_IMAGE_VEL_LIMIT_CMPS),
+//         g_mode8_velx_target, g_mode8_vely_target,
+//         Pos_Est_vel_x, Pos_Est_vel_y,
+//         roll_angle_target, pitch_angle_target, yaw_angle_target,
+//         g_euler.roll, g_euler.pitch, g_euler.yaw,
+//         g_tof_fused_height_mm,
+//         (float)g_car_lamp_fused_distance_projectioncenter_2.valid,
+//         (float)g_tof_fused_valid,
+//         g_car_sync_time_ms);
 }
 
 /*

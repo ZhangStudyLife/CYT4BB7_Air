@@ -204,8 +204,8 @@ uint8 CarPlan_Update(car_plan_result_t *result)
 
         CarPlan_SetForcedForwardResult(side_camera,
                                        (side_camera == (uint8)Back)
-                                           ? -CAR_PLAN_SPEED_MPS
-                                           : CAR_PLAN_SPEED_MPS,
+                                           ? -CAR_PLAN_SPEED_MPS_FAST
+                                           : CAR_PLAN_SPEED_MPS_FAST,
                                        &candidate);
         s_car_plan_result = candidate;
         CarPlan_CopyResult(result, &s_car_plan_result);

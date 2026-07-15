@@ -281,9 +281,12 @@ int main(void)
             ipc_image_poll();
             (void)BeaconLostDetector_Update();
 
-            car_plan_result_t car_plan;
+            car_plan_result_t car_plan = {0};
             uint8 car_plan_send_valid;
-            (void)CarPlan_Update(&car_plan);
+            if (FC_START_CRSF_Get_Flight_Mode() != FC_START_CRSF_FLIGHT_MODE_8)
+            {
+                (void)CarPlan_Update(&car_plan);
+            }
             car_plan_send_valid = ((car_plan.valid != 0U) && (g_tof_fused_height_mm > 500.0f)) ? 1U : 0U;
 
             send_air_run_data_100hz(&car_plan, car_plan_send_valid);

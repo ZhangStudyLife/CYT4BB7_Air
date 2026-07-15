@@ -1,9 +1,7 @@
 #include "fc_mode.h"
-#include "yaw_align.h"
 #include "../Estimation/Pos_Est/Pos_Est.h"
 #include "../Estimation/Height_Est/Height_Est.h"
 #include "../Image/image_data.h"
-#include "../Planner/car_lamp_fused.h"
 #include "../Planner/pix_to_distance.h"
 #include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
 #include <math.h>
@@ -22,8 +20,6 @@ pid_t g_mode8_velx_pid;
 pid_t g_mode8_vely_pid;
 float g_mode8_velx_target = 0.0f;
 float g_mode8_vely_target = 0.0f;
-float img_err_x_old = 0.0f;
-float img_err_y_old = 0.0f;
 float g_mode8_turn_accel_ff_gain_x = 0.72f; /* 模式8转弯加速度X轴前馈比例，用于直接调试。 */
 float g_mode8_turn_accel_ff_gain_y = 0.30f; /* 模式8转弯加速度Y轴前馈比例，用于直接调试。 */
 float g_mode8_turn_accel_ff_limit_x_deg = 18.0f; /* 模式8转弯加速度X轴前馈限幅，单位 deg。 */
@@ -33,123 +29,6 @@ static float s_mode8_prev_velx_target = 0.0f;
 static float s_mode8_prev_vely_target = 0.0f;
 static float s_mode8_velx_ff_lpf = 0.0f;
 static float s_mode8_vely_ff_lpf = 0.0f;
-static uint16_t s_mode8_yaw_tick = 0U;
-static uint8_t s_mode8_yaw_index = 0U;
-
-static void FC_Mode8_UpdateImgYKp(float dt, uint8_t reset)
-{
-    static float hold_time_s = 0.0f;
-    const float kp_base = g_fc_params.mode8_img_y_kp;
-    const float kp_max = 2.31948906f;
-    float speed_y;
-    float kp_target;
-
-    if (reset != 0U)
-    {
-        hold_time_s = 0.0f;
-        g_mode8_imgy_pid.kp = kp_base;
-        return;
-    }
-
-    speed_y = fabsf(g_car_vel_y);
-    if (speed_y <= 0.6f)
-    {
-        kp_target = kp_base;
-    }
-    else if (speed_y < 1.4f)
-    {
-        kp_target = kp_base + (kp_max - kp_base) * 0.5f * (speed_y - 0.6f) / 0.8f;
-    }
-    else if (speed_y < 1.6f)
-    {
-        kp_target = kp_base + (kp_max - kp_base) *
-                                  (0.5f + 0.5f * (speed_y - 1.4f) / 0.2f);
-    }
-    else
-    {
-        kp_target = kp_max;
-    }
-
-    if (kp_target >= g_mode8_imgy_pid.kp)
-    {
-        g_mode8_imgy_pid.kp = kp_target;
-        hold_time_s = 0.6f;
-    }
-    else if (hold_time_s > 0.0f)
-    {
-        hold_time_s -= dt;
-    }
-    else
-    {
-        g_mode8_imgy_pid.kp -= 0.5f * dt;
-        if (g_mode8_imgy_pid.kp < kp_target)
-        {
-            g_mode8_imgy_pid.kp = kp_target;
-        }
-    }
-}
-
-static void img_err_compare(void)
-{
-    float down_proj_cx;
-    float down_proj_cy;
-
-    img_err_x_old = 0.0f;
-    img_err_y_old = 0.0f;
-
-    if (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING)
-    {
-        return;
-    }
-
-    if (g_car_lamp_fused.valid == 0U)
-    {
-        return;
-    }
-
-    if ((g_tof_fused_valid == 0U) || (g_tof_fused_height_mm <= FC_MODE_IMAGE_MIN_HEIGHT_MM))
-    {
-        return;
-    }
-
-    down_proj_cx = 1.408988f * g_euler.roll +
-                   0.015998f * g_euler.pitch;
-    down_proj_cy = -19.863429f -
-                   0.064165f * g_euler.roll +
-                   1.377711f * g_euler.pitch;
-
-    img_err_x_old = g_car_lamp_fused.cx - down_proj_cx;
-    img_err_y_old = g_car_lamp_fused.cy - down_proj_cy;
-}
-
-static void FC_Mode8_UpdateYawTarget(void)
-{
-    static const float yaw_targets[] = {
-        0.0f, 45.0f, 135.0f, 225.0f, 315.0f, 360.0f,
-        270.0f, 180.0f, 90.0f, 0.0f,
-        -90.0f, -180.0f, -270.0f, -360.0f,
-        -225.0f, -90.0f, 0.0f};
-    static const uint16_t phase_ticks[] = {
-        300U, 200U, 250U, 200U, 250U, 300U,
-        200U, 250U, 200U, 300U,
-        200U, 250U, 200U, 300U,
-        250U, 200U, 300U};
-    static const float yaw_noise[] = {
-        0.0f, 0.8f, -0.4f, 1.6f, -1.2f,
-        0.5f, -2.4f, 1.0f, -0.7f, 0.8f};
-
-    yaw_angle_target = yaw_targets[s_mode8_yaw_index] +
-                       yaw_noise[s_mode8_yaw_tick % 10U];
-    if (++s_mode8_yaw_tick >= phase_ticks[s_mode8_yaw_index])
-    {
-        s_mode8_yaw_tick = 0U;
-        s_mode8_yaw_index++;
-        if (s_mode8_yaw_index >= (sizeof(yaw_targets) / sizeof(yaw_targets[0])))
-        {
-            s_mode8_yaw_index = 0U;
-        }
-    }
-}
 
 void FC_Mode8_Init(void)
 {
@@ -181,7 +60,6 @@ void FC_Mode8_Reset(void)
     Beep_SetAlarm(BEEP_ALARM_MODE8_LAMP_LOST, 0U);
     PID_Reset(&g_mode8_imgx_pid);
     PID_Reset(&g_mode8_imgy_pid);
-    FC_Mode8_UpdateImgYKp(0.0f, 1U);
     PID_Reset(&g_mode8_velx_pid);
     PID_Reset(&g_mode8_vely_pid);
     g_mode8_velx_target = 0.0f;
@@ -190,36 +68,30 @@ void FC_Mode8_Reset(void)
     s_mode8_prev_vely_target = 0.0f;
     s_mode8_velx_ff_lpf = 0.0f;
     s_mode8_vely_ff_lpf = 0.0f;
-    s_mode8_yaw_tick = 0U;
-    s_mode8_yaw_index = 0U;
-    YawAlign_Reset();
     roll_angle_target = FC_Mode_Get_Roll_Mech_Trim_Deg();
     pitch_angle_target = FC_Mode_Get_Pitch_Mech_Trim_Deg();
-    yaw_angle_target = g_euler.yaw;
+    yaw_angle_target = 0.0f;
 }
 
 void FC_Mode8_100Hz(void)
 {
     if (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING)
     {
-        s_mode8_yaw_tick = 0U;
-        s_mode8_yaw_index = 0U;
         yaw_angle_target = 0.0f;
         return;
     }
-    YawAlign_Update();
+    yaw_angle_target = 0.0f;
 
-    // 这个是自动修改yaw的目标,是为了调节yaw,所以临时写的自动修改yaw目标,注释掉以后yaw目标就是0! 不允许对这部分代码修改,就这么保留注释!
-    // FC_Mode8_UpdateYawTarget();
-    // wifi_justfloat(g_car_vel_x, g_car_vel_y, g_car_yaw, g_car_yaw_rate_dps,
-    //                g_euler.roll, g_euler.pitch, g_euler.yaw,
-    //                roll_angle_target, pitch_angle_target, yaw_angle_target,
-    //                g_car_lamp_fused_distance_projectioncenter_2.x_cm,
-    //                g_car_lamp_fused_distance_projectioncenter_2.y_cm,
-    //                g_mode8_velx_target, g_mode8_vely_target,
-    //                g_mode8_velx_pid.ff_term, g_mode8_vely_pid.ff_term,
-    //                g_mode8_velx_pid.output + g_mode8_velx_pid.ff_term,
-    //                g_mode8_vely_pid.output + g_mode8_vely_pid.ff_term);
+    wifi_justfloat(g_car_vel_x, g_car_vel_y, g_car_yaw, g_car_yaw_rate_dps,
+                   g_euler.roll, g_euler.pitch, g_euler.yaw,
+                   roll_angle_target, pitch_angle_target, yaw_angle_target,
+                   g_car_lamp_fused_distance_projectioncenter_2.x_cm,
+                   g_car_lamp_fused_distance_projectioncenter_2.y_cm,
+                   g_mode8_velx_target, g_mode8_vely_target,
+                   g_mode8_velx_pid.ff_term, g_mode8_vely_pid.ff_term,
+                   g_mode8_velx_pid.output + g_mode8_velx_pid.ff_term,
+                   g_mode8_vely_pid.output + g_mode8_vely_pid.ff_term,
+                   Pos_Est_vel_x, Pos_Est_vel_y);
 }
 
 void FC_Mode8_50Hz(float dt)
@@ -251,13 +123,13 @@ void FC_Mode8_50Hz(float dt)
     uint8_t fused_lamp_valid;
     uint8_t tof_height_valid;
 
-    img_err_compare();
-
     if (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING)
     {
         FC_Mode8_Reset();
         return;
     }
+
+    yaw_angle_target = 0.0f;
 
     fused_lamp_valid = g_car_lamp_fused_distance_projectioncenter_2.valid;
 
@@ -267,7 +139,6 @@ void FC_Mode8_50Hz(float dt)
     tof_height_valid = ((0U != g_tof_fused_valid) &&
                         (g_tof_fused_height_mm > FC_MODE_IMAGE_MIN_HEIGHT_MM)) ? 1U : 0U;
 
-    FC_Mode8_UpdateImgYKp(dt, 0U);
     if ((fused_lamp_valid != 0U) && (tof_height_valid != 0U))
     {
         img_err_x = g_car_lamp_fused_distance_projectioncenter_2.x_cm;
@@ -424,11 +295,6 @@ void FC_Mode8_50Hz(float dt)
     //                image_data[Back].car_lamp_data[0].cy,   /* I28 */
     //                image_data[Back].car_lamp_data[1].cx,   /* I29 */
     //                image_data[Back].car_lamp_data[1].cy,   /* I30 */
-    //                (float)yaw_align_active,                /* I31 */
-    //                (float)yaw_debug.locked,                /* I32 */
-    //                (float)yaw_debug.locked_beacon.camera,  /* I33 */
-    //                yaw_debug.locked_beacon.x,              /* I34 */
-    //                yaw_debug.locked_beacon.y,              /* I35 */
     //                g_euler.yaw,                            /* I36 */
     //                yaw_angle_target,                       /* I37 */
     //                yaw_gyro_target,                        /* I38 */
@@ -457,4 +323,23 @@ void FC_Mode8_50Hz(float dt)
     //                g_euler.yaw,                                       /* I7 */
     //                lc302_data.flow_x_integral,
     //                lc302_data.flow_y_integral);
+    wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw,
+                   roll_angle_target, pitch_angle_target, yaw_angle_target,
+                   g_tof_fused_height_mm,g_height_fused_vz_mps,
+                   g_car_vel_x, g_car_vel_y,g_car_yaw,
+                   Pos_Est_vel_x, Pos_Est_vel_y,
+                   g_mode8_velx_target, g_mode8_vely_target,
+                   g_car_lamp_fused_distance_projectioncenter_2.x_cm,
+                   g_car_lamp_fused_distance_projectioncenter_2.y_cm,
+                   velx_ff, vely_ff,
+                   g_mode8_velx_pid.p_term, g_mode8_velx_pid.i_term,
+                   g_mode8_vely_pid.p_term, g_mode8_vely_pid.i_term,
+                   g_mode8_imgx_pid.p_term, g_mode8_imgx_pid.i_term,g_mode8_imgx_pid.d_term,
+                   g_mode8_imgy_pid.p_term, g_mode8_imgy_pid.i_term,g_mode8_imgy_pid.d_term,
+                   car_ff_x, car_ff_y,
+                   (float)g_car_lamp_fused_distance_projectioncenter_2.valid,
+                   g_mode8_imgy_pid.kp,
+                   g_mode8_velx_pid.d_term, g_mode8_vely_pid.d_term,
+                   g_car_sync_time_ms
+                   );
 }

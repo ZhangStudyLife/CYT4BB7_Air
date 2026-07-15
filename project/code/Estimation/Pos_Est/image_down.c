@@ -99,6 +99,12 @@ static uint8 s_mt9v03x_initialized;
 
 #define IMAGE_QUEUE_SIZE                (BEACON_IMAGE_W * BEACON_IMAGE_H)
 #define PI_F                            3.1415926f
+#define BEACON_AREA_GATE_X_MIN          (-110.0f) /* 信标面积查表的最小中心横坐标 */
+#define BEACON_AREA_GATE_Y_MIN          (-75.0f)  /* 信标面积查表的最小中心纵坐标 */
+#define BEACON_AREA_GATE_X_STEP         (25.0f)   /* 信标面积查表的横向网格宽度，单位像素 */
+#define BEACON_AREA_GATE_Y_STEP         (20.0f)   /* 信标面积查表的纵向网格高度，单位像素 */
+#define BEACON_AREA_GATE_X_COUNT        (9U)      /* 信标面积查表的横向网格数量 */
+#define BEACON_AREA_GATE_Y_COUNT        (7U)      /* 信标面积查表的纵向网格数量 */
 
 typedef struct
 {
@@ -143,6 +149,30 @@ static const unsigned char (*g_current_image)[BEACON_IMAGE_W] = 0;
 static unsigned char g_has_lamp_track = 0;
 static temporal_track_t g_b0_track;
 static temporal_track_t g_car_track;
+
+/* 下摄跨飞行保守面积上限，0表示该坐标格样本不足并保持原排序。 */
+static const uint8 g_center_beacon_area_upper[BEACON_AREA_GATE_Y_COUNT][BEACON_AREA_GATE_X_COUNT] =
+{
+    {  0U,  31U,  39U,  62U,  61U,  44U,  21U,   0U,   0U},
+    { 17U,  49U,  63U, 107U, 103U,  86U,  42U,  18U,   0U},
+    { 17U,  55U,  79U, 145U, 137U, 121U,  56U,  18U,   0U},
+    { 20U,  49U,  90U, 145U, 156U, 125U,  58U,  24U,   0U},
+    { 22U,  48U,  77U, 132U, 134U, 101U,  39U,  20U,   0U},
+    {  0U,  20U,  57U,  90U,  99U,  89U,  28U,  18U,   0U},
+    {  0U,  20U,  34U,  56U,  57U,  39U,  21U,   0U,   0U}
+};
+
+/* 下摄信标面积下限，0表示该坐标网格不启用下限过滤。 */
+static const uint8 g_center_beacon_area_lower[BEACON_AREA_GATE_Y_COUNT][BEACON_AREA_GATE_X_COUNT] =
+{
+    { 0U,  8U,  8U, 10U,  9U,  8U,  8U, 0U, 0U},
+    { 8U,  9U, 24U, 32U, 35U, 22U,  8U, 8U, 0U},
+    { 8U, 10U, 31U, 52U, 51U, 41U, 11U, 8U, 0U},
+    { 8U, 10U, 36U, 46U, 67U, 46U, 11U, 8U, 0U},
+    { 8U,  8U, 16U, 43U, 52U, 33U,  9U, 8U, 0U},
+    { 0U,  8U, 19U, 32U, 32U, 20U,  8U, 8U, 0U},
+    { 0U,  8U,  8U, 11U, 12U,  8U,  8U, 0U, 0U}
+};
 
 static void beacon_image_reset_temporal(void);
 
@@ -1205,6 +1235,49 @@ static unsigned char is_isolated_near_lamp_beacon(const component_t *comp)
         LAMP_NEAR_BEACON_BACKGROUND_MAX ? 1 : 0;
 }
 
+/**
+ * @brief 根据下摄信标坐标查表，过滤超出面积上下限的连通域。
+ * @return 1表示允许；坐标越界或对应边界为0时不启用该边界。
+ */
+static unsigned char is_beacon_area_allowed(
+    float x,
+    float y,
+    float area)
+{
+    int x_index;
+    int y_index;
+    uint8 lower;
+    uint8 upper;
+
+    if ((x < BEACON_AREA_GATE_X_MIN) ||
+        (x >= BEACON_AREA_GATE_X_MIN +
+              BEACON_AREA_GATE_X_STEP * (float)BEACON_AREA_GATE_X_COUNT) ||
+        (y < BEACON_AREA_GATE_Y_MIN) ||
+        (y >= BEACON_AREA_GATE_Y_MIN +
+              BEACON_AREA_GATE_Y_STEP * (float)BEACON_AREA_GATE_Y_COUNT))
+    {
+        return 1U;
+    }
+    x_index = (int)((x - BEACON_AREA_GATE_X_MIN) / BEACON_AREA_GATE_X_STEP);
+    y_index = (int)((y - BEACON_AREA_GATE_Y_MIN) / BEACON_AREA_GATE_Y_STEP);
+    if ((x_index < 0) || (x_index >= (int)BEACON_AREA_GATE_X_COUNT) ||
+        (y_index < 0) || (y_index >= (int)BEACON_AREA_GATE_Y_COUNT))
+    {
+        return 1U;
+    }
+    lower = g_center_beacon_area_lower[y_index][x_index];
+    upper = g_center_beacon_area_upper[y_index][x_index];
+    if ((lower != 0U) && (area < (float)lower))
+    {
+        return 0U;
+    }
+    if ((upper != 0U) && (area > (float)upper))
+    {
+        return 0U;
+    }
+    return 1U;
+}
+
 static void insert_beacon_by_area(
     const component_t *comp,
     const component_t *lamp,
@@ -1247,11 +1320,21 @@ static void insert_beacon_by_area(
         return;
     }
 
+    circle.x = comp->cx - (float)BEACON_IMAGE_W * 0.5f;
+    circle.y = comp->cy - (float)BEACON_IMAGE_H * 0.5f;
+    circle.radius = sqrtf((float)comp->area / PI_F);
+    circle.area = (float)comp->area;
+    circle.valid = 1;
+    if (is_beacon_area_allowed(circle.x, circle.y, circle.area) == 0U)
+    {
+        return;
+    }
+
     slot = result->beacon_count;
     if (slot >= BEACON_MAX_BEACON_COUNT)
     {
         slot = BEACON_MAX_BEACON_COUNT - 1;
-        if ((float)comp->area <= result->beacons[slot].radius * result->beacons[slot].radius * PI_F)
+        if (circle.area <= result->beacons[slot].area)
         {
             return;
         }
@@ -1263,18 +1346,12 @@ static void insert_beacon_by_area(
 
     for (i = slot - 1; i >= 0; i--)
     {
-        if ((float)comp->area <= result->beacons[i].radius * result->beacons[i].radius * PI_F)
+        if (circle.area <= result->beacons[i].area)
         {
             break;
         }
         result->beacons[i + 1] = result->beacons[i];
     }
-
-    circle.x = comp->cx - (float)BEACON_IMAGE_W * 0.5f;
-    circle.y = comp->cy - (float)BEACON_IMAGE_H * 0.5f;
-    circle.radius = sqrtf((float)comp->area / PI_F);
-    circle.area = (float)comp->area;
-    circle.valid = 1;
     result->beacons[i + 1] = circle;
 }
 

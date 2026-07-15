@@ -206,9 +206,10 @@ void FC_Mode8_100Hz(void)
         yaw_angle_target = 0.0f;
         return;
     }
+    YawAlign_Update();
 
     // 这个是自动修改yaw的目标,是为了调节yaw,所以临时写的自动修改yaw目标,注释掉以后yaw目标就是0! 不允许对这部分代码修改,就这么保留注释!
-    FC_Mode8_UpdateYawTarget();
+    // FC_Mode8_UpdateYawTarget();
     // wifi_justfloat(g_car_vel_x, g_car_vel_y, g_car_yaw, g_car_yaw_rate_dps,
     //                g_euler.roll, g_euler.pitch, g_euler.yaw,
     //                roll_angle_target, pitch_angle_target, yaw_angle_target,

@@ -178,6 +178,7 @@ void FC_Mode8_Init(void)
 
 void FC_Mode8_Reset(void)
 {
+    Beep_SetAlarm(BEEP_ALARM_MODE8_LAMP_LOST, 0U);
     PID_Reset(&g_mode8_imgx_pid);
     PID_Reset(&g_mode8_imgy_pid);
     FC_Mode8_UpdateImgYKp(0.0f, 1U);
@@ -254,21 +255,14 @@ void FC_Mode8_50Hz(float dt)
 
     if (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING)
     {
-        Beep_Disable();
         FC_Mode8_Reset();
         return;
     }
 
     fused_lamp_valid = g_car_lamp_fused_distance_projectioncenter_2.valid;
 
-    if (fused_lamp_valid != 0U)
-    {
-        Beep_Disable();
-    }
-    else
-    {
-        Beep_Enable();
-    }
+    Beep_SetAlarm(BEEP_ALARM_MODE8_LAMP_LOST,
+                  (fused_lamp_valid == 0U) ? 1U : 0U);
 
     tof_height_valid = ((0U != g_tof_fused_valid) &&
                         (g_tof_fused_height_mm > FC_MODE_IMAGE_MIN_HEIGHT_MM)) ? 1U : 0U;

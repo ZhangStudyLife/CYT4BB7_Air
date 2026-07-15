@@ -8,6 +8,8 @@
 #define BEEP_TICK_HZ            (100U)
 #define BEEP_MAX_CYCLE_TIME_S   (600.0f)
 #define BEEP_MAX_CYCLE_COUNT    (600U)
+/* 兼容Beep_Enable/Beep_Disable的持续报警位 */
+#define BEEP_ALARM_LEGACY       (1U << 7)
 
 /* 运行状态 */
 static uint8  s_beep_active = 0U;
@@ -21,6 +23,8 @@ static uint32 s_beep_tick_in_cycle = 0U;
 static uint16 s_beep_cycle_count = 0U;
 /* 已完成周期数 */
 static uint16 s_beep_cycle_done = 0U;
+/* 各持续报警源状态位，任一位置位时蜂鸣器保持高电平 */
+static volatile uint8 s_beep_alarm_mask = 0U;
 
 /* 占空比限幅到0~100 */
 static uint8 Beep_ClampDuty(uint8 duty_percent)
@@ -36,41 +40,60 @@ void Beep_Init(void)
 {
     /* 初始化为推挽输出，默认低电平（静音） */
     gpio_init(BUZZER_PIN, GPO, GPIO_LOW, GPO_PUSH_PULL);
+    s_beep_alarm_mask = 0U;
     Beep_Stop();
 }
 
 void Beep_Stop(void)
 {
-    /* 清空播放状态并拉低蜂鸣器引脚 */
+    /* 清空循环播放状态，输出仍服从持续报警位 */
     s_beep_active = 0U;
     s_beep_duty_percent = 0U;
     s_beep_cycle_ticks = 0U;
     s_beep_tick_in_cycle = 0U;
     s_beep_cycle_count = 0U;
     s_beep_cycle_done = 0U;
-    gpio_low(BUZZER_PIN);
+    if (s_beep_alarm_mask != 0U)
+    {
+        gpio_high(BUZZER_PIN);
+    }
+    else
+    {
+        gpio_low(BUZZER_PIN);
+    }
 }
 
 void Beep_Enable(void)
 {
-    s_beep_active = 0U;
-    s_beep_duty_percent = 0U;
-    s_beep_cycle_ticks = 0U;
-    s_beep_tick_in_cycle = 0U;
-    s_beep_cycle_count = 0U;
-    s_beep_cycle_done = 0U;
-    gpio_high(BUZZER_PIN);
+    Beep_SetAlarm(BEEP_ALARM_LEGACY, 1U);
 }
 
 void Beep_Disable(void)
 {
-    s_beep_active = 0U;
-    s_beep_duty_percent = 0U;
-    s_beep_cycle_ticks = 0U;
-    s_beep_tick_in_cycle = 0U;
-    s_beep_cycle_count = 0U;
-    s_beep_cycle_done = 0U;
-    gpio_low(BUZZER_PIN);
+    Beep_SetAlarm(BEEP_ALARM_LEGACY, 0U);
+}
+
+/*
+ * 设置指定持续报警源
+ * alarm  : BEEP_ALARM_*报警位
+ * active : 非0置位报警，0清除报警
+ * 返回值 : 无
+ */
+void Beep_SetAlarm(uint8 alarm, uint8 active)
+{
+    if (active != 0U)
+    {
+        s_beep_alarm_mask |= alarm;
+        gpio_high(BUZZER_PIN);
+    }
+    else
+    {
+        s_beep_alarm_mask &= (uint8)(~alarm);
+        if ((s_beep_alarm_mask == 0U) && (s_beep_active == 0U))
+        {
+            gpio_low(BUZZER_PIN);
+        }
+    }
 }
 
 void Beep_Play(uint8 duty_percent, float cycle_time_s, uint16 cycle_count)
@@ -118,6 +141,14 @@ void Beep_Update_100HZ(void)
     /* 空闲时直接返回，保持非阻塞 */
     if (0U == s_beep_active)
     {
+        if (s_beep_alarm_mask != 0U)
+        {
+            gpio_high(BUZZER_PIN);
+        }
+        else
+        {
+            gpio_low(BUZZER_PIN);
+        }
         return;
     }
 
@@ -125,7 +156,8 @@ void Beep_Update_100HZ(void)
     on_ticks = ((uint32)s_beep_duty_percent * s_beep_cycle_ticks) / 100U;
 
     /* 周期前半段(占空比部分)拉高，后半段拉低 */
-    if ((on_ticks > 0U) && (s_beep_tick_in_cycle < on_ticks))
+    if ((s_beep_alarm_mask != 0U) ||
+        ((on_ticks > 0U) && (s_beep_tick_in_cycle < on_ticks)))
     {
         gpio_high(BUZZER_PIN);
     }

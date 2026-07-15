@@ -38,6 +38,7 @@ static float height_pos_out = 0.0f;
 /* 目标高度，单位米 */
 extern volatile uint32 tick_1000us_cnt;
 extern float g_car_sync_time_ms;
+extern uint32 g_car_last_update_time_ms;
 extern float g_car_vel_x;
 extern float g_car_vel_y;
 extern float img_err_x_old;
@@ -338,6 +339,7 @@ void FC_Loop_50Hz(void)
     uint32 diff = tick_now - tick_1000us_cnt_last;
     float dt = diff * 0.001f;
     FC_START_CRSF_state_e fc_state = FC_START_CRSF_Get_State();
+    uint8 car_data_fresh;
 
     tick_1000us_cnt_last = tick_now;
     if (dt < 0.0001f)
@@ -421,6 +423,11 @@ void FC_Loop_50Hz(void)
         FC_Mode0_50Hz(dt);
         break;
     }
+
+    car_data_fresh = ((g_car_sync_time_ms > 0.0f) &&
+                      ((tick_now - g_car_last_update_time_ms) < FC_MODE_CAR_RUN_DATA_TIMEOUT_MS)) ? 1U : 0U;
+    Beep_SetAlarm(BEEP_ALARM_CAR_DATA_LOST,
+                  (car_data_fresh == 0U) ? 1U : 0U);
 
     // wifi_justfloat(
     //     g_car_lamp_fused_distance_projectioncenter_2.x_cm,

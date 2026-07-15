@@ -586,24 +586,24 @@ void FC_Loop_100Hz(void)
         break;
     }
 
-    {
-        air_comm_air_stats_t air_stats;
+    // {
+    //     air_comm_air_stats_t air_stats;
 
-        memset(&air_stats, 0, sizeof(air_stats));
-        air_comm_air_get_stats(&air_stats);
-        wifi_justfloat(1.0f,
-                       air_stats.tick_ms,
-                       air_stats.tx_frame_count,
-                       air_stats.rx_frame_count,
-                       air_stats.raw_rx_byte_count,
-                       air_stats.rx_byte_count,
-                       air_stats.heartbeat_tx_count,
-                       air_stats.heartbeat_rx_count,
-                       air_stats.crc_error_count,
-                       air_stats.rx_oversize_count,
-                       air_stats.rx_queue_overflow_count,
-                       air_stats.online_status,g_car_vel_x,g_car_vel_y);
-    }
+    //     memset(&air_stats, 0, sizeof(air_stats));
+    //     air_comm_air_get_stats(&air_stats);
+    //     wifi_justfloat(1.0f,
+    //                    air_stats.tick_ms,
+    //                    air_stats.tx_frame_count,
+    //                    air_stats.rx_frame_count,
+    //                    air_stats.raw_rx_byte_count,
+    //                    air_stats.rx_byte_count,
+    //                    air_stats.heartbeat_tx_count,
+    //                    air_stats.heartbeat_rx_count,
+    //                    air_stats.crc_error_count,
+    //                    air_stats.rx_oversize_count,
+    //                    air_stats.rx_queue_overflow_count,
+    //                    air_stats.online_status,g_car_vel_x,g_car_vel_y);
+    // }
 
     // 依托这个确认了车端的flash确实有效以及确实可以修改飞机的参数
     //                target_height_m * 1000.0f,   /* 目标高度，单位 mm */

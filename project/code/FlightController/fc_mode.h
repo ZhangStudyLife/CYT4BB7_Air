@@ -43,11 +43,11 @@
 /* 小车运行数据用于 yaw 坐标转换的最大未更新时间，单位 ms。 */
 #define FC_MODE_CAR_RUN_DATA_TIMEOUT_MS (200U)
 /* 模式7摇杆满量程对应的最大水平目标速度，单位 cm/s。 */
-#define FC_MODE7_VEL_LIMIT_CMPS (250.0f)
+#define FC_MODE7_VEL_LIMIT_CMPS (200.0f)
 /* 模式7归一化摇杆死区。 */
 #define FC_MODE7_STICK_DEADZONE (0.03f)
 /* 模式7三次速度曲线占比。 */
-#define FC_MODE7_STICK_EXPO (0.35f)
+#define FC_MODE7_STICK_EXPO (0.40f)
 
 #ifdef __cplusplus
 extern "C"

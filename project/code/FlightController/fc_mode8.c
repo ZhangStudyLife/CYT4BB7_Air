@@ -323,23 +323,23 @@ void FC_Mode8_50Hz(float dt)
     //                g_euler.yaw,                                       /* I7 */
     //                lc302_data.flow_x_integral,
     //                lc302_data.flow_y_integral);
-    wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw,
-                   roll_angle_target, pitch_angle_target, yaw_angle_target,
-                   g_tof_fused_height_mm,g_height_fused_vz_mps,
-                   g_car_vel_x, g_car_vel_y,g_car_yaw,
-                   Pos_Est_vel_x, Pos_Est_vel_y,
-                   g_mode8_velx_target, g_mode8_vely_target,
-                   g_car_lamp_fused_distance_projectioncenter_2.x_cm,
-                   g_car_lamp_fused_distance_projectioncenter_2.y_cm,
-                   velx_ff, vely_ff,
-                   g_mode8_velx_pid.p_term, g_mode8_velx_pid.i_term,
-                   g_mode8_vely_pid.p_term, g_mode8_vely_pid.i_term,
-                   g_mode8_imgx_pid.p_term, g_mode8_imgx_pid.i_term,g_mode8_imgx_pid.d_term,
-                   g_mode8_imgy_pid.p_term, g_mode8_imgy_pid.i_term,g_mode8_imgy_pid.d_term,
-                   car_ff_x, car_ff_y,
-                   (float)g_car_lamp_fused_distance_projectioncenter_2.valid,
-                   g_mode8_imgy_pid.kp,
-                   g_mode8_velx_pid.d_term, g_mode8_vely_pid.d_term,
-                   g_car_sync_time_ms
-                   );
+    // wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw,
+    //                roll_angle_target, pitch_angle_target, yaw_angle_target,
+    //                g_tof_fused_height_mm,g_height_fused_vz_mps,
+    //                g_car_vel_x, g_car_vel_y,g_car_yaw,
+    //                Pos_Est_vel_x, Pos_Est_vel_y,
+    //                g_mode8_velx_target, g_mode8_vely_target,
+    //                g_car_lamp_fused_distance_projectioncenter_2.x_cm,
+    //                g_car_lamp_fused_distance_projectioncenter_2.y_cm,
+    //                velx_ff, vely_ff,
+    //                g_mode8_velx_pid.p_term, g_mode8_velx_pid.i_term,
+    //                g_mode8_vely_pid.p_term, g_mode8_vely_pid.i_term,
+    //                g_mode8_imgx_pid.p_term, g_mode8_imgx_pid.i_term,g_mode8_imgx_pid.d_term,
+    //                g_mode8_imgy_pid.p_term, g_mode8_imgy_pid.i_term,g_mode8_imgy_pid.d_term,
+    //                car_ff_x, car_ff_y,
+    //                (float)g_car_lamp_fused_distance_projectioncenter_2.valid,
+    //                g_mode8_imgy_pid.kp,
+    //                g_mode8_velx_pid.d_term, g_mode8_vely_pid.d_term,
+    //                g_car_sync_time_ms
+    //                );
 }

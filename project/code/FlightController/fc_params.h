@@ -152,7 +152,6 @@ typedef struct
     float mode2_img_x_i_limit;
     float mode2_img_x_d_lpf;
     float mode2_img_y_kp;
-    float mode2_img_y_kp_max;              /* 模式2图像Y动态Kp上限 */
     float mode2_img_y_ki;
     float mode2_img_y_kd;
     float mode2_img_y_kff;

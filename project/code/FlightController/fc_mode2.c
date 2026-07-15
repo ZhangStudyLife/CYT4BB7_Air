@@ -33,59 +33,6 @@ static float s_mode2_vely_ff_lpf = 0.0f;
 static uint16_t s_mode2_yaw_tick = 0U;
 static uint8_t s_mode2_yaw_index = 0U;
 
-static void FC_Mode2_UpdateImgYKp(float dt, uint8_t reset)
-{
-    static float hold_time_s = 0.0f;
-    const float kp_base = g_fc_params.mode2_img_y_kp;
-    const float kp_max = (g_fc_params.mode2_img_y_kp_max > kp_base) ? g_fc_params.mode2_img_y_kp_max : kp_base;
-    float speed_y;
-    float kp_target;
-
-    if (reset != 0U)
-    {
-        hold_time_s = 0.0f;
-        g_mode2_imgy_pid.kp = kp_base;
-        return;
-    }
-
-    speed_y = fabsf(g_car_vel_y);
-    if (speed_y <= 0.6f)
-    {
-        kp_target = kp_base;
-    }
-    else if (speed_y < 1.4f)
-    {
-        kp_target = kp_base + (kp_max - kp_base) * 0.5f * (speed_y - 0.6f) / 0.8f;
-    }
-    else if (speed_y < 1.6f)
-    {
-        kp_target = kp_base + (kp_max - kp_base) *
-                                  (0.5f + 0.5f * (speed_y - 1.4f) / 0.2f);
-    }
-    else
-    {
-        kp_target = kp_max;
-    }
-
-    if (kp_target >= g_mode2_imgy_pid.kp)
-    {
-        g_mode2_imgy_pid.kp = kp_target;
-        hold_time_s = 0.6f;
-    }
-    else if (hold_time_s > 0.0f)
-    {
-        hold_time_s -= dt;
-    }
-    else
-    {
-        g_mode2_imgy_pid.kp -= 0.5f * dt;
-        if (g_mode2_imgy_pid.kp < kp_target)
-        {
-            g_mode2_imgy_pid.kp = kp_target;
-        }
-    }
-}
-
 static void FC_Mode2_UpdateYawTarget(void)
 {
     static const float yaw_targets[] = {
@@ -133,7 +80,6 @@ void FC_Mode2_Reset(void)
 {
     PID_Reset(&g_mode2_imgx_pid);
     PID_Reset(&g_mode2_imgy_pid);
-    FC_Mode2_UpdateImgYKp(0.0f, 1U);
     PID_Reset(&g_mode2_velx_pid);
     PID_Reset(&g_mode2_vely_pid);
     g_mode2_velx_target = 0.0f;
@@ -229,7 +175,6 @@ void FC_Mode2_50Hz(float dt)
     tof_height_valid = ((0U != g_tof_fused_valid) &&
                         (g_tof_fused_height_mm > FC_MODE_IMAGE_MIN_HEIGHT_MM)) ? 1U : 0U;
 
-    FC_Mode2_UpdateImgYKp(dt, 0U);
     if ((fused_lamp_valid != 0U) && (tof_height_valid != 0U))
     {
         img_err_x = g_car_lamp_fused_distance_projectioncenter_2.x_cm;

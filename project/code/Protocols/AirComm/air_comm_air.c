@@ -19,8 +19,8 @@
 #define AIR_COMM_FRAME_OVERHEAD              (9U)    /* 帧开销：4帧头 + type + seq + len + 2crc */
 #define AIR_COMM_MAX_FRAME                   (AIR_COMM_MAX_PAYLOAD + AIR_COMM_FRAME_OVERHEAD)
 #define AIR_COMM_RX_QUEUE_SIZE               (512U)  /* 接收环形队列大小（字节） */
-#define AIR_COMM_PARAM_TABLE_MAX             (157U)  /* 最多注册参数个数 */
-#define AIR_COMM_DEFAULT_PARAM_COUNT         (157U)
+#define AIR_COMM_PARAM_TABLE_MAX             (156U)  /* 最多注册参数个数 */
+#define AIR_COMM_DEFAULT_PARAM_COUNT         (156U)
 #define AIR_COMM_REMOTE_CANCEL_MS            (400U)
 #define AIR_COMM_REMOTE_TIMEOUT_MS           (700U)
 #define AIR_COMM_REMOTE_EXP_CANCEL_MS        (1800U)
@@ -1659,7 +1659,6 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(mode2_img_x_i_limit, g_fc_params.mode2_img_x_i_limit, 0.0f, 20.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_img_x_d_lpf, g_fc_params.mode2_img_x_d_lpf, 0.0f, 20.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_img_y_kp, g_fc_params.mode2_img_y_kp, 1.0f, 4.0f);
-    AIR_COMM_REGISTER_FLOAT(mode2_img_y_kp_max, g_fc_params.mode2_img_y_kp_max, 1.0f, 4.5f);
     AIR_COMM_REGISTER_FLOAT(mode2_img_y_ki, g_fc_params.mode2_img_y_ki, 0.0f, 0.05f);
     AIR_COMM_REGISTER_FLOAT(mode2_img_y_kd, g_fc_params.mode2_img_y_kd, 0.0f, 0.25f);
     AIR_COMM_REGISTER_FLOAT(mode2_img_y_kff, g_fc_params.mode2_img_y_kff, 0.0f, 0.05f);

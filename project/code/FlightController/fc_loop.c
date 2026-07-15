@@ -579,24 +579,24 @@ void FC_Loop_100Hz(void)
         break;
     }
 
-    // {
-    //     air_comm_air_stats_t air_stats;
+    {
+        air_comm_air_stats_t air_stats;
 
-    //     memset(&air_stats, 0, sizeof(air_stats));
-    //     air_comm_air_get_stats(&air_stats);
-    //     wifi_justfloat(1.0f,
-    //                    air_stats.tick_ms,
-    //                    air_stats.tx_frame_count,
-    //                    air_stats.rx_frame_count,
-    //                    air_stats.raw_rx_byte_count,
-    //                    air_stats.rx_byte_count,
-    //                    air_stats.heartbeat_tx_count,
-    //                    air_stats.heartbeat_rx_count,
-    //                    air_stats.crc_error_count,
-    //                    air_stats.rx_oversize_count,
-    //                    air_stats.rx_queue_overflow_count,
-    //                    air_stats.online_status);
-    // }
+        memset(&air_stats, 0, sizeof(air_stats));
+        air_comm_air_get_stats(&air_stats);
+        wifi_justfloat(1.0f,
+                       air_stats.tick_ms,
+                       air_stats.tx_frame_count,
+                       air_stats.rx_frame_count,
+                       air_stats.raw_rx_byte_count,
+                       air_stats.rx_byte_count,
+                       air_stats.heartbeat_tx_count,
+                       air_stats.heartbeat_rx_count,
+                       air_stats.crc_error_count,
+                       air_stats.rx_oversize_count,
+                       air_stats.rx_queue_overflow_count,
+                       air_stats.online_status,g_car_vel_x,g_car_vel_y);
+    }
 
     // 依托这个确认了车端的flash确实有效以及确实可以修改飞机的参数
     //                target_height_m * 1000.0f,   /* 目标高度，单位 mm */
@@ -669,17 +669,13 @@ void FC_Loop_100Hz(void)
 
     // wifi_justfloat(g_car_lamp_fused.cx,                               /* I1 */
     //                g_car_lamp_fused.cy,                               /* I2 */
-    //                g_projection_center.cx,
-    //                g_projection_center.cy,
-    //                img_err_x_old,
-    //                img_err_y_old,
     //                g_car_lamp_fused_distance_projectioncenter_2.x_cm, /* I3 */
     //                g_car_lamp_fused_distance_projectioncenter_2.y_cm, /* I4 */
     //                g_euler.pitch,                                     /* I5 */
     //                g_euler.roll,                                      /* I6 */
     //                g_euler.yaw,                                       /* I7 */
     //                lc302_data.flow_x_integral,
-    //                lc302_data.flow_y_integral);
+    //                lc302_data.flow_y_integral,g_car_vel_x,g_car_vel_y);
 
     //    wifi_justfloat(  image_data[Front].car_lamp_data[0].cx,       /* I19 */
     //                     image_data[Front].car_lamp_data[0].cy,       /* I20 */

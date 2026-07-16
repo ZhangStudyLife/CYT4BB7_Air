@@ -24,7 +24,7 @@ extern "C" {
 #define MOTOR_INPUT_MIN         (-10000)    /* 控制量最小值（仅roll/pitch/yaw） */
 
 /* ======================== 机架几何参数（Mark5 Pro） ======================== */
-#define MOTOR_ARM_PITCH_MM      (69)        /* 前后方向力臂：138mm/2 */
+#define MOTOR_ARM_PITCH_MM      (90)        /* 前后方向力臂：180mm/2 */
 #define MOTOR_ARM_ROLL_MM       (90)        /* 左右方向力臂：180mm/2 */
 
 /*

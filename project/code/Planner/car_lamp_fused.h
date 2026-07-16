@@ -8,6 +8,9 @@ typedef struct
     uint8 valid;
     float cx;
     float cy;
+    float angle;
+    float width;
+    float length;
 } car_lamp_fused_result_t;
 
 extern car_lamp_fused_result_t g_car_lamp_fused;

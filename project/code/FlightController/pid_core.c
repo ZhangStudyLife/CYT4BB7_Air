@@ -5,7 +5,7 @@
 #define PID_FILTER_PI             (3.14159265359f)
 #define PID_BUTTERWORTH_Q         (0.70710678f)
 #define PID_LPF_MIN_HZ            (0.0f)
-#define PID_LPF_DT_REINIT_EPSILON (1.0e-7f)
+#define PID_LPF_DT_REINIT_RATIO   (0.25f) /* dt变化超过25%时才重建D项滤波器 */
 #define PID_PT3_MIN_HZ            (0.0f) /* PT3 截止频率旁路阈值，单位 Hz */
 #define PID_PT3_MIN_MS            (0.0f) /* PT3 平滑时间旁路阈值，单位 ms */
 
@@ -354,7 +354,7 @@ float PID_Update(pid_t *pid, float setpoint, float measurement, float dt)
     pid->dt = effective_dt;
 
     if ((pid->d_lpf_hz > PID_LPF_MIN_HZ) &&
-        (pid_absf(effective_dt - previous_dt) > PID_LPF_DT_REINIT_EPSILON))
+        (pid_absf(effective_dt - previous_dt) > (previous_dt * PID_LPF_DT_REINIT_RATIO)))
     {
         pid_refresh_dterm_filter(pid);
         pid->d_initialized = 0U;

@@ -110,16 +110,16 @@ void FC_Mode2_100Hz(void)
     // 这个是自动修改yaw的目标,是为了调节yaw,所以临时写的自动修改yaw目标,注释掉以后yaw目标就是0! 不允许对这部分代码修改,就这么保留注释!
     // FC_Mode2_UpdateYawTarget();
 
-    wifi_justfloat(g_car_vel_x, g_car_vel_y, g_car_yaw, g_car_yaw_rate_dps,
-                   g_euler.roll, g_euler.pitch, g_euler.yaw,
-                   roll_angle_target, pitch_angle_target, yaw_angle_target,
-                   g_car_lamp_fused_distance_projectioncenter_2.x_cm,
-                   g_car_lamp_fused_distance_projectioncenter_2.y_cm,
-                   g_mode2_velx_target, g_mode2_vely_target,
-                   g_mode2_velx_pid.ff_term, g_mode2_vely_pid.ff_term,
-                   g_mode2_velx_pid.output + g_mode2_velx_pid.ff_term,
-                   g_mode2_vely_pid.output + g_mode2_vely_pid.ff_term,
-                    Pos_Est_vel_x, Pos_Est_vel_y);
+    // wifi_justfloat(
+    //     roll_angle_target, pitch_angle_target, yaw_angle_target,
+    //     g_euler.roll, g_euler.pitch, g_euler.yaw,
+    //     Pos_Est_vel_x, Pos_Est_vel_y,
+    //     g_mode2_velx_pid.p_term, g_mode2_velx_pid.i_term,
+    //     g_mode2_velx_pid.d_term, g_mode2_velx_pid.output,
+    //     g_mode2_vely_pid.p_term, g_mode2_vely_pid.i_term,
+    //     g_mode2_vely_pid.d_term, g_mode2_vely_pid.output,
+    //     g_mode2_velx_target, g_mode2_vely_target,
+    //     g_tof_fused_height_mm);
 }
 
 void FC_Mode2_50Hz(float dt)
@@ -237,9 +237,9 @@ void FC_Mode2_50Hz(float dt)
     if (car_data_fresh != 0U)
     {
         velx_ff = FC_Mode_Clamp(g_fc_params.mode2_vel_x_kff * velx_target_rate + turn_ff_x,
-                                -FC_MODE_XY_ANGLE_LIMIT_DEG, FC_MODE_XY_ANGLE_LIMIT_DEG);
+                                -angle_target_max, angle_target_max);
         vely_ff = FC_Mode_Clamp(g_fc_params.mode2_vel_y_kff * vely_target_rate + turn_ff_y,
-                                -FC_MODE_XY_ANGLE_LIMIT_DEG, FC_MODE_XY_ANGLE_LIMIT_DEG);
+                                -angle_target_max, angle_target_max);
         s_mode2_velx_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA * (velx_ff - s_mode2_velx_ff_lpf);
         s_mode2_vely_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA * (vely_ff - s_mode2_vely_ff_lpf);
         velx_ff = s_mode2_velx_ff_lpf;
@@ -253,18 +253,18 @@ void FC_Mode2_50Hz(float dt)
         vely_ff = 0.0f;
     }
 
-    g_mode2_velx_pid.output_min = -FC_MODE_XY_ANGLE_LIMIT_DEG - roll_trim - velx_ff;
-    g_mode2_velx_pid.output_max = FC_MODE_XY_ANGLE_LIMIT_DEG - roll_trim - velx_ff;
-    g_mode2_vely_pid.output_min = -FC_MODE_XY_ANGLE_LIMIT_DEG - pitch_trim - vely_ff;
-    g_mode2_vely_pid.output_max = FC_MODE_XY_ANGLE_LIMIT_DEG - pitch_trim - vely_ff;
+    g_mode2_velx_pid.output_min = -angle_target_max - roll_trim - velx_ff;
+    g_mode2_velx_pid.output_max = angle_target_max - roll_trim - velx_ff;
+    g_mode2_vely_pid.output_min = -angle_target_max - pitch_trim - vely_ff;
+    g_mode2_vely_pid.output_max = angle_target_max - pitch_trim - vely_ff;
 
     velx_out = PID_Update(&g_mode2_velx_pid, g_mode2_velx_target, -Pos_Est_vel_x, dt) + velx_ff;
     vely_out = PID_Update(&g_mode2_vely_pid, g_mode2_vely_target, -Pos_Est_vel_y, dt) + vely_ff;
     g_mode2_velx_pid.ff_term = velx_ff;
     g_mode2_vely_pid.ff_term = vely_ff;
 
-    roll_angle_target = FC_Mode_Clamp(velx_out + roll_trim, -FC_MODE_XY_ANGLE_LIMIT_DEG, FC_MODE_XY_ANGLE_LIMIT_DEG);
-    pitch_angle_target = FC_Mode_Clamp(vely_out + pitch_trim, -FC_MODE_XY_ANGLE_LIMIT_DEG, FC_MODE_XY_ANGLE_LIMIT_DEG);
+    roll_angle_target = FC_Mode_Clamp(velx_out + roll_trim, -angle_target_max, angle_target_max);
+    pitch_angle_target = FC_Mode_Clamp(vely_out + pitch_trim, -angle_target_max, angle_target_max);
     YawAlign_GetDebug(&yaw_debug);
 
     // wifi_justfloat(g_car_vel_x,                 /* I1 */

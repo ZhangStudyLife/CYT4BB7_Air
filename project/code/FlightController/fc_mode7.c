@@ -94,24 +94,24 @@ void FC_Mode7_50Hz(float dt)
     roll_trim = FC_Mode_Get_Roll_Mech_Trim_Deg();
     pitch_trim = FC_Mode_Get_Pitch_Mech_Trim_Deg();
     velx_ff = FC_Mode_Clamp(g_fc_params.mode7_vel_x_kff * velx_target_rate,
-                            -FC_MODE_XY_ANGLE_LIMIT_DEG, FC_MODE_XY_ANGLE_LIMIT_DEG);
+                            -angle_target_max, angle_target_max);
     vely_ff = FC_Mode_Clamp(g_fc_params.mode7_vel_y_kff * vely_target_rate,
-                            -FC_MODE_XY_ANGLE_LIMIT_DEG, FC_MODE_XY_ANGLE_LIMIT_DEG);
+                            -angle_target_max, angle_target_max);
     s_mode7_velx_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA * (velx_ff - s_mode7_velx_ff_lpf);
     s_mode7_vely_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA * (vely_ff - s_mode7_vely_ff_lpf);
     velx_ff = s_mode7_velx_ff_lpf;
     vely_ff = s_mode7_vely_ff_lpf;
 
-    g_mode7_velx_pid.output_min = -FC_MODE_XY_ANGLE_LIMIT_DEG - roll_trim - velx_ff;
-    g_mode7_velx_pid.output_max = FC_MODE_XY_ANGLE_LIMIT_DEG - roll_trim - velx_ff;
-    g_mode7_vely_pid.output_min = -FC_MODE_XY_ANGLE_LIMIT_DEG - pitch_trim - vely_ff;
-    g_mode7_vely_pid.output_max = FC_MODE_XY_ANGLE_LIMIT_DEG - pitch_trim - vely_ff;
+    g_mode7_velx_pid.output_min = -angle_target_max - roll_trim - velx_ff;
+    g_mode7_velx_pid.output_max = angle_target_max - roll_trim - velx_ff;
+    g_mode7_vely_pid.output_min = -angle_target_max - pitch_trim - vely_ff;
+    g_mode7_vely_pid.output_max = angle_target_max - pitch_trim - vely_ff;
 
     velx_out = PID_Update(&g_mode7_velx_pid, g_mode7_velx_target, -Pos_Est_vel_x, dt) + velx_ff;
     vely_out = PID_Update(&g_mode7_vely_pid, g_mode7_vely_target, -Pos_Est_vel_y, dt) + vely_ff;
     g_mode7_velx_pid.ff_term = velx_ff;
     g_mode7_vely_pid.ff_term = vely_ff;
 
-    roll_angle_target = FC_Mode_Clamp(velx_out + roll_trim, -FC_MODE_XY_ANGLE_LIMIT_DEG, FC_MODE_XY_ANGLE_LIMIT_DEG);
-    pitch_angle_target = FC_Mode_Clamp(vely_out + pitch_trim, -FC_MODE_XY_ANGLE_LIMIT_DEG, FC_MODE_XY_ANGLE_LIMIT_DEG);
+    roll_angle_target = FC_Mode_Clamp(velx_out + roll_trim, -angle_target_max, angle_target_max);
+    pitch_angle_target = FC_Mode_Clamp(vely_out + pitch_trim, -angle_target_max, angle_target_max);
 }

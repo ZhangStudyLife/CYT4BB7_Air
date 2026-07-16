@@ -31,6 +31,8 @@ float roll_angle_target = 0.0f;
 float pitch_angle_target = 0.0f;
 /* Yaw 角度目标，单位度 */
 float yaw_angle_target = 0.0f;
+/* 水平速度控制允许输出的最大 Roll/Pitch 目标角，单位 deg */
+float angle_target_max = 30.0f;
 /* 高度速度环输出，单位 PWM */
 static float height_vel_out = 0.0f;
 /* 高度位置环输出，单位米每秒 */
@@ -747,21 +749,21 @@ void FC_Loop_500Hz(void)
         float roll_ctrl;
         float pitch_ctrl;
 
-        if (roll_angle_target > FC_MODE_XY_ANGLE_LIMIT_DEG)
+        if (roll_angle_target > angle_target_max)
         {
-            roll_angle_target = FC_MODE_XY_ANGLE_LIMIT_DEG;
+            roll_angle_target = angle_target_max;
         }
-        if (roll_angle_target < -FC_MODE_XY_ANGLE_LIMIT_DEG)
+        if (roll_angle_target < -angle_target_max)
         {
-            roll_angle_target = -FC_MODE_XY_ANGLE_LIMIT_DEG;
+            roll_angle_target = -angle_target_max;
         }
-        if (pitch_angle_target > FC_MODE_XY_ANGLE_LIMIT_DEG)
+        if (pitch_angle_target > angle_target_max)
         {
-            pitch_angle_target = FC_MODE_XY_ANGLE_LIMIT_DEG;
+            pitch_angle_target = angle_target_max;
         }
-        if (pitch_angle_target < -FC_MODE_XY_ANGLE_LIMIT_DEG)
+        if (pitch_angle_target < -angle_target_max)
         {
-            pitch_angle_target = -FC_MODE_XY_ANGLE_LIMIT_DEG;
+            pitch_angle_target = -angle_target_max;
         }
 
         /* 控制量限幅 */
@@ -804,18 +806,45 @@ void FC_Loop_500Hz(void)
     }
 
 
-    wifi_justfloat(
-        roll_gyro_target, pitch_gyro_target, yaw_gyro_target,
-        g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
-        roll_angle_target, pitch_angle_target, yaw_angle_target,
-        g_euler.roll, g_euler.pitch, g_euler.yaw,
-        Pos_Est_vel_x, Pos_Est_vel_y,
-        g_mode7_velx_pid.p_term, g_mode7_velx_pid.i_term,
-        g_mode7_velx_pid.d_term, g_mode7_velx_pid.output,
-        g_mode7_vely_pid.p_term, g_mode7_vely_pid.i_term,
-        g_mode7_vely_pid.d_term, g_mode7_vely_pid.output,
-        g_mode7_velx_target, g_mode7_vely_target,
-        g_tof_fused_height_mm);
+    wifi_justfloat(image_data[Front].car_lamp_data[0].cx,  /* I7 */
+                image_data[Front].car_lamp_data[0].cy,  /* I8 */
+                image_data[Front].car_lamp_data[0].angle, /* I9 */
+                image_data[Front].car_lamp_data[0].width, /* I10 */
+                image_data[Front].car_lamp_data[0].length, /* I11 */
+                image_data[Center].car_lamp_data[0].cx, /* I17 */
+                image_data[Center].car_lamp_data[0].cy, /* I18 */
+                image_data[Center].car_lamp_data[0].angle, /* I19 */
+                image_data[Center].car_lamp_data[0].width, /* I20 */
+                image_data[Center].car_lamp_data[0].length, /* I21 */
+                image_data[Back].car_lamp_data[0].cx,   /* I27 */
+                image_data[Back].car_lamp_data[0].cy,   /* I28 */
+                image_data[Back].car_lamp_data[0].angle, /* I29 */
+                image_data[Back].car_lamp_data[0].width, /* I30 */
+                image_data[Back].car_lamp_data[0].length, /* I31 */
+                g_car_lamp_fused.cx,
+                g_car_lamp_fused.cy,
+                g_car_lamp_fused.valid,
+                g_car_lamp_fused_distance_projectioncenter_2.x_cm,
+                g_car_lamp_fused_distance_projectioncenter_2.y_cm,
+                g_euler.roll,
+                g_euler.pitch,
+                g_euler.yaw,
+                g_projection_center.cx,
+                g_projection_center.cy
+                );
+
+    // wifi_justfloat(
+    //     roll_gyro_target, pitch_gyro_target, yaw_gyro_target,
+    //     g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
+    //     roll_angle_target, pitch_angle_target, yaw_angle_target,
+    //     g_euler.roll, g_euler.pitch, g_euler.yaw,
+    //     Pos_Est_vel_x, Pos_Est_vel_y,
+    //     g_mode7_velx_pid.p_term, g_mode7_velx_pid.i_term,
+    //     g_mode7_velx_pid.d_term, g_mode7_velx_pid.output,
+    //     g_mode7_vely_pid.p_term, g_mode7_vely_pid.i_term,
+    //     g_mode7_vely_pid.d_term, g_mode7_vely_pid.output,
+    //     g_mode7_velx_target, g_mode7_vely_target,
+    //     g_tof_fused_height_mm);
 
 }
 

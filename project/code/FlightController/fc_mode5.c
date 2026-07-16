@@ -207,9 +207,9 @@ void FC_Mode5_50Hz(float dt)
     if (car_data_fresh != 0U)
     {
         velx_ff = FC_Mode_Clamp(g_fc_params.mode5_vel_x_kff * velx_target_rate + turn_ff_x,
-                                -FC_MODE_XY_ANGLE_LIMIT_DEG, FC_MODE_XY_ANGLE_LIMIT_DEG);
+                                -angle_target_max, angle_target_max);
         vely_ff = FC_Mode_Clamp(g_fc_params.mode5_vel_y_kff * vely_target_rate + turn_ff_y,
-                                -FC_MODE_XY_ANGLE_LIMIT_DEG, FC_MODE_XY_ANGLE_LIMIT_DEG);
+                                -angle_target_max, angle_target_max);
         s_mode5_velx_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA * (velx_ff - s_mode5_velx_ff_lpf);
         s_mode5_vely_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA * (vely_ff - s_mode5_vely_ff_lpf);
         velx_ff = s_mode5_velx_ff_lpf;
@@ -223,18 +223,18 @@ void FC_Mode5_50Hz(float dt)
         vely_ff = 0.0f;
     }
 
-    g_mode5_velx_pid.output_min = -FC_MODE_XY_ANGLE_LIMIT_DEG - roll_trim - velx_ff;
-    g_mode5_velx_pid.output_max = FC_MODE_XY_ANGLE_LIMIT_DEG - roll_trim - velx_ff;
-    g_mode5_vely_pid.output_min = -FC_MODE_XY_ANGLE_LIMIT_DEG - pitch_trim - vely_ff;
-    g_mode5_vely_pid.output_max = FC_MODE_XY_ANGLE_LIMIT_DEG - pitch_trim - vely_ff;
+    g_mode5_velx_pid.output_min = -angle_target_max - roll_trim - velx_ff;
+    g_mode5_velx_pid.output_max = angle_target_max - roll_trim - velx_ff;
+    g_mode5_vely_pid.output_min = -angle_target_max - pitch_trim - vely_ff;
+    g_mode5_vely_pid.output_max = angle_target_max - pitch_trim - vely_ff;
 
     velx_out = PID_Update(&g_mode5_velx_pid, g_mode5_velx_target, -Pos_Est_vel_x, dt) + velx_ff;
     vely_out = PID_Update(&g_mode5_vely_pid, g_mode5_vely_target, -Pos_Est_vel_y, dt) + vely_ff;
     g_mode5_velx_pid.ff_term = velx_ff;
     g_mode5_vely_pid.ff_term = vely_ff;
 
-    roll_angle_target = FC_Mode_Clamp(velx_out + roll_trim, -FC_MODE_XY_ANGLE_LIMIT_DEG, FC_MODE_XY_ANGLE_LIMIT_DEG);
-    pitch_angle_target = FC_Mode_Clamp(vely_out + pitch_trim, -FC_MODE_XY_ANGLE_LIMIT_DEG, FC_MODE_XY_ANGLE_LIMIT_DEG);
+    roll_angle_target = FC_Mode_Clamp(velx_out + roll_trim, -angle_target_max, angle_target_max);
+    pitch_angle_target = FC_Mode_Clamp(vely_out + pitch_trim, -angle_target_max, angle_target_max);
 
     // wifi_justfloat(g_car_vel_x,                 /* I1 */
     //              g_car_vel_y,                   /* I2 */

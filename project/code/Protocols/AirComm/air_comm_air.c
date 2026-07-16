@@ -19,8 +19,8 @@
 #define AIR_COMM_FRAME_OVERHEAD              (9U)    /* 帧开销：4帧头 + type + seq + len + 2crc */
 #define AIR_COMM_MAX_FRAME                   (AIR_COMM_MAX_PAYLOAD + AIR_COMM_FRAME_OVERHEAD)
 #define AIR_COMM_RX_QUEUE_SIZE               (512U)  /* 接收环形队列大小（字节） */
-#define AIR_COMM_PARAM_TABLE_MAX             (156U)  /* 最多注册参数个数 */
-#define AIR_COMM_DEFAULT_PARAM_COUNT         (156U)
+#define AIR_COMM_PARAM_TABLE_MAX             (157U)  /* 最多注册参数个数 */
+#define AIR_COMM_DEFAULT_PARAM_COUNT         (157U)
 #define AIR_COMM_REMOTE_CANCEL_MS            (400U)
 #define AIR_COMM_REMOTE_TIMEOUT_MS           (700U)
 #define AIR_COMM_REMOTE_EXP_CANCEL_MS        (1800U)
@@ -1480,6 +1480,7 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_INT32(base_throttle, g_fc_params.base_throttle, 0, 6000);
     AIR_COMM_REGISTER_FLOAT(roll_mech_trim_deg, g_fc_params.roll_mech_trim_deg, -30.0f, 30.0f);
     AIR_COMM_REGISTER_FLOAT(pitch_mech_trim_deg, g_fc_params.pitch_mech_trim_deg, -30.0f, 30.0f);
+    AIR_COMM_REGISTER_FLOAT(angle_target_max, angle_target_max, 10.0f, 30.0f);
 
     AIR_COMM_REGISTER_FLOAT(roll_gyro_kp, g_fc_params.roll_gyro_kp, 0.0f, 3000.0f);
     AIR_COMM_REGISTER_FLOAT(roll_gyro_ki, g_fc_params.roll_gyro_ki, 0.0f, 3000.0f);
@@ -1677,7 +1678,7 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(mode2_vel_y_i_limit, g_fc_params.mode2_vel_y_i_limit, 0.0f, 20.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_vel_y_d_lpf, g_fc_params.mode2_vel_y_d_lpf, 0.0f, 30.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_kp_car_x, g_fc_params.mode2_kp_car_x, 0.0f, 100.0f);
-    AIR_COMM_REGISTER_FLOAT(mode2_kp_car_y, g_fc_params.mode2_kp_car_y, 60.0f, 100.0f);
+    AIR_COMM_REGISTER_FLOAT(mode2_kp_car_y, g_fc_params.mode2_kp_car_y, 0.0f, 100.0f);
     AIR_COMM_REGISTER_FLOAT(Car_Speed, Car_Speed, 0.0f, 3.0f);
     AIR_COMM_REGISTER_FLOAT(Car_Speed_Fast, Car_Speed_Fast, 0.0f, 3.0f);
 

@@ -42,7 +42,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pitch_mech_trim_deg = 1.5f;   /* Pitch 机械配平角 */
 
     /* ===== Roll 轴角速度环参数 ===== */
-    params->roll_gyro_kp = 5.4f;
+    params->roll_gyro_kp = 7.0f;
     params->roll_gyro_ki = 0.18f;
     params->roll_gyro_kd = 0.010f;
     params->roll_gyro_kff = 0.0f;
@@ -50,7 +50,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->roll_gyro_d_lpf = 60.0f;
 
     /* ===== Pitch 轴角速度环参数 ===== */
-    params->pitch_gyro_kp = 5.3f;
+    params->pitch_gyro_kp = 7.0f;
     params->pitch_gyro_ki = 0.14f;
     params->pitch_gyro_kd = 0.010f;
     params->pitch_gyro_kff = 0.0f;
@@ -69,7 +69,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->roll_angle_kp = 6.0f;
     params->roll_angle_ki = 0.0f;
     params->roll_angle_kd = 0.0f;
-    params->roll_angle_kff = 0.02f;
+    params->roll_angle_kff = 0.0f;
     params->roll_angle_i_limit = 80.0f;
     params->roll_angle_d_lpf = 15.0f;
 
@@ -77,7 +77,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pitch_angle_kp = 6.2f;
     params->pitch_angle_ki = 0.0f;
     params->pitch_angle_kd = 0.0f;
-    params->pitch_angle_kff = 0.04f;
+    params->pitch_angle_kff = 0.0f;
     params->pitch_angle_i_limit = 80.0f;
     params->pitch_angle_d_lpf = 15.0f;
 
@@ -143,16 +143,16 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode1_brake_exit_vel_cmps = 10.0f;
 
     /* ===== 模式 7 速度环参数 ===== */
-    params->mode7_vel_x_kp = 0.2;
+    params->mode7_vel_x_kp = 0.2f;
     params->mode7_vel_x_ki = 0.02f;
-    params->mode7_vel_x_kd = 0.0025f;
-    params->mode7_vel_x_kff = 0.002f;
+    params->mode7_vel_x_kd = 0.0f;
+    params->mode7_vel_x_kff = 0.0f;
     params->mode7_vel_x_i_limit = 3.0f;
     params->mode7_vel_x_d_lpf = 10.0f;
     params->mode7_vel_y_kp = 0.2f;
-    params->mode7_vel_y_ki = 0.015f;
-    params->mode7_vel_y_kd = 0.0025f;
-    params->mode7_vel_y_kff = 0.002f;
+    params->mode7_vel_y_ki = 0.02f;
+    params->mode7_vel_y_kd = 0.00f;
+    params->mode7_vel_y_kff = 0.0f;
     params->mode7_vel_y_i_limit = 3.0f;
     params->mode7_vel_y_d_lpf = 10.0f;
 
@@ -160,7 +160,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pos_est_k_flow = 0.04f;
 
     /* ===== 模式 8 图像位置环参数 ===== */
-    params->mode8_img_x_kp = 2.8f;
+    params->mode8_img_x_kp = 2.4f;
     params->mode8_img_x_ki = 0.0f;
     params->mode8_img_x_kd = 0.0f;
     params->mode8_img_x_kff = 0.0f;
@@ -175,14 +175,14 @@ static void fc_params_fill_defaults(fc_params_t *params)
 
     params->mode8_vel_x_kp = 0.2f;
     params->mode8_vel_x_ki = 0.02f;
-    params->mode8_vel_x_kd = 0.0025f;
-    params->mode8_vel_x_kff = 0.002f;
+    params->mode8_vel_x_kd = 0.0f;
+    params->mode8_vel_x_kff = 0.0f;
     params->mode8_vel_x_i_limit = 3.0f;
     params->mode8_vel_x_d_lpf = 10.0f;
     params->mode8_vel_y_kp = 0.2f;
-    params->mode8_vel_y_ki = 0.015f;
-    params->mode8_vel_y_kd = 0.0025f;
-    params->mode8_vel_y_kff = 0.002f;
+    params->mode8_vel_y_ki = 0.02f;
+    params->mode8_vel_y_kd = 0.0f;
+    params->mode8_vel_y_kff = 0.0f;
     params->mode8_vel_y_i_limit = 3.0f;
     params->mode8_vel_y_d_lpf = 10.0f;
     params->mode8_kp_car_x = 50.0f;
@@ -191,30 +191,30 @@ static void fc_params_fill_defaults(fc_params_t *params)
     /* ===== Mode 2 image and velocity params ===== */
     params->mode2_img_x_kp = 2.8f;
     params->mode2_img_x_ki = 0.0f;
-    params->mode2_img_x_kd = 0.0f;
+    params->mode2_img_x_kd = 0.15f;
     params->mode2_img_x_kff = 0.0f;
     params->mode2_img_x_i_limit = 0.0f;
-    params->mode2_img_x_d_lpf = 0.0f;
-    params->mode2_img_y_kp = 2.2f;
+    params->mode2_img_x_d_lpf = 1.5f;
+    params->mode2_img_y_kp = 2.0f;
     params->mode2_img_y_ki = 0.0f;
-    params->mode2_img_y_kd = 0.0f;
+    params->mode2_img_y_kd = 0.15f;
     params->mode2_img_y_kff = 0.0f;
     params->mode2_img_y_i_limit = 0.0f;
-    params->mode2_img_y_d_lpf = 0.0f;
+    params->mode2_img_y_d_lpf = 1.5f;
     params->mode2_vel_x_kp = 0.2f;
     params->mode2_vel_x_ki = 0.02f;
-    params->mode2_vel_x_kd = 0.0025f;
-    params->mode2_vel_x_kff = 0.002f;
+    params->mode2_vel_x_kd = 0.0f;
+    params->mode2_vel_x_kff = 0.0f;
     params->mode2_vel_x_i_limit = 3.0f;
     params->mode2_vel_x_d_lpf = 10.0f;
     params->mode2_vel_y_kp = 0.2f;
-    params->mode2_vel_y_ki = 0.015f;
-    params->mode2_vel_y_kd = 0.0025f;
-    params->mode2_vel_y_kff = 0.002f;
+    params->mode2_vel_y_ki = 0.02f;
+    params->mode2_vel_y_kd = 0.00f;
+    params->mode2_vel_y_kff = 0.0f;
     params->mode2_vel_y_i_limit = 3.0f;
     params->mode2_vel_y_d_lpf = 10.0f;
-    params->mode2_kp_car_x = 50.0f;
-    params->mode2_kp_car_y = 65.0f;
+    params->mode2_kp_car_x = 10.0f;
+    params->mode2_kp_car_y = 30.0f;
 
     /* ===== Mode 5 image and velocity params ===== */
     params->mode5_img_x_kp = 2.8f;
@@ -231,14 +231,14 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode5_img_y_d_lpf = 0.0f;
     params->mode5_vel_x_kp = 0.2f;
     params->mode5_vel_x_ki = 0.02f;
-    params->mode5_vel_x_kd = 0.0025f;
-    params->mode5_vel_x_kff = 0.002f;
+    params->mode5_vel_x_kd = 0.0f;
+    params->mode5_vel_x_kff = 0.001f;
     params->mode5_vel_x_i_limit = 3.0f;
     params->mode5_vel_x_d_lpf = 10.0f;
     params->mode5_vel_y_kp = 0.2f;
-    params->mode5_vel_y_ki = 0.015f;
-    params->mode5_vel_y_kd = 0.0025f;
-    params->mode5_vel_y_kff = 0.002f;
+    params->mode5_vel_y_ki = 0.02f;
+    params->mode5_vel_y_kd = 0.00f;
+    params->mode5_vel_y_kff = 0.001f;
     params->mode5_vel_y_i_limit = 3.0f;
     params->mode5_vel_y_d_lpf = 10.0f;
     params->mode5_kp_car_x = 50.0f;

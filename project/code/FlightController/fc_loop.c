@@ -398,7 +398,7 @@ void FC_Loop_50Hz(void)
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_3:
-        FC_Mode0_50Hz(dt);
+        FC_Mode3_50Hz(dt);
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_4:
@@ -560,7 +560,7 @@ void FC_Loop_100Hz(void)
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_3:
-        FC_Mode0_100Hz();
+        FC_Mode3_100Hz();
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_4:

@@ -46,13 +46,9 @@ static float FC_Mode1_ApplyDeadzone(float v, float dz)
 void FC_Mode1_Init(void)
 {
     PID_Init(&s_mode1_velx_pid,
-             g_fc_params.vel_x_kp, g_fc_params.vel_x_ki, g_fc_params.vel_x_kd,
-             g_fc_params.vel_x_kff, g_fc_params.vel_xy_dt,
-             g_fc_params.vel_x_i_limit, g_fc_params.vel_x_d_lpf);
+             0.14f, 0.02f, 0.0f, 0.0f, g_fc_params.vel_xy_dt, 3.0f, 0.0f);
     PID_Init(&s_mode1_vely_pid,
-             g_fc_params.vel_y_kp, g_fc_params.vel_y_ki, g_fc_params.vel_y_kd,
-             g_fc_params.vel_y_kff, g_fc_params.vel_xy_dt,
-             g_fc_params.vel_y_i_limit, g_fc_params.vel_y_d_lpf);
+             0.14f, 0.02f, 0.0f, 0.0f, g_fc_params.vel_xy_dt, 3.0f, 0.0f);
     FC_Mode1_Reset();
 }
 

@@ -89,22 +89,6 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->yaw_angle_i_limit = 0.0f;
     params->yaw_angle_d_lpf = 0.0f;
 
-    /* ===== X 轴位置环参数 ===== */
-    params->pos_x_kp = 0.90f;
-    params->pos_x_ki = 0.0f;
-    params->pos_x_kd = 0.0f;
-    params->pos_x_kff = 0.0f;
-    params->pos_x_i_limit = 0.0f;
-    params->pos_x_d_lpf = 0.0f;
-
-    /* ===== Y 轴位置环参数 ===== */
-    params->pos_y_kp = 0.90f;
-    params->pos_y_ki = 0.0f;
-    params->pos_y_kd = 0.0f;
-    params->pos_y_kff = 0.0f;
-    params->pos_y_i_limit = 0.0f;
-    params->pos_y_d_lpf = 0.0f;
-
     /* ===== Z 轴位置环参数 ===== */
     params->pos_z_kp = 1.3f;
     params->pos_z_ki = 0.0f;
@@ -112,22 +96,6 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pos_z_kff = 0.0f;
     params->pos_z_i_limit = 0.0f;
     params->pos_z_d_lpf = 0.0f;
-
-    /* ===== X 轴速度环参数 ===== */
-    params->vel_x_kp = 0.14f;
-    params->vel_x_ki = 0.02f;
-    params->vel_x_kd = 0.0f;
-    params->vel_x_kff = 0.0f;
-    params->vel_x_i_limit = 3.0f;
-    params->vel_x_d_lpf = 0.0f;
-
-    /* ===== Y 轴速度环参数 ===== */
-    params->vel_y_kp = 0.14f;
-    params->vel_y_ki = 0.02f;
-    params->vel_y_kd = 0.0f;
-    params->vel_y_kff = 0.0f;
-    params->vel_y_i_limit = 3.0f;
-    params->vel_y_d_lpf = 0.0f;
 
     /* ===== Z 轴速度环参数 ===== */
     params->vel_z_kp = 30.0f;
@@ -142,119 +110,8 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode1_brake_kp = 0.18f;
     params->mode1_brake_exit_vel_cmps = 10.0f;
 
-    /* ===== 模式 7 速度环参数 ===== */
-    params->mode7_vel_x_kp = 0.2f;
-    params->mode7_vel_x_ki = 0.02f;
-    params->mode7_vel_x_kd = 0.0f;
-    params->mode7_vel_x_kff = 0.0f;
-    params->mode7_vel_x_i_limit = 3.0f;
-    params->mode7_vel_x_d_lpf = 10.0f;
-    params->mode7_vel_y_kp = 0.2f;
-    params->mode7_vel_y_ki = 0.02f;
-    params->mode7_vel_y_kd = 0.00f;
-    params->mode7_vel_y_kff = 0.0f;
-    params->mode7_vel_y_i_limit = 3.0f;
-    params->mode7_vel_y_d_lpf = 10.0f;
-
     /* ===== 位置估计参数 ===== */
     params->pos_est_k_flow = 0.04f;
-
-    /* ===== 模式 8 图像位置环参数 ===== */
-    params->mode8_img_x_kp = 2.4f;
-    params->mode8_img_x_ki = 0.0f;
-    params->mode8_img_x_kd = 0.0f;
-    params->mode8_img_x_kff = 0.0f;
-    params->mode8_img_x_i_limit = 0.0f;
-    params->mode8_img_x_d_lpf = 0.0f;
-    params->mode8_img_y_kp = 2.2f;
-    params->mode8_img_y_ki = 0.0f;
-    params->mode8_img_y_kd = 0.0f;
-    params->mode8_img_y_kff = 0.0f;
-    params->mode8_img_y_i_limit = 0.0f;
-    params->mode8_img_y_d_lpf = 0.0f;
-
-    params->mode8_vel_x_kp = 0.2f;
-    params->mode8_vel_x_ki = 0.02f;
-    params->mode8_vel_x_kd = 0.0f;
-    params->mode8_vel_x_kff = 0.0f;
-    params->mode8_vel_x_i_limit = 3.0f;
-    params->mode8_vel_x_d_lpf = 10.0f;
-    params->mode8_vel_y_kp = 0.2f;
-    params->mode8_vel_y_ki = 0.02f;
-    params->mode8_vel_y_kd = 0.0f;
-    params->mode8_vel_y_kff = 0.0f;
-    params->mode8_vel_y_i_limit = 3.0f;
-    params->mode8_vel_y_d_lpf = 10.0f;
-    params->mode8_kp_car_x = 50.0f;
-    params->mode8_kp_car_y = 65.0f;
-
-    /* ===== 模式 4 图像、速度与转弯前馈参数 ===== */
-    params->mode4_img_x_kp = 2.5f;
-    params->mode4_img_x_kp2 = 0.1f;
-    params->mode4_img_x_ki = 0.0f;
-    params->mode4_img_x_kd = 0.0f;
-    params->mode4_img_x_kff = 0.0f;
-    params->mode4_img_x_i_limit = 0.0f;
-    params->mode4_img_x_d_lpf = 0.0f;
-    params->mode4_img_y_kp = 2.5f;
-    params->mode4_img_y_kp2 = 0.1f;
-    params->mode4_img_y_ki = 0.0f;
-    params->mode4_img_y_kd = 0.0f;
-    params->mode4_img_y_kff = 0.0f;
-    params->mode4_img_y_i_limit = 0.0f;
-    params->mode4_img_y_d_lpf = 0.0f;
-    params->mode4_vel_x_kp = 0.2f;
-    params->mode4_vel_x_ki = 0.02f;
-    params->mode4_vel_x_kd = 0.0f;
-    params->mode4_vel_x_kff = 0.0f;
-    params->mode4_vel_x_i_limit = 3.0f;
-    params->mode4_vel_x_d_lpf = 10.0f;
-    params->mode4_vel_y_kp = 0.2f;
-    params->mode4_vel_y_ki = 0.02f;
-    params->mode4_vel_y_kd = 0.0f;
-    params->mode4_vel_y_kff = 0.0f;
-    params->mode4_vel_y_i_limit = 3.0f;
-    params->mode4_vel_y_d_lpf = 10.0f;
-    params->mode4_kp_car_x = 50.0f;
-    params->mode4_kp_car_y = 65.0f;
-    params->mode4_turn_accel_ff_gain_x = 0.72f;
-    params->mode4_turn_accel_ff_gain_y = 0.30f;
-    params->mode4_turn_accel_ff_limit_x_deg = 18.0f;
-    params->mode4_turn_accel_ff_limit_y_deg = 14.0f;
-
-    /* ===== 模式 3 图像、速度与转弯前馈参数 ===== */
-    params->mode3_img_x_kp = 2.5f;
-    params->mode3_img_x_kp2 = 0.1f;
-    params->mode3_img_x_ki = 0.0f;
-    params->mode3_img_x_kd = 0.0f;
-    params->mode3_img_x_kff = 0.0f;
-    params->mode3_img_x_i_limit = 0.0f;
-    params->mode3_img_x_d_lpf = 0.0f;
-    params->mode3_img_y_kp = 2.5f;
-    params->mode3_img_y_kp2 = 0.1f;
-    params->mode3_img_y_ki = 0.0f;
-    params->mode3_img_y_kd = 0.0f;
-    params->mode3_img_y_kff = 0.0f;
-    params->mode3_img_y_i_limit = 0.0f;
-    params->mode3_img_y_d_lpf = 0.0f;
-    params->mode3_vel_x_kp = 0.2f;
-    params->mode3_vel_x_ki = 0.02f;
-    params->mode3_vel_x_kd = 0.0f;
-    params->mode3_vel_x_kff = 0.0f;
-    params->mode3_vel_x_i_limit = 3.0f;
-    params->mode3_vel_x_d_lpf = 10.0f;
-    params->mode3_vel_y_kp = 0.2f;
-    params->mode3_vel_y_ki = 0.02f;
-    params->mode3_vel_y_kd = 0.0f;
-    params->mode3_vel_y_kff = 0.0f;
-    params->mode3_vel_y_i_limit = 3.0f;
-    params->mode3_vel_y_d_lpf = 10.0f;
-    params->mode3_kp_car_x = 50.0f;
-    params->mode3_kp_car_y = 65.0f;
-    params->mode3_turn_accel_ff_gain_x = 0.72f;
-    params->mode3_turn_accel_ff_gain_y = 0.30f;
-    params->mode3_turn_accel_ff_limit_x_deg = 18.0f;
-    params->mode3_turn_accel_ff_limit_y_deg = 14.0f;
 
     /* ===== Mode 2 image and velocity params ===== */
     params->mode2_img_x_kp = 2.8f;
@@ -284,6 +141,74 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode2_kp_car_x = 10.0f;
     params->mode2_kp_car_y = 30.0f;
 
+    /* ===== 模式 3 图像、速度与转弯前馈参数 ===== */
+    params->mode3_img_x_kp = 0.9f;
+    params->mode3_img_x_kp2 = 3.0f;
+    params->mode3_img_x_ki = 0.0f;
+    params->mode3_img_x_kd = 0.7f;
+    params->mode3_img_x_kff = 0.0f;
+    params->mode3_img_x_i_limit = 0.0f;
+    params->mode3_img_x_d_lpf = 1.5f;
+    params->mode3_img_y_kp = 0.9f;
+    params->mode3_img_y_kp2 = 3.0f;
+    params->mode3_img_y_ki = 0.0f;
+    params->mode3_img_y_kd = 0.7f;
+    params->mode3_img_y_kff = 0.0f;
+    params->mode3_img_y_i_limit = 0.0f;
+    params->mode3_img_y_d_lpf = 1.5f;
+    params->mode3_vel_x_kp = 0.18f;
+    params->mode3_vel_x_ki = 0.0f;
+    params->mode3_vel_x_kd = 0.0f;
+    params->mode3_vel_x_kff = 0.0f;
+    params->mode3_vel_x_i_limit = 3.0f;
+    params->mode3_vel_x_d_lpf = 10.0f;
+    params->mode3_vel_y_kp = 0.18f;
+    params->mode3_vel_y_ki = 0.0f;
+    params->mode3_vel_y_kd = 0.0f;
+    params->mode3_vel_y_kff = 0.0f;
+    params->mode3_vel_y_i_limit = 3.0f;
+    params->mode3_vel_y_d_lpf = 10.0f;
+    params->mode3_kp_car_x = 60.0f;
+    params->mode3_kp_car_y = 60.0f;
+    params->mode3_turn_accel_ff_gain_x = 0.72f;
+    params->mode3_turn_accel_ff_gain_y = 0.30f;
+    params->mode3_turn_accel_ff_limit_x_deg = 18.0f;
+    params->mode3_turn_accel_ff_limit_y_deg = 14.0f;
+
+    /* ===== 模式 4 图像、速度与转弯前馈参数 ===== */
+    params->mode4_img_x_kp = 0.9f;
+    params->mode4_img_x_kp2 = 3.0f;
+    params->mode4_img_x_ki = 0.0f;
+    params->mode4_img_x_kd = 0.7f;
+    params->mode4_img_x_kff = 0.0f;
+    params->mode4_img_x_i_limit = 0.0f;
+    params->mode4_img_x_d_lpf = 1.5f;
+    params->mode4_img_y_kp = 0.9f;
+    params->mode4_img_y_kp2 = 3.0f;
+    params->mode4_img_y_ki = 0.0f;
+    params->mode4_img_y_kd = 0.7f;
+    params->mode4_img_y_kff = 0.0f;
+    params->mode4_img_y_i_limit = 0.0f;
+    params->mode4_img_y_d_lpf = 1.5f;
+    params->mode4_vel_x_kp = 0.18f;
+    params->mode4_vel_x_ki = 0.0f;
+    params->mode4_vel_x_kd = 0.0f;
+    params->mode4_vel_x_kff = 0.0f;
+    params->mode4_vel_x_i_limit = 3.0f;
+    params->mode4_vel_x_d_lpf = 10.0f;
+    params->mode4_vel_y_kp = 0.18f;
+    params->mode4_vel_y_ki = 0.0f;
+    params->mode4_vel_y_kd = 0.0f;
+    params->mode4_vel_y_kff = 0.0f;
+    params->mode4_vel_y_i_limit = 3.0f;
+    params->mode4_vel_y_d_lpf = 10.0f;
+    params->mode4_kp_car_x = 60.0f;
+    params->mode4_kp_car_y = 60.0f;
+    params->mode4_turn_accel_ff_gain_x = 0.72f;
+    params->mode4_turn_accel_ff_gain_y = 0.30f;
+    params->mode4_turn_accel_ff_limit_x_deg = 18.0f;
+    params->mode4_turn_accel_ff_limit_y_deg = 14.0f;
+
     /* ===== Mode 5 image and velocity params ===== */
     params->mode5_img_x_kp = 2.8f;
     params->mode5_img_x_ki = 0.0f;
@@ -311,6 +236,48 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode5_vel_y_d_lpf = 10.0f;
     params->mode5_kp_car_x = 50.0f;
     params->mode5_kp_car_y = 65.0f;
+
+    /* ===== 模式 7 速度环参数 ===== */
+    params->mode7_vel_x_kp = 0.2f;
+    params->mode7_vel_x_ki = 0.02f;
+    params->mode7_vel_x_kd = 0.0f;
+    params->mode7_vel_x_kff = 0.0f;
+    params->mode7_vel_x_i_limit = 3.0f;
+    params->mode7_vel_x_d_lpf = 10.0f;
+    params->mode7_vel_y_kp = 0.2f;
+    params->mode7_vel_y_ki = 0.02f;
+    params->mode7_vel_y_kd = 0.00f;
+    params->mode7_vel_y_kff = 0.0f;
+    params->mode7_vel_y_i_limit = 3.0f;
+    params->mode7_vel_y_d_lpf = 10.0f;
+
+    /* ===== 模式 8 图像位置环参数 ===== */
+    params->mode8_img_x_kp = 2.4f;
+    params->mode8_img_x_ki = 0.0f;
+    params->mode8_img_x_kd = 0.0f;
+    params->mode8_img_x_kff = 0.0f;
+    params->mode8_img_x_i_limit = 0.0f;
+    params->mode8_img_x_d_lpf = 0.0f;
+    params->mode8_img_y_kp = 2.2f;
+    params->mode8_img_y_ki = 0.0f;
+    params->mode8_img_y_kd = 0.0f;
+    params->mode8_img_y_kff = 0.0f;
+    params->mode8_img_y_i_limit = 0.0f;
+    params->mode8_img_y_d_lpf = 0.0f;
+    params->mode8_vel_x_kp = 0.2f;
+    params->mode8_vel_x_ki = 0.02f;
+    params->mode8_vel_x_kd = 0.0f;
+    params->mode8_vel_x_kff = 0.0f;
+    params->mode8_vel_x_i_limit = 3.0f;
+    params->mode8_vel_x_d_lpf = 10.0f;
+    params->mode8_vel_y_kp = 0.2f;
+    params->mode8_vel_y_ki = 0.02f;
+    params->mode8_vel_y_kd = 0.0f;
+    params->mode8_vel_y_kff = 0.0f;
+    params->mode8_vel_y_i_limit = 3.0f;
+    params->mode8_vel_y_d_lpf = 10.0f;
+    params->mode8_kp_car_x = 50.0f;
+    params->mode8_kp_car_y = 65.0f;
 
 }
 

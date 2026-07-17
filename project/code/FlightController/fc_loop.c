@@ -806,32 +806,35 @@ void FC_Loop_500Hz(void)
     }
 
 
-    wifi_justfloat(image_data[Front].car_lamp_data[0].cx,  /* I7 */
-                image_data[Front].car_lamp_data[0].cy,  /* I8 */
-                image_data[Front].car_lamp_data[0].angle, /* I9 */
-                image_data[Front].car_lamp_data[0].width, /* I10 */
-                image_data[Front].car_lamp_data[0].length, /* I11 */
-                image_data[Center].car_lamp_data[0].cx, /* I17 */
-                image_data[Center].car_lamp_data[0].cy, /* I18 */
-                image_data[Center].car_lamp_data[0].angle, /* I19 */
-                image_data[Center].car_lamp_data[0].width, /* I20 */
-                image_data[Center].car_lamp_data[0].length, /* I21 */
-                image_data[Back].car_lamp_data[0].cx,   /* I27 */
-                image_data[Back].car_lamp_data[0].cy,   /* I28 */
-                image_data[Back].car_lamp_data[0].angle, /* I29 */
-                image_data[Back].car_lamp_data[0].width, /* I30 */
-                image_data[Back].car_lamp_data[0].length, /* I31 */
-                g_car_lamp_fused.cx,
-                g_car_lamp_fused.cy,
-                g_car_lamp_fused.valid,
-                g_car_lamp_fused_distance_projectioncenter_2.x_cm,
-                g_car_lamp_fused_distance_projectioncenter_2.y_cm,
-                g_euler.roll,
-                g_euler.pitch,
-                g_euler.yaw,
-                g_projection_center.cx,
-                g_projection_center.cy
-                );
+    
+
+
+    // wifi_justfloat(image_data[Front].car_lamp_data[0].cx,  /* I7 */
+    //             image_data[Front].car_lamp_data[0].cy,  /* I8 */
+    //             image_data[Front].car_lamp_data[0].angle, /* I9 */
+    //             image_data[Front].car_lamp_data[0].width, /* I10 */
+    //             image_data[Front].car_lamp_data[0].length, /* I11 */
+    //             image_data[Center].car_lamp_data[0].cx, /* I17 */
+    //             image_data[Center].car_lamp_data[0].cy, /* I18 */
+    //             image_data[Center].car_lamp_data[0].angle, /* I19 */
+    //             image_data[Center].car_lamp_data[0].width, /* I20 */
+    //             image_data[Center].car_lamp_data[0].length, /* I21 */
+    //             image_data[Back].car_lamp_data[0].cx,   /* I27 */
+    //             image_data[Back].car_lamp_data[0].cy,   /* I28 */
+    //             image_data[Back].car_lamp_data[0].angle, /* I29 */
+    //             image_data[Back].car_lamp_data[0].width, /* I30 */
+    //             image_data[Back].car_lamp_data[0].length, /* I31 */
+    //             g_car_lamp_fused.cx,
+    //             g_car_lamp_fused.cy,
+    //             g_car_lamp_fused.valid,
+    //             g_car_lamp_fused_distance_projectioncenter_2.x_cm,
+    //             g_car_lamp_fused_distance_projectioncenter_2.y_cm,
+    //             g_euler.roll,
+    //             g_euler.pitch,
+    //             g_euler.yaw,
+    //             g_projection_center.cx,
+    //             g_projection_center.cy
+    //             );
 
     // wifi_justfloat(
     //     roll_gyro_target, pitch_gyro_target, yaw_gyro_target,

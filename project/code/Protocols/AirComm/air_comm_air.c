@@ -19,8 +19,8 @@
 #define AIR_COMM_FRAME_OVERHEAD              (9U)    /* 帧开销：4帧头 + type + seq + len + 2crc */
 #define AIR_COMM_MAX_FRAME                   (AIR_COMM_MAX_PAYLOAD + AIR_COMM_FRAME_OVERHEAD)
 #define AIR_COMM_RX_QUEUE_SIZE               (512U)  /* 接收环形队列大小（字节） */
-#define AIR_COMM_PARAM_TABLE_MAX             (157U)  /* 最多注册参数个数 */
-#define AIR_COMM_DEFAULT_PARAM_COUNT         (157U)
+#define AIR_COMM_PARAM_TABLE_MAX             (189U)  /* 最多注册参数个数 */
+#define AIR_COMM_DEFAULT_PARAM_COUNT         (189U)
 #define AIR_COMM_REMOTE_CANCEL_MS            (400U)
 #define AIR_COMM_REMOTE_TIMEOUT_MS           (700U)
 #define AIR_COMM_REMOTE_EXP_CANCEL_MS        (1800U)
@@ -1681,6 +1681,39 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(mode2_kp_car_y, g_fc_params.mode2_kp_car_y, 0.0f, 100.0f);
     AIR_COMM_REGISTER_FLOAT(Car_Speed, Car_Speed, 0.0f, 3.0f);
     AIR_COMM_REGISTER_FLOAT(Car_Speed_Fast, Car_Speed_Fast, 0.0f, 3.0f);
+
+    AIR_COMM_REGISTER_FLOAT(mode4_img_x_kp, g_fc_params.mode4_img_x_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_img_x_kp2, g_fc_params.mode4_img_x_kp2, 0.0f, 3.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_img_x_ki, g_fc_params.mode4_img_x_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_img_x_kd, g_fc_params.mode4_img_x_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_img_x_kff, g_fc_params.mode4_img_x_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_img_x_i_limit, g_fc_params.mode4_img_x_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_img_x_d_lpf, g_fc_params.mode4_img_x_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_img_y_kp, g_fc_params.mode4_img_y_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_img_y_kp2, g_fc_params.mode4_img_y_kp2, 0.0f, 3.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_img_y_ki, g_fc_params.mode4_img_y_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_img_y_kd, g_fc_params.mode4_img_y_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_img_y_kff, g_fc_params.mode4_img_y_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_img_y_i_limit, g_fc_params.mode4_img_y_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_img_y_d_lpf, g_fc_params.mode4_img_y_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_vel_x_kp, g_fc_params.mode4_vel_x_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_vel_x_ki, g_fc_params.mode4_vel_x_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_vel_x_kd, g_fc_params.mode4_vel_x_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_vel_x_kff, g_fc_params.mode4_vel_x_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_vel_x_i_limit, g_fc_params.mode4_vel_x_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_vel_x_d_lpf, g_fc_params.mode4_vel_x_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_vel_y_kp, g_fc_params.mode4_vel_y_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_vel_y_ki, g_fc_params.mode4_vel_y_ki, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_vel_y_kd, g_fc_params.mode4_vel_y_kd, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_vel_y_kff, g_fc_params.mode4_vel_y_kff, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_vel_y_i_limit, g_fc_params.mode4_vel_y_i_limit, 0.0f, 5000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_vel_y_d_lpf, g_fc_params.mode4_vel_y_d_lpf, 0.0f, 500.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_kp_car_x, g_fc_params.mode4_kp_car_x, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_kp_car_y, g_fc_params.mode4_kp_car_y, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_turn_accel_ff_gain_x, g_fc_params.mode4_turn_accel_ff_gain_x, 0.0f, 3.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_turn_accel_ff_gain_y, g_fc_params.mode4_turn_accel_ff_gain_y, 0.0f, 3.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_turn_accel_ff_limit_x_deg, g_fc_params.mode4_turn_accel_ff_limit_x_deg, 0.0f, 20.0f);
+    AIR_COMM_REGISTER_FLOAT(mode4_turn_accel_ff_limit_y_deg, g_fc_params.mode4_turn_accel_ff_limit_y_deg, 0.0f, 20.0f);
 
     if((s_air_comm_param_count != AIR_COMM_DEFAULT_PARAM_COUNT) ||
        (air_comm_register_default_commands() == 0U))

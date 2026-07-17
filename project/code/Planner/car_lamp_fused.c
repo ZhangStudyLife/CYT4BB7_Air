@@ -3,7 +3,7 @@
 #include <math.h>
 
 static const float s_lamp_lpf_alpha = 0.500f;
-static const float s_lamp_step_limit_px = 5.0f;
+static const float s_lamp_step_limit_px = 6.0f;
 static const uint8 s_lamp_hold_max_ticks = 20U;
 
 car_lamp_fused_result_t g_car_lamp_fused;

@@ -16,6 +16,8 @@
 #define BEEP_ALARM_MODE8_LAMP_LOST  (1U << 2)
 /* 车端串口数据超时持续报警位 */
 #define BEEP_ALARM_CAR_DATA_LOST    (1U << 3)
+/* Mode4飞行中融合车灯丢失持续报警位 */
+#define BEEP_ALARM_MODE4_LAMP_LOST  (1U << 4)
 
 /* 初始化蜂鸣器（默认静音） */
 void Beep_Init(void);

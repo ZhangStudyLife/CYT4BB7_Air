@@ -222,6 +222,17 @@ extern float g_mode5_velx_target;
 extern float g_mode5_vely_target;
 
 /*
+ * 模式4 X/Y 轴速度环 PID 实例。
+ * 作用: 供外部模块读取图像跟随速度目标和速度环调试状态。
+ */
+extern pid_t g_mode4_velx_pid;
+extern pid_t g_mode4_vely_pid;
+extern pid_t g_mode4_imgx_pid;
+extern pid_t g_mode4_imgy_pid;
+extern float g_mode4_velx_target;
+extern float g_mode4_vely_target;
+
+/*
  * 模式8 X/Y 轴速度环 PID 实例。
  * 作用: 供外部模块读取图像跟随速度目标和速度环调试状态。
  */

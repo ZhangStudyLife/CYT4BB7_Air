@@ -234,8 +234,8 @@ void FC_Mode4_50Hz(float dt)
     g_mode4_vely_pid.output_min = -angle_target_max - pitch_trim - vely_ff;
     g_mode4_vely_pid.output_max = angle_target_max - pitch_trim - vely_ff;
 
-    velx_out = PID_Update(&g_mode4_velx_pid, g_mode4_velx_target, -Pos_Est_vel_x, dt) + velx_ff;
-    vely_out = PID_Update(&g_mode4_vely_pid, g_mode4_vely_target, -Pos_Est_vel_y, dt) + vely_ff;
+    velx_out = PID_Update(&g_mode4_velx_pid, g_mode4_velx_target, -Pos_Est_vel_x_2, dt) + velx_ff;
+    vely_out = PID_Update(&g_mode4_vely_pid, g_mode4_vely_target, -Pos_Est_vel_y_2, dt) + vely_ff;
     g_mode4_velx_pid.ff_term = velx_ff;
     g_mode4_vely_pid.ff_term = vely_ff;
 

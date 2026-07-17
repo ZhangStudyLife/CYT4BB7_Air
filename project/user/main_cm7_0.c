@@ -171,6 +171,7 @@ int main(void)
     FC_Params_Init();
     (void)FC_Params_LoadFromFlash();
     Pos_Est_Init();
+    Pos_Est_Init_2();
     FC_Loop_Init();
     BeaconLostDetector_Init();
     wifi_justfloat_Init();
@@ -208,6 +209,7 @@ int main(void)
             // ICM42688_Aux_Update_1000Hz(tick_1000us_cnt);         //对比用的陀螺仪关掉
             // BMI088_Update_1000Hz(tick_1000us_cnt);
             Pos_Est_Update_1000HZ();
+            Pos_Est_Update_1000HZ_2();
             // wifi_justfloat();
             // {
             //     const VL53L1X_data_struct *tof = VL53L1X_GetData();

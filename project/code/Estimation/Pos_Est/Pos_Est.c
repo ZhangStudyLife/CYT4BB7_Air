@@ -6,9 +6,17 @@
 #include "HW_Drivers/LC302/LC302.h"
 #include "FlightController/fc_params.h"
 #include "FlightController/fc_start_crsf.h"
+#include "Planner/car_lamp_fused.h"
+#include "Planner/ProjectionCenter.h"
 #include <math.h>
 
 extern volatile uint32 tick_1000us_cnt;
+extern float g_car_vel_x;
+extern float g_car_vel_y;
+extern float g_car_yaw;
+extern float g_car_yaw_rate_dps;
+extern float g_car_sync_time_ms;
+extern uint32 g_car_last_update_time_ms;
 
 /*
  * Coordinate and unit contract:
@@ -73,8 +81,29 @@ extern volatile uint32 tick_1000us_cnt;
 #define POS_EST_FLOW_REACQUIRE_SPEED_CMPS (260.0f)
 #define POS_EST_FLOW_REACQUIRE_INNOVATION_CMPS (300.0f)
 
+/* 新估计器的光流校正增益。 */
+#define POS_EST2_FLOW_GAIN (0.06f)
+/* 车端速度数据允许的最大更新时间，单位ms。 */
+#define POS_EST2_CAR_DATA_TIMEOUT_MS (200U)
+/* 解耦器启动或超时重置后恢复融合所需的连续有效帧数。 */
+#define POS_EST2_FLOW_REACQUIRE_FRAMES (4U)
+/* 车灯距离投影中心达到该值时认为不再覆盖光流落点，单位px。 */
+#define POS_EST2_COVERAGE_ZERO_RADIUS_PX (70.0f)
+/* 车灯覆盖率从1衰减到0所使用的半径跨度，单位px。 */
+#define POS_EST2_COVERAGE_RADIUS_SPAN_PX (50.0f)
+/* 车灯面积归一化基准，单位px^2。 */
+#define POS_EST2_LAMP_AREA_NOMINAL_PX2 (75.0f)
+/* 车灯面积权重下限。 */
+#define POS_EST2_LAMP_AREA_WEIGHT_MIN (0.6f)
+/* 车灯面积权重上限。 */
+#define POS_EST2_LAMP_AREA_WEIGHT_MAX (1.2f)
+
 float Pos_Est_vel_x = 0.0f;
 float Pos_Est_vel_y = 0.0f;
+/* 去除车模平移速度影响后的机体X轴速度，左正，单位cm/s。 */
+float Pos_Est_vel_x_2 = 0.0f;
+/* 去除车模平移速度影响后的机体Y轴速度，前正，单位cm/s。 */
+float Pos_Est_vel_y_2 = 0.0f;
 
 static float s_vel_pred_x = 0.0f;
 static float s_vel_pred_y = 0.0f;
@@ -104,6 +133,34 @@ static float s_flow_ref_x = 0.0f;
 static float s_flow_ref_y = 0.0f;
 static uint8_t s_flow_ref_valid = 0U;
 static uint8_t s_flow_ref_frame_count = 0U;
+
+/* 旧估计器发布给新估计器的本周期加速度和偏航角速度快照。 */
+static float s_common_acc_x_cmss = 0.0f;
+static float s_common_acc_y_cmss = 0.0f;
+static float s_common_yaw_rate_dps = 0.0f;
+static uint8_t s_common_accel_bias_locked = 0U;
+
+/* 旧估计器唯一消费LC302后发布的解耦光流快照。 */
+static uint32_t s_common_flow_sequence = 0U;
+static float s_common_flow_dec_x = 0.0f;
+static float s_common_flow_dec_y = 0.0f;
+static float s_common_flow_height_mm = 0.0f;
+static uint32_t s_common_flow_time_ms = 0U;
+static uint8_t s_common_flow_valid = 0U;
+static uint8_t s_common_flow_height_valid = 0U;
+static uint32_t s_common_flow_reset_sequence = 0U;
+
+/* 新估计器独立维护的速度和光流消费状态。 */
+static float s_vel_pred_x_2 = 0.0f;
+static float s_vel_pred_y_2 = 0.0f;
+static uint32_t s_flow_sequence_consumed_2 = 0U;
+static uint32_t s_flow_last_accepted_ms_2 = 0U;
+static uint32_t s_flow_reset_sequence_consumed_2 = 0U;
+static uint8_t s_flow_reacquire_count_2 = 0U;
+static uint8_t s_flow_invalid_count_2 = 0U;
+static float s_flow_prev_observation_x_2 = 0.0f;
+static float s_flow_prev_observation_y_2 = 0.0f;
+static uint8_t s_flow_prev_observation_valid_2 = 0U;
 
 static float Pos_Est_ClampFloat(float value, float min_value, float max_value)
 {
@@ -458,6 +515,18 @@ void Pos_Est_Init(void)
     s_acc_bias_x_cmss = 0.0f;
     s_acc_bias_y_cmss = 0.0f;
     s_static_sample_count = 0U;
+    s_common_acc_x_cmss = 0.0f;
+    s_common_acc_y_cmss = 0.0f;
+    s_common_yaw_rate_dps = 0.0f;
+    s_common_accel_bias_locked = 0U;
+    s_common_flow_sequence = 0U;
+    s_common_flow_dec_x = 0.0f;
+    s_common_flow_dec_y = 0.0f;
+    s_common_flow_height_mm = 0.0f;
+    s_common_flow_time_ms = tick_1000us_cnt;
+    s_common_flow_valid = 0U;
+    s_common_flow_height_valid = 0U;
+    s_common_flow_reset_sequence = 0U;
     Pos_Est_ResetFlowState(tick_1000us_cnt);
 }
 
@@ -566,6 +635,12 @@ void Pos_Est_Update_1000HZ(void)
     }
     yaw_delta_rad = yaw_rate_dps * POS_EST_DEG_TO_RAD * POS_EST_ACC_DT_S;
 
+    /* 发布已经完成标定、限幅和冲击门控的公共IMU快照。 */
+    s_common_acc_x_cmss = acc_x_lp;
+    s_common_acc_y_cmss = acc_y_lp;
+    s_common_yaw_rate_dps = yaw_rate_dps;
+    s_common_accel_bias_locked = accel_bias_locked;
+
     if (accel_bias_locked == 0U)
     {
         Pos_Est_RotateBodyVelocity(&s_vel_pred_x, &s_vel_pred_y, yaw_delta_rad);
@@ -608,6 +683,15 @@ void Pos_Est_Update_1000HZ(void)
                                  frame_flow_y,
                                  frame_valid,
                                  tick_1000us_cnt);
+
+        /* 序号最后更新，保证新估计器看到的是完整的同一帧快照。 */
+        s_common_flow_dec_x = FlowGyroDecoupler_LC302_GetDecX();
+        s_common_flow_dec_y = FlowGyroDecoupler_LC302_GetDecY();
+        s_common_flow_height_mm = g_tof_fused_height_mm;
+        s_common_flow_time_ms = tick_1000us_cnt;
+        s_common_flow_valid = frame_valid;
+        s_common_flow_height_valid = g_tof_fused_valid;
+        s_common_flow_sequence++;
     }
 
     flow_age_ms = tick_1000us_cnt - s_flow_last_arrival_ms;
@@ -616,6 +700,7 @@ void Pos_Est_Update_1000HZ(void)
     {
         /* A late next frame no longer matches a fixed 20.8 ms gyro window. */
         FlowGyroDecoupler_LC302_Reinit();
+        s_common_flow_reset_sequence++;
         s_flow_decoupler_timed_out = 1U;
         s_flow_prev_rate_valid = 0U;
         Pos_Est_SetFlowUnhealthy();
@@ -663,26 +748,320 @@ void Pos_Est_Update_1000HZ(void)
     Pos_Est_vel_x = s_vel_pred_x;
     Pos_Est_vel_y = s_vel_pred_y;
 
-    // wifi_justfloat(
-    //     acc_x_lp,
-    //     acc_y_lp,
-    //     yaw_rate_dps,
+    float img_err_x = g_car_lamp_fused.cx - g_projection_center.cx;
+    float img_err_y = g_car_lamp_fused.cy - g_projection_center.cy;
 
-    //     flow_new_frame,
-    //     frame_flow_x,
-    //     frame_flow_y,
-    //     frame_valid,
+    wifi_justfloat(
+        g_euler.roll,
+        g_euler.pitch,
+        g_euler.yaw,
+        acc_x_lp,
+        acc_y_lp,
+        yaw_rate_dps,
 
-    //     FlowGyroDecoupler_LC302_GetDecX(),
-    //     FlowGyroDecoupler_LC302_GetDecY(),
+        g_car_vel_x,
+        g_car_vel_y,
+        g_car_yaw,
+        g_car_yaw_rate_dps,
 
-    //     g_tof_fused_height_mm,
-    //     g_tof_fused_valid,
-    //     g_imu_shock_flag,
-    //     accel_bias_locked,
+        img_err_x,
+        img_err_y,
 
-    //     Pos_Est_vel_x,
-    //     Pos_Est_vel_y
-    // );
+        flow_new_frame,
+        frame_flow_x,
+        frame_flow_y,
+        frame_valid,
 
+        FlowGyroDecoupler_LC302_GetDecX(),
+        FlowGyroDecoupler_LC302_GetDecY(),
+
+        lc302_data.flow_x_integral,
+        lc302_data.flow_y_integral,
+
+        g_tof_fused_height_mm,
+        g_tof_fused_valid,
+        g_imu_shock_flag,
+        accel_bias_locked,
+
+        Pos_Est_vel_x,
+        Pos_Est_vel_y,
+        g_car_lamp_fused.valid,
+            g_car_lamp_fused.width,
+                g_car_lamp_fused.length,
+                    g_car_sync_time_ms,
+                        s_flow_healthy,
+                            s_flow_gain_ramp,
+                        Pos_Est_vel_x_2,
+                    Pos_Est_vel_y_2);
+}
+
+/*
+ * 函数功能：初始化去除车模平移速度影响的并行速度估计器。
+ * 输入参数：无。
+ * 返回值：无。
+ */
+void Pos_Est_Init_2(void)
+{
+    Pos_Est_vel_x_2 = 0.0f;
+    Pos_Est_vel_y_2 = 0.0f;
+    s_vel_pred_x_2 = 0.0f;
+    s_vel_pred_y_2 = 0.0f;
+    s_flow_sequence_consumed_2 = s_common_flow_sequence;
+    s_flow_last_accepted_ms_2 = tick_1000us_cnt;
+    s_flow_reset_sequence_consumed_2 = s_common_flow_reset_sequence;
+    s_flow_reacquire_count_2 = 0U;
+    s_flow_invalid_count_2 = 0U;
+    s_flow_prev_observation_x_2 = 0.0f;
+    s_flow_prev_observation_y_2 = 0.0f;
+    s_flow_prev_observation_valid_2 = 0U;
+}
+
+/*
+ * 函数功能：在1000Hz下更新去除车模平移速度影响的机体速度估计值。
+ * 输入参数：无。
+ * 返回值：无，结果写入Pos_Est_vel_x_2和Pos_Est_vel_y_2。
+ */
+void Pos_Est_Update_1000HZ_2(void)
+{
+    float yaw_delta_rad;
+    uint32_t flow_age_ms;
+    float output_speed;
+
+    if (s_common_accel_bias_locked != 0U)
+    {
+        s_vel_pred_x_2 = 0.0f;
+        s_vel_pred_y_2 = 0.0f;
+        s_flow_sequence_consumed_2 = s_common_flow_sequence;
+        s_flow_reset_sequence_consumed_2 = s_common_flow_reset_sequence;
+        s_flow_reacquire_count_2 = 0U;
+        s_flow_invalid_count_2 = 0U;
+        s_flow_prev_observation_valid_2 = 0U;
+        s_flow_last_accepted_ms_2 = tick_1000us_cnt;
+        Pos_Est_vel_x_2 = 0.0f;
+        Pos_Est_vel_y_2 = 0.0f;
+        return;
+    }
+
+    if (s_flow_reset_sequence_consumed_2 != s_common_flow_reset_sequence)
+    {
+        s_flow_reset_sequence_consumed_2 = s_common_flow_reset_sequence;
+        s_flow_reacquire_count_2 = 0U;
+        s_flow_invalid_count_2 = 0U;
+        s_flow_prev_observation_valid_2 = 0U;
+    }
+
+    /* 与旧估计器一致：先旋转机体系速度，再积分机体加速度。 */
+    yaw_delta_rad = s_common_yaw_rate_dps * POS_EST_DEG_TO_RAD * POS_EST_ACC_DT_S;
+    Pos_Est_RotateBodyVelocity(&s_vel_pred_x_2,
+                               &s_vel_pred_y_2,
+                               yaw_delta_rad);
+    s_vel_pred_x_2 -= s_common_acc_y_cmss * POS_EST_ACC_DT_S;
+    s_vel_pred_y_2 += s_common_acc_x_cmss * POS_EST_ACC_DT_S;
+
+    if (s_flow_sequence_consumed_2 != s_common_flow_sequence)
+    {
+        float height_m;
+        float flow_observation_x;
+        float flow_observation_y;
+        float observation_speed;
+        float innovation_norm;
+        float continuity_norm = 0.0f;
+        float car_coverage = 0.0f;
+        uint8_t observation_available = 1U;
+
+        s_flow_sequence_consumed_2 = s_common_flow_sequence;
+
+        if ((s_common_flow_valid != 0U) &&
+            (s_common_flow_height_valid != 0U) &&
+            (s_common_flow_height_mm >= POS_EST_FLOW_MIN_HEIGHT_M * 1000.0f) &&
+            (s_common_flow_height_mm <= VL53L1X_VALID_RANGE_MAX))
+        {
+            s_flow_invalid_count_2 = 0U;
+            height_m = s_common_flow_height_mm * 0.001f;
+            flow_observation_x = height_m * s_common_flow_dec_x * POS_EST_FLOW_TO_CMPS;
+            flow_observation_y = height_m * s_common_flow_dec_y * POS_EST_FLOW_TO_CMPS;
+
+            /* 根据车灯相对投影中心的位置和面积估计车对光流落点的覆盖率。 */
+            if (g_car_lamp_fused.valid != 0U)
+            {
+                if ((g_projection_center.valid != 0U) &&
+                    isfinite(g_car_lamp_fused.cx) &&
+                    isfinite(g_car_lamp_fused.cy) &&
+                    isfinite(g_car_lamp_fused.width) &&
+                    isfinite(g_car_lamp_fused.length) &&
+                    isfinite(g_projection_center.cx) &&
+                    isfinite(g_projection_center.cy))
+                {
+                    float image_error_x = g_car_lamp_fused.cx - g_projection_center.cx;
+                    float image_error_y = g_car_lamp_fused.cy - g_projection_center.cy;
+                    float image_error_radius = Pos_Est_VectorNorm(image_error_x,
+                                                                  image_error_y);
+                    float center_weight = Pos_Est_ClampFloat(
+                        (POS_EST2_COVERAGE_ZERO_RADIUS_PX - image_error_radius) /
+                            POS_EST2_COVERAGE_RADIUS_SPAN_PX,
+                        0.0f,
+                        1.0f);
+                    float area_weight = Pos_Est_ClampFloat(
+                        g_car_lamp_fused.width * g_car_lamp_fused.length /
+                            POS_EST2_LAMP_AREA_NOMINAL_PX2,
+                        POS_EST2_LAMP_AREA_WEIGHT_MIN,
+                        POS_EST2_LAMP_AREA_WEIGHT_MAX);
+
+                    car_coverage = Pos_Est_ClampFloat(center_weight * area_weight,
+                                                      0.0f,
+                                                      1.0f);
+                }
+                else
+                {
+                    observation_available = 0U;
+                }
+            }
+
+            /* 覆盖率大于0但车速已过期时，拒绝可能被车污染的光流帧。 */
+            if ((observation_available != 0U) && (car_coverage > 0.0f))
+            {
+                if ((g_car_sync_time_ms > 0.0f) &&
+                    ((tick_1000us_cnt - g_car_last_update_time_ms) <
+                     POS_EST2_CAR_DATA_TIMEOUT_MS) &&
+                    isfinite(g_car_vel_x) &&
+                    isfinite(g_car_vel_y) &&
+                    isfinite(g_car_yaw) &&
+                    isfinite(g_euler.yaw))
+                {
+                    float yaw_diff_deg = g_car_yaw - g_euler.yaw;
+                    float yaw_diff_rad;
+                    float yaw_cos;
+                    float yaw_sin;
+                    float car_vel_left_cmps;
+                    float car_vel_forward_cmps;
+
+                    while (yaw_diff_deg > 180.0f)
+                    {
+                        yaw_diff_deg -= 360.0f;
+                    }
+                    while (yaw_diff_deg < -180.0f)
+                    {
+                        yaw_diff_deg += 360.0f;
+                    }
+
+                    yaw_diff_rad = yaw_diff_deg * POS_EST_DEG_TO_RAD;
+                    yaw_cos = cosf(yaw_diff_rad);
+                    yaw_sin = sinf(yaw_diff_rad);
+                    car_vel_left_cmps = -100.0f *
+                                        (g_car_vel_x * yaw_cos +
+                                         g_car_vel_y * yaw_sin);
+                    car_vel_forward_cmps = 100.0f *
+                                           (-g_car_vel_x * yaw_sin +
+                                            g_car_vel_y * yaw_cos);
+                    flow_observation_x += car_coverage * car_vel_left_cmps;
+                    flow_observation_y += car_coverage * car_vel_forward_cmps;
+                }
+                else
+                {
+                    observation_available = 0U;
+                }
+            }
+
+            observation_speed = Pos_Est_VectorNorm(flow_observation_x,
+                                                   flow_observation_y);
+            innovation_norm = Pos_Est_VectorNorm(flow_observation_x - s_vel_pred_x_2,
+                                                 flow_observation_y - s_vel_pred_y_2);
+            if (s_flow_prev_observation_valid_2 != 0U)
+            {
+                continuity_norm = Pos_Est_VectorNorm(
+                    flow_observation_x - s_flow_prev_observation_x_2,
+                    flow_observation_y - s_flow_prev_observation_y_2);
+            }
+
+            if ((observation_available != 0U) &&
+                isfinite(flow_observation_x) &&
+                isfinite(flow_observation_y) &&
+                (observation_speed <= POS_EST_FLOW_SPEED_HARD_CMPS) &&
+                (innovation_norm <= POS_EST_FLOW_INNOVATION_HARD_CMPS) &&
+                ((s_flow_prev_observation_valid_2 == 0U) ||
+                 (continuity_norm <= POS_EST_FLOW_CONTINUITY_HARD_CMPS)))
+            {
+                float innovation_x;
+                float innovation_y;
+                float correction_x;
+                float correction_y;
+                float correction_norm;
+
+                s_flow_prev_observation_x_2 = flow_observation_x;
+                s_flow_prev_observation_y_2 = flow_observation_y;
+                s_flow_prev_observation_valid_2 = 1U;
+                if (s_flow_reacquire_count_2 < POS_EST2_FLOW_REACQUIRE_FRAMES)
+                {
+                    s_flow_reacquire_count_2++;
+                }
+
+                if (s_flow_reacquire_count_2 >= POS_EST2_FLOW_REACQUIRE_FRAMES)
+                {
+                    innovation_x = Pos_Est_ClampFloat(
+                        flow_observation_x - s_vel_pred_x_2,
+                        -POS_EST_FLOW_INNOVATION_LIMIT_CMPS,
+                        POS_EST_FLOW_INNOVATION_LIMIT_CMPS);
+                    innovation_y = Pos_Est_ClampFloat(
+                        flow_observation_y - s_vel_pred_y_2,
+                        -POS_EST_FLOW_INNOVATION_LIMIT_CMPS,
+                        POS_EST_FLOW_INNOVATION_LIMIT_CMPS);
+                    correction_x = POS_EST2_FLOW_GAIN * innovation_x;
+                    correction_y = POS_EST2_FLOW_GAIN * innovation_y;
+                    correction_norm = Pos_Est_VectorNorm(correction_x, correction_y);
+                    if (correction_norm > POS_EST_FLOW_CORRECTION_LIMIT_CMPS)
+                    {
+                        float correction_scale = POS_EST_FLOW_CORRECTION_LIMIT_CMPS /
+                                                 correction_norm;
+                        correction_x *= correction_scale;
+                        correction_y *= correction_scale;
+                    }
+                    s_vel_pred_x_2 += correction_x;
+                    s_vel_pred_y_2 += correction_y;
+                    s_flow_last_accepted_ms_2 = s_common_flow_time_ms;
+                }
+            }
+            else
+            {
+                s_flow_reacquire_count_2 = 0U;
+                s_flow_prev_observation_valid_2 = 0U;
+            }
+        }
+        else
+        {
+            if (s_flow_invalid_count_2 < POS_EST_FLOW_INVALID_LIMIT)
+            {
+                s_flow_invalid_count_2++;
+            }
+            if (s_flow_invalid_count_2 >= POS_EST_FLOW_INVALID_LIMIT)
+            {
+                s_flow_reacquire_count_2 = 0U;
+                s_flow_prev_observation_valid_2 = 0U;
+            }
+        }
+    }
+
+    flow_age_ms = tick_1000us_cnt - s_flow_last_accepted_ms_2;
+    if ((s_common_accel_bias_locked == 0U) &&
+        (flow_age_ms > POS_EST_FLOW_LONG_OUTAGE_MS))
+    {
+        s_vel_pred_x_2 *= 0.998f;
+        s_vel_pred_y_2 *= 0.998f;
+    }
+    else if ((s_common_accel_bias_locked == 0U) &&
+             (flow_age_ms > POS_EST_FLOW_INERTIAL_HOLD_MS))
+    {
+        s_vel_pred_x_2 *= 0.9995f;
+        s_vel_pred_y_2 *= 0.9995f;
+    }
+
+    output_speed = Pos_Est_VectorNorm(s_vel_pred_x_2, s_vel_pred_y_2);
+    if (output_speed > POS_EST_FLOW_OUTPUT_LIMIT_CMPS)
+    {
+        float output_scale = POS_EST_FLOW_OUTPUT_LIMIT_CMPS / output_speed;
+        s_vel_pred_x_2 *= output_scale;
+        s_vel_pred_y_2 *= output_scale;
+    }
+
+    Pos_Est_vel_x_2 = s_vel_pred_x_2;
+    Pos_Est_vel_y_2 = s_vel_pred_y_2;
 }

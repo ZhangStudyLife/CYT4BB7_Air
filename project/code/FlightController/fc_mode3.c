@@ -78,19 +78,19 @@ void FC_Mode3_100Hz(void)
         yaw_angle_target = 0.0f;
         return;
     }
-    // wifi_justfloat(
-    //     roll_angle_target, pitch_angle_target, yaw_angle_target,
-    //     g_euler.roll, g_euler.pitch, g_euler.yaw,
-    //     g_car_vel_x, g_car_vel_y, g_car_yaw, g_car_yaw_rate_dps,
-    //     Pos_Est_vel_x, Pos_Est_vel_y,
-    //     g_mode3_velx_target, g_mode3_vely_target,
-    //     g_mode3_velx_pid.p_term, g_mode3_velx_pid.i_term,
-    //     g_mode3_velx_pid.d_term, g_mode3_velx_pid.output,
-    //     g_mode3_vely_pid.p_term, g_mode3_vely_pid.i_term,
-    //     g_mode3_vely_pid.d_term, g_mode3_vely_pid.output,
-    //     g_car_lamp_fused_distance_projectioncenter_2.x_cm, g_car_lamp_fused_distance_projectioncenter_2.y_cm,
-    //     g_mode3_imgx_pid.output, g_mode3_imgy_pid.output,
-    //     g_tof_fused_height_mm);
+    wifi_justfloat(
+        roll_angle_target, pitch_angle_target, yaw_angle_target,
+        g_euler.roll, g_euler.pitch, g_euler.yaw,
+        g_car_vel_x, g_car_vel_y, g_car_yaw, g_car_yaw_rate_dps,
+        Pos_Est_vel_x_2, Pos_Est_vel_y_2,
+        g_mode3_velx_target, g_mode3_vely_target,
+        g_mode3_velx_pid.p_term, g_mode3_velx_pid.i_term,
+        g_mode3_velx_pid.d_term, g_mode3_velx_pid.output,
+        g_mode3_vely_pid.p_term, g_mode3_vely_pid.i_term,
+        g_mode3_vely_pid.d_term, g_mode3_vely_pid.output,
+        g_car_lamp_fused.cx - g_projection_center.cx, g_car_lamp_fused.cy - g_projection_center.cy,
+        g_mode3_imgx_pid.output, g_mode3_imgy_pid.output,
+        g_tof_fused_height_mm);
 }
 
 void FC_Mode3_50Hz(float dt)

@@ -750,49 +750,6 @@ void Pos_Est_Update_1000HZ(void)
 
     float img_err_x = g_car_lamp_fused.cx - g_projection_center.cx;
     float img_err_y = g_car_lamp_fused.cy - g_projection_center.cy;
-
-    wifi_justfloat(
-        g_euler.roll,
-        g_euler.pitch,
-        g_euler.yaw,
-        acc_x_lp,
-        acc_y_lp,
-        yaw_rate_dps,
-
-        g_car_vel_x,
-        g_car_vel_y,
-        g_car_yaw,
-        g_car_yaw_rate_dps,
-
-        img_err_x,
-        img_err_y,
-
-        flow_new_frame,
-        frame_flow_x,
-        frame_flow_y,
-        frame_valid,
-
-        FlowGyroDecoupler_LC302_GetDecX(),
-        FlowGyroDecoupler_LC302_GetDecY(),
-
-        lc302_data.flow_x_integral,
-        lc302_data.flow_y_integral,
-
-        g_tof_fused_height_mm,
-        g_tof_fused_valid,
-        g_imu_shock_flag,
-        accel_bias_locked,
-
-        Pos_Est_vel_x,
-        Pos_Est_vel_y,
-        g_car_lamp_fused.valid,
-            g_car_lamp_fused.width,
-                g_car_lamp_fused.length,
-                    g_car_sync_time_ms,
-                        s_flow_healthy,
-                            s_flow_gain_ramp,
-                        Pos_Est_vel_x_2,
-                    Pos_Est_vel_y_2);
 }
 
 /*

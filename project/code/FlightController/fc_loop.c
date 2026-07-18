@@ -67,12 +67,10 @@ static FC_START_CRSF_state_e s_prev_fc_state = FC_START_CRSF_STATE_INIT;
 #define FC_HOVER_LEARN_TOF_SPREAD_MAX 250.0f
 #define FC_HOVER_LEARN_RATE_MAX 220.0f
 #define FC_THRUST_ACC_MPS2_PER_PWM 0.00360f
-#define FC_HEIGHT_VEL_KP_ACC 1.50f
 #define FC_HEIGHT_VEL_KD_ACC 0.035f
 #define FC_HEIGHT_VEL_TARGET_LIMIT 0.60f
 #define FC_HEIGHT_VEL_OUT_MIN (-650.0f)
 #define FC_HEIGHT_VEL_OUT_MAX 650.0f
-#define FC_HEIGHT_VEL_KP_PWM (FC_HEIGHT_VEL_KP_ACC / FC_THRUST_ACC_MPS2_PER_PWM)
 #define FC_HEIGHT_VEL_KD_PWM (FC_HEIGHT_VEL_KD_ACC / FC_THRUST_ACC_MPS2_PER_PWM)
 static float s_hover_throttle = 2800.0f;
 static float s_hover_learn_step = 0.0f;
@@ -264,9 +262,9 @@ void FC_Loop_Init(void)
              g_fc_params.yaw_gyro_kp, g_fc_params.yaw_gyro_ki, g_fc_params.yaw_gyro_kd,
              g_fc_params.yaw_gyro_kff, g_fc_params.gyro_dt,
              g_fc_params.yaw_gyro_i_limit, g_fc_params.yaw_gyro_d_lpf);
-    PID_Init(&height_pos_pid, 1.40f, 0.0f, 0.0f, 0.0f,
+    PID_Init(&height_pos_pid, g_fc_params.pos_z_kp, 0.0f, 0.0f, 0.0f,
              g_fc_params.pos_z_dt, 0.0f, 0.0f);
-    PID_Init(&height_vel_pid, FC_HEIGHT_VEL_KP_PWM, g_fc_params.vel_z_ki, FC_HEIGHT_VEL_KD_PWM, 0.0f,
+    PID_Init(&height_vel_pid, g_fc_params.vel_z_kp, g_fc_params.vel_z_ki, FC_HEIGHT_VEL_KD_PWM, 0.0f,
              g_fc_params.vel_z_dt, g_fc_params.vel_z_i_limit, 12.0f);
     height_pos_pid.aw_enable = 1U;
     height_pos_pid.output_min = -FC_HEIGHT_VEL_TARGET_LIMIT;
@@ -353,6 +351,7 @@ void FC_Loop_50Hz(void)
         (0U != g_tof_fused_valid) &&
         (g_height_meas_health >= 0.25f))
     {
+        height_pos_pid.kp = g_fc_params.pos_z_kp;
         height_pos_out = PID_Update(&height_pos_pid,
                                     (fc_state == FC_START_CRSF_STATE_LANDING) ? FC_LANDING_TARGET_HEIGHT_M : FC_TARGET_HEIGHT_M,
                                     g_tof_fused_height_mm * 0.001f,
@@ -484,6 +483,8 @@ void FC_Loop_100Hz(void)
 
     if ((fc_state == FC_START_CRSF_STATE_FLYING) || (fc_state == FC_START_CRSF_STATE_LANDING))
     {
+        height_vel_pid.kp = g_fc_params.vel_z_kp;
+        height_vel_pid.ki = g_fc_params.vel_z_ki;
         if ((0U == g_tof_fused_valid) || (g_height_meas_health < 0.25f))
         {
             height_pos_out = 0.0f;

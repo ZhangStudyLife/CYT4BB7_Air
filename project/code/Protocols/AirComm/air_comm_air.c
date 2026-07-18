@@ -20,7 +20,7 @@
 #define AIR_COMM_MAX_FRAME                   (AIR_COMM_MAX_PAYLOAD + AIR_COMM_FRAME_OVERHEAD)
 #define AIR_COMM_RX_QUEUE_SIZE               (512U)  /* 接收环形队列大小（字节） */
 #define AIR_COMM_PARAM_TABLE_MAX             (221U)  /* 最多注册参数个数 */
-#define AIR_COMM_DEFAULT_PARAM_COUNT         (209U)
+#define AIR_COMM_DEFAULT_PARAM_COUNT         (216U)
 #define AIR_COMM_REMOTE_CANCEL_MS            (400U)
 #define AIR_COMM_REMOTE_TIMEOUT_MS           (700U)
 #define AIR_COMM_REMOTE_EXP_CANCEL_MS        (1800U)
@@ -1520,6 +1520,8 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(yaw_angle_i_limit, g_fc_params.yaw_angle_i_limit, 0.0f, 5000.0f);
     AIR_COMM_REGISTER_FLOAT(yaw_angle_d_lpf, g_fc_params.yaw_angle_d_lpf, 0.0f, 500.0f);
 
+    AIR_COMM_REGISTER_FLOAT(pos_z_kp, g_fc_params.pos_z_kp, 0.0f, 3000.0f);
+    AIR_COMM_REGISTER_FLOAT(vel_z_kp, g_fc_params.vel_z_kp, 0.0f, 3000.0f);
     AIR_COMM_REGISTER_FLOAT(vel_z_ki, g_fc_params.vel_z_ki, 0.0f, 3000.0f);
     AIR_COMM_REGISTER_FLOAT(vel_z_i_limit, g_fc_params.vel_z_i_limit, 0.0f, 5000.0f);
     AIR_COMM_REGISTER_FLOAT(mode7_vel_x_kp, g_fc_params.mode7_vel_x_kp, 0.0f, 3000.0f);
@@ -1733,6 +1735,11 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(mode3_turn_accel_ff_gain_y, g_fc_params.mode3_turn_accel_ff_gain_y, 0.0f, 3.0f);
     AIR_COMM_REGISTER_FLOAT(mode3_turn_accel_ff_limit_x_deg, g_fc_params.mode3_turn_accel_ff_limit_x_deg, 0.0f, 20.0f);
     AIR_COMM_REGISTER_FLOAT(mode3_turn_accel_ff_limit_y_deg, g_fc_params.mode3_turn_accel_ff_limit_y_deg, 0.0f, 20.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_change_mode2, g_fc_params.yaw_change_mode2, 0.0f, 1.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_change_mode3, g_fc_params.yaw_change_mode3, 0.0f, 1.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_change_mode4, g_fc_params.yaw_change_mode4, 0.0f, 1.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_change_mode5, g_fc_params.yaw_change_mode5, 0.0f, 1.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_change_mode8, g_fc_params.yaw_change_mode8, 0.0f, 1.0f);
 
     if((s_air_comm_param_count != AIR_COMM_DEFAULT_PARAM_COUNT) ||
        (air_comm_register_default_commands() == 0U))

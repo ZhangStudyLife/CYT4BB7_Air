@@ -1,4 +1,5 @@
 #include "fc_mode.h"
+#include "yaw_align.h"
 #include "../Estimation/Pos_Est/Pos_Est.h"
 #include "../Estimation/Height_Est/Height_Est.h"
 #include "../Image/image_data.h"
@@ -68,9 +69,10 @@ void FC_Mode8_Reset(void)
     s_mode8_prev_vely_target = 0.0f;
     s_mode8_velx_ff_lpf = 0.0f;
     s_mode8_vely_ff_lpf = 0.0f;
+    YawAlign_Reset();
     roll_angle_target = FC_Mode_Get_Roll_Mech_Trim_Deg();
     pitch_angle_target = FC_Mode_Get_Pitch_Mech_Trim_Deg();
-    yaw_angle_target = 0.0f;
+    yaw_angle_target = (g_fc_params.yaw_change_mode8 >= 0.5f) ? g_euler.yaw : 0.0f;
 }
 
 void FC_Mode8_100Hz(void)
@@ -80,8 +82,6 @@ void FC_Mode8_100Hz(void)
         yaw_angle_target = 0.0f;
         return;
     }
-    yaw_angle_target = 0.0f;
-
     // wifi_justfloat(
     //     roll_angle_target, pitch_angle_target, yaw_angle_target,
     //     g_euler.roll, g_euler.pitch, g_euler.yaw,
@@ -132,7 +132,15 @@ void FC_Mode8_50Hz(float dt)
         return;
     }
 
-    yaw_angle_target = 0.0f;
+    if (g_fc_params.yaw_change_mode8 >= 0.5f)
+    {
+        YawAlign_Update();
+    }
+    else
+    {
+        YawAlign_Reset();
+        yaw_angle_target = 0.0f;
+    }
 
     fused_lamp_valid = g_car_lamp_fused_distance_projectioncenter_2.valid;
 

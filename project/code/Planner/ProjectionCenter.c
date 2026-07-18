@@ -1,12 +1,12 @@
 #include "ProjectionCenter.h"
 #include "../Estimation/Attitude/IMU_TOP.h"
 
-#define PROJECTION_CENTER_X_BIAS      (0.0f)
-#define PROJECTION_CENTER_X_ROLL_K    (1.4f)
-#define PROJECTION_CENTER_X_PITCH_K   (0.015f)
-#define PROJECTION_CENTER_Y_BIAS      (-25.0f)
-#define PROJECTION_CENTER_Y_ROLL_K    (-0.015f)
-#define PROJECTION_CENTER_Y_PITCH_K   (1.3f)
+#define PROJECTION_CENTER_X_BIAS      (-7.05f)
+#define PROJECTION_CENTER_X_ROLL_K    (1.22f)
+#define PROJECTION_CENTER_X_PITCH_K   (-0.02f)
+#define PROJECTION_CENTER_Y_BIAS      (-25.45f)
+#define PROJECTION_CENTER_Y_ROLL_K    (0.01f)
+#define PROJECTION_CENTER_Y_PITCH_K   (1.34f)
 
 projection_center_result_t g_projection_center;
 

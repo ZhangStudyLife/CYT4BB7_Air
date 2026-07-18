@@ -53,6 +53,9 @@ static uint8 CarPlan_MakeGeometryResult(uint8 camera, car_plan_result_t *out)
     float perp;
     float strafe;
     float forward;
+    float abs_strafe;
+    float abs_forward;
+    float speed_scale;
 
     if ((image_data_car_lamp_valid(lamp) == 0U) ||
         (image_data_beacon_valid(beacon) == 0U))
@@ -91,11 +94,16 @@ static uint8 CarPlan_MakeGeometryResult(uint8 camera, car_plan_result_t *out)
         forward = -perp;
     }
 
+    /* 取 strafe/forward 中绝对值较大者满速为 Car_Speed，另一轴按比例缩放（符号保持不变） */
+    abs_strafe = fabsf(strafe);
+    abs_forward = fabsf(forward);
+    speed_scale = Car_Speed / ((abs_strafe > abs_forward) ? abs_strafe : abs_forward);
+
     out->valid = 1U;
     out->camera = camera;
     out->beacon_index = CAR_PLAN_BEACON0_INDEX;
-    out->target_strafe_mps = strafe * Car_Speed;
-    out->target_forward_mps = forward * Car_Speed;
+    out->target_strafe_mps = strafe * speed_scale;
+    out->target_forward_mps = forward * speed_scale;
     out->dist_px = dist;
     out->along = along;
     out->perp = perp;

@@ -95,7 +95,7 @@ static const wifi_params_entry_t s_wifi_params_table[] =
     WIFI_PARAMS_FLOAT_ITEM("pos_z_i_limit", pos_z_i_limit, 0.0f, 5000.0f),
     WIFI_PARAMS_FLOAT_ITEM("pos_z_d_lpf", pos_z_d_lpf, 0.0f, 500.0f),
 
-    WIFI_PARAMS_FLOAT_ITEM("vel_z_kp", vel_z_kp, 0.0f, 3000.0f),
+    WIFI_PARAMS_FLOAT_ITEM("vel_z_kp", vel_z_kp, 0.0f, 1000.0f),
     WIFI_PARAMS_FLOAT_ITEM("vel_z_ki", vel_z_ki, 0.0f, 3000.0f),
     WIFI_PARAMS_FLOAT_ITEM("vel_z_kd", vel_z_kd, 0.0f, 3000.0f),
     WIFI_PARAMS_FLOAT_ITEM("vel_z_kff", vel_z_kff, 0.0f, 3000.0f),

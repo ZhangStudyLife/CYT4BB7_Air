@@ -37,7 +37,7 @@
 #define AIR_COMM_AIR_PARAM_NAME_MAX          (32U)   /* 参数名最大长度（不含 '\0'） */
 #define AIR_COMM_AIR_COMMAND_NAME_MAX        (32U)   /* 远程命令名最大长度，不含 '\0' */
 #define AIR_COMM_AIR_ACK_TEXT_MAX            (96U)   /* 远程命令 ACK 文本最大长度，不含 '\0' */
-#define AIR_COMM_AIR_RUN_DATA_MAX_FLOATS     (48U)   /* 单次实时数据最多 float 个数 */
+#define AIR_COMM_AIR_RUN_DATA_MAX_FLOATS     (52U)   /* 单次实时数据最多 float 个数 */
 #define AIR_COMM_AIR_BAUDRATE                (1152000U) /* UART 波特率 */
 
 /* 参数/远程命令操作返回状态 */
@@ -105,6 +105,80 @@ extern int32 bl3_beacon_thr; /* 两颗2BL3信标二值化阈值的核0菜单镜�
 extern int32 c1_exp_time;    /* 核1摄像头曝光时间的核0菜单镜像，不参与核0飞控计算 */
 extern int32 bl3_exp_time;   /* 两颗2BL3曝光时间的核0菜单镜像，不参与核0飞控计算 */
 extern int32 c1_screen_mode; /* 核1屏幕显示模式的核0菜单镜像，不参与核0飞控计算 */
+extern int32 c1_beacon_min;
+extern int32 c1_edge_min;
+extern int32 c1_edge_thr;
+extern int32 c1_lamp_thr;
+extern int32 c1_lamp_min;
+extern int32 c1_lamp_max;
+extern float c1_lamp_elong;
+extern float c1_lamp_len;
+extern int32 c1_near_pad;
+extern int32 c1_near_min;
+extern int32 c1_near_iso_min;
+extern int32 c1_near_bg;
+extern float c1_match_dist;
+extern float c1_gate_dist;
+extern float c1_new_dist;
+extern int32 c1_confirm;
+extern int32 c1_misses;
+extern float c1_pos_alpha;
+extern float c1_vel_alpha;
+extern int32 bl3_edge_thr;   /* 两颗2BL3边缘区域二值化阈值镜像 */
+extern int32 bl3_track_thr;  /* 两颗2BL3跟踪补强二值化阈值镜像 */
+extern int32 bl3_lamp_thr;   /* 两颗2BL3车灯普通区域二值化阈值镜像 */
+extern int32 bl3_lamp_up_thr; /* 两颗2BL3车灯上部区域二值化阈值镜像 */
+extern float bl3_lamp_up_y;  /* 两颗2BL3车灯上部区域纵向边界镜像，单位像素 */
+extern float bl3_bridge_gap; /* 两颗2BL3车灯横向暗缝最大连接宽度镜像，单位像素 */
+extern int32 bl3_beacon_min; /* 两颗2BL3普通信标最小面积镜像 */
+extern int32 bl3_edge_min;   /* 两颗2BL3边缘信标最小面积镜像 */
+extern int32 bl3_top_max;    /* 两颗2BL3顶部信标最大面积镜像 */
+extern int32 bl3_edge_max;   /* 两颗2BL3侧边信标最大面积镜像 */
+extern int32 bl3_lamp_min;   /* 两颗2BL3车灯最小面积镜像 */
+extern int32 bl3_lamp_max;   /* 两颗2BL3车灯普通最大面积镜像 */
+extern float bl3_lamp_elong; /* 两颗2BL3车灯最小长宽比镜像 */
+extern float bl3_back_len;   /* 两颗2BL3后摄车灯最小长轴镜像，单位像素 */
+extern int32 bl3_iso_gray;   /* 两颗2BL3孤立小信标最小峰值灰度镜像 */
+extern int32 bl3_iso_bg;     /* 两颗2BL3孤立小信标最大背景灰度镜像 */
+extern float bl3_ring_in;    /* 两颗2BL3局部背景方环内半径镜像，单位像素 */
+extern float bl3_ring_out;   /* 两颗2BL3局部背景方环外半径镜像，单位像素 */
+extern float bl3_near_pad;   /* 两颗2BL3车灯附近信标外扩距离镜像，单位像素 */
+extern int32 bl3_near_min;   /* 两颗2BL3车灯附近信标最小面积镜像 */
+extern int32 bl3_near_gray;  /* 两颗2BL3车灯附近孤立信标最小峰值灰度镜像 */
+extern int32 bl3_near_bg;    /* 两颗2BL3车灯附近孤立信标最大背景灰度镜像 */
+extern float bl3_match_dist; /* 两颗2BL3信标跟踪匹配距离镜像，单位像素 */
+extern float bl3_gate_dist;  /* 两颗2BL3已确认目标匹配门距离镜像，单位像素 */
+extern float bl3_new_dist;   /* 两颗2BL3新目标重建距离镜像，单位像素 */
+extern int32 bl3_confirm;    /* 两颗2BL3目标初始化确认帧数镜像 */
+extern int32 bl3_misses;     /* 两颗2BL3信标最大连续丢失帧数镜像 */
+extern float bl3_pos_alpha;  /* 两颗2BL3位置滤波当前测量权重镜像 */
+extern float bl3_vel_alpha;  /* 两颗2BL3速度滤波当前测量权重镜像 */
+extern int32 bl3_stream_mode; /* 两颗2BL3图传内容模式镜像 */
+extern float bl3_lamp_width;
+extern float bl3_narrow_width;
+extern float bl3_narrow_elong;
+extern int32 bl3_upper_area;
+extern float bl3_upper_len;
+extern float bl3_upper_width;
+extern float bl3_compact_y;
+extern int32 bl3_compact_area;
+extern float bl3_compact_len;
+extern float bl3_compact_width;
+extern float bl3_compact_elong;
+extern float bl3_vglare_elong;
+extern int32 bl3_vglare_gray;
+extern float bl3_linear_elong;
+extern int32 bl3_weak_c_thr;
+extern int32 bl3_weak_c_min;
+extern int32 bl3_weak_c_max;
+extern int32 bl3_weak_c_gray;
+extern int32 bl3_weak_c_bg;
+extern int32 bl3_shape_min;
+extern float bl3_shape_ratio;
+extern int32 bl3_shape_fill;
+extern int32 bl3_shape_s_fill;
+extern float bl3_top_v_elong;
+extern int32 bl3_sat_t_gray;
 
 void air_comm_air_init(void);
 

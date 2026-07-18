@@ -34,7 +34,10 @@
 #define CAMERA_SPI_IRQ_SRC                  scb_6_interrupt_IRQn
 #define CAMERA_SPI_CPU_IRQ                  CPUIntIdx5_IRQn
 #define CAMERA_SPI_PERI_FREQ                CY_INITIAL_TARGET_PERI_FREQ
-#define CAMERA_SPI_IMAGE_DISPLAY_ENABLE     (0U)
+/* 下行字节8复用为参数写锁：0允许SET，1禁止SET；GET不受影响。 */
+#define CAMERA_SPI_DOWNLINK_PARAM_WRITE_LOCK_OFFSET (8U)
+#define CAMERA_SPI_PARAM_WRITE_ALLOWED      (0U)
+#define CAMERA_SPI_PARAM_WRITE_LOCKED       (1U)
 
 /* 2BL3参数命令与ACK协议固定字段。 */
 #define CAMERA_SPI_PARAM_MAGIC              (0xC3U)
@@ -42,6 +45,8 @@
 #define CAMERA_SPI_PARAM_VERSION            (1U)
 #define CAMERA_SPI_PARAM_MAX_CYCLES         (12U)
 #define CAMERA_SPI_PARAM_EXP_MAX_CYCLES     (80U)
+/* GET不一致时使用不同事务号复读，避免2BL3返回同一事务的缓存ACK。 */
+#define CAMERA_SPI_PARAM_GET_MISMATCH_ATTEMPTS (3U)
 #define CAMERA_SPI_PARAM_PREFLIGHT_TXN_MASK (0x40000000UL)
 #define CAMERA_SPI_PARAM_ROLLBACK_TXN_MASK  (0x80000000UL)
 #define CAMERA_SPI_PARAM_ORIGINAL_TXN_MASK  (0xC0000000UL)
@@ -123,12 +128,16 @@ typedef struct
     uint8 cycle_count;
     uint8 final_status;
     uint8 cancel_requested;
+    uint8 rollback_fail_seen;
+    uint8 get_mismatch_count;
+    uint8 get_mismatch_stable;
     uint16 param_id;
     uint32 transaction;
     uint32 value_bits;
     uint32 fallback_bits;
     uint32 previous_bits[CAMERA_SPI_BOARD_COUNT];
     uint32 actual_bits[CAMERA_SPI_BOARD_COUNT];
+    uint32 get_mismatch_reference[CAMERA_SPI_BOARD_COUNT];
     uint8 board_status[CAMERA_SPI_BOARD_COUNT];
 } camera_spi_param_transaction_t;
 
@@ -149,6 +158,8 @@ static uint8 s_initialized;
 static uint8 s_active;
 static uint8 s_active_board;
 static uint8 s_flight_state;
+/* 核0同步的参数写锁，1表示当前禁止2BL3参数SET。 */
+static uint8 s_param_write_locked;
 /* 核0同步过来的 2BL3 图传发送模式 */
 static uint8 s_image_send_enable;
 static uint8 s_ready_mask;
@@ -267,7 +278,7 @@ static uint16 camera_spi_build_downlink_app(uint8 board_id, uint8 *app)
     app[6] = s_flight_state;
     app[7] = ((s_image_send_enable == 2U) ||
               ((s_image_send_enable == 1U) && (s_flight_state == 0U))) ? 1U : 0U;
-    app[8] = (s_flight_state == 0U) ? CAMERA_SPI_IMAGE_DISPLAY_ENABLE : 0U;
+    app[CAMERA_SPI_DOWNLINK_PARAM_WRITE_LOCK_OFFSET] = s_param_write_locked;
 
     if(((s_param_transaction.state == CAMERA_SPI_PARAM_PREFLIGHT) ||
         (s_param_transaction.state == CAMERA_SPI_PARAM_ACTIVE) ||
@@ -283,8 +294,19 @@ static uint16 camera_spi_build_downlink_app(uint8 board_id, uint8 *app)
         }
         else if(s_param_transaction.state == CAMERA_SPI_PARAM_ROLLBACK)
         {
-            transaction ^= CAMERA_SPI_PARAM_ROLLBACK_TXN_MASK;
+            transaction |= CAMERA_SPI_PARAM_ROLLBACK_TXN_MASK;
             value_bits = s_param_transaction.previous_bits[board_id];
+        }
+        else if(s_param_transaction.op == IPC_REMOTE_PARAM_OP_GET)
+        {
+            if(s_param_transaction.get_mismatch_count == 1U)
+            {
+                transaction |= CAMERA_SPI_PARAM_PREFLIGHT_TXN_MASK;
+            }
+            else if(s_param_transaction.get_mismatch_count >= 2U)
+            {
+                transaction |= CAMERA_SPI_PARAM_ROLLBACK_TXN_MASK;
+            }
         }
         else if(s_param_transaction.op == IPC_REMOTE_PARAM_OP_SET)
         {
@@ -318,19 +340,25 @@ static void camera_spi_refresh_flight_state(void)
     uint8 board_id;
     uint8 flying = (ipc_core0_is_flying() != 0U) ? 1U : 0U;
     uint8 image_send_enable = ipc_core0_image_send_enable();
+    uint8 param_write_locked =
+        (ipc_core0_screen_refresh_enable() != 0U) ?
+            CAMERA_SPI_PARAM_WRITE_ALLOWED : CAMERA_SPI_PARAM_WRITE_LOCKED;
 
     if(image_send_enable > 2U)
     {
         image_send_enable = 0U;
     }
 
-    if((flying == s_flight_state) && (image_send_enable == s_image_send_enable))
+    if((flying == s_flight_state) &&
+       (image_send_enable == s_image_send_enable) &&
+       (param_write_locked == s_param_write_locked))
     {
         return;
     }
 
     s_flight_state = flying;
     s_image_send_enable = image_send_enable;
+    s_param_write_locked = param_write_locked;
     for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
     {
         s_boards[board_id].tx_sequence++;
@@ -470,8 +498,19 @@ static uint8 camera_spi_parse_param_ack(uint8 board_id, const uint8 *data)
     }
     else if(s_param_transaction.state == CAMERA_SPI_PARAM_ROLLBACK)
     {
-        expected_transaction ^= CAMERA_SPI_PARAM_ROLLBACK_TXN_MASK;
+        expected_transaction |= CAMERA_SPI_PARAM_ROLLBACK_TXN_MASK;
         expected_op = IPC_REMOTE_PARAM_OP_SET;
+    }
+    else if(s_param_transaction.op == IPC_REMOTE_PARAM_OP_GET)
+    {
+        if(s_param_transaction.get_mismatch_count == 1U)
+        {
+            expected_transaction |= CAMERA_SPI_PARAM_PREFLIGHT_TXN_MASK;
+        }
+        else if(s_param_transaction.get_mismatch_count >= 2U)
+        {
+            expected_transaction |= CAMERA_SPI_PARAM_ROLLBACK_TXN_MASK;
+        }
     }
     if(transaction != expected_transaction)
     {
@@ -494,6 +533,10 @@ static uint8 camera_spi_parse_param_ack(uint8 board_id, const uint8 *data)
     if(status > IPC_REMOTE_PARAM_STATUS_ROLLBACK_FAIL)
     {
         status = IPC_REMOTE_PARAM_STATUS_ERROR;
+    }
+    if(status == IPC_REMOTE_PARAM_STATUS_ROLLBACK_FAIL)
+    {
+        s_param_transaction.rollback_fail_seen = 1U;
     }
     s_param_transaction.board_status[board_id] = status;
     s_param_transaction.actual_bits[board_id] = camera_spi_read_u32_le(&data[16]);
@@ -576,7 +619,9 @@ static uint8 camera_spi_parse_response(uint8 board_id)
 /* 将两板参数事务置为完成态，等待核1 IPC层读取。 */
 static void camera_spi_param_complete(uint8 status, uint32 actual_bits)
 {
-    s_param_transaction.final_status = status;
+    s_param_transaction.final_status =
+        (s_param_transaction.rollback_fail_seen != 0U) ?
+            IPC_REMOTE_PARAM_STATUS_ROLLBACK_FAIL : status;
     s_param_transaction.actual_bits[0] = actual_bits;
     s_param_transaction.state = CAMERA_SPI_PARAM_COMPLETE;
 }
@@ -593,7 +638,7 @@ static void camera_spi_param_start_rollback(uint8 board_mask)
     s_param_transaction.board_status[1] = IPC_REMOTE_PARAM_STATUS_TIMEOUT;
 }
 
-/* 每轮两板SPI结束后汇总ACK；普通参数等待12周期，曝光参数等待80周期。 */
+/* 每轮两板SPI结束后汇总ACK；普通参数等待12周期，曝光和持久化命令等待80周期。 */
 /* 未收到ACK的板每轮都请求ACK，避免从机主循环错过首个请求帧。 */
 static void camera_spi_param_schedule_next(void)
 {
@@ -626,7 +671,7 @@ static void camera_spi_param_evaluate(void)
     }
 
     required_mask = s_param_transaction.command_mask;
-    max_cycles = (s_param_transaction.param_id == IPC_REMOTE_PARAM_ID_EXP_TIME) ?
+    max_cycles = (s_param_transaction.param_id == IPC_REMOTE_PARAM_ID_BL3_EXP_TIME) ?
                  CAMERA_SPI_PARAM_EXP_MAX_CYCLES : CAMERA_SPI_PARAM_MAX_CYCLES;
     for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
     {
@@ -701,8 +746,40 @@ static void camera_spi_param_evaluate(void)
             }
             else if(s_param_transaction.actual_bits[0] != s_param_transaction.actual_bits[1])
             {
-                camera_spi_param_complete(IPC_REMOTE_PARAM_STATUS_MISMATCH,
-                                          s_param_transaction.fallback_bits);
+                if(s_param_transaction.get_mismatch_count == 0U)
+                {
+                    s_param_transaction.get_mismatch_reference[0] =
+                        s_param_transaction.actual_bits[0];
+                    s_param_transaction.get_mismatch_reference[1] =
+                        s_param_transaction.actual_bits[1];
+                    s_param_transaction.get_mismatch_stable = 1U;
+                }
+                else if((s_param_transaction.actual_bits[0] !=
+                         s_param_transaction.get_mismatch_reference[0]) ||
+                        (s_param_transaction.actual_bits[1] !=
+                         s_param_transaction.get_mismatch_reference[1]))
+                {
+                    s_param_transaction.get_mismatch_stable = 0U;
+                }
+
+                s_param_transaction.get_mismatch_count++;
+                if(s_param_transaction.get_mismatch_count <
+                   CAMERA_SPI_PARAM_GET_MISMATCH_ATTEMPTS)
+                {
+                    s_param_transaction.command_due_mask = 0x03U;
+                    s_param_transaction.ack_mask = 0U;
+                    s_param_transaction.cycle_count = 0U;
+                    s_param_transaction.board_status[0] = IPC_REMOTE_PARAM_STATUS_TIMEOUT;
+                    s_param_transaction.board_status[1] = IPC_REMOTE_PARAM_STATUS_TIMEOUT;
+                }
+                else
+                {
+                    camera_spi_param_complete(
+                        (s_param_transaction.get_mismatch_stable != 0U) ?
+                            IPC_REMOTE_PARAM_STATUS_MISMATCH :
+                            IPC_REMOTE_PARAM_STATUS_ERROR,
+                        s_param_transaction.fallback_bits);
+                }
             }
             else
             {
@@ -973,11 +1050,13 @@ void CameraSpi_Init(void)
     memset(&s_spi_context, 0, sizeof(s_spi_context));
     memset(&s_param_transaction, 0, sizeof(s_param_transaction));
     memset(&s_param_rollback_cache, 0, sizeof(s_param_rollback_cache));
-    memset(&s_param_rollback_cache, 0, sizeof(s_param_rollback_cache));
     s_initialized = 0U;
     s_active = 0U;
     s_active_board = 0U;
     s_flight_state = (ipc_core0_is_flying() != 0U) ? 1U : 0U;
+    s_param_write_locked =
+        (ipc_core0_screen_refresh_enable() != 0U) ?
+            CAMERA_SPI_PARAM_WRITE_ALLOWED : CAMERA_SPI_PARAM_WRITE_LOCKED;
     s_image_send_enable = ipc_core0_image_send_enable();
     if(s_image_send_enable > 2U)
     {
@@ -1071,8 +1150,7 @@ uint8 CameraSpi_RemoteParamStart(uint8 op,
     s_param_rollback_cache.valid = 0U;
     memset(&s_param_transaction, 0, sizeof(s_param_transaction));
     s_param_transaction.state = (op == IPC_REMOTE_PARAM_OP_SET) ?
-                                CAMERA_SPI_PARAM_PREFLIGHT :
-                                CAMERA_SPI_PARAM_ACTIVE;
+                                CAMERA_SPI_PARAM_PREFLIGHT : CAMERA_SPI_PARAM_ACTIVE;
     s_param_transaction.op = op;
     s_param_transaction.type = type;
     s_param_transaction.command_mask = 0x03U;

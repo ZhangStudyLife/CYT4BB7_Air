@@ -1,4 +1,5 @@
 #include "car_plan.h"
+#include "ProjectionCenter.h"
 #include "../Image/image_data.h"
 #include <math.h>
 #include <string.h>
@@ -9,8 +10,7 @@
 #define CAR_PLAN_CENTER_MAX_DIST_PX        (65.0f)
 
 float Car_Speed = 1.2f; /* 车模规划速度，单位 m/s，可由车机通过 AirComm 修改 */
-float Car_Speed_Fast = 1.2f; /* 车模固定前进速度，单位 m/s，可由车机通过 AirComm 修改 */
-
+float Car_Speed_Fast = 2.0f; /* 车模快速前进速度，单位 m/s，可由车机通过 AirComm 修改 */
 static car_plan_result_t s_car_plan_result;
 
 static void CarPlan_ClearResult(car_plan_result_t *result)
@@ -36,6 +36,50 @@ static uint8 CarPlan_CarLampValid(uint8 camera)
     return image_data_car_lamp_valid(&image_data[camera].car_lamp_data[0]);
 }
 
+/**
+ * @brief 将指定相机的像素点映射到 Center 相机坐标系。
+ * @param camera 输入相机编号。
+ * @param x 输入像素点 X 坐标，单位 px。
+ * @param y 输入像素点 Y 坐标，单位 px。
+ * @param center_x 输出 Center 坐标系 X 坐标，单位 px。
+ * @param center_y 输出 Center 坐标系 Y 坐标，单位 px。
+ * @return 无。
+ */
+static void CarPlan_MapPointToCenter(uint8 camera,
+                                     float x,
+                                     float y,
+                                     float *center_x,
+                                     float *center_y)
+{
+    float x2;
+    float xy;
+    float y2;
+
+    if (camera == (uint8)Center)
+    {
+        *center_x = x;
+        *center_y = y;
+        return;
+    }
+
+    x2 = x * x;
+    xy = x * y;
+    y2 = y * y;
+    if (camera == (uint8)Front)
+    {
+        *center_x = -3.224193f + 1.123975f * x + 0.003353f * y +
+                    0.000073f * x2 - 0.004078f * xy - 0.000302f * y2;
+        *center_y = -60.512112f + 0.030475f * x + 0.772429f * y +
+                    0.004336f * x2 - 0.000232f * xy + 0.004678f * y2;
+        return;
+    }
+
+    *center_x = -10.828701f - 1.119896f * x + 0.059751f * y -
+                0.000063f * x2 + 0.004186f * xy - 0.000850f * y2;
+    *center_y = 58.428997f - 0.026951f * x - 0.718077f * y -
+                0.004166f * x2 + 0.000106f * xy - 0.004593f * y2;
+}
+
 static uint8 CarPlan_MakeGeometryResult(uint8 camera, car_plan_result_t *out)
 {
     const car_lamp_data *lamp = &image_data[camera].car_lamp_data[0];
@@ -55,7 +99,13 @@ static uint8 CarPlan_MakeGeometryResult(uint8 camera, car_plan_result_t *out)
     float forward;
     float abs_strafe;
     float abs_forward;
+    float plan_speed;
     float speed_scale;
+    float beacon_vector_x;
+    float beacon_vector_y;
+    float projection_vector_x;
+    float projection_vector_y;
+    float direction_dot;
 
     if ((image_data_car_lamp_valid(lamp) == 0U) ||
         (image_data_beacon_valid(beacon) == 0U))
@@ -94,10 +144,41 @@ static uint8 CarPlan_MakeGeometryResult(uint8 camera, car_plan_result_t *out)
         forward = -perp;
     }
 
-    /* 取 strafe/forward 中绝对值较大者满速为 Car_Speed，另一轴按比例缩放（符号保持不变） */
+    plan_speed = Car_Speed;
+    if (g_projection_center.valid != 0U)
+    {
+        CarPlan_MapPointToCenter(camera, beacon->x, beacon->y,
+                                 &beacon_vector_x, &beacon_vector_y);
+        CarPlan_MapPointToCenter(camera, lamp->cx, lamp->cy,
+                                 &projection_vector_x, &projection_vector_y);
+        beacon_vector_x -= g_projection_center.cx;
+        beacon_vector_y -= g_projection_center.cy;
+        projection_vector_x = g_projection_center.cx - projection_vector_x;
+        projection_vector_y = g_projection_center.cy - projection_vector_y;
+        if ((beacon_vector_x * beacon_vector_x + beacon_vector_y * beacon_vector_y) <
+            (CAR_PLAN_CENTER_MAX_DIST_PX * CAR_PLAN_CENTER_MAX_DIST_PX))
+        {
+            beacon_vector_x += projection_vector_x;
+            beacon_vector_y += projection_vector_y;
+            direction_dot = projection_vector_x * beacon_vector_x +
+                            projection_vector_y * beacon_vector_y;
+            /* 两个车灯出发向量夹角小于 60 度时使用快速速度。 */
+            if ((direction_dot > 0.0f) &&
+                ((direction_dot * direction_dot) >
+                 (0.25f *
+                  (projection_vector_x * projection_vector_x +
+                   projection_vector_y * projection_vector_y) *
+                  (beacon_vector_x * beacon_vector_x + beacon_vector_y * beacon_vector_y))))
+            {
+                plan_speed = Car_Speed_Fast;
+            }
+        }
+    }
+
+    /* 取 strafe/forward 中绝对值较大者满速为 plan_speed，另一轴按比例缩放（符号保持不变） */
     abs_strafe = fabsf(strafe);
     abs_forward = fabsf(forward);
-    speed_scale = Car_Speed / ((abs_strafe > abs_forward) ? abs_strafe : abs_forward);
+    speed_scale = plan_speed / ((abs_strafe > abs_forward) ? abs_strafe : abs_forward);
 
     out->valid = 1U;
     out->camera = camera;
@@ -215,8 +296,8 @@ uint8 CarPlan_Update(car_plan_result_t *result)
 
         CarPlan_SetForcedForwardResult(side_camera,
                                        (side_camera == (uint8)Back)
-                                           ? -Car_Speed_Fast
-                                           : Car_Speed_Fast,
+                                           ? -Car_Speed
+                                           : Car_Speed,
                                        &candidate);
         s_car_plan_result = candidate;
         CarPlan_CopyResult(result, &s_car_plan_result);

@@ -86,8 +86,65 @@ void FC_Mode3_100Hz(void)
 
 
     
-    float   s_common_flow_dec_x = FlowGyroDecoupler_LC302_GetDecX();
-    float   s_common_flow_dec_y = FlowGyroDecoupler_LC302_GetDecY();
+    // float   s_common_flow_dec_x = FlowGyroDecoupler_LC302_GetDecX();
+    // float   s_common_flow_dec_y = FlowGyroDecoupler_LC302_GetDecY();
+
+       wifi_justfloat(  image_data[Front].beacon_data[0].x,          /* I1 */
+                        image_data[Front].beacon_data[0].y,          /* I2 */
+                        image_data[Front].beacon_data[0].area,          /* I3 */
+                        
+                        image_data[Front].beacon_data[1].x,          /* I4 */
+                        image_data[Front].beacon_data[1].y,          /* I5 */
+                        image_data[Front].beacon_data[1].area,          /* I6 */
+                        
+                        image_data[Center].beacon_data[0].x,         /* I7 */
+                        image_data[Center].beacon_data[0].y,         /* I8 */
+                        image_data[Center].beacon_data[0].area,        /* I9 */
+
+                        image_data[Center].beacon_data[1].x,         /* I10 */
+                        image_data[Center].beacon_data[1].y,         /* I11 */
+                        image_data[Center].beacon_data[1].area,        /* I12 */
+
+                        image_data[Back].beacon_data[0].x,           /* I13 */
+                        image_data[Back].beacon_data[0].y,           /* I14 */
+                        image_data[Back].beacon_data[0].area,           /* I15 */
+
+                        image_data[Back].beacon_data[1].x,           /* I16 */
+                        image_data[Back].beacon_data[1].y,           /* I17 */
+                        image_data[Back].beacon_data[1].area,           /* I18 */
+
+                        image_data[Front].car_lamp_data[0].cx,       /* I19 */
+                        image_data[Front].car_lamp_data[0].cy,       /* I20 */
+                        image_data[Front].car_lamp_data[0].angle,    /* I21 */
+                        image_data[Front].car_lamp_data[0].width,    /* I22 */
+                        image_data[Front].car_lamp_data[0].length,   /* I23 */
+                        image_data[Center].car_lamp_data[0].cx,      /* I24 */
+                        image_data[Center].car_lamp_data[0].cy,      /* I25 */
+                        image_data[Center].car_lamp_data[0].angle,   /* I26 */
+                        image_data[Center].car_lamp_data[0].width,   /* I27 */
+                        image_data[Center].car_lamp_data[0].length,  /* I28 */
+                        image_data[Back].car_lamp_data[0].cx,        /* I29 */
+                        image_data[Back].car_lamp_data[0].cy,        /* I30 */
+                        image_data[Back].car_lamp_data[0].angle,     /* I31 */
+                        image_data[Back].car_lamp_data[0].width,     /* I32 */
+                        image_data[Back].car_lamp_data[0].length,    /* I33 */
+                        g_euler.pitch,                              /* I34 */
+                        g_euler.roll,                               /* I35 */
+                        g_euler.yaw,                                /* I36 */
+                        g_car_sync_time_ms,                         /* I37 */
+                        g_car_vel_x, g_car_vel_y, g_car_yaw,
+                        car_plan.target_forward_mps,car_plan.target_strafe_mps
+                        // g_car_lamp_fused.cx,                        /* I38 */
+                        // g_car_lamp_fused.cy,                        /* I39 */
+                        // g_car_lamp_fused_distance_projectioncenter_2.x_cm,
+                        // g_car_lamp_fused_distance_projectioncenter_2.y_cm
+                        // g_tof_fused_height_mm,
+                        // g_height_fused_vz_mps,
+                        // CRSF_STD[8]
+                        );
+
+
+
 
 
     // wifi_justfloat(

@@ -239,8 +239,8 @@ static void threshold_image(
 static void threshold_beacon_image(
     const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W])
 {
-    unsigned char x;
-    unsigned char y;
+    int x;
+    int y;
 
     for (y = 0; y < BEACON_IMAGE_H; y++)
     {
@@ -923,8 +923,8 @@ static unsigned char split_close_compound_lamp(
     const component_t *compound,
     component_t *best_lamp)
 {
-    unsigned char x;
-    unsigned char y;
+    int x;
+    int y;
     component_t lamp_core;
     component_t beacon_core;
     component_t merged_core;
@@ -937,18 +937,21 @@ static unsigned char split_close_compound_lamp(
     memset(&merged_core, 0, sizeof(merged_core));
     begin_visit_pass();
 
-    for (y = (unsigned char)compound->min_y; y <= (unsigned char)compound->max_y; y++)
+    for (y = compound->min_y; y <= compound->max_y; y++)
     {
-        for (x = (unsigned char)compound->min_x; x <= (unsigned char)compound->max_x; x++)
+        for (x = compound->min_x; x <= compound->max_x; x++)
         {
             component_t comp;
 
-            if (g_current_image[y][x] < CLOSE_LAMP_SPLIT_THRESHOLD || is_visited(x, y))
+            if (g_current_image[y][x] < CLOSE_LAMP_SPLIT_THRESHOLD ||
+                is_visited((unsigned char)x, (unsigned char)y))
             {
                 continue;
             }
 
-            comp = grow_local_threshold_component(x, y, compound);
+            comp = grow_local_threshold_component((unsigned char)x,
+                                                  (unsigned char)y,
+                                                  compound);
             if (is_close_lamp_core(&comp) != 0 &&
                 (has_lamp_core == 0 || comp.area > lamp_core.area))
             {
@@ -1121,6 +1124,18 @@ static unsigned char component_from_temporal_car(
     half_len = track->length * 0.5f + (float)CAR_LAMP_TEMPORAL_MASK_PAD;
     half_wid = track->width * 0.5f + (float)CAR_LAMP_TEMPORAL_MASK_PAD;
     radius = sqrtf(half_len * half_len + half_wid * half_wid);
+    /* 预测框完全离开画面时立即失效，避免负边界进入无符号像素循环。 */
+    if ((isfinite(image_cx) == 0) ||
+        (isfinite(image_cy) == 0) ||
+        (isfinite(radius) == 0) ||
+        (isfinite(track->angle) == 0) ||
+        (image_cx + radius < 0.0f) ||
+        (image_cy + radius < 0.0f) ||
+        (image_cx - radius >= (float)BEACON_IMAGE_W) ||
+        (image_cy - radius >= (float)BEACON_IMAGE_H))
+    {
+        return 0;
+    }
 
     lamp->cx = image_cx;
     lamp->cy = image_cy;
@@ -1588,8 +1603,8 @@ static unsigned char find_temporal_car_lamp(component_t *best_lamp)
     int max_x;
     int min_y;
     int max_y;
-    unsigned char x;
-    unsigned char y;
+    int x;
+    int y;
 
     if (best_lamp == 0 || g_current_image == 0 ||
         component_from_temporal_car(&g_car_track, &temporal_lamp, 1) == 0)
@@ -1607,21 +1622,28 @@ static unsigned char find_temporal_car_lamp(component_t *best_lamp)
     if (min_y < 0) min_y = 0;
     if (max_x >= BEACON_IMAGE_W) max_x = BEACON_IMAGE_W - 1;
     if (max_y >= BEACON_IMAGE_H) max_y = BEACON_IMAGE_H - 1;
+    if ((max_x < 0) || (max_y < 0) ||
+        (min_x >= BEACON_IMAGE_W) || (min_y >= BEACON_IMAGE_H) ||
+        (min_x > max_x) || (min_y > max_y))
+    {
+        return 0;
+    }
 
     threshold_image(g_current_image, (unsigned char)g_image_down_beacon_binary_threshold);
     begin_visit_pass();
-    for (y = (unsigned char)min_y; y <= (unsigned char)max_y; y++)
+    for (y = min_y; y <= max_y; y++)
     {
-        for (x = (unsigned char)min_x; x <= (unsigned char)max_x; x++)
+        for (x = min_x; x <= max_x; x++)
         {
             component_t comp;
 
-            if (g_binary[y][x] == 0 || is_visited(x, y))
+            if (g_binary[y][x] == 0 ||
+                is_visited((unsigned char)x, (unsigned char)y))
             {
                 continue;
             }
 
-            comp = grow_component(x, y);
+            comp = grow_component((unsigned char)x, (unsigned char)y);
             if (comp.area >= CAR_LAMP_TEMPORAL_MIN_BRIGHT_AREA &&
                 is_component_in_lamp_core(&comp, &temporal_lamp) != 0)
             {

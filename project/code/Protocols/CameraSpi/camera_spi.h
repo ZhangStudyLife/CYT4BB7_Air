@@ -18,6 +18,13 @@ typedef struct
 } camera_spi_remote_param_result_t;
 
 void CameraSpi_Init(void);
+
+/*
+ * 非阻塞推进Camera SPI硬件传输。
+ * 无输入参数；返回1表示仍有传输待完成，返回0表示当前轮次已完成或空闲。
+ */
+uint8 CameraSpi_Service(void);
+
 void CameraSpi_Update(void);
 void CameraSpi_GetSnapshot(struct image_data camera[IMAGE_CAMERA_COUNT]);
 

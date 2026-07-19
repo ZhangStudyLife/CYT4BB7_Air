@@ -18,10 +18,17 @@ typedef struct
 } camera_spi_remote_param_result_t;
 
 void CameraSpi_Init(void);
+
+/*
+ * 非阻塞推进Camera SPI硬件传输。
+ * 无输入参数；返回1表示仍有传输待完成，返回0表示当前轮次已完成或空闲。
+ */
+uint8 CameraSpi_Service(void);
+
 void CameraSpi_Update(void);
 void CameraSpi_GetSnapshot(struct image_data camera[IMAGE_CAMERA_COUNT]);
 
-/* 启动一笔同时发往两颗2BL3的参数事务，返回1表示已启动。 */
+/* 启动一笔同时发往两颗2BL3的参数事务；持久化命令SET跳过预读，返回1表示已启动。 */
 uint8 CameraSpi_RemoteParamStart(uint8 op,
                                  uint8 type,
                                  uint16 param_id,
@@ -32,7 +39,7 @@ uint8 CameraSpi_RemoteParamStart(uint8 op,
 /* 读取并消费已完成的两板参数事务结果，返回1表示取得结果。 */
 uint8 CameraSpi_RemoteParamTakeResult(camera_spi_remote_param_result_t *result);
 
-/* 取消指定事务；SET已下发或成功结果刚被消费时，均先恢复两板各自旧值。 */
+/* 取消指定事务；普通SET恢复两板各自旧值，持久化命令直接超时且不回滚。 */
 uint8 CameraSpi_RemoteParamCancel(uint32 transaction);
 
 #endif

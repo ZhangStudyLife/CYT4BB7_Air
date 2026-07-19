@@ -26,18 +26,8 @@ typedef struct
 #error "Beacon image algorithm is tuned for MT9V03X 188x120 frames."
 #endif
 
-#define BEACON_THRESHOLD_MIN_VALUE      24
-#define BEACON_MIN_COMPONENT_AREA       10
-#define BEACON_MAX_COMPONENT_AREA       5000
-#define CAR_LAMP_BINARY_THRESHOLD       200
 #define LAMP_MASK_PAD                   2
-#define LAMP_NEAR_BEACON_PAD            8
-#define LAMP_NEAR_BEACON_MIN_AREA       45
-#define LAMP_NEAR_BEACON_ISOLATED_MIN_AREA 18
-#define LAMP_NEAR_BEACON_BACKGROUND_MAX 40
 #define BEACON_SIDE_EDGE_MARGIN         25
-#define BEACON_SIDE_EDGE_MIN_AREA       10
-#define BEACON_SIDE_EDGE_THRESHOLD      100
 #define BEACON_TOP_BOTTOM_EDGE_REJECT_MARGIN 8
 #define CLOSE_LAMP_SPLIT_THRESHOLD      250
 #define CLOSE_LAMP_MIN_AREA             120
@@ -59,14 +49,29 @@ typedef struct
 #define CLOSE_MERGED_CORE_MAX_AREA      150
 #define CLOSE_MERGED_CORE_MIN_BBOX_W    16
 
-/* 核1信标二值化运行时阈值，车端远程设置后从下一帧开始使用。 */
+/* Core1图像算法运行时参数。 */
 int32 g_image_down_beacon_binary_threshold = 120;
+int32 g_image_down_beacon_min_area = 10;
+int32 g_image_down_side_edge_min_area = 10;
+int32 g_image_down_side_edge_threshold = 100;
+int32 g_image_down_car_lamp_binary_threshold = 200;
+int32 g_image_down_car_lamp_min_area = 24;
+int32 g_image_down_car_lamp_max_area = 1200;
+float g_image_down_car_lamp_min_elongation = 1.6f;
+float g_image_down_car_lamp_min_length = 8.0f;
+int32 g_image_down_near_lamp_pad = 8;
+int32 g_image_down_near_lamp_min_area = 45;
+int32 g_image_down_near_lamp_isolated_min_area = 18;
+int32 g_image_down_near_lamp_background_max = 40;
+float g_image_down_match_distance = 18.0f;
+float g_image_down_gate_distance = 24.0f;
+float g_image_down_new_target_distance = 36.0f;
+int32 g_image_down_confirm_frames = 2;
+int32 g_image_down_max_misses = 3;
+float g_image_down_filter_pos_alpha = 0.65f;
+float g_image_down_filter_vel_alpha = 0.30f;
 static uint8 s_mt9v03x_initialized;
 #define CLOSE_MERGED_CORE_MIN_BBOX_H    14
-#define CAR_LAMP_MIN_AREA               24
-#define CAR_LAMP_MAX_AREA               1200
-#define CAR_LAMP_MIN_ELONGATION         1.6f
-#define CAR_LAMP_MIN_LENGTH             8.0f
 #define CAR_LAMP_TRACK_START_AREA       30
 #define CAR_LAMP_TRACK_START_ELONGATION 1.6f
 #define CAR_LAMP_TRACK_START_SCORE      80.0f
@@ -81,10 +86,7 @@ static uint8 s_mt9v03x_initialized;
 #define CAR_LAMP_SIDE_SUN_Y             36
 #define CAR_LAMP_EDGE_MARGIN            2
 #define CAR_LAMP_LOCAL_RING_PAD         3
-#define B0_MATCH_DISTANCE               18.0f
 #define B0_SWITCH_AREA_RATIO            1.45f
-#define B0_INIT_CONFIRM_FRAMES          2
-#define BEACON_MAX_MISSES               3
 #define CAR_LAMP_EDGE_MAX_MISSES        3
 #define CAR_LAMP_CENTER_MAX_MISSES      24
 #define CAR_LAMP_TEMPORAL_EDGE_MARGIN   8
@@ -92,10 +94,6 @@ static uint8 s_mt9v03x_initialized;
 #define CAR_LAMP_TEMPORAL_CORE_PAD      2
 #define CAR_LAMP_TEMPORAL_TAKEOVER_PAD  10
 #define CAR_LAMP_TEMPORAL_MIN_BRIGHT_AREA 3
-#define KALMAN_GATE_DISTANCE            24.0f
-#define KALMAN_NEW_TARGET_DISTANCE      36.0f
-#define FILTER_POS_ALPHA                0.65f
-#define FILTER_VEL_ALPHA                0.30f
 
 #define IMAGE_QUEUE_SIZE                (BEACON_IMAGE_W * BEACON_IMAGE_H)
 #define PI_F                            3.1415926f
@@ -141,6 +139,8 @@ typedef struct
 uint8 g_image_frame[MT9V03X_H][MT9V03X_W];
 
 static unsigned char g_binary[BEACON_IMAGE_H][BEACON_IMAGE_W];
+static unsigned char g_beacon_binary_snapshot[BEACON_IMAGE_H][BEACON_IMAGE_W];
+static unsigned char g_car_lamp_binary_snapshot[BEACON_IMAGE_H][BEACON_IMAGE_W];
 static unsigned char g_visit_stamp[BEACON_IMAGE_H][BEACON_IMAGE_W];
 static unsigned char g_current_stamp = 0;
 static unsigned char g_queue_x[IMAGE_QUEUE_SIZE];
@@ -179,6 +179,8 @@ static void beacon_image_reset_temporal(void);
 static void beacon_image_init(void)
 {
     memset(g_binary, 0, sizeof(g_binary));
+    memset(g_beacon_binary_snapshot, 0, sizeof(g_beacon_binary_snapshot));
+    memset(g_car_lamp_binary_snapshot, 0, sizeof(g_car_lamp_binary_snapshot));
     memset(g_visit_stamp, 0, sizeof(g_visit_stamp));
     g_current_image = 0;
     g_has_lamp_track = 0;
@@ -237,8 +239,8 @@ static void threshold_image(
 static void threshold_beacon_image(
     const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W])
 {
-    unsigned char x;
-    unsigned char y;
+    int x;
+    int y;
 
     for (y = 0; y < BEACON_IMAGE_H; y++)
     {
@@ -247,7 +249,7 @@ static void threshold_beacon_image(
             unsigned char threshold =
                 (x < BEACON_SIDE_EDGE_MARGIN ||
                  x >= BEACON_IMAGE_W - BEACON_SIDE_EDGE_MARGIN)
-                    ? BEACON_SIDE_EDGE_THRESHOLD
+                    ? (unsigned char)g_image_down_side_edge_threshold
                     : (unsigned char)g_image_down_beacon_binary_threshold;
             g_binary[y][x] = (image[y][x] >= threshold) ? 255 : 0;
         }
@@ -418,7 +420,7 @@ static unsigned char is_lamp_candidate(const component_t *comp)
     int bbox_h = comp->max_y - comp->min_y + 1;
     int bbox_span = bbox_w > bbox_h ? bbox_w : bbox_h;
 
-    if (comp->area > CAR_LAMP_MAX_AREA)
+    if (comp->area > g_image_down_car_lamp_max_area)
     {
         return 0;
     }
@@ -437,21 +439,21 @@ static unsigned char is_lamp_candidate(const component_t *comp)
         (comp->min_x <= CAR_LAMP_EDGE_MARGIN ||
          comp->max_x >= BEACON_IMAGE_W - 1 - CAR_LAMP_EDGE_MARGIN) ? 1 : 0;
 
-    if (touches_top_or_bottom != 0 && comp->area < CAR_LAMP_MIN_AREA)
+    if (touches_top_or_bottom != 0 && comp->area < g_image_down_car_lamp_min_area)
     {
         return 0;
     }
-    if (comp->area < CAR_LAMP_MIN_AREA)
+    if (comp->area < g_image_down_car_lamp_min_area)
     {
         return 0;
     }
-    if (comp->elongation < CAR_LAMP_MIN_ELONGATION &&
+    if (comp->elongation < g_image_down_car_lamp_min_elongation &&
         (comp->area < CAR_LAMP_LARGE_AREA ||
          comp->elongation < CAR_LAMP_LARGE_ELONGATION))
     {
         return 0;
     }
-    if (comp->major < CAR_LAMP_MIN_LENGTH)
+    if (comp->major < g_image_down_car_lamp_min_length)
     {
         return 0;
     }
@@ -612,7 +614,7 @@ static int component_mean_gray(const component_t *comp)
     {
         for (x = comp->min_x; x <= comp->max_x; x++)
         {
-            if (g_current_image[y][x] >= CAR_LAMP_BINARY_THRESHOLD)
+            if (g_current_image[y][x] >= g_image_down_car_lamp_binary_threshold)
             {
                 sum += g_current_image[y][x];
                 count++;
@@ -921,8 +923,8 @@ static unsigned char split_close_compound_lamp(
     const component_t *compound,
     component_t *best_lamp)
 {
-    unsigned char x;
-    unsigned char y;
+    int x;
+    int y;
     component_t lamp_core;
     component_t beacon_core;
     component_t merged_core;
@@ -935,18 +937,21 @@ static unsigned char split_close_compound_lamp(
     memset(&merged_core, 0, sizeof(merged_core));
     begin_visit_pass();
 
-    for (y = (unsigned char)compound->min_y; y <= (unsigned char)compound->max_y; y++)
+    for (y = compound->min_y; y <= compound->max_y; y++)
     {
-        for (x = (unsigned char)compound->min_x; x <= (unsigned char)compound->max_x; x++)
+        for (x = compound->min_x; x <= compound->max_x; x++)
         {
             component_t comp;
 
-            if (g_current_image[y][x] < CLOSE_LAMP_SPLIT_THRESHOLD || is_visited(x, y))
+            if (g_current_image[y][x] < CLOSE_LAMP_SPLIT_THRESHOLD ||
+                is_visited((unsigned char)x, (unsigned char)y))
             {
                 continue;
             }
 
-            comp = grow_local_threshold_component(x, y, compound);
+            comp = grow_local_threshold_component((unsigned char)x,
+                                                  (unsigned char)y,
+                                                  compound);
             if (is_close_lamp_core(&comp) != 0 &&
                 (has_lamp_core == 0 || comp.area > lamp_core.area))
             {
@@ -1119,6 +1124,18 @@ static unsigned char component_from_temporal_car(
     half_len = track->length * 0.5f + (float)CAR_LAMP_TEMPORAL_MASK_PAD;
     half_wid = track->width * 0.5f + (float)CAR_LAMP_TEMPORAL_MASK_PAD;
     radius = sqrtf(half_len * half_len + half_wid * half_wid);
+    /* 预测框完全离开画面时立即失效，避免负边界进入无符号像素循环。 */
+    if ((isfinite(image_cx) == 0) ||
+        (isfinite(image_cy) == 0) ||
+        (isfinite(radius) == 0) ||
+        (isfinite(track->angle) == 0) ||
+        (image_cx + radius < 0.0f) ||
+        (image_cy + radius < 0.0f) ||
+        (image_cx - radius >= (float)BEACON_IMAGE_W) ||
+        (image_cy - radius >= (float)BEACON_IMAGE_H))
+    {
+        return 0;
+    }
 
     lamp->cx = image_cx;
     lamp->cy = image_cy;
@@ -1208,10 +1225,10 @@ static unsigned char is_near_lamp(const component_t *comp, const component_t *la
     {
         return 0;
     }
-    return (comp->max_x >= lamp->min_x - LAMP_NEAR_BEACON_PAD &&
-            comp->min_x <= lamp->max_x + LAMP_NEAR_BEACON_PAD &&
-            comp->max_y >= lamp->min_y - LAMP_NEAR_BEACON_PAD &&
-            comp->min_y <= lamp->max_y + LAMP_NEAR_BEACON_PAD) ? 1 : 0;
+    return (comp->max_x >= lamp->min_x - g_image_down_near_lamp_pad &&
+            comp->min_x <= lamp->max_x + g_image_down_near_lamp_pad &&
+            comp->max_y >= lamp->min_y - g_image_down_near_lamp_pad &&
+            comp->min_y <= lamp->max_y + g_image_down_near_lamp_pad) ? 1 : 0;
 }
 
 static unsigned char is_side_edge_beacon(const component_t *comp)
@@ -1226,13 +1243,14 @@ static unsigned char is_side_edge_beacon(const component_t *comp)
 
 static unsigned char is_isolated_near_lamp_beacon(const component_t *comp)
 {
-    if (comp == 0 || comp->valid == 0 || comp->area < LAMP_NEAR_BEACON_ISOLATED_MIN_AREA)
+    if (comp == 0 || comp->valid == 0 ||
+        comp->area < g_image_down_near_lamp_isolated_min_area)
     {
         return 0;
     }
 
     return local_background_average(comp, CAR_LAMP_LOCAL_RING_PAD) <=
-        LAMP_NEAR_BEACON_BACKGROUND_MAX ? 1 : 0;
+        g_image_down_near_lamp_background_max ? 1 : 0;
 }
 
 /**
@@ -1301,8 +1319,8 @@ static void insert_beacon_by_area(
         return;
     }
     min_area = is_side_edge_beacon(comp) != 0
-        ? BEACON_SIDE_EDGE_MIN_AREA
-        : BEACON_MIN_COMPONENT_AREA;
+        ? g_image_down_side_edge_min_area
+        : g_image_down_beacon_min_area;
     if (comp->area < min_area)
     {
         return;
@@ -1314,7 +1332,7 @@ static void insert_beacon_by_area(
     }
     if ((is_near_lamp(comp, lamp) != 0 ||
          is_near_lamp(comp, temporal_lamp) != 0) &&
-        comp->area < LAMP_NEAR_BEACON_MIN_AREA &&
+        comp->area < g_image_down_near_lamp_min_area &&
         is_isolated_near_lamp_beacon(comp) == 0)
     {
         return;
@@ -1385,6 +1403,8 @@ static void find_beacons(
     threshold_beacon_image(image);
     erase_lamp_rect_from_binary(lamp);
     erase_temporal_lamp_from_binary(temporal_lamp);
+    memcpy(g_beacon_binary_snapshot, g_binary,
+           sizeof(g_beacon_binary_snapshot));
     begin_visit_pass();
 
     for (y = 0; y < BEACON_IMAGE_H; y++)
@@ -1454,10 +1474,14 @@ static void update_track_position(temporal_track_t *track, float x, float y)
     float predict_x = track->x + track->vx;
     float predict_y = track->y + track->vy;
 
-    track->vx = (1.0f - FILTER_VEL_ALPHA) * track->vx + FILTER_VEL_ALPHA * (x - old_x);
-    track->vy = (1.0f - FILTER_VEL_ALPHA) * track->vy + FILTER_VEL_ALPHA * (y - old_y);
-    track->x = FILTER_POS_ALPHA * x + (1.0f - FILTER_POS_ALPHA) * predict_x;
-    track->y = FILTER_POS_ALPHA * y + (1.0f - FILTER_POS_ALPHA) * predict_y;
+    track->vx = (1.0f - g_image_down_filter_vel_alpha) * track->vx +
+                g_image_down_filter_vel_alpha * (x - old_x);
+    track->vy = (1.0f - g_image_down_filter_vel_alpha) * track->vy +
+                g_image_down_filter_vel_alpha * (y - old_y);
+    track->x = g_image_down_filter_pos_alpha * x +
+               (1.0f - g_image_down_filter_pos_alpha) * predict_x;
+    track->y = g_image_down_filter_pos_alpha * y +
+               (1.0f - g_image_down_filter_pos_alpha) * predict_y;
     track->misses = 0;
 }
 
@@ -1478,7 +1502,7 @@ static void output_temporal_beacon(const temporal_track_t *track, beacon_result_
     beacon_circle_t beacon;
     int i;
     int matched = -1;
-    float best_d2 = B0_MATCH_DISTANCE * B0_MATCH_DISTANCE;
+    float best_d2 = g_image_down_match_distance * g_image_down_match_distance;
 
     memset(&beacon, 0, sizeof(beacon));
     beacon.x = track->x;
@@ -1579,8 +1603,8 @@ static unsigned char find_temporal_car_lamp(component_t *best_lamp)
     int max_x;
     int min_y;
     int max_y;
-    unsigned char x;
-    unsigned char y;
+    int x;
+    int y;
 
     if (best_lamp == 0 || g_current_image == 0 ||
         component_from_temporal_car(&g_car_track, &temporal_lamp, 1) == 0)
@@ -1598,21 +1622,28 @@ static unsigned char find_temporal_car_lamp(component_t *best_lamp)
     if (min_y < 0) min_y = 0;
     if (max_x >= BEACON_IMAGE_W) max_x = BEACON_IMAGE_W - 1;
     if (max_y >= BEACON_IMAGE_H) max_y = BEACON_IMAGE_H - 1;
+    if ((max_x < 0) || (max_y < 0) ||
+        (min_x >= BEACON_IMAGE_W) || (min_y >= BEACON_IMAGE_H) ||
+        (min_x > max_x) || (min_y > max_y))
+    {
+        return 0;
+    }
 
     threshold_image(g_current_image, (unsigned char)g_image_down_beacon_binary_threshold);
     begin_visit_pass();
-    for (y = (unsigned char)min_y; y <= (unsigned char)max_y; y++)
+    for (y = min_y; y <= max_y; y++)
     {
-        for (x = (unsigned char)min_x; x <= (unsigned char)max_x; x++)
+        for (x = min_x; x <= max_x; x++)
         {
             component_t comp;
 
-            if (g_binary[y][x] == 0 || is_visited(x, y))
+            if (g_binary[y][x] == 0 ||
+                is_visited((unsigned char)x, (unsigned char)y))
             {
                 continue;
             }
 
-            comp = grow_component(x, y);
+            comp = grow_component((unsigned char)x, (unsigned char)y);
             if (comp.area >= CAR_LAMP_TEMPORAL_MIN_BRIGHT_AREA &&
                 is_component_in_lamp_core(&comp, &temporal_lamp) != 0)
             {
@@ -1637,7 +1668,7 @@ static int nearest_beacon_index(const beacon_result_t *result, float x, float y)
 {
     int i;
     int best = -1;
-    float best_d2 = B0_MATCH_DISTANCE * B0_MATCH_DISTANCE;
+    float best_d2 = g_image_down_match_distance * g_image_down_match_distance;
 
     for (i = 0; i < result->beacon_count; i++)
     {
@@ -1659,7 +1690,7 @@ static unsigned char update_temporal_beacon(beacon_result_t *result)
 
     if (result->beacon_count == 0)
     {
-        return predict_missed_track(&g_b0_track, BEACON_MAX_MISSES);
+        return predict_missed_track(&g_b0_track, g_image_down_max_misses);
     }
 
     if (g_b0_track.confirmed != 0)
@@ -1669,13 +1700,14 @@ static unsigned char update_temporal_beacon(beacon_result_t *result)
 
         selected = nearest_beacon_index(result, predict_x, predict_y);
         if (selected > 0 &&
-            beacon_area(&result->beacons[0]) > beacon_area(&result->beacons[selected]) * B0_SWITCH_AREA_RATIO)
+            beacon_area(&result->beacons[0]) >
+                beacon_area(&result->beacons[selected]) * B0_SWITCH_AREA_RATIO)
         {
             selected = 0;
         }
         if (selected < 0 &&
             square_distance(predict_x, predict_y, result->beacons[0].x, result->beacons[0].y) >
-                KALMAN_NEW_TARGET_DISTANCE * KALMAN_NEW_TARGET_DISTANCE)
+                g_image_down_new_target_distance * g_image_down_new_target_distance)
         {
             start_pending_track(&g_b0_track, result->beacons[0].x, result->beacons[0].y);
             set_beacon_track_shape(&g_b0_track, &result->beacons[0]);
@@ -1689,7 +1721,7 @@ static unsigned char update_temporal_beacon(beacon_result_t *result)
 
     if (selected < 0)
     {
-        return predict_missed_track(&g_b0_track, BEACON_MAX_MISSES);
+        return predict_missed_track(&g_b0_track, g_image_down_max_misses);
     }
 
     measurement = &result->beacons[selected];
@@ -1703,7 +1735,7 @@ static unsigned char update_temporal_beacon(beacon_result_t *result)
     if (g_b0_track.confirmed == 0)
     {
         if (square_distance(g_b0_track.x, g_b0_track.y, measurement->x, measurement->y) >
-            KALMAN_NEW_TARGET_DISTANCE * KALMAN_NEW_TARGET_DISTANCE)
+            g_image_down_new_target_distance * g_image_down_new_target_distance)
         {
             start_pending_track(&g_b0_track, measurement->x, measurement->y);
             set_beacon_track_shape(&g_b0_track, measurement);
@@ -1712,7 +1744,7 @@ static unsigned char update_temporal_beacon(beacon_result_t *result)
         update_track_position(&g_b0_track, measurement->x, measurement->y);
         set_beacon_track_shape(&g_b0_track, measurement);
         g_b0_track.hits++;
-        if (g_b0_track.hits >= B0_INIT_CONFIRM_FRAMES)
+        if (g_b0_track.hits >= g_image_down_confirm_frames)
         {
             g_b0_track.confirmed = 1;
             return 1;
@@ -1722,7 +1754,7 @@ static unsigned char update_temporal_beacon(beacon_result_t *result)
 
     if (square_distance(g_b0_track.x + g_b0_track.vx, g_b0_track.y + g_b0_track.vy,
                         measurement->x, measurement->y) >
-        KALMAN_NEW_TARGET_DISTANCE * KALMAN_NEW_TARGET_DISTANCE)
+        g_image_down_new_target_distance * g_image_down_new_target_distance)
     {
         start_pending_track(&g_b0_track, measurement->x, measurement->y);
         set_beacon_track_shape(&g_b0_track, measurement);
@@ -1757,7 +1789,7 @@ static unsigned char update_temporal_car(beacon_result_t *result)
     if (g_car_track.confirmed != 0 &&
         square_distance(g_car_track.x + g_car_track.vx, g_car_track.y + g_car_track.vy,
                         measurement->cx, measurement->cy) >
-            KALMAN_GATE_DISTANCE * KALMAN_GATE_DISTANCE)
+            g_image_down_gate_distance * g_image_down_gate_distance)
     {
         start_pending_track(&g_car_track, measurement->cx, measurement->cy);
         set_car_track_shape(&g_car_track, measurement);
@@ -1765,7 +1797,7 @@ static unsigned char update_temporal_car(beacon_result_t *result)
     }
     if (g_car_track.confirmed == 0 &&
         square_distance(g_car_track.x, g_car_track.y, measurement->cx, measurement->cy) >
-            KALMAN_NEW_TARGET_DISTANCE * KALMAN_NEW_TARGET_DISTANCE)
+            g_image_down_new_target_distance * g_image_down_new_target_distance)
     {
         start_pending_track(&g_car_track, measurement->cx, measurement->cy);
         set_car_track_shape(&g_car_track, measurement);
@@ -1775,7 +1807,8 @@ static unsigned char update_temporal_car(beacon_result_t *result)
     update_track_position(&g_car_track, measurement->cx, measurement->cy);
     set_car_track_shape(&g_car_track, measurement);
     g_car_track.hits++;
-    if (g_car_track.confirmed == 0 && g_car_track.hits >= B0_INIT_CONFIRM_FRAMES)
+    if (g_car_track.confirmed == 0 &&
+        g_car_track.hits >= g_image_down_confirm_frames)
     {
         g_car_track.confirmed = 1;
     }
@@ -1831,7 +1864,9 @@ static void beacon_image_process(
 
     g_current_image = image;
     memset(&temporal_lamp, 0, sizeof(temporal_lamp));
-    threshold_image(image, CAR_LAMP_BINARY_THRESHOLD);
+    threshold_image(image, (unsigned char)g_image_down_car_lamp_binary_threshold);
+    memcpy(g_car_lamp_binary_snapshot, g_binary,
+           sizeof(g_car_lamp_binary_snapshot));
     has_lamp = find_car_lamp(&lamp);
     if (has_lamp == 0)
     {
@@ -1895,7 +1930,6 @@ static void image_down_store_result(const beacon_result_t *result)
     uint8 car_lamp_count = result->car_lamp_count;
 
     image_down_clear_results();
-
     if(beacon_count > IMAGE_MAX_BEACON_COUNT)
     {
         beacon_count = IMAGE_MAX_BEACON_COUNT;
@@ -1953,7 +1987,12 @@ uint8 *image_down_get_frame_buffer(void)
 
 const uint8 *image_down_get_binary_buffer(void)
 {
-    return g_binary[0];
+    return g_beacon_binary_snapshot[0];
+}
+
+const uint8 *image_down_get_car_lamp_binary_buffer(void)
+{
+    return g_car_lamp_binary_snapshot[0];
 }
 
 /*
@@ -1961,119 +2000,268 @@ const uint8 *image_down_get_binary_buffer(void)
  * 输入参数: op操作码；type数值类型；param_id参数ID；value_bits目标值位模式；actual_bits实际值位模式输出。
  * 返回值: IPC_REMOTE_PARAM_STATUS_*统一状态码。
  */
+typedef uint8 (*image_down_param_handler_t)(uint8 op,
+                                            uint32 requested_bits,
+                                            uint32 *actual_bits);
+
+typedef struct
+{
+    uint16 id;
+    uint8 type;
+    void *value_ptr;
+    float minimum;
+    float maximum;
+    image_down_param_handler_t handler;
+} image_down_param_descriptor_t;
+
+#define IMAGE_DOWN_PARAM_I(id_, value_, min_, max_) \
+    {(id_), IPC_REMOTE_PARAM_TYPE_INT32, &(value_), (min_), (max_), NULL}
+#define IMAGE_DOWN_PARAM_F(id_, value_, min_, max_) \
+    {(id_), IPC_REMOTE_PARAM_TYPE_FLOAT, &(value_), (min_), (max_), NULL}
+#define IMAGE_DOWN_PARAM_CUSTOM_I(id_, handler_) \
+    {(id_), IPC_REMOTE_PARAM_TYPE_INT32, NULL, 0.0f, 0.0f, (handler_)}
+
+static uint32 image_down_param_value_bits(
+    const image_down_param_descriptor_t *param)
+{
+    uint32 bits = 0U;
+    memcpy(&bits, param->value_ptr, sizeof(bits));
+    return bits;
+}
+
+static int32 image_down_param_bits_to_int32(uint32 bits)
+{
+    int32 value;
+    memcpy(&value, &bits, sizeof(value));
+    return value;
+}
+
+static uint8 image_down_exposure_param_execute(uint8 op,
+                                               uint32 requested_bits,
+                                               uint32 *actual_bits)
+{
+    int32 value;
+    uint16 old_value = g_mt9v03x_exp_time;
+
+    if(op == IPC_REMOTE_PARAM_OP_SET)
+    {
+        value = image_down_param_bits_to_int32(requested_bits);
+        if((value < 0) || (value > 636))
+        {
+            *actual_bits = (uint32)g_mt9v03x_exp_time;
+            return IPC_REMOTE_PARAM_STATUS_OUT_OF_RANGE;
+        }
+        if(((uint16)value == old_value) && (s_mt9v03x_initialized != 0U))
+        {
+            *actual_bits = (uint32)g_mt9v03x_exp_time;
+            return IPC_REMOTE_PARAM_STATUS_OK;
+        }
+
+        g_mt9v03x_exp_time = (uint16)value;
+        s_mt9v03x_initialized = 0U;
+        if(mt9v03x_init() != 0U)
+        {
+            g_mt9v03x_exp_time = old_value;
+            if(mt9v03x_init() != 0U)
+            {
+                *actual_bits = (uint32)g_mt9v03x_exp_time;
+                return IPC_REMOTE_PARAM_STATUS_ROLLBACK_FAIL;
+            }
+            s_mt9v03x_initialized = 1U;
+            *actual_bits = (uint32)g_mt9v03x_exp_time;
+            return IPC_REMOTE_PARAM_STATUS_ERROR;
+        }
+        s_mt9v03x_initialized = 1U;
+    }
+    else if(op != IPC_REMOTE_PARAM_OP_GET)
+    {
+        *actual_bits = (uint32)g_mt9v03x_exp_time;
+        return IPC_REMOTE_PARAM_STATUS_ERROR;
+    }
+
+    *actual_bits = (uint32)g_mt9v03x_exp_time;
+    return (s_mt9v03x_initialized != 0U) ?
+           IPC_REMOTE_PARAM_STATUS_OK : IPC_REMOTE_PARAM_STATUS_ERROR;
+}
+
+static uint8 image_down_screen_param_execute(uint8 op,
+                                             uint32 requested_bits,
+                                             uint32 *actual_bits)
+{
+    int32 value;
+
+    if(op == IPC_REMOTE_PARAM_OP_SET)
+    {
+        value = image_down_param_bits_to_int32(requested_bits);
+        if((value < (int32)IMAGE_DEBUG_SCREEN_MODE_DATA) ||
+           (value > (int32)IMAGE_DEBUG_SCREEN_MODE_OVERLAY))
+        {
+            *actual_bits = (uint32)ImageDebugScreen_GetMode();
+            return IPC_REMOTE_PARAM_STATUS_OUT_OF_RANGE;
+        }
+        (void)ImageDebugScreen_SetMode((uint8)value);
+    }
+    else if(op != IPC_REMOTE_PARAM_OP_GET)
+    {
+        *actual_bits = (uint32)ImageDebugScreen_GetMode();
+        return IPC_REMOTE_PARAM_STATUS_ERROR;
+    }
+
+    *actual_bits = (uint32)ImageDebugScreen_GetMode();
+    return IPC_REMOTE_PARAM_STATUS_OK;
+}
+
+static const image_down_param_descriptor_t s_image_down_params[] =
+{
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_BEACON_THR,
+                       g_image_down_beacon_binary_threshold, 0, 255),
+    IMAGE_DOWN_PARAM_CUSTOM_I(IPC_REMOTE_PARAM_ID_C1_EXP_TIME,
+                              image_down_exposure_param_execute),
+    IMAGE_DOWN_PARAM_CUSTOM_I(IPC_REMOTE_PARAM_ID_C1_SCREEN_MODE,
+                              image_down_screen_param_execute),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_BEACON_MIN,
+                       g_image_down_beacon_min_area, 0, 22560),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_EDGE_MIN,
+                       g_image_down_side_edge_min_area, 0, 22560),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_EDGE_THR,
+                       g_image_down_side_edge_threshold, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_LAMP_THR,
+                       g_image_down_car_lamp_binary_threshold, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_LAMP_MIN,
+                       g_image_down_car_lamp_min_area, 0, 22560),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_LAMP_MAX,
+                       g_image_down_car_lamp_max_area, 0, 22560),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_LAMP_ELONG,
+                       g_image_down_car_lamp_min_elongation, 0.0f, 224.0f),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_LAMP_LEN,
+                       g_image_down_car_lamp_min_length, 0.0f, 224.0f),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_NEAR_PAD,
+                       g_image_down_near_lamp_pad, 0, 224),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_NEAR_MIN,
+                       g_image_down_near_lamp_min_area, 0, 22560),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_NEAR_ISO_MIN,
+                       g_image_down_near_lamp_isolated_min_area, 0, 22560),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_NEAR_BG,
+                       g_image_down_near_lamp_background_max, 0, 255),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_MATCH_DIST,
+                       g_image_down_match_distance, 0.0f, 224.0f),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_GATE_DIST,
+                       g_image_down_gate_distance, 0.0f, 224.0f),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_NEW_DIST,
+                       g_image_down_new_target_distance, 0.0f, 224.0f),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_CONFIRM,
+                       g_image_down_confirm_frames, 1, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_MISSES,
+                       g_image_down_max_misses, 0, 255),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_POS_ALPHA,
+                       g_image_down_filter_pos_alpha, 0.0f, 1.0f),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_VEL_ALPHA,
+                       g_image_down_filter_vel_alpha, 0.0f, 1.0f)
+};
+
+typedef char image_down_param_count_must_match[
+    (sizeof(s_image_down_params) / sizeof(s_image_down_params[0]) == 22U) ?
+    1 : -1];
+
+static const image_down_param_descriptor_t *image_down_find_param(uint16 id)
+{
+    uint16 index;
+    for(index = 0U;
+        index < (uint16)(sizeof(s_image_down_params) /
+                         sizeof(s_image_down_params[0]));
+        index++)
+    {
+        if(s_image_down_params[index].id == id)
+        {
+            return &s_image_down_params[index];
+        }
+    }
+    return NULL;
+}
+
+static uint8 image_down_param_values_valid(
+    const image_down_param_descriptor_t *param)
+{
+    float float_value;
+    int32 int_value;
+
+    if(param->type == IPC_REMOTE_PARAM_TYPE_FLOAT)
+    {
+        memcpy(&float_value, param->value_ptr, sizeof(float_value));
+        if((isfinite(float_value) == 0) ||
+           (float_value < param->minimum) ||
+           (float_value > param->maximum))
+        {
+            return 0U;
+        }
+    }
+    else
+    {
+        memcpy(&int_value, param->value_ptr, sizeof(int_value));
+        if(((float)int_value < param->minimum) ||
+           ((float)int_value > param->maximum))
+        {
+            return 0U;
+        }
+    }
+
+    return (g_image_down_car_lamp_min_area <=
+            g_image_down_car_lamp_max_area) ? 1U : 0U;
+}
+
 uint8 image_down_remote_param_execute(uint8 op,
                                       uint8 type,
                                       uint16 param_id,
-                                      uint32 value_bits,
+                                      uint32 requested_bits,
                                       uint32 *actual_bits)
 {
-    int32 value;
+    const image_down_param_descriptor_t *param;
+    uint32 previous_bits;
 
     if(actual_bits == NULL)
     {
         return IPC_REMOTE_PARAM_STATUS_ERROR;
     }
-    if(type != IPC_REMOTE_PARAM_TYPE_INT32)
+    *actual_bits = 0U;
+
+    param = image_down_find_param(param_id);
+    if(param == NULL)
     {
-        *actual_bits = 0U;
         return IPC_REMOTE_PARAM_STATUS_NOT_FOUND;
     }
-
-    if(param_id == IPC_REMOTE_PARAM_ID_BEACON_THRESHOLD)
+    if(type != param->type)
     {
-        if(op == IPC_REMOTE_PARAM_OP_SET)
-        {
-            value = (int32)value_bits;
-            if((value < 0) || (value > 255))
-            {
-                *actual_bits = (uint32)g_image_down_beacon_binary_threshold;
-                return IPC_REMOTE_PARAM_STATUS_OUT_OF_RANGE;
-            }
-            g_image_down_beacon_binary_threshold = value;
-        }
-        else if(op != IPC_REMOTE_PARAM_OP_GET)
-        {
-            *actual_bits = (uint32)g_image_down_beacon_binary_threshold;
-            return IPC_REMOTE_PARAM_STATUS_ERROR;
-        }
+        return IPC_REMOTE_PARAM_STATUS_MISMATCH;
+    }
+    if(param->handler != NULL)
+    {
+        return param->handler(op, requested_bits, actual_bits);
+    }
 
-        *actual_bits = (uint32)g_image_down_beacon_binary_threshold;
+    *actual_bits = image_down_param_value_bits(param);
+    if(op == IPC_REMOTE_PARAM_OP_GET)
+    {
+        return IPC_REMOTE_PARAM_STATUS_OK;
+    }
+    if(op != IPC_REMOTE_PARAM_OP_SET)
+    {
+        return IPC_REMOTE_PARAM_STATUS_ERROR;
+    }
+    if(*actual_bits == requested_bits)
+    {
         return IPC_REMOTE_PARAM_STATUS_OK;
     }
 
-    if(param_id == IPC_REMOTE_PARAM_ID_EXP_TIME)
+    previous_bits = *actual_bits;
+    memcpy(param->value_ptr, &requested_bits, sizeof(requested_bits));
+    if(image_down_param_values_valid(param) == 0U)
     {
-        uint16 old_value = g_mt9v03x_exp_time;
-
-        if(op == IPC_REMOTE_PARAM_OP_SET)
-        {
-            value = (int32)value_bits;
-            if((value < 0) || (value > 636))
-            {
-                *actual_bits = (uint32)g_mt9v03x_exp_time;
-                return IPC_REMOTE_PARAM_STATUS_OUT_OF_RANGE;
-            }
-            if(((uint16)value == old_value) &&
-               (s_mt9v03x_initialized != 0U))
-            {
-                *actual_bits = (uint32)g_mt9v03x_exp_time;
-                return IPC_REMOTE_PARAM_STATUS_OK;
-            }
-
-            if(((uint16)value != old_value) ||
-               (s_mt9v03x_initialized == 0U))
-            {
-                g_mt9v03x_exp_time = (uint16)value;
-                s_mt9v03x_initialized = 0U;
-                if(mt9v03x_init() != 0U)
-                {
-                    g_mt9v03x_exp_time = old_value;
-                    if(mt9v03x_init() != 0U)
-                    {
-                        *actual_bits = (uint32)g_mt9v03x_exp_time;
-                        return IPC_REMOTE_PARAM_STATUS_ROLLBACK_FAIL;
-                    }
-                    s_mt9v03x_initialized = 1U;
-                    *actual_bits = (uint32)g_mt9v03x_exp_time;
-                    return IPC_REMOTE_PARAM_STATUS_ERROR;
-                }
-                s_mt9v03x_initialized = 1U;
-            }
-        }
-        else if(op != IPC_REMOTE_PARAM_OP_GET)
-        {
-            *actual_bits = (uint32)g_mt9v03x_exp_time;
-            return IPC_REMOTE_PARAM_STATUS_ERROR;
-        }
-
-        *actual_bits = (uint32)g_mt9v03x_exp_time;
-        return (s_mt9v03x_initialized != 0U) ?
-               IPC_REMOTE_PARAM_STATUS_OK : IPC_REMOTE_PARAM_STATUS_ERROR;
+        memcpy(param->value_ptr, &previous_bits, sizeof(previous_bits));
+        return IPC_REMOTE_PARAM_STATUS_OUT_OF_RANGE;
     }
 
-    if(param_id == IPC_REMOTE_PARAM_ID_SCREEN_MODE)
-    {
-        if(op == IPC_REMOTE_PARAM_OP_SET)
-        {
-            value = (int32)value_bits;
-            if((value < (int32)IMAGE_DEBUG_SCREEN_MODE_DATA) ||
-               (value > (int32)IMAGE_DEBUG_SCREEN_MODE_BINARY))
-            {
-                *actual_bits = (uint32)ImageDebugScreen_GetMode();
-                return IPC_REMOTE_PARAM_STATUS_OUT_OF_RANGE;
-            }
-            (void)ImageDebugScreen_SetMode((uint8)value);
-        }
-        else if(op != IPC_REMOTE_PARAM_OP_GET)
-        {
-            *actual_bits = (uint32)ImageDebugScreen_GetMode();
-            return IPC_REMOTE_PARAM_STATUS_ERROR;
-        }
-
-        *actual_bits = (uint32)ImageDebugScreen_GetMode();
-        return IPC_REMOTE_PARAM_STATUS_OK;
-    }
-
-    *actual_bits = 0U;
-    return IPC_REMOTE_PARAM_STATUS_NOT_FOUND;
+    beacon_image_reset_temporal();
+    *actual_bits = image_down_param_value_bits(param);
+    return (*actual_bits == requested_bits) ?
+           IPC_REMOTE_PARAM_STATUS_OK : IPC_REMOTE_PARAM_STATUS_ERROR;
 }

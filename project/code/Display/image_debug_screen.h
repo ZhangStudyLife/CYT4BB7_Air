@@ -7,9 +7,11 @@
 extern "C" {
 #endif
 
-#define IMAGE_DEBUG_SCREEN_MODE_DATA    (0U)
-#define IMAGE_DEBUG_SCREEN_MODE_RAW     (1U)
-#define IMAGE_DEBUG_SCREEN_MODE_BINARY  (2U)
+#define IMAGE_DEBUG_SCREEN_MODE_DATA           (0U)
+#define IMAGE_DEBUG_SCREEN_MODE_RAW            (1U)
+#define IMAGE_DEBUG_SCREEN_MODE_BEACON_BINARY  (2U)
+#define IMAGE_DEBUG_SCREEN_MODE_LAMP_BINARY    (3U)
+#define IMAGE_DEBUG_SCREEN_MODE_OVERLAY        (4U)
 
 /* 只初始化软件状态；IPS114硬件在核0允许刷屏后延迟初始化。 */
 void ImageDebugScreen_Init(void);
@@ -20,7 +22,7 @@ void ImageDebugScreen_Tick10ms(void);
 uint8 ImageDebugScreen_SetMode(uint8 mode);
 uint8 ImageDebugScreen_GetMode(void);
 
-/* 新帧到达时启动Raw/Binary显示，已启动帧分两个100Hz阶段完成。 */
+/* 新帧到达时启动图像显示，已启动帧分两个100Hz阶段完成。 */
 void ImageDebugScreen_Update(uint8 image_frame_updated);
 
 #ifdef __cplusplus

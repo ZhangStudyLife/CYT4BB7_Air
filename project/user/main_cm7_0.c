@@ -18,7 +18,7 @@ static uint8 s_ipc_flying_retry_div = 0U; /* 飞行状态 IPC 通知失败后的
 static uint8 s_ipc_state_periodic_div = 0U;
 
 #define AIR_RUN_DATA_CRITICAL_COUNT       (15U) /* 飞行期间下发的关键数据数量 */
-#define AIR_RUN_DATA_DIAGNOSTIC_COUNT     (45U) /* 常态下发的完整诊断数据数量 */
+#define AIR_RUN_DATA_DIAGNOSTIC_COUNT     (52U) /* 常态下发的完整诊断数据数量 */
 #define AIR_RUN_CRITICAL_STATE            (0U)  /* 飞机运行状态 */
 #define AIR_RUN_CRITICAL_CRSF_CH0         (1U)  /* CRSF标准化通道0 */
 #define AIR_RUN_CRITICAL_CRSF_CH1         (2U)  /* CRSF标准化通道1 */
@@ -105,7 +105,10 @@ static void send_air_run_data_100hz(const car_plan_result_t *car_plan,
     }
 
     {
+        ipc_camera_spi_log_t camera_spi_log;
         float air_data[AIR_RUN_DATA_DIAGNOSTIC_COUNT];
+
+        ipc_camera_spi_log_get(&camera_spi_log);
 
         air_data[0] = g_tof_fused_height_mm;
         air_data[1] = g_euler.roll;
@@ -148,6 +151,16 @@ static void send_air_run_data_100hz(const car_plan_result_t *car_plan,
         air_data[42] = g_imufilter_1000hz.accx;
         air_data[43] = g_imufilter_1000hz.accy;
         air_data[44] = g_imufilter_1000hz.accz;
+        air_data[45] = (float)(camera_spi_log.board[0].online |
+                               (gpio_get_level(P01_0) << 1));
+        air_data[46] = (float)(camera_spi_log.board[1].online |
+                               (gpio_get_level(P01_1) << 1));
+        air_data[47] = (float)(((uint16)camera_spi_log.board[0].last_error << 8) |
+                               (uint16)camera_spi_log.board[1].last_error);
+        air_data[48] = (float)camera_spi_log.board[0].last_rx_head0;
+        air_data[49] = (float)camera_spi_log.board[0].last_rx_head1;
+        air_data[50] = (float)camera_spi_log.board[1].last_rx_head0;
+        air_data[51] = (float)camera_spi_log.board[1].last_rx_head1;
         (void)air_comm_send_run_data(air_data, AIR_RUN_DATA_DIAGNOSTIC_COUNT);
     }
 }

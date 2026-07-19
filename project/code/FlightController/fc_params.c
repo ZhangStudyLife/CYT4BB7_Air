@@ -38,7 +38,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
 
     /* ===== 油门与机械配平参数 ===== */
     params->base_throttle = 3400;         /* 悬停油门 */
-    params->roll_mech_trim_deg = 2.0f;    /* Roll 机械配平角 */
+    params->roll_mech_trim_deg = 0.5f;    /* Roll 机械配平角 */
     params->pitch_mech_trim_deg = 1.5f;   /* Pitch 机械配平角 */
 
     /* ===== Roll 轴角速度环参数 ===== */
@@ -98,7 +98,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pos_z_d_lpf = 0.0f;
 
     /* ===== Z 轴速度环参数 ===== */
-    params->vel_z_kp = 420.0f;
+    params->vel_z_kp = 1000.0f;
     params->vel_z_ki = 80.0f;
     params->vel_z_kd =0.0f;
     params->vel_z_kff = 0.0f;
@@ -111,7 +111,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode1_brake_exit_vel_cmps = 10.0f;
 
     /* ===== 位置估计参数 ===== */
-    params->pos_est_k_flow = 0.04f;
+    params->pos_est_k_flow = 0.5f;
 
     /* ===== Mode 2 image and velocity params ===== */
     params->mode2_img_x_kp = 2.8f;
@@ -156,20 +156,20 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode3_img_y_kff = 0.0f;
     params->mode3_img_y_i_limit = 0.0f;
     params->mode3_img_y_d_lpf = 1.5f;
-    params->mode3_vel_x_kp = 0.18f;
+    params->mode3_vel_x_kp = 0.12f;
     params->mode3_vel_x_ki = 0.0f;
     params->mode3_vel_x_kd = 0.0f;
     params->mode3_vel_x_kff = 0.0f;
     params->mode3_vel_x_i_limit = 3.0f;
     params->mode3_vel_x_d_lpf = 10.0f;
-    params->mode3_vel_y_kp = 0.18f;
+    params->mode3_vel_y_kp = 0.12f;
     params->mode3_vel_y_ki = 0.0f;
     params->mode3_vel_y_kd = 0.0f;
     params->mode3_vel_y_kff = 0.0f;
     params->mode3_vel_y_i_limit = 3.0f;
     params->mode3_vel_y_d_lpf = 10.0f;
     params->mode3_kp_car_x = 60.0f;
-    params->mode3_kp_car_y = 90.0f;
+    params->mode3_kp_car_y = 70.0f;
     params->mode3_turn_accel_ff_gain_x = 0.72f;
     params->mode3_turn_accel_ff_gain_y = 0.30f;
     params->mode3_turn_accel_ff_limit_x_deg = 18.0f;
@@ -190,20 +190,20 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode4_img_y_kff = 0.0f;
     params->mode4_img_y_i_limit = 0.0f;
     params->mode4_img_y_d_lpf = 1.5f;
-    params->mode4_vel_x_kp = 0.18f;
+    params->mode4_vel_x_kp = 0.12f;
     params->mode4_vel_x_ki = 0.0f;
     params->mode4_vel_x_kd = 0.0f;
     params->mode4_vel_x_kff = 0.0f;
     params->mode4_vel_x_i_limit = 3.0f;
     params->mode4_vel_x_d_lpf = 10.0f;
-    params->mode4_vel_y_kp = 0.18f;
+    params->mode4_vel_y_kp = 0.12f;
     params->mode4_vel_y_ki = 0.0f;
     params->mode4_vel_y_kd = 0.0f;
     params->mode4_vel_y_kff = 0.0f;
     params->mode4_vel_y_i_limit = 3.0f;
     params->mode4_vel_y_d_lpf = 10.0f;
     params->mode4_kp_car_x = 60.0f;
-    params->mode4_kp_car_y = 90.0f;
+    params->mode4_kp_car_y = 70.0f;
     params->mode4_turn_accel_ff_gain_x = 0.72f;
     params->mode4_turn_accel_ff_gain_y = 0.30f;
     params->mode4_turn_accel_ff_limit_x_deg = 18.0f;

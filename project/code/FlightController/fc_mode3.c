@@ -1,5 +1,6 @@
 #include "fc_mode.h"
 #include "yaw_align.h"
+#include "../Estimation/Pos_Est/FlowGyroDecoupler_LC302.h"
 #include "../Estimation/Pos_Est/Pos_Est.h"
 #include "../Estimation/Height_Est/Height_Est.h"
 #include "../Image/image_data.h"
@@ -82,21 +83,32 @@ void FC_Mode3_100Hz(void)
         return;
     }
     CarPlan_GetResult(&car_plan);
-    wifi_justfloat(
-        roll_angle_target, pitch_angle_target, yaw_angle_target,
-        g_euler.roll, g_euler.pitch, g_euler.yaw,
-        g_car_vel_x, g_car_vel_y, g_car_yaw, g_car_yaw_rate_dps,
-        Pos_Est_vel_x_2, Pos_Est_vel_y_2,
-        g_mode3_velx_target, g_mode3_vely_target,
-        g_car_lamp_fused.cx - g_projection_center.cx, g_car_lamp_fused.cy - g_projection_center.cy,
-        g_mode3_imgx_pid.p_term, g_mode3_imgx_pid.d_term,
-        g_mode3_imgy_pid.p_term, g_mode3_imgy_pid.d_term,
-        g_mode3_imgx_pid.output, g_mode3_imgy_pid.output,
-        g_tof_fused_height_mm,
-        image_data[car_plan.camera].beacon_data[car_plan.beacon_index].x,
-        image_data[car_plan.camera].beacon_data[car_plan.beacon_index].y,
-        g_car_lamp_fused.cx, g_car_lamp_fused.cy,
-        car_plan.target_forward_mps, car_plan.target_strafe_mps,CRSF_STD[8]);
+
+
+    
+    float   s_common_flow_dec_x = FlowGyroDecoupler_LC302_GetDecX();
+    float   s_common_flow_dec_y = FlowGyroDecoupler_LC302_GetDecY();
+
+
+    // wifi_justfloat(
+    //     g_imufilter_1000hz.accx, g_imufilter_1000hz.accy, g_imufilter_1000hz.accz,
+    //     roll_angle_target, pitch_angle_target, yaw_angle_target,
+    //     g_euler.roll, g_euler.pitch, g_euler.yaw,
+    //     g_car_vel_x, g_car_vel_y,
+    //     lc302_data.flow_x_integral, lc302_data.flow_y_integral,
+    //     s_common_flow_dec_x, s_common_flow_dec_y,
+    //     Pos_Est_vel_x, Pos_Est_vel_y,
+    //     Pos_Est_vel_x_2, Pos_Est_vel_y_2,
+    //     g_mode3_velx_target, g_mode3_vely_target,
+    //     g_car_lamp_fused.cx - g_projection_center.cx, g_car_lamp_fused.cy - g_projection_center.cy,
+    //     g_mode3_imgx_pid.p_term, g_mode3_imgx_pid.d_term,
+    //     g_mode3_imgy_pid.p_term, g_mode3_imgy_pid.d_term,
+    //     g_tof_fused_height_mm,
+    //     image_data[car_plan.camera].beacon_data[car_plan.beacon_index].x,
+    //     image_data[car_plan.camera].beacon_data[car_plan.beacon_index].y,
+    //     g_car_lamp_fused.cx, g_car_lamp_fused.cy,
+    //     car_plan.target_forward_mps, car_plan.target_strafe_mps,CRSF_STD[8],
+    //     g_motor_cmd.throttle, g_motor_cmd.roll, g_motor_cmd.pitch, g_motor_cmd.yaw);
 }
 
 void FC_Mode3_50Hz(float dt)
@@ -206,8 +218,8 @@ void FC_Mode3_50Hz(float dt)
         turn_ff_x = FC_Mode_Clamp(turn_ff_x, -g_fc_params.mode3_turn_accel_ff_limit_x_deg, g_fc_params.mode3_turn_accel_ff_limit_x_deg);
         turn_ff_y = FC_Mode_Clamp(turn_ff_y, -g_fc_params.mode3_turn_accel_ff_limit_y_deg, g_fc_params.mode3_turn_accel_ff_limit_y_deg);
     }
-    velx_sp = img_fb_x + ((img_fb_x * car_ff_x > 0.0f) ? car_ff_x : 0.0f);
-    vely_sp = img_fb_y + ((img_fb_y * car_ff_y > 0.0f) ? car_ff_y : 0.0f);
+    velx_sp = img_fb_x + car_ff_x;
+    vely_sp = img_fb_y + car_ff_y;
     // wifi_justfloat(g_car_vel_x, g_car_vel_y,
     //                img_fb_x, img_fb_y,
     //                velx_sp, vely_sp,

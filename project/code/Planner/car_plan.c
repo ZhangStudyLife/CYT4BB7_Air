@@ -8,6 +8,7 @@
 #define CAR_PLAN_MIN_DIST_PX               (2.0f)
 #define CAR_PLAN_ANGLE_TO_RAD              (0.017453292519943295f)
 #define CAR_PLAN_CENTER_MAX_DIST_PX        (65.0f)
+#define CAR_PLAN_CAR_CENTER_Y_OFFSET_PX    (10.0f) /* 车体中心相对车灯中心向图像 y 正方向偏移，单位 px。 */
 
 float Car_Speed = 1.2f; /* 车模规划速度，单位 m/s，可由车机通过 AirComm 修改 */
 float Car_Speed_Fast = 2.0f; /* 车模快速前进速度，单位 m/s，可由车机通过 AirComm 修改 */
@@ -114,7 +115,7 @@ static uint8 CarPlan_MakeGeometryResult(uint8 camera, car_plan_result_t *out)
     }
 
     dx = beacon->x - lamp->cx;
-    dy = beacon->y - lamp->cy;
+    dy = beacon->y - (lamp->cy + CAR_PLAN_CAR_CENTER_Y_OFFSET_PX);
     dist = sqrtf(dx * dx + dy * dy);
     if (dist <= CAR_PLAN_MIN_DIST_PX)
     {
@@ -149,7 +150,8 @@ static uint8 CarPlan_MakeGeometryResult(uint8 camera, car_plan_result_t *out)
     {
         CarPlan_MapPointToCenter(camera, beacon->x, beacon->y,
                                  &beacon_vector_x, &beacon_vector_y);
-        CarPlan_MapPointToCenter(camera, lamp->cx, lamp->cy,
+        CarPlan_MapPointToCenter(camera, lamp->cx,
+                                 lamp->cy + CAR_PLAN_CAR_CENTER_Y_OFFSET_PX,
                                  &projection_vector_x, &projection_vector_y);
         beacon_vector_x -= g_projection_center.cx;
         beacon_vector_y -= g_projection_center.cy;
@@ -269,8 +271,9 @@ uint8 CarPlan_Update(car_plan_result_t *result)
     if ((CarPlan_CarLampValid((uint8)Center) != 0U) &&
         (CarPlan_BeaconValid((uint8)Center) != 0U) &&
         (((center_beacon->x - center_lamp->cx) * (center_beacon->x - center_lamp->cx) +
-          (center_beacon->y - center_lamp->cy) * (center_beacon->y - center_lamp->cy)) <
-         (CAR_PLAN_CENTER_MAX_DIST_PX * CAR_PLAN_CENTER_MAX_DIST_PX)) &&
+          (center_beacon->y - (center_lamp->cy + CAR_PLAN_CAR_CENTER_Y_OFFSET_PX)) *
+          (center_beacon->y - (center_lamp->cy + CAR_PLAN_CAR_CENTER_Y_OFFSET_PX))) <
+         (90.0f * 90.0f)) &&
         (CarPlan_MakeGeometryResult((uint8)Center, &candidate) != 0U))
     {
         s_car_plan_result = candidate;

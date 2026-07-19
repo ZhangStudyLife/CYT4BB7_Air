@@ -20,7 +20,7 @@
 #define AIR_COMM_MAX_FRAME                   (AIR_COMM_MAX_PAYLOAD + AIR_COMM_FRAME_OVERHEAD)
 #define AIR_COMM_RX_QUEUE_SIZE               (512U)  /* 接收环形队列大小（字节） */
 #define AIR_COMM_PARAM_TABLE_MAX             (384U)  /* 最多注册参数个数 */
-#define AIR_COMM_DEFAULT_PARAM_COUNT         (290U)
+#define AIR_COMM_DEFAULT_PARAM_COUNT         (291U)
 #define AIR_COMM_REMOTE_CANCEL_MS            (400U)
 #define AIR_COMM_REMOTE_TIMEOUT_MS           (700U)
 #define AIR_COMM_REMOTE_EXP_CANCEL_MS        (1800U)
@@ -1728,6 +1728,7 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(roll_mech_trim_deg, g_fc_params.roll_mech_trim_deg, -30.0f, 30.0f);
     AIR_COMM_REGISTER_FLOAT(pitch_mech_trim_deg, g_fc_params.pitch_mech_trim_deg, -30.0f, 30.0f);
     AIR_COMM_REGISTER_FLOAT(angle_target_max, angle_target_max, 10.0f, 30.0f);
+    AIR_COMM_REGISTER_FLOAT(g_fc_target_height_m, g_fc_target_height_m, 1.0f, 1.5f);
 
     AIR_COMM_REGISTER_FLOAT(roll_gyro_kp, g_fc_params.roll_gyro_kp, 0.0f, 3000.0f);
     AIR_COMM_REGISTER_FLOAT(roll_gyro_ki, g_fc_params.roll_gyro_ki, 0.0f, 3000.0f);

@@ -19,6 +19,8 @@ extern float pitch_angle_target;
 extern float yaw_angle_target;
 /* 水平速度控制允许输出的最大 Roll/Pitch 目标角，单位 deg */
 extern float angle_target_max;
+/* 正常飞行目标高度，单位 m */
+extern float g_fc_target_height_m;
 
 /*
  * 主要是PID循环控制函数的声明，分别对应不同频率的控制环

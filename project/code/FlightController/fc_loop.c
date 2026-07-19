@@ -33,6 +33,8 @@ float pitch_angle_target = 0.0f;
 float yaw_angle_target = 0.0f;
 /* 水平速度控制允许输出的最大 Roll/Pitch 目标角，单位 deg */
 float angle_target_max = 30.0f;
+/* 正常飞行目标高度，单位 m */
+float g_fc_target_height_m = 1.1f;
 /* 高度速度环输出，单位 PWM */
 static float height_vel_out = 0.0f;
 /* 高度位置环输出，单位米每秒 */
@@ -48,7 +50,6 @@ extern float img_err_y_old;
 
 /* Yaw 角度目标是否已经对齐当前机头方向 */
 static uint8_t s_yaw_target_inited = 0U;
-#define FC_TARGET_HEIGHT_M 1.0f
 #define FC_LANDING_TARGET_HEIGHT_M -0.5f
 /* 100Hz 锁存的飞行模式，50Hz 控制只消费该锁存值 */
 static FC_START_CRSF_flight_mode_e s_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
@@ -353,7 +354,7 @@ void FC_Loop_50Hz(void)
     {
         height_pos_pid.kp = g_fc_params.pos_z_kp;
         height_pos_out = PID_Update(&height_pos_pid,
-                                    (fc_state == FC_START_CRSF_STATE_LANDING) ? FC_LANDING_TARGET_HEIGHT_M : FC_TARGET_HEIGHT_M,
+                                    (fc_state == FC_START_CRSF_STATE_LANDING) ? FC_LANDING_TARGET_HEIGHT_M : g_fc_target_height_m,
                                     g_tof_fused_height_mm * 0.001f,
                                     dt);
         height_pos_out = fc_clampf(height_pos_out, -FC_HEIGHT_VEL_TARGET_LIMIT, FC_HEIGHT_VEL_TARGET_LIMIT);
@@ -521,7 +522,7 @@ void FC_Loop_100Hz(void)
 
     // // 发送融合高度 , 目标高度 ,融合速度 , 高度环输出的目标速度 , 基础油门 , 综合学习的油门 , 输出到电调混动的基础油们
     // wifi_justfloat(g_tof_fused_height_mm,
-    //                ((fc_state == FC_START_CRSF_STATE_LANDING) ? FC_LANDING_TARGET_HEIGHT_M : FC_TARGET_HEIGHT_M) * 1000.0f,
+    //                ((fc_state == FC_START_CRSF_STATE_LANDING) ? FC_LANDING_TARGET_HEIGHT_M : g_fc_target_height_m) * 1000.0f,
     //                g_height_fused_vz_mps,
     //                height_pos_out,
     //                (float)g_fc_params.base_throttle,

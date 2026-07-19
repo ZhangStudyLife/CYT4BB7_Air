@@ -96,7 +96,7 @@ void FC_Mode3_100Hz(void)
         image_data[car_plan.camera].beacon_data[car_plan.beacon_index].x,
         image_data[car_plan.camera].beacon_data[car_plan.beacon_index].y,
         g_car_lamp_fused.cx, g_car_lamp_fused.cy,
-        car_plan.target_forward_mps, car_plan.target_strafe_mps);
+        car_plan.target_forward_mps, car_plan.target_strafe_mps,CRSF_STD[8]);
 }
 
 void FC_Mode3_50Hz(float dt)

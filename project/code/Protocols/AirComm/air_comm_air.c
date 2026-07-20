@@ -20,7 +20,7 @@
 #define AIR_COMM_MAX_FRAME                   (AIR_COMM_MAX_PAYLOAD + AIR_COMM_FRAME_OVERHEAD)
 #define AIR_COMM_RX_QUEUE_SIZE               (512U)  /* 接收环形队列大小（字节） */
 #define AIR_COMM_PARAM_TABLE_MAX             (384U)  /* 最多注册参数个数 */
-#define AIR_COMM_DEFAULT_PARAM_COUNT         (291U)
+#define AIR_COMM_DEFAULT_PARAM_COUNT         (292U)
 #define AIR_COMM_REMOTE_CANCEL_MS            (400U)
 #define AIR_COMM_REMOTE_TIMEOUT_MS           (700U)
 #define AIR_COMM_REMOTE_EXP_CANCEL_MS        (1800U)
@@ -2066,6 +2066,7 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(mode2_vel_y_d_lpf, g_fc_params.mode2_vel_y_d_lpf, 0.0f, 30.0f);
     AIR_COMM_REGISTER_FLOAT(Car_Speed, Car_Speed, 0.0f, 3.0f);
     AIR_COMM_REGISTER_FLOAT(Car_Speed_Fast, Car_Speed_Fast, 0.0f, 4.0f);
+    AIR_COMM_REGISTER_FLOAT(Car_Plan_Mode, Car_Plan_Mode, 1.0f, 2.0f);
 
     AIR_COMM_REGISTER_FLOAT(mode4_img_x_kp, g_fc_params.mode4_img_x_kp, 0.0f, 3000.0f);
     AIR_COMM_REGISTER_FLOAT(mode4_img_x_kp2, g_fc_params.mode4_img_x_kp2, 0.0f, 10.0f);

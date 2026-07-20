@@ -8,6 +8,7 @@
 
 extern float Car_Speed; /* 车模规划速度，单位 m/s，可由车机通过 AirComm 修改 */
 extern float Car_Speed_Fast; /* 车模固定前进速度，单位 m/s，可由车机通过 AirComm 修改 */
+extern float Car_Plan_Mode; /* 车模规划算法选择：1=car_plan，2=car_plan_2，可由车机通过 AirComm 修改 */
 
 typedef struct
 {

@@ -297,13 +297,75 @@ int main(void)
             (void)BeaconLostDetector_Update();
 
             car_plan_result_t car_plan = {0};
+            car_plan_2_result_t car_plan_2 = {0};
             uint8 car_plan_send_valid;
             if (FC_START_CRSF_Get_Flight_Mode() != FC_START_CRSF_FLIGHT_MODE_8)
             {
                 (void)CarPlan_Update(&car_plan);
+                (void)CarPlan_2_Update(&car_plan_2);
+                if (Car_Plan_Mode >= 1.5f)
+                {
+                    car_plan.valid = car_plan_2.valid;
+                    car_plan.target_strafe_mps = car_plan_2.target_strafe_mps;
+                    car_plan.target_forward_mps = car_plan_2.target_forward_mps;
+                }
             }
             car_plan_send_valid = ((car_plan.valid != 0U) && (g_tof_fused_height_mm > 500.0f)) ? 1U : 0U;
 
+
+       wifi_justfloat(  image_data[Front].beacon_data[0].x,          /* I1 */
+                        image_data[Front].beacon_data[0].y,          /* I2 */
+                        image_data[Front].beacon_data[0].area,          /* I3 */
+                        
+                        image_data[Front].beacon_data[1].x,          /* I4 */
+                        image_data[Front].beacon_data[1].y,          /* I5 */
+                        image_data[Front].beacon_data[1].area,          /* I6 */
+                        
+                        image_data[Center].beacon_data[0].x,         /* I7 */
+                        image_data[Center].beacon_data[0].y,         /* I8 */
+                        image_data[Center].beacon_data[0].area,        /* I9 */
+
+                        image_data[Center].beacon_data[1].x,         /* I10 */
+                        image_data[Center].beacon_data[1].y,         /* I11 */
+                        image_data[Center].beacon_data[1].area,        /* I12 */
+
+                        image_data[Back].beacon_data[0].x,           /* I13 */
+                        image_data[Back].beacon_data[0].y,           /* I14 */
+                        image_data[Back].beacon_data[0].area,           /* I15 */
+
+                        image_data[Back].beacon_data[1].x,           /* I16 */
+                        image_data[Back].beacon_data[1].y,           /* I17 */
+                        image_data[Back].beacon_data[1].area,           /* I18 */
+
+                        image_data[Front].car_lamp_data[0].cx,       /* I19 */
+                        image_data[Front].car_lamp_data[0].cy,       /* I20 */
+                        image_data[Front].car_lamp_data[0].angle,    /* I21 */
+                        image_data[Front].car_lamp_data[0].width,    /* I22 */
+                        image_data[Front].car_lamp_data[0].length,   /* I23 */
+                        image_data[Center].car_lamp_data[0].cx,      /* I24 */
+                        image_data[Center].car_lamp_data[0].cy,      /* I25 */
+                        image_data[Center].car_lamp_data[0].angle,   /* I26 */
+                        image_data[Center].car_lamp_data[0].width,   /* I27 */
+                        image_data[Center].car_lamp_data[0].length,  /* I28 */
+                        image_data[Back].car_lamp_data[0].cx,        /* I29 */
+                        image_data[Back].car_lamp_data[0].cy,        /* I30 */
+                        image_data[Back].car_lamp_data[0].angle,     /* I31 */
+                        image_data[Back].car_lamp_data[0].width,     /* I32 */
+                        image_data[Back].car_lamp_data[0].length,    /* I33 */
+                        g_euler.pitch,                              /* I34 */
+                        g_euler.roll,                               /* I35 */
+                        g_euler.yaw,                                /* I36 */
+                        g_car_sync_time_ms,                         /* I37 */
+                        g_car_vel_x, g_car_vel_y, g_car_yaw,
+                        car_plan.target_forward_mps,car_plan.target_strafe_mps
+                        // g_car_lamp_fused.cx,                        /* I38 */
+                        // g_car_lamp_fused.cy,                        /* I39 */
+                        // g_car_lamp_fused_distance_projectioncenter_2.x_cm,
+                        // g_car_lamp_fused_distance_projectioncenter_2.y_cm
+                        // g_tof_fused_height_mm,
+                        // g_height_fused_vz_mps,
+                        // CRSF_STD[8]
+                        );
             send_air_run_data_100hz(&car_plan, car_plan_send_valid);
 
             // wifi_justfloat(image_data[Front].car_lamp_data[0].cx,

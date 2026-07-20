@@ -102,6 +102,7 @@
 #include "../code/HW_Drivers/LC302/LC302_Aux.h"
 #include "../code/IPC/ipc_image_data.h"
 #include "../code/Planner/car_plan.h"
+#include "../code/Planner/car_plan_2.h"
 #if defined(CY_CORE_CM7_1)
 #include "../code/Protocols/CameraSpi/camera_spi.h"
 #endif

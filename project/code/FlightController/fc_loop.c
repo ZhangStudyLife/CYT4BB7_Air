@@ -5,6 +5,7 @@
 #include "../Estimation/Height_Est/Height_Est.h"
 #include "../IPC/ipc_image_data.h"
 #include "../Planner/car_lamp_fused.h"
+#include "../Planner/car_plan.h"
 #include "../Planner/pix_to_distance.h"
 #include "../Planner/ProjectionCenter.h"
 #include "../Planner/pull_detect.h"
@@ -45,6 +46,7 @@ extern float g_car_sync_time_ms;
 extern uint32 g_car_last_update_time_ms;
 extern float g_car_vel_x;
 extern float g_car_vel_y;
+extern float g_car_yaw;
 extern float img_err_x_old;
 extern float img_err_y_old;
 
@@ -465,6 +467,7 @@ void FC_Loop_100Hz(void)
     static uint32 tick_1000us_cnt_last = 0;
     FC_START_CRSF_state_e fc_state;
     air_comm_air_stats_t air_stats;
+    car_plan_result_t car_plan;
     float car_data[11] = {0.0f};
     uint32 tick_now = tick_1000us_cnt;
     uint32 diff = tick_now - tick_1000us_cnt_last;

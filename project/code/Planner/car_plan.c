@@ -12,6 +12,7 @@
 
 float Car_Speed = 1.2f; /* 车模规划速度，单位 m/s，可由车机通过 AirComm 修改 */
 float Car_Speed_Fast = 2.0f; /* 车模快速前进速度，单位 m/s，可由车机通过 AirComm 修改 */
+float Car_Plan_Mode = 2.0f; /* 车模规划算法选择：1=car_plan，2=car_plan_2，可由车机通过 AirComm 修改 */
 static car_plan_result_t s_car_plan_result;
 
 static void CarPlan_ClearResult(car_plan_result_t *result)

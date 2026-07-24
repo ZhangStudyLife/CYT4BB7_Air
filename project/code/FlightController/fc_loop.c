@@ -61,7 +61,7 @@ static FC_START_CRSF_flight_mode_e s_prev_flight_mode = FC_START_CRSF_FLIGHT_MOD
 static FC_START_CRSF_state_e s_prev_fc_state = FC_START_CRSF_STATE_INIT;
 /* 悬停油门在线学习（借鉴 ArduPilot MOT_THST_HOVER） */
 #define FC_HOVER_THR_TC 4.0f
-#define FC_HOVER_LEARN_MIN_DELTA (-300.0f)
+#define FC_HOVER_LEARN_MIN_DELTA (-700.0f)
 #define FC_HOVER_LEARN_MAX_DELTA 900.0f
 #define FC_HOVER_LEARN_VZ_MAX 0.18f
 #define FC_HOVER_LEARN_POS_MAX 0.08f
@@ -72,10 +72,10 @@ static FC_START_CRSF_state_e s_prev_fc_state = FC_START_CRSF_STATE_INIT;
 #define FC_THRUST_ACC_MPS2_PER_PWM 0.00360f
 #define FC_HEIGHT_VEL_KD_ACC 0.035f
 #define FC_HEIGHT_VEL_TARGET_LIMIT 0.60f
-#define FC_HEIGHT_VEL_OUT_MIN (-650.0f)
-#define FC_HEIGHT_VEL_OUT_MAX 650.0f
+#define FC_HEIGHT_VEL_OUT_MIN (-1000.0f)
+#define FC_HEIGHT_VEL_OUT_MAX 1000.0f
 #define FC_HEIGHT_VEL_KD_PWM (FC_HEIGHT_VEL_KD_ACC / FC_THRUST_ACC_MPS2_PER_PWM)
-static float s_hover_throttle = 2800.0f;
+static float s_hover_throttle = 5500.0f;
 static float s_hover_learn_step = 0.0f;
 /* 姿态角外环输出到角速度目标的限幅，单位 deg/s */
 static const float s_fc_angle_out_limit = 260.0f;
@@ -342,7 +342,7 @@ void FC_Loop_50Hz(void)
     uint32 diff = tick_now - tick_1000us_cnt_last;
     float dt = diff * 0.001f;
     FC_START_CRSF_state_e fc_state = FC_START_CRSF_Get_State();
-    uint8 car_data_fresh;
+    // uint8 car_data_fresh;
 
     tick_1000us_cnt_last = tick_now;
     if (dt < 0.0001f)
@@ -428,10 +428,11 @@ void FC_Loop_50Hz(void)
         break;
     }
 
-    car_data_fresh = ((g_car_sync_time_ms > 0.0f) &&
-                      ((tick_now - g_car_last_update_time_ms) < FC_MODE_CAR_RUN_DATA_TIMEOUT_MS)) ? 1U : 0U;
-    Beep_SetAlarm(BEEP_ALARM_CAR_DATA_LOST,
-                  (car_data_fresh == 0U) ? 1U : 0U);
+    // 先单纯调飞机,没有车
+    // car_data_fresh = ((g_car_sync_time_ms > 0.0f) &&
+    //                   ((tick_now - g_car_last_update_time_ms) < FC_MODE_CAR_RUN_DATA_TIMEOUT_MS)) ? 1U : 0U;
+    // Beep_SetAlarm(BEEP_ALARM_CAR_DATA_LOST,
+    //               (car_data_fresh == 0U) ? 1U : 0U);
 
     // wifi_justfloat(
     //     g_car_lamp_fused_distance_projectioncenter_2.x_cm,
@@ -890,7 +891,7 @@ void FC_Loop_1000Hz(void)
         //                         8u);
         g_motor_cmd.throttle = (int32_t)fc_clampf(
             FC_Apply_Tilt_Throttle_Compensation(s_hover_throttle) + height_vel_out,
-            1700.0f, 5000.0f);
+            1700.0f, 10000.0f);
         g_motor_cmd.roll = roll_ctrl;
         g_motor_cmd.pitch = -pitch_ctrl;
         g_motor_cmd.yaw = yaw_ctrl;

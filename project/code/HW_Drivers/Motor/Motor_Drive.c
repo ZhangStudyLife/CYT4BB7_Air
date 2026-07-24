@@ -98,12 +98,12 @@ static inline int32 abs_i(int32 value)
 /**
  * @brief   油门值转换为PWM duty值
  * @param   throttle 油门量（0~10000）
- * @return  PWM duty值（4000~6000，受安全限制）
+ * @return  PWM duty值（4000~8000）
  *
  * @note    映射关系：
  *          - 输入0     → duty=4000 (1000us脉宽)
- *          - 输入5000  → duty=6000 (1500us脉宽，安全上限)
- *          - 输入10000 → 先限幅到5000 → duty=6000 (1500us脉宽)
+ *          - 输入5000  → duty=6000 (1500us脉宽)
+ *          - 输入10000 → duty=8000 (2000us脉宽)
  */
 static inline uint32 throttle_to_driver_value(int32 throttle)
 {

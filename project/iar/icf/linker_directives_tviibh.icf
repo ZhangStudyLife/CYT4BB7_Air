@@ -363,4 +363,5 @@ place at address mem:0x28001160 { section .ipc_image_seq };
 place at address mem:0x28001180 { section .ipc_camera_spi_log };
 place at address mem:0x28001200 { section .ipc_remote_param_request };
 place at address mem:0x28001240 { section .ipc_remote_param_response };
+place at address mem:0x28001280 { section .ipc_attitude_data };
 place in ICFEDIT_region_RAM         {section .global_ram_data};

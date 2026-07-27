@@ -18,6 +18,8 @@ volatile ipc_remote_param_mailbox_t g_ipc_remote_param_request;
 #pragma location=".ipc_remote_param_response"
 #pragma data_alignment=64
 volatile ipc_remote_param_mailbox_t g_ipc_remote_param_response;
+#pragma location=".ipc_attitude_data"
+volatile ipc_attitude_data_t g_ipc_attitude_data;
 
 #define IPC_FLIGHT_STATE_MAGIC   (0xA5000000UL)
 #define IPC_FLIGHT_STATE_MASK    (0xFFFF0000UL)
@@ -106,12 +108,38 @@ static uint8 s_remote_param_core0_active = 0U;
 static uint32 s_remote_param_core0_transaction = 0U;
 static uint32 s_remote_param_core0_counter = 0U;
 static ipc_remote_param_mailbox_t s_remote_param_core0_request;
+static uint32 s_attitude_sequence = 0U;
 
 void ipc_image_publish(void)
 {
 }
 
 #endif
+
+void ipc_attitude_publish(float roll_deg, float pitch_deg)
+{
+#if defined(CY_CORE_CM7_0)
+    s_attitude_sequence++;
+    if(s_attitude_sequence == 0U)
+    {
+        s_attitude_sequence = 1U;
+    }
+    g_ipc_attitude_data.roll_deg = roll_deg;
+    g_ipc_attitude_data.pitch_deg = pitch_deg;
+    g_ipc_attitude_data.sequence = s_attitude_sequence;
+#else
+    (void)roll_deg;
+    (void)pitch_deg;
+#endif
+}
+
+void ipc_attitude_get(ipc_attitude_data_t *out)
+{
+    if(out != NULL)
+    {
+        memcpy(out, (const void *)&g_ipc_attitude_data, sizeof(*out));
+    }
+}
 
 #if defined(CY_CORE_CM7_0)
 static uint8 ipc_remote_param_response_matches_request(

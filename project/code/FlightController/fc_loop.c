@@ -75,7 +75,7 @@ static FC_START_CRSF_state_e s_prev_fc_state = FC_START_CRSF_STATE_INIT;
 #define FC_HEIGHT_VEL_OUT_MIN (-1000.0f)
 #define FC_HEIGHT_VEL_OUT_MAX 1000.0f
 #define FC_HEIGHT_VEL_KD_PWM (FC_HEIGHT_VEL_KD_ACC / FC_THRUST_ACC_MPS2_PER_PWM)
-static float s_hover_throttle = 5500.0f;
+static float s_hover_throttle = 3200.0f;
 static float s_hover_learn_step = 0.0f;
 /* 姿态角外环输出到角速度目标的限幅，单位 deg/s */
 static const float s_fc_angle_out_limit = 260.0f;
@@ -594,24 +594,6 @@ void FC_Loop_100Hz(void)
         break;
     }
 
-    // {
-    //     air_comm_air_stats_t air_stats;
-
-    //     memset(&air_stats, 0, sizeof(air_stats));
-    //     air_comm_air_get_stats(&air_stats);
-    //     wifi_justfloat(1.0f,
-    //                    air_stats.tick_ms,
-    //                    air_stats.tx_frame_count,
-    //                    air_stats.rx_frame_count,
-    //                    air_stats.raw_rx_byte_count,
-    //                    air_stats.rx_byte_count,
-    //                    air_stats.heartbeat_tx_count,
-    //                    air_stats.heartbeat_rx_count,
-    //                    air_stats.crc_error_count,
-    //                    air_stats.rx_oversize_count,
-    //                    air_stats.rx_queue_overflow_count,
-    //                    air_stats.online_status,g_car_vel_x,g_car_vel_y);
-    // }
 
     // 依托这个确认了车端的flash确实有效以及确实可以修改飞机的参数
     //                target_height_m * 1000.0f,   /* 目标高度，单位 mm */
@@ -899,6 +881,24 @@ void FC_Loop_1000Hz(void)
         Motor_Mixer(&g_motor_cmd);
     }
 
+
+    wifi_justfloat(
+        pitch_angle_target,
+        g_euler.pitch,
+        pitch_gyro_target,
+        g_imufilter_1000hz.gyroy,
+        -g_motor_cmd.pitch,          /* pitch_ctrl */
+        pitch_gyro_pid.p_term,
+        pitch_gyro_pid.i_term,
+        pitch_gyro_pid.d_term,
+        pitch_gyro_pid.error,
+        g_motor_cmd.throttle,
+        g_motor_cmd.roll,
+        g_motor_cmd.yaw,
+        g_motor_state.output[0],
+        g_motor_state.output[1],
+        g_motor_state.output[2],
+        g_motor_state.output[3]);
     // wifi_justfloat(g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
     //     roll_gyro_target, pitch_gyro_target, yaw_gyro_target,
     //     roll_gyro_pid.p_term, roll_gyro_pid.i_term, roll_gyro_pid.d_term,

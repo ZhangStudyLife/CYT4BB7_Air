@@ -37,36 +37,36 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->vel_z_dt = 0.01f;   /* 100Hz */
 
     /* ===== 油门与机械配平参数 ===== */
-    params->base_throttle = 5500;         /* 悬停油门 */
+    params->base_throttle = 3200;         /* 悬停油门 */
     params->roll_mech_trim_deg = 0.5f;    /* Roll 机械配平角 */
     params->pitch_mech_trim_deg = 1.5f;   /* Pitch 机械配平角 */
 
     /* ===== Roll 轴角速度环参数 ===== */
-    params->roll_gyro_kp = 8.5f;
-    params->roll_gyro_ki = 0.22f;
+    params->roll_gyro_kp = 6.8f;
+    params->roll_gyro_ki = 0.14f;
     params->roll_gyro_kd = 0.010f;
     params->roll_gyro_kff = 0.0f;
-    params->roll_gyro_i_limit = 220.0f;
+    params->roll_gyro_i_limit = 2000.0f;
     params->roll_gyro_d_lpf = 60.0f;
 
     /* ===== Pitch 轴角速度环参数 ===== */
-    params->pitch_gyro_kp = 8.5f;
-    params->pitch_gyro_ki = 0.17f;
+    params->pitch_gyro_kp = 6.8f;
+    params->pitch_gyro_ki = 0.36f;
     params->pitch_gyro_kd = 0.010f;
     params->pitch_gyro_kff = 0.0f;
-    params->pitch_gyro_i_limit = 170.0f;
+    params->pitch_gyro_i_limit = 2000.0f;
     params->pitch_gyro_d_lpf = 60.0f;
 
     /* ===== Yaw 轴角速度环参数 ===== */
-    params->yaw_gyro_kp = 15.0f;
-    params->yaw_gyro_ki = 5.0f;
+    params->yaw_gyro_kp = 13.0f;
+    params->yaw_gyro_ki = 4.8f;
     params->yaw_gyro_kd = 0.0f;
     params->yaw_gyro_kff = 0.0f;
-    params->yaw_gyro_i_limit = 700.0f;
+    params->yaw_gyro_i_limit = 2000.0f;
     params->yaw_gyro_d_lpf = 30.0f;
 
     /* ===== Roll 轴角度环参数 ===== */
-    params->roll_angle_kp = 6.0f;
+    params->roll_angle_kp = 5.8f;
     params->roll_angle_ki = 0.0f;
     params->roll_angle_kd = 0.0f;
     params->roll_angle_kff = 0.0f;
@@ -74,7 +74,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->roll_angle_d_lpf = 15.0f;
 
     /* ===== Pitch 轴角度环参数 ===== */
-    params->pitch_angle_kp = 6.2f;
+    params->pitch_angle_kp = 5.8f;
     params->pitch_angle_ki = 0.0f;
     params->pitch_angle_kd = 0.0f;
     params->pitch_angle_kff = 0.0f;
@@ -82,7 +82,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pitch_angle_d_lpf = 15.0f;
 
     /* ===== Yaw 轴角度环参数 ===== */
-    params->yaw_angle_kp = 6.0f;
+    params->yaw_angle_kp = 5.4f;
     params->yaw_angle_ki = 0.0f;
     params->yaw_angle_kd = 0.0f;
     params->yaw_angle_kff = 0.0f;

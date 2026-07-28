@@ -9,7 +9,7 @@
 #define CAMERA_SPI_APP_DATA_CAPACITY        (77U)
 #define CAMERA_SPI_PARAM_APP_LEN             (24U)
 #define CAMERA_SPI_PARAM_ACK_APP_LEN        (20U)
-#define CAMERA_SPI_ATTITUDE_APP_LEN          (38U)
+#define CAMERA_SPI_ATTITUDE_APP_LEN          (43U)
 
 #define CAMERA_SPI_FRAME_HEAD_0             (0xAAU)
 #define CAMERA_SPI_FRAME_HEAD_1             (0x55U)
@@ -64,6 +64,9 @@
 #define CAMERA_SPI_ATTITUDE_SEQUENCE_OFFSET  (26U)
 #define CAMERA_SPI_ATTITUDE_ROLL_OFFSET      (30U)
 #define CAMERA_SPI_ATTITUDE_PITCH_OFFSET     (34U)
+#define CAMERA_SPI_ATTITUDE_HEIGHT_OFFSET    (38U)
+#define CAMERA_SPI_ATTITUDE_FLAGS_OFFSET     (42U)
+#define CAMERA_SPI_ATTITUDE_HEIGHT_VALID     (0x01U)
 
 #define CAMERA_SPI_IMAGE_VERSION_OFFSET        (0U)
 #define CAMERA_SPI_IMAGE_BEACON_COUNT_OFFSET   (1U)
@@ -312,6 +315,10 @@ static uint16 camera_spi_build_downlink_app(uint8 board_id, uint8 *app)
     camera_spi_write_u32_le(&app[CAMERA_SPI_ATTITUDE_SEQUENCE_OFFSET], s_attitude.sequence);
     camera_spi_write_float_le(&app[CAMERA_SPI_ATTITUDE_ROLL_OFFSET], s_attitude.roll_deg);
     camera_spi_write_float_le(&app[CAMERA_SPI_ATTITUDE_PITCH_OFFSET], s_attitude.pitch_deg);
+    camera_spi_write_float_le(&app[CAMERA_SPI_ATTITUDE_HEIGHT_OFFSET], s_attitude.height_mm);
+    app[CAMERA_SPI_ATTITUDE_FLAGS_OFFSET] =
+        ((s_attitude.flags & IPC_ATTITUDE_FLAG_HEIGHT_VALID) != 0U) ?
+        CAMERA_SPI_ATTITUDE_HEIGHT_VALID : 0U;
 
     if(((s_param_transaction.state == CAMERA_SPI_PARAM_PREFLIGHT) ||
         (s_param_transaction.state == CAMERA_SPI_PARAM_ACTIVE) ||

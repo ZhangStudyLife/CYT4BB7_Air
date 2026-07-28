@@ -293,7 +293,10 @@ int main(void)
             FC_START_CRSF_UpdateLandingButton100Hz();
             FC_Loop_100Hz();
             air_comm_air_update_100HZ();
-            ipc_attitude_publish(g_euler.roll, g_euler.pitch);
+            ipc_attitude_publish(g_euler.roll,
+                                 g_euler.pitch,
+                                 g_tof_fused_height_mm,
+                                 g_tof_fused_valid);
             ipc_image_poll();
             (void)BeaconLostDetector_Update();
 

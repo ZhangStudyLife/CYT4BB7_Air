@@ -116,7 +116,10 @@ void ipc_image_publish(void)
 
 #endif
 
-void ipc_attitude_publish(float roll_deg, float pitch_deg)
+void ipc_attitude_publish(float roll_deg,
+                          float pitch_deg,
+                          float height_mm,
+                          uint8 height_valid)
 {
 #if defined(CY_CORE_CM7_0)
     s_attitude_sequence++;
@@ -126,10 +129,15 @@ void ipc_attitude_publish(float roll_deg, float pitch_deg)
     }
     g_ipc_attitude_data.roll_deg = roll_deg;
     g_ipc_attitude_data.pitch_deg = pitch_deg;
+    g_ipc_attitude_data.height_mm = height_mm;
+    g_ipc_attitude_data.flags = (height_valid != 0U) ?
+                                IPC_ATTITUDE_FLAG_HEIGHT_VALID : 0U;
     g_ipc_attitude_data.sequence = s_attitude_sequence;
 #else
     (void)roll_deg;
     (void)pitch_deg;
+    (void)height_mm;
+    (void)height_valid;
 #endif
 }
 

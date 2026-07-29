@@ -11,33 +11,16 @@ extern "C" {
 #define IMU_SAMPLE_RATE_HZ         (1000.0f)
 
 /* 第一级陷波中心频率，单位 Hz */
-#define IMU_NOTCH0_HZ              (185.0f)
+#define IMU_NOTCH0_HZ              (300.0f)
 /* 第一级陷波带宽，单位 Hz */
-#define IMU_NOTCH0_BW_HZ           (70.0f)
+#define IMU_NOTCH0_BW_HZ           (180.0f)
 /* 第一级陷波品质因数，按 Q=f/BW 定义 */
 #define IMU_NOTCH0_Q               (IMU_NOTCH0_HZ / IMU_NOTCH0_BW_HZ)
 
-/* 加速度计第一级陷波带宽，单位 Hz */
-#define IMU_ACCEL_NOTCH0_BW_HZ     (70.0f)
-/* 加速度计第一级陷波品质因数，按 Q=f/BW 定义 */
-#define IMU_ACCEL_NOTCH0_Q         (IMU_NOTCH0_HZ / IMU_ACCEL_NOTCH0_BW_HZ)
-
-/* 第二级陷波是否启用：0=旁路，1=启用 */
-#define IMU_NOTCH1_ENABLE          (1U)
-
-/* 第二级陷波中心频率，单位 Hz */
-#define IMU_NOTCH1_HZ              (93.0f)
-/* 第二级陷波带宽，单位 Hz */
-#define IMU_NOTCH1_BW_HZ           (35.0f)
-/* 第二级陷波品质因数，按 Q=f/BW 定义 */
-#define IMU_NOTCH1_Q               (IMU_NOTCH1_HZ / IMU_NOTCH1_BW_HZ)
-
-/* 陀螺仪抗混叠二阶 Butterworth 低通截止频率，单位 Hz */
-#define IMU_GYRO_ANTI_ALIAS_LPF_HZ (250.0f)
 /* 陀螺仪主低通二阶 Butterworth 截止频率，单位 Hz */
-#define IMU_GYRO_LPF_HZ            (50.0f)
-/* 加速度计主低通二阶 Butterworth 截止频率，单位 Hz */
-#define IMU_ACCEL_LPF_HZ           (40.0f)
+#define IMU_GYRO_LPF_HZ            (80.0f)
+/* 加速度计主低通 PT2 截止频率，单位 Hz */
+#define IMU_ACCEL_LPF_HZ           (25.0f)
 
 /* IMU 三轴数量 */
 #define IMU_AXIS_NUM               (3U)
@@ -100,7 +83,7 @@ extern float g_imu_acc_norm_g;
 void IMUFilter_Init(void);
 
 /**
- * 函数功能: 以 1kHz 输入原始 IMU 数据，依次执行陀螺仪抗混叠、双陷波和低通，
+ * 函数功能: 以 1kHz 输入 IMU 数据，执行陀螺仪单陷波与低通、加速度计 PT2 低通，
  *           并输出 1000Hz、500Hz、250Hz 三个结构体。
  * 输入参数:
  *   gx, gy, gz - 陀螺仪三轴输入，单位 dps。

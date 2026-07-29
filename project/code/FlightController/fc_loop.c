@@ -882,23 +882,23 @@ void FC_Loop_1000Hz(void)
     }
 
 
-    wifi_justfloat(
-        pitch_angle_target,
-        g_euler.pitch,
-        pitch_gyro_target,
-        g_imufilter_1000hz.gyroy,
-        -g_motor_cmd.pitch,          /* pitch_ctrl */
-        pitch_gyro_pid.p_term,
-        pitch_gyro_pid.i_term,
-        pitch_gyro_pid.d_term,
-        pitch_gyro_pid.error,
-        g_motor_cmd.throttle,
-        g_motor_cmd.roll,
-        g_motor_cmd.yaw,
-        g_motor_state.output[0],
-        g_motor_state.output[1],
-        g_motor_state.output[2],
-        g_motor_state.output[3]);
+    // wifi_justfloat(
+    //     pitch_angle_target,
+    //     g_euler.pitch,
+    //     pitch_gyro_target,
+    //     g_imufilter_1000hz.gyroy,
+    //     -g_motor_cmd.pitch,          /* pitch_ctrl */
+    //     pitch_gyro_pid.p_term,
+    //     pitch_gyro_pid.i_term,
+    //     pitch_gyro_pid.d_term,
+    //     pitch_gyro_pid.error,
+    //     g_motor_cmd.throttle,
+    //     g_motor_cmd.roll,
+    //     g_motor_cmd.yaw,
+    //     g_motor_state.output[0],
+    //     g_motor_state.output[1],
+    //     g_motor_state.output[2],
+    //     g_motor_state.output[3]);
     // wifi_justfloat(g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
     //     roll_gyro_target, pitch_gyro_target, yaw_gyro_target,
     //     roll_gyro_pid.p_term, roll_gyro_pid.i_term, roll_gyro_pid.d_term,

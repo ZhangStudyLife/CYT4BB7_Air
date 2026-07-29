@@ -59,6 +59,8 @@ static FC_START_CRSF_flight_mode_e s_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
 static FC_START_CRSF_flight_mode_e s_prev_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
 /* 上一次飞控状态，用于检测飞行态切换边沿 */
 static FC_START_CRSF_state_e s_prev_fc_state = FC_START_CRSF_STATE_INIT;
+/* Mode0 手动姿态前馈是否已完成目标对齐 */
+static uint8_t s_mode0_angle_ff_active = 0U;
 /* 悬停油门在线学习（借鉴 ArduPilot MOT_THST_HOVER） */
 #define FC_HOVER_THR_TC 4.0f
 #define FC_HOVER_LEARN_MIN_DELTA (-700.0f)
@@ -88,8 +90,10 @@ static const float s_fc_yaw_target_delta_limit_deg = 100.0f;
 static const float s_fc_angle_aw_gain = 0.15f;
 /* 姿态角外环积分松弛阈值，目标变化过快时降低积分堆积 */
 static const float s_fc_angle_iterm_relax_threshold = 30.0f;
-/* 姿态角外环前馈 PT3 平滑时间，参考 Betaflight Angle FF 默认值，单位 ms */
-static const float s_fc_angle_ff_smoothing_ms = 80.0f;
+/* Mode0 姿态角外环前馈 PT3 平滑时间，单位 ms */
+static const float s_fc_angle_ff_smoothing_ms = 15.0f;
+/* Mode0 姿态角外环前馈限幅，单位 deg/s */
+static const float s_fc_angle_ff_limit_dps = 150.0f;
 /* 姿态角外环输出 PT3 低通截止频率，参考 Betaflight attitudeFilter，单位 Hz */
 static const float s_fc_angle_output_lpf_hz = 50.0f;
 static const float s_fc_deg_to_rad = 0.017453293f;
@@ -232,7 +236,8 @@ void FC_Loop_Init(void)
     roll_angle_pid.output_min = -s_fc_angle_out_limit;
     roll_angle_pid.output_max = s_fc_angle_out_limit;
     roll_angle_pid.iterm_relax_threshold = s_fc_angle_iterm_relax_threshold;
-    PID_SetFeedforwardFilter(&roll_angle_pid, s_fc_angle_ff_smoothing_ms, s_fc_angle_output_lpf_hz);
+    PID_SetFeedforwardFilter(&roll_angle_pid, s_fc_angle_ff_smoothing_ms, s_fc_angle_output_lpf_hz,
+                             s_fc_angle_ff_limit_dps);
     PID_Init(&pitch_angle_pid,
              g_fc_params.pitch_angle_kp, g_fc_params.pitch_angle_ki, g_fc_params.pitch_angle_kd,
              g_fc_params.pitch_angle_kff, g_fc_params.angle_dt,
@@ -243,7 +248,8 @@ void FC_Loop_Init(void)
     pitch_angle_pid.output_min = -s_fc_angle_out_limit;
     pitch_angle_pid.output_max = s_fc_angle_out_limit;
     pitch_angle_pid.iterm_relax_threshold = s_fc_angle_iterm_relax_threshold;
-    PID_SetFeedforwardFilter(&pitch_angle_pid, s_fc_angle_ff_smoothing_ms, s_fc_angle_output_lpf_hz);
+    PID_SetFeedforwardFilter(&pitch_angle_pid, s_fc_angle_ff_smoothing_ms, s_fc_angle_output_lpf_hz,
+                             s_fc_angle_ff_limit_dps);
     PID_Init(&yaw_angle_pid,
              g_fc_params.yaw_angle_kp, g_fc_params.yaw_angle_ki, g_fc_params.yaw_angle_kd,
              g_fc_params.yaw_angle_kff, g_fc_params.angle_dt,
@@ -325,6 +331,7 @@ void FC_Loop_Reset(void)
     s_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
     s_prev_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
     s_prev_fc_state = FC_START_CRSF_STATE_INIT;
+    s_mode0_angle_ff_active = 0U;
     s_yaw_target_inited = 0U;
     s_hover_throttle = (float)g_fc_params.base_throttle;
 }
@@ -362,7 +369,7 @@ void FC_Loop_50Hz(void)
         height_pos_out = fc_clampf(height_pos_out, -FC_HEIGHT_VEL_TARGET_LIMIT, FC_HEIGHT_VEL_TARGET_LIMIT);
     }
     else if ((fc_state == FC_START_CRSF_STATE_FLYING) &&
-        (g_height_meas_health < 0.25f))
+             (g_height_meas_health < 0.25f))
     {
         height_pos_out = fc_clampf(height_pos_out, -0.10f, 0.10f);
     }
@@ -516,10 +523,11 @@ void FC_Loop_100Hz(void)
           fminf(fminf(g_tof1_height_mm, g_tof2_height_mm), fminf(g_tof3_height_mm, g_tof4_height_mm))) < FC_HOVER_LEARN_TOF_SPREAD_MAX))
     {
         s_hover_learn_step = fc_clampf((dt / (dt + FC_HOVER_THR_TC)) * height_vel_out,
-            -FC_HOVER_LEARN_RATE_MAX * dt, FC_HOVER_LEARN_RATE_MAX * dt);
+                                       -FC_HOVER_LEARN_RATE_MAX * dt, FC_HOVER_LEARN_RATE_MAX * dt);
         s_hover_learn_step = fc_clampf(s_hover_throttle + s_hover_learn_step,
-            (float)g_fc_params.base_throttle + FC_HOVER_LEARN_MIN_DELTA,
-            (float)g_fc_params.base_throttle + FC_HOVER_LEARN_MAX_DELTA) - s_hover_throttle;
+                                       (float)g_fc_params.base_throttle + FC_HOVER_LEARN_MIN_DELTA,
+                                       (float)g_fc_params.base_throttle + FC_HOVER_LEARN_MAX_DELTA) -
+                             s_hover_throttle;
         s_hover_throttle += s_hover_learn_step;
         height_vel_out -= s_hover_learn_step;
     }
@@ -533,10 +541,8 @@ void FC_Loop_100Hz(void)
     //                s_hover_throttle,
     //                FC_Apply_Tilt_Throttle_Compensation(s_hover_throttle));
 
-
-
-        // wifi_justfloat(ICM42688.gyro_x,ICM42688.gyro_y,ICM42688.gyro_z,
-        //     ICM42688.acc_x,ICM42688.acc_y,ICM42688.acc_z);
+    // wifi_justfloat(ICM42688.gyro_x,ICM42688.gyro_y,ICM42688.gyro_z,
+    //     ICM42688.acc_x,ICM42688.acc_y,ICM42688.acc_z);
 
     //                g_tof_fused_height_mm,    // 融合高度 mm
     //                g_imufilter_1000hz.accz,  // 机体系Z轴加速度 m/s²
@@ -594,7 +600,6 @@ void FC_Loop_100Hz(void)
         break;
     }
 
-
     // 依托这个确认了车端的flash确实有效以及确实可以修改飞机的参数
     //                target_height_m * 1000.0f,   /* 目标高度，单位 mm */
     //                g_tof_fused_height_mm,       /* 当前高度，单位 mm */
@@ -611,15 +616,14 @@ void FC_Loop_100Hz(void)
     //                g_tof3_height_mm,
     //                g_tof4_height_mm);
 
-
     //    wifi_justfloat(image_data[Front].beacon_data[0].x,          /* I1 */
     //                     image_data[Front].beacon_data[0].y,          /* I2 */
     //                     image_data[Front].beacon_data[0].area,          /* I3 */
-                        
+
     //                     image_data[Front].beacon_data[1].x,          /* I4 */
     //                     image_data[Front].beacon_data[1].y,          /* I5 */
     //                     image_data[Front].beacon_data[1].area,          /* I6 */
-                        
+
     //                     image_data[Center].beacon_data[0].x,         /* I7 */
     //                     image_data[Center].beacon_data[0].y,         /* I8 */
     //                     image_data[Center].beacon_data[0].area,        /* I9 */
@@ -704,11 +708,6 @@ void FC_Loop_100Hz(void)
     //                     CRSF_STD[8],
     //                     g_pull_detect_result.danger
     //                     );
-
-
-
-
-
 }
 
 void FC_Loop_500Hz(void)
@@ -720,7 +719,7 @@ void FC_Loop_500Hz(void)
 
     // wifi_justfloat(g_imufilter_1000hz.accx,g_imufilter_1000hz.accy,g_imufilter_1000hz.accz,
     //     g_imufilter_1000hz.gyrox,g_imufilter_1000hz.gyroy,g_imufilter_1000hz.gyroz,
-    //     g_tof_fused_height_mm, g_height_fused_vz_mps, 
+    //     g_tof_fused_height_mm, g_height_fused_vz_mps,
     //     g_tof1_height_mm, g_tof2_height_mm, g_tof3_height_mm, g_tof4_height_mm,
     //     lc302_data.flow_x_integral, lc302_data.flow_y_integral, lc302_data.integration_timespan,
     // Pos_Est_vel_x, Pos_Est_vel_y);
@@ -736,6 +735,7 @@ void FC_Loop_500Hz(void)
         float limit;
         float roll_ctrl;
         float pitch_ctrl;
+        uint8_t mode0_angle_ff_enable;
 
         if (roll_angle_target > angle_target_max)
         {
@@ -756,6 +756,25 @@ void FC_Loop_500Hz(void)
 
         /* 控制量限幅 */
         limit = s_fc_angle_out_limit;
+        mode0_angle_ff_enable = ((s_flight_mode == FC_START_CRSF_FLIGHT_MODE_0) ||
+                                 (s_flight_mode == FC_START_CRSF_FLIGHT_MODE_1) ||
+                                 (s_flight_mode == FC_START_CRSF_FLIGHT_MODE_6)) ? 1U : 0U;
+        if ((mode0_angle_ff_enable != 0U) && (s_mode0_angle_ff_active == 0U))
+        {
+            roll_angle_pid.prev_sp = roll_angle_target;
+            pitch_angle_pid.prev_sp = pitch_angle_target;
+            roll_angle_pid.sp_rate = 0.0f;
+            pitch_angle_pid.sp_rate = 0.0f;
+            roll_angle_pid.ff_pt3_filter.state1 = 0.0f;
+            roll_angle_pid.ff_pt3_filter.state2 = 0.0f;
+            roll_angle_pid.ff_pt3_filter.state3 = 0.0f;
+            pitch_angle_pid.ff_pt3_filter.state1 = 0.0f;
+            pitch_angle_pid.ff_pt3_filter.state2 = 0.0f;
+            pitch_angle_pid.ff_pt3_filter.state3 = 0.0f;
+        }
+        roll_angle_pid.kff = (mode0_angle_ff_enable != 0U) ? g_fc_params.roll_angle_kff : 0.0f;
+        pitch_angle_pid.kff = (mode0_angle_ff_enable != 0U) ? g_fc_params.pitch_angle_kff : 0.0f;
+        s_mode0_angle_ff_active = mode0_angle_ff_enable;
         roll_ctrl = fc_clampf(PID_Update(&roll_angle_pid, roll_angle_target, roll_angle_meas, dt), -limit, limit);
         pitch_ctrl = fc_clampf(PID_Update(&pitch_angle_pid, pitch_angle_target, pitch_angle_meas, dt), -limit, limit);
 
@@ -790,13 +809,12 @@ void FC_Loop_500Hz(void)
     }
     else
     {
+        roll_angle_pid.kff = 0.0f;
+        pitch_angle_pid.kff = 0.0f;
+        s_mode0_angle_ff_active = 0U;
         s_yaw_target_inited = 0U;
         yaw_gyro_target = 0.0f;
     }
-
-
-    
-
 
     // wifi_justfloat(image_data[Front].car_lamp_data[0].cx,  /* I7 */
     //             image_data[Front].car_lamp_data[0].cy,  /* I8 */
@@ -837,7 +855,6 @@ void FC_Loop_500Hz(void)
     //     g_mode7_vely_pid.d_term, g_mode7_vely_pid.output,
     //     g_mode7_velx_target, g_mode7_vely_target,
     //     g_tof_fused_height_mm);
-
 }
 
 void FC_Loop_1000Hz(void)
@@ -879,8 +896,17 @@ void FC_Loop_1000Hz(void)
         g_motor_cmd.yaw = yaw_ctrl;
 
         Motor_Mixer(&g_motor_cmd);
-    }
 
+        wifi_justfloat(g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy,
+                       roll_gyro_target, pitch_gyro_target,
+                       roll_gyro_pid.p_term, roll_gyro_pid.i_term, roll_gyro_pid.d_term,
+                       pitch_gyro_pid.p_term, pitch_gyro_pid.i_term, pitch_gyro_pid.d_term,
+                       g_euler.roll, g_euler.pitch,
+                       roll_angle_target, pitch_angle_target,
+                       roll_angle_pid.sp_rate, roll_angle_pid.p_term, roll_angle_pid.ff_term,
+                       pitch_angle_pid.sp_rate, pitch_angle_pid.p_term, pitch_angle_pid.ff_term,
+                       (float)s_flight_mode, (float)FC_START_CRSF_Get_State());
+    }
 
     // wifi_justfloat(
     //     pitch_angle_target,
@@ -899,14 +925,6 @@ void FC_Loop_1000Hz(void)
     //     g_motor_state.output[1],
     //     g_motor_state.output[2],
     //     g_motor_state.output[3]);
-    // wifi_justfloat(g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
-    //     roll_gyro_target, pitch_gyro_target, yaw_gyro_target,
-    //     roll_gyro_pid.p_term, roll_gyro_pid.i_term, roll_gyro_pid.d_term,
-    //     pitch_gyro_pid.p_term, pitch_gyro_pid.i_term, pitch_gyro_pid.d_term,
-    //     yaw_gyro_pid.p_term, yaw_gyro_pid.i_term, yaw_gyro_pid.d_term,
-    //     g_euler.roll, g_euler.pitch, g_euler.yaw,
-    //     roll_angle_target,pitch_angle_target,yaw_angle_target
-    // );
 
     air_comm_air_poll();
 }

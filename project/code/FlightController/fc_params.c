@@ -44,15 +44,15 @@ static void fc_params_fill_defaults(fc_params_t *params)
     /* ===== Roll 轴角速度环参数 ===== */
     params->roll_gyro_kp = 6.8f;
     params->roll_gyro_ki = 0.14f;
-    params->roll_gyro_kd = 0.010f;
+    params->roll_gyro_kd = 0.015f;
     params->roll_gyro_kff = 0.0f;
     params->roll_gyro_i_limit = 2000.0f;
     params->roll_gyro_d_lpf = 60.0f;
 
     /* ===== Pitch 轴角速度环参数 ===== */
     params->pitch_gyro_kp = 6.8f;
-    params->pitch_gyro_ki = 0.36f;
-    params->pitch_gyro_kd = 0.010f;
+    params->pitch_gyro_ki = 0.18f;
+    params->pitch_gyro_kd = 0.013f;
     params->pitch_gyro_kff = 0.0f;
     params->pitch_gyro_i_limit = 2000.0f;
     params->pitch_gyro_d_lpf = 60.0f;
@@ -66,18 +66,18 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->yaw_gyro_d_lpf = 30.0f;
 
     /* ===== Roll 轴角度环参数 ===== */
-    params->roll_angle_kp = 5.8f;
+    params->roll_angle_kp = 8.2f;
     params->roll_angle_ki = 0.0f;
     params->roll_angle_kd = 0.0f;
-    params->roll_angle_kff = 0.0f;
+    params->roll_angle_kff = 0.42f;
     params->roll_angle_i_limit = 80.0f;
     params->roll_angle_d_lpf = 15.0f;
 
     /* ===== Pitch 轴角度环参数 ===== */
-    params->pitch_angle_kp = 5.8f;
+    params->pitch_angle_kp = 7.5f;
     params->pitch_angle_ki = 0.0f;
     params->pitch_angle_kd = 0.0f;
-    params->pitch_angle_kff = 0.0f;
+    params->pitch_angle_kff = 0.42f;
     params->pitch_angle_i_limit = 80.0f;
     params->pitch_angle_d_lpf = 15.0f;
 
@@ -98,7 +98,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pos_z_d_lpf = 0.0f;
 
     /* ===== Z 轴速度环参数 ===== */
-    params->vel_z_kp = 1500.0f;
+    params->vel_z_kp = 500.0f;
     params->vel_z_ki = 120.0f;
     params->vel_z_kd =0.0f;
     params->vel_z_kff = 0.0f;

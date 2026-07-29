@@ -34,6 +34,7 @@ typedef struct
 
     float i_limit;
     float ff_smoothing_ms; /* 前馈 PT3 平滑时间，单位 ms，0 表示旁路 */
+    float ff_limit;        /* 前馈项限幅绝对值，0 表示不限制 */
     float output_lpf_hz;   /* 输出 PT3 低通截止频率，单位 Hz，0 表示旁路 */
     float d_lpf_hz; /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
@@ -84,9 +85,10 @@ void PID_Init(pid_t *pid, float kp, float ki, float kd, float kff,
  *   pid             - PID 控制器实例指针。
  *   ff_smoothing_ms - 前馈平滑时间，单位 ms，0 表示旁路。
  *   output_lpf_hz   - 输出低通截止频率，单位 Hz，0 表示旁路。
+ *   ff_limit        - 前馈项限幅绝对值，0 表示不限制。
  * 返回值: 无。
  */
-void PID_SetFeedforwardFilter(pid_t *pid, float ff_smoothing_ms, float output_lpf_hz);
+void PID_SetFeedforwardFilter(pid_t *pid, float ff_smoothing_ms, float output_lpf_hz, float ff_limit);
 
 /**
  * 函数功能: 使用当前设定值和测量值更新 PID 输出。

@@ -291,6 +291,7 @@ void PID_Init(pid_t *pid, float kp, float ki, float kd, float kff,
     pid->i_limit = pid_absf(i_limit);
     pid->d_lpf_hz = (d_lpf > PID_LPF_MIN_HZ) ? d_lpf : 0.0f;
     pid->ff_smoothing_ms = 0.0f;
+    pid->ff_limit = 0.0f;
     pid->output_lpf_hz = 0.0f;
     pid->iterm_relax_threshold = 100.0f;
 
@@ -311,9 +312,10 @@ void PID_Init(pid_t *pid, float kp, float ki, float kd, float kff,
  *   pid             - PID 控制器实例指针。
  *   ff_smoothing_ms - 前馈平滑时间，单位 ms，0 表示旁路。
  *   output_lpf_hz   - 输出低通截止频率，单位 Hz，0 表示旁路。
+ *   ff_limit        - 前馈项限幅绝对值，0 表示不限制。
  * 返回值: 无。
  */
-void PID_SetFeedforwardFilter(pid_t *pid, float ff_smoothing_ms, float output_lpf_hz)
+void PID_SetFeedforwardFilter(pid_t *pid, float ff_smoothing_ms, float output_lpf_hz, float ff_limit)
 {
     if (pid == 0)
     {
@@ -322,6 +324,7 @@ void PID_SetFeedforwardFilter(pid_t *pid, float ff_smoothing_ms, float output_lp
 
     pid->ff_smoothing_ms = (ff_smoothing_ms > PID_PT3_MIN_MS) ? ff_smoothing_ms : 0.0f;
     pid->output_lpf_hz = (output_lpf_hz > PID_PT3_MIN_HZ) ? output_lpf_hz : 0.0f;
+    pid->ff_limit = pid_absf(ff_limit);
     pid_refresh_pt3_filters(pid);
 }
 
@@ -343,6 +346,7 @@ float PID_Update(pid_t *pid, float setpoint, float measurement, float dt)
     float d_raw;
     float iterm_relax_threshold;
     float i_candidate;
+    uint8_t d_filter_reinitialized = 0U;
 
     if (pid == 0)
     {
@@ -357,7 +361,7 @@ float PID_Update(pid_t *pid, float setpoint, float measurement, float dt)
         (pid_absf(effective_dt - previous_dt) > (previous_dt * PID_LPF_DT_REINIT_RATIO)))
     {
         pid_refresh_dterm_filter(pid);
-        pid->d_initialized = 0U;
+        d_filter_reinitialized = 1U;
     }
 
     pid->error = setpoint - measurement;
@@ -376,12 +380,15 @@ float PID_Update(pid_t *pid, float setpoint, float measurement, float dt)
         pid->d_initialized = 1U;
         pid->prev_meas = measurement;
         pid->prev_sp = setpoint;
+        pid->sp_rate = 0.0f;
         d_raw = 0.0f;
         pid_biquad_reset(&pid->d_lpf_filter);
     }
     else
     {
-        d_raw = -pid->kd * (measurement - pid->prev_meas) / effective_dt;
+        d_raw = (d_filter_reinitialized != 0U) ?
+                    0.0f :
+                    -pid->kd * (measurement - pid->prev_meas) / effective_dt;
     }
 
     if (pid->d_lpf_hz > PID_LPF_MIN_HZ)
@@ -393,10 +400,22 @@ float PID_Update(pid_t *pid, float setpoint, float measurement, float dt)
         pid->d_term = d_raw;
     }
 
-    pid->ff_term = pid->kff * pid->sp_rate;
-    if (pid->ff_smoothing_ms > PID_PT3_MIN_MS)
+    if (pid_absf(pid->kff) > 0.0f)
     {
-        pid->ff_term = pid_pt3_apply(&pid->ff_pt3_filter, pid->ff_term);
+        pid->ff_term = pid->kff * pid->sp_rate;
+        if (pid->ff_smoothing_ms > PID_PT3_MIN_MS)
+        {
+            pid->ff_term = pid_pt3_apply(&pid->ff_pt3_filter, pid->ff_term);
+        }
+        if (pid->ff_limit > 0.0f)
+        {
+            pid->ff_term = pid_clampf(pid->ff_term, -pid->ff_limit, pid->ff_limit);
+        }
+    }
+    else
+    {
+        pid->ff_term = 0.0f;
+        pid_pt3_reset(&pid->ff_pt3_filter);
     }
     i_candidate = pid->integral + pid->ki * pid->error * effective_dt * relax_factor;
 

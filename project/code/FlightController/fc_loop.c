@@ -90,12 +90,6 @@ static const float s_fc_yaw_target_delta_limit_deg = 100.0f;
 static const float s_fc_angle_aw_gain = 0.15f;
 /* 姿态角外环积分松弛阈值，目标变化过快时降低积分堆积 */
 static const float s_fc_angle_iterm_relax_threshold = 30.0f;
-/* Mode0 姿态角外环前馈 PT3 平滑时间，单位 ms */
-static const float s_fc_angle_ff_smoothing_ms = 15.0f;
-/* Mode0 姿态角外环前馈限幅，单位 deg/s */
-static const float s_fc_angle_ff_limit_dps = 150.0f;
-/* 姿态角外环输出 PT3 低通截止频率，参考 Betaflight attitudeFilter，单位 Hz */
-static const float s_fc_angle_output_lpf_hz = 50.0f;
 static const float s_fc_deg_to_rad = 0.017453293f;
 static const float s_fc_tilt_cos_min = 0.8f;
 static const float s_fc_tilt_comp_throttle_max = 10000.0f;
@@ -236,8 +230,8 @@ void FC_Loop_Init(void)
     roll_angle_pid.output_min = -s_fc_angle_out_limit;
     roll_angle_pid.output_max = s_fc_angle_out_limit;
     roll_angle_pid.iterm_relax_threshold = s_fc_angle_iterm_relax_threshold;
-    PID_SetFeedforwardFilter(&roll_angle_pid, s_fc_angle_ff_smoothing_ms, s_fc_angle_output_lpf_hz,
-                             s_fc_angle_ff_limit_dps);
+    PID_SetFeedforwardFilter(&roll_angle_pid, g_fc_params.angle_ff_smoothing_ms,
+                             g_fc_params.angle_output_lpf_hz, g_fc_params.angle_ff_limit_dps);
     PID_Init(&pitch_angle_pid,
              g_fc_params.pitch_angle_kp, g_fc_params.pitch_angle_ki, g_fc_params.pitch_angle_kd,
              g_fc_params.pitch_angle_kff, g_fc_params.angle_dt,
@@ -248,8 +242,8 @@ void FC_Loop_Init(void)
     pitch_angle_pid.output_min = -s_fc_angle_out_limit;
     pitch_angle_pid.output_max = s_fc_angle_out_limit;
     pitch_angle_pid.iterm_relax_threshold = s_fc_angle_iterm_relax_threshold;
-    PID_SetFeedforwardFilter(&pitch_angle_pid, s_fc_angle_ff_smoothing_ms, s_fc_angle_output_lpf_hz,
-                             s_fc_angle_ff_limit_dps);
+    PID_SetFeedforwardFilter(&pitch_angle_pid, g_fc_params.angle_ff_smoothing_ms,
+                             g_fc_params.angle_output_lpf_hz, g_fc_params.angle_ff_limit_dps);
     PID_Init(&yaw_angle_pid,
              g_fc_params.yaw_angle_kp, g_fc_params.yaw_angle_ki, g_fc_params.yaw_angle_kd,
              g_fc_params.yaw_angle_kff, g_fc_params.angle_dt,
@@ -259,12 +253,16 @@ void FC_Loop_Init(void)
              g_fc_params.roll_gyro_kp, g_fc_params.roll_gyro_ki, g_fc_params.roll_gyro_kd,
              g_fc_params.roll_gyro_kff, g_fc_params.gyro_dt,
              g_fc_params.roll_gyro_i_limit, g_fc_params.roll_gyro_d_lpf);
+    PID_SetFeedforwardFilter(&roll_gyro_pid, g_fc_params.gyro_ff_smoothing_ms, 0.0f,
+                             g_fc_params.gyro_ff_limit);
     /* Roll 角速度目标持续变化时，提前放松积分，减少低频拉扯和线缆外力带来的积分堆积 */
     roll_gyro_pid.iterm_relax_threshold = 40.0f;
     PID_Init(&pitch_gyro_pid,
              g_fc_params.pitch_gyro_kp, g_fc_params.pitch_gyro_ki, g_fc_params.pitch_gyro_kd,
              g_fc_params.pitch_gyro_kff, g_fc_params.gyro_dt,
              g_fc_params.pitch_gyro_i_limit, g_fc_params.pitch_gyro_d_lpf);
+    PID_SetFeedforwardFilter(&pitch_gyro_pid, g_fc_params.gyro_ff_smoothing_ms, 0.0f,
+                             g_fc_params.gyro_ff_limit);
     /* Pitch 角速度环与 Roll 保持相同的积分放松策略，降低连续目标变化时的积分拖拽 */
     pitch_gyro_pid.iterm_relax_threshold = 40.0f;
     PID_Init(&yaw_gyro_pid,

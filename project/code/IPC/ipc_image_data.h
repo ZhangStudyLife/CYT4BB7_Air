@@ -10,6 +10,8 @@ extern "C" {
 
 #define IPC_CAMERA_SPI_BOARD_COUNT (2U)
 
+#define IPC_ATTITUDE_FLAG_HEIGHT_VALID          (0x00000001UL)
+
 /* 跨核远程参数协议固定版本。 */
 #define IPC_REMOTE_PARAM_MAGIC                 (0x5250414DUL)
 #define IPC_REMOTE_PARAM_VERSION               (1U)
@@ -170,14 +172,32 @@ typedef struct
     ipc_camera_spi_board_log_t board[IPC_CAMERA_SPI_BOARD_COUNT];
 } ipc_camera_spi_log_t;
 
+typedef struct
+{
+    uint32 sequence;
+    float roll_deg;
+    float pitch_deg;
+    float height_mm;
+    uint32 flags;
+} ipc_attitude_data_t;
+
+typedef char ipc_attitude_data_size_must_be_20[
+    (sizeof(ipc_attitude_data_t) == 20U) ? 1 : -1];
+
 extern volatile uint32 g_image_data_seq;
 extern volatile ipc_camera_spi_log_t g_ipc_camera_spi_log;
 extern volatile ipc_remote_param_mailbox_t g_ipc_remote_param_request;
 extern volatile ipc_remote_param_mailbox_t g_ipc_remote_param_response;
+extern volatile ipc_attitude_data_t g_ipc_attitude_data;
 
 void ipc_image_callback(uint32 ipc_data);
 void ipc_image_publish(void);
 void ipc_image_poll(void);
+void ipc_attitude_publish(float roll_deg,
+                          float pitch_deg,
+                          float height_mm,
+                          uint8 height_valid);
+void ipc_attitude_get(ipc_attitude_data_t *out);
 
 uint8 ipc_flight_state_send(uint8 flying,
                             uint8 image_send_enable,

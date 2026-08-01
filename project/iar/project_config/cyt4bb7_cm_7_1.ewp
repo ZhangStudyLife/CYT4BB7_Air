@@ -1135,6 +1135,15 @@
         <file>
             <name>$PROJ_DIR$\..\..\code\Image\image_data.h</name>
         </file>
+        <group>
+            <name>ImageHorizon</name>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Image\image_down_horizon.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Image\image_down_horizon.h</name>
+            </file>
+        </group>
         <file>
             <name>$PROJ_DIR$\..\..\code\IPC\ipc_image_data.c</name>
         </file>

@@ -7,9 +7,9 @@
 
 #define CAMERA_SPI_TRANSFER_LEN             (97U)
 #define CAMERA_SPI_APP_DATA_CAPACITY        (77U)
-#define CAMERA_SPI_DOWNLINK_APP_LEN         (9U)
-#define CAMERA_SPI_PARAM_APP_LEN            (24U)
+#define CAMERA_SPI_PARAM_APP_LEN             (24U)
 #define CAMERA_SPI_PARAM_ACK_APP_LEN        (20U)
+#define CAMERA_SPI_ATTITUDE_APP_LEN          (43U)
 
 #define CAMERA_SPI_FRAME_HEAD_0             (0xAAU)
 #define CAMERA_SPI_FRAME_HEAD_1             (0x55U)
@@ -56,6 +56,17 @@
 #define CAMERA_SPI_PARAM_ROLLBACK_TXN_MASK  (0x80000000UL)
 #define CAMERA_SPI_PARAM_ORIGINAL_TXN_MASK  (0xC0000000UL)
 #define CAMERA_SPI_PARAM_ACK_REQUEST        (0x01U)
+
+#define CAMERA_SPI_ATTITUDE_MAGIC            (0xA6U)
+#define CAMERA_SPI_ATTITUDE_VERSION          (1U)
+#define CAMERA_SPI_ATTITUDE_MAGIC_OFFSET     (24U)
+#define CAMERA_SPI_ATTITUDE_VERSION_OFFSET   (25U)
+#define CAMERA_SPI_ATTITUDE_SEQUENCE_OFFSET  (26U)
+#define CAMERA_SPI_ATTITUDE_ROLL_OFFSET      (30U)
+#define CAMERA_SPI_ATTITUDE_PITCH_OFFSET     (34U)
+#define CAMERA_SPI_ATTITUDE_HEIGHT_OFFSET    (38U)
+#define CAMERA_SPI_ATTITUDE_FLAGS_OFFSET     (42U)
+#define CAMERA_SPI_ATTITUDE_HEIGHT_VALID     (0x01U)
 
 #define CAMERA_SPI_IMAGE_VERSION_OFFSET        (0U)
 #define CAMERA_SPI_IMAGE_BEACON_COUNT_OFFSET   (1U)
@@ -177,6 +188,7 @@ static uint32 s_active_poll_count;
 static uint32 s_active_start_cycles;
 static uint32 s_transfer_timeout_cycles;
 static uint32 s_log_seq;
+static ipc_attitude_data_t s_attitude;
 /* 两颗2BL3广播参数事务状态，仅由核1的100Hz主循环访问。 */
 static camera_spi_param_transaction_t s_param_transaction;
 /* 最近一次已被上层消费的成功SET回滚快照，用于处理迟到取消。 */
@@ -218,6 +230,14 @@ static uint32 camera_spi_read_u32_le(const uint8 *buffer)
            ((uint32)buffer[1] << 8) |
            ((uint32)buffer[2] << 16) |
            ((uint32)buffer[3] << 24);
+}
+
+static void camera_spi_write_float_le(uint8 *buffer, float value)
+{
+    uint32 bits;
+
+    memcpy(&bits, &value, sizeof(bits));
+    camera_spi_write_u32_le(buffer, bits);
 }
 
 static uint16 camera_spi_crc16(const uint8 *data, uint16 len)
@@ -290,6 +310,15 @@ static uint16 camera_spi_build_downlink_app(uint8 board_id, uint8 *app)
     app[7] = ((s_image_send_enable == 2U) ||
               ((s_image_send_enable == 1U) && (s_flight_state == 0U))) ? 1U : 0U;
     app[CAMERA_SPI_DOWNLINK_PARAM_WRITE_LOCK_OFFSET] = s_param_write_locked;
+    app[CAMERA_SPI_ATTITUDE_MAGIC_OFFSET] = CAMERA_SPI_ATTITUDE_MAGIC;
+    app[CAMERA_SPI_ATTITUDE_VERSION_OFFSET] = CAMERA_SPI_ATTITUDE_VERSION;
+    camera_spi_write_u32_le(&app[CAMERA_SPI_ATTITUDE_SEQUENCE_OFFSET], s_attitude.sequence);
+    camera_spi_write_float_le(&app[CAMERA_SPI_ATTITUDE_ROLL_OFFSET], s_attitude.roll_deg);
+    camera_spi_write_float_le(&app[CAMERA_SPI_ATTITUDE_PITCH_OFFSET], s_attitude.pitch_deg);
+    camera_spi_write_float_le(&app[CAMERA_SPI_ATTITUDE_HEIGHT_OFFSET], s_attitude.height_mm);
+    app[CAMERA_SPI_ATTITUDE_FLAGS_OFFSET] =
+        ((s_attitude.flags & IPC_ATTITUDE_FLAG_HEIGHT_VALID) != 0U) ?
+        CAMERA_SPI_ATTITUDE_HEIGHT_VALID : 0U;
 
     if(((s_param_transaction.state == CAMERA_SPI_PARAM_PREFLIGHT) ||
         (s_param_transaction.state == CAMERA_SPI_PARAM_ACTIVE) ||
@@ -343,7 +372,7 @@ static uint16 camera_spi_build_downlink_app(uint8 board_id, uint8 *app)
         return CAMERA_SPI_PARAM_APP_LEN;
     }
 
-    return CAMERA_SPI_DOWNLINK_APP_LEN;
+    return CAMERA_SPI_ATTITUDE_APP_LEN;
 }
 
 static void camera_spi_refresh_flight_state(void)
@@ -1245,6 +1274,7 @@ void CameraSpi_Update(void)
     }
 
     camera_spi_update_freshness();
+    ipc_attitude_get(&s_attitude);
     camera_spi_refresh_flight_state();
     s_ready_mask = camera_spi_ready_mask();
     s_cycle_pending_mask = s_ready_mask & CAMERA_SPI_ALL_BOARD_MASK;

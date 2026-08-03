@@ -38,17 +38,17 @@ extern "C" {
 #define MOTOR_MIX_PITCH_SCALE_I ((MOTOR_ARM_ROLL_MM * 10000) / MOTOR_ARM_PITCH_MM) /* ≈13043 */
 
 /* ======================== PWM参数配置 ======================== */
-#define MOTOR_PWM_FREQ          (400U)      /* PWM频率：400Hz */
-#define MOTOR_PWM_PERIOD_US     (2500U)     /* PWM周期：2500us */
+#define MOTOR_PWM_FREQ          (200U)      /* PWM频率：200Hz */
+#define MOTOR_PWM_PERIOD_US     (1000000U / MOTOR_PWM_FREQ) /* PWM周期：5000us */
 #define MOTOR_PWM_DUTY_MAX      (10000U)    /* PWM占空比最大值（驱动层定义） */
 
 /* 油门脉宽范围（微秒） */
 #define MOTOR_PULSE_MIN_US      (1000U)     /* 最小油门脉宽：电机停止 */
 #define MOTOR_PULSE_MAX_US      (2000U)     /* 最大油门脉宽：全速 */
 
-/* 脉宽转占空比（基于2500us周期） */
-#define MOTOR_DUTY_MIN          (4000U)     /* 1000us → 40% → duty=4000 */
-#define MOTOR_DUTY_MAX          (8000U)     /* 2000us → 80% → duty=8000 */
+/* 脉宽转占空比（基于5000us周期） */
+#define MOTOR_DUTY_MIN          ((MOTOR_PULSE_MIN_US * MOTOR_PWM_DUTY_MAX) / MOTOR_PWM_PERIOD_US) /* 1000us → 20% → duty=2000 */
+#define MOTOR_DUTY_MAX          ((MOTOR_PULSE_MAX_US * MOTOR_PWM_DUTY_MAX) / MOTOR_PWM_PERIOD_US) /* 2000us → 40% → duty=4000 */
 
 /* ======================== 安全限制 ======================== */
 #define MOTOR_THROTTLE_LIMIT_MAX    (10000)     /* 最大油门限制：100% = 10000/10000 */
@@ -56,7 +56,7 @@ extern "C" {
 #define MOTOR_DUTY_LIMIT        (MOTOR_DUTY_MIN + ((MOTOR_DUTY_MAX - MOTOR_DUTY_MIN) * MOTOR_THROTTLE_LIMIT_MAX / MOTOR_INPUT_MAX)) /* 最大duty限制 */
 
 /* 混控模式下的最低怠速（防止BLDC六步换相失速） */
-#define MOTOR_IDLE_THROTTLE     (1100)      /* 最低怠速：20% = 2000/10000，约1200us脉宽 */
+#define MOTOR_IDLE_THROTTLE     (1100)      /* 最低怠速：11% = 1100/10000，约1110us脉宽 */
 
 /* ======================== 电机编号定义（Quad X布局） ======================== */
 /*

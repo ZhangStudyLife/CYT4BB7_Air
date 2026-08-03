@@ -6,22 +6,33 @@
 
 #include "zf_common_headfile.h"
 #include "Estimation/Pos_Est/image_down.h"
+#include "Image/image_down_horizon.h"
 #include "IPC/ipc_image_data.h"
 
 #define IMAGE_SCREEN_WIDTH             (188U)
 #define IMAGE_SCREEN_HEIGHT            (120U)
-#define IMAGE_SCREEN_BLOCK_ROWS         (8U)
-#define IMAGE_SCREEN_FIRST_HALF_ROWS   (64U)
+#define IMAGE_SCREEN_PHYSICAL_WIDTH    (240U)
+#define IMAGE_SCREEN_DATA_ROW_HEIGHT   (16U)
 #define IMAGE_SCREEN_DATA_PERIOD_TICKS (1U)
-#define IMAGE_SCREEN_PHYSICAL_WIDTH     (240U)
-#define IMAGE_SCREEN_PHYSICAL_HEIGHT    (135U)
-#define IMAGE_SCREEN_CLEAR_SLICE_ROWS   (64U)
+#define IMAGE_SCREEN_SPI_SPEED         (20U * 1000U * 1000U)
+#define IMAGE_SCREEN_AUX_REFRESH_FRAMES (5U)
+#define IMAGE_SCREEN_LCD_X_OFFSET       (40U)
+#define IMAGE_SCREEN_LCD_Y_OFFSET       (52U)
 #define IMAGE_SCREEN_AUX_X              (190U)
 #define IMAGE_SCREEN_AUX_LINE_HEIGHT    (8U)
 #define IMAGE_SCREEN_AUX_LINE_COUNT     (14U)
-#define IMAGE_SCREEN_AUX_LINES_PER_TICK (4U)
 #define IMAGE_SCREEN_AUX_TEXT_LENGTH    (8U)
 #define IMAGE_SCREEN_PI_F               (3.1415926f)
+
+#define IMAGE_SCREEN_BEACON_COLOR       (RGB565_RED)
+#define IMAGE_SCREEN_LAMP_COLOR         (RGB565_YELLOW)
+#define IMAGE_SCREEN_HORIZON_COLOR      (RGB565_GREEN)
+#define IMAGE_SCREEN_HORIZON_EXT_COLOR  (RGB565_CYAN)
+
+#define IMAGE_SCREEN_CLIP_LEFT          (0x01U)
+#define IMAGE_SCREEN_CLIP_RIGHT         (0x02U)
+#define IMAGE_SCREEN_CLIP_TOP           (0x04U)
+#define IMAGE_SCREEN_CLIP_BOTTOM        (0x08U)
 
 #define IMAGE_SCREEN_X_VALUE  (32U)
 #define IMAGE_SCREEN_Y_LABEL  (88U)
@@ -39,20 +50,21 @@ static uint32 s_next_refresh_tick;
 static uint8 s_screen_mode;
 static uint8 s_hw_initialized;
 static uint8 s_refresh_was_enabled;
+static uint8 s_startup_layout_ready;
 static uint8 s_layout_dirty;
-static uint8 s_data_layout_stage;
-static uint8 s_data_update_stage;
-static uint8 s_image_frame_active;
 static uint8 s_image_frame_pending;
-static uint8 s_image_next_row;
-static uint8 s_aux_frame_active;
-static uint8 s_aux_next_line;
-static uint16 s_layout_clear_row;
-static uint8 s_image_snapshot[IMAGE_SCREEN_HEIGHT][IMAGE_SCREEN_WIDTH];
-static uint8 s_clear_block[IMAGE_SCREEN_BLOCK_ROWS][IMAGE_SCREEN_PHYSICAL_WIDTH];
+static uint8 s_aux_refresh_counter;
+static uint16 s_image_rgb565[IMAGE_SCREEN_HEIGHT][IMAGE_SCREEN_WIDTH];
 static char s_aux_lines[IMAGE_SCREEN_AUX_LINE_COUNT][IMAGE_SCREEN_AUX_TEXT_LENGTH + 1U];
 
 extern volatile uint8 g_image_tick_100hz;
+
+static int ImageDebugScreen_RoundToInt(float value);
+static void ImageDebugScreen_ShowRgb565Region(uint16 x,
+                                              uint16 y,
+                                              uint16 width,
+                                              uint16 height,
+                                              const uint16 *pixels);
 
 /* 已消费节拍与ISR待处理节拍之和等于当前真实10ms序号。 */
 static uint32 ImageDebugScreen_Now(void)
@@ -78,72 +90,16 @@ static uint8 ImageDebugScreen_TickDue(uint32 now, uint32 deadline)
     return (((int32)(now - deadline)) >= 0) ? 1U : 0U;
 }
 
-static void ImageDebugScreen_AbortImageFrame(void)
-{
-    s_image_frame_active = 0U;
-    s_image_next_row = 0U;
-}
-
-static void ImageDebugScreen_AbortAuxFrame(void)
-{
-    s_aux_frame_active = 0U;
-    s_aux_next_line = 0U;
-}
-
 static void ImageDebugScreen_MarkLayoutDirty(void)
 {
+    s_startup_layout_ready = 0U;
     s_layout_dirty = 1U;
-    s_layout_clear_row = 0U;
-    s_data_layout_stage = 0U;
-    s_data_update_stage = 0U;
     s_image_frame_pending = 0U;
-    ImageDebugScreen_AbortImageFrame();
-    ImageDebugScreen_AbortAuxFrame();
+    s_aux_refresh_counter = 0U;
 }
 
-static uint8 ImageDebugScreen_ShowLamp(uint16 y, const car_lamp_data *lamp)
+static void ImageDebugScreen_RenderDataLayoutTop(void)
 {
-    if((ImageDebugScreen_RefreshAllowed() == 0U) ||
-       (ImageDebugScreen_TaskBacklog() != 0U))
-    {
-        return 0U;
-    }
-
-    ips114_set_color((image_data_car_lamp_valid(lamp) != 0U) ?
-                     RGB565_BLACK : RGB565_RED,
-                     RGB565_WHITE);
-    ips114_show_float(IMAGE_SCREEN_X_VALUE, y, lamp->cx, 3U, 1U);
-    ips114_show_float(IMAGE_SCREEN_Y_VALUE, y, lamp->cy, 3U, 1U);
-    ips114_set_color(RGB565_BLACK, RGB565_WHITE);
-    return 1U;
-}
-
-static uint8 ImageDebugScreen_ShowBeacon(uint16 y, const beacon_data *beacon)
-{
-    if((ImageDebugScreen_RefreshAllowed() == 0U) ||
-       (ImageDebugScreen_TaskBacklog() != 0U))
-    {
-        return 0U;
-    }
-
-    ips114_set_color((image_data_beacon_valid(beacon) != 0U) ?
-                     RGB565_BLACK : RGB565_RED,
-                     RGB565_WHITE);
-    ips114_show_float(IMAGE_SCREEN_X_VALUE, y, beacon->x, 3U, 1U);
-    ips114_show_float(IMAGE_SCREEN_Y_VALUE, y, beacon->y, 3U, 1U);
-    ips114_show_float(IMAGE_SCREEN_A_VALUE, y, beacon->area, 4U, 1U);
-    ips114_set_color(RGB565_BLACK, RGB565_WHITE);
-    return 1U;
-}
-
-static uint8 ImageDebugScreen_DrawDataLayoutTop(void)
-{
-    if((ImageDebugScreen_RefreshAllowed() == 0U) ||
-       (ImageDebugScreen_TaskBacklog() != 0U))
-    {
-        return 0U;
-    }
-
     ips114_show_string(0U, 0U, "Beacon[0] XYA");
     ips114_show_string(0U, 16U, "F x:");
     ips114_show_string(IMAGE_SCREEN_Y_LABEL, 16U, " y:");
@@ -154,17 +110,10 @@ static uint8 ImageDebugScreen_DrawDataLayoutTop(void)
     ips114_show_string(0U, 48U, "B x:");
     ips114_show_string(IMAGE_SCREEN_Y_LABEL, 48U, " y:");
     ips114_show_string(IMAGE_SCREEN_A_LABEL, 48U, " a:");
-    return 1U;
 }
 
-static uint8 ImageDebugScreen_DrawDataLayoutBottom(void)
+static void ImageDebugScreen_RenderDataLayoutBottom(void)
 {
-    if((ImageDebugScreen_RefreshAllowed() == 0U) ||
-       (ImageDebugScreen_TaskBacklog() != 0U))
-    {
-        return 0U;
-    }
-
     ips114_show_string(0U, 64U, "Lamp[0] CXY");
     ips114_show_string(0U, 80U, "F x:");
     ips114_show_string(IMAGE_SCREEN_Y_LABEL, 80U, " y:");
@@ -172,15 +121,10 @@ static uint8 ImageDebugScreen_DrawDataLayoutBottom(void)
     ips114_show_string(IMAGE_SCREEN_Y_LABEL, 96U, " y:");
     ips114_show_string(0U, 112U, "B x:");
     ips114_show_string(IMAGE_SCREEN_Y_LABEL, 112U, " y:");
-    return 1U;
 }
 
 static uint8 ImageDebugScreen_PrepareLayout(void)
 {
-    uint16 end_row;
-    uint16 row;
-    uint16 rows;
-
     if((ImageDebugScreen_RefreshAllowed() == 0U) ||
        (ImageDebugScreen_TaskBacklog() != 0U))
     {
@@ -189,140 +133,203 @@ static uint8 ImageDebugScreen_PrepareLayout(void)
 
     ips114_set_font(IPS114_8X16_FONT);
     ips114_set_color(RGB565_BLACK, RGB565_WHITE);
-    if(s_layout_clear_row < IMAGE_SCREEN_PHYSICAL_HEIGHT)
+    ips114_clear();
+    if(s_screen_mode == IMAGE_DEBUG_SCREEN_MODE_DATA)
     {
-        end_row = s_layout_clear_row + IMAGE_SCREEN_CLEAR_SLICE_ROWS;
-        if(end_row > IMAGE_SCREEN_PHYSICAL_HEIGHT)
-        {
-            end_row = IMAGE_SCREEN_PHYSICAL_HEIGHT;
-        }
-
-        for(row = s_layout_clear_row; row < end_row; row += rows)
-        {
-            if((ImageDebugScreen_RefreshAllowed() == 0U) ||
-               (ImageDebugScreen_TaskBacklog() != 0U))
-            {
-                s_layout_clear_row = row;
-                return 0U;
-            }
-            rows = end_row - row;
-            if(rows > IMAGE_SCREEN_BLOCK_ROWS)
-            {
-                rows = IMAGE_SCREEN_BLOCK_ROWS;
-            }
-            ips114_show_gray_image(0U,
-                                   row,
-                                   &s_clear_block[0][0],
-                                   IMAGE_SCREEN_PHYSICAL_WIDTH,
-                                   rows,
-                                   IMAGE_SCREEN_PHYSICAL_WIDTH,
-                                   rows,
-                                   0U);
-        }
-        s_layout_clear_row = end_row;
-        if(s_layout_clear_row < IMAGE_SCREEN_PHYSICAL_HEIGHT)
-        {
-            return 0U;
-        }
+        ImageDebugScreen_RenderDataLayoutTop();
+        ImageDebugScreen_RenderDataLayoutBottom();
     }
-
-    if(s_screen_mode != IMAGE_DEBUG_SCREEN_MODE_DATA)
-    {
-        s_layout_dirty = 0U;
-        return 1U;
-    }
-
-    if(s_data_layout_stage == 0U)
-    {
-        if(ImageDebugScreen_DrawDataLayoutTop() == 0U)
-        {
-            return 0U;
-        }
-        s_data_layout_stage = 1U;
-        return 0U;
-    }
-    if(ImageDebugScreen_DrawDataLayoutBottom() == 0U)
-    {
-        return 0U;
-    }
-    s_data_layout_stage = 2U;
     s_layout_dirty = 0U;
     return 1U;
 }
 
-static uint8 ImageDebugScreen_UpdateData(void)
+static void ImageDebugScreen_DrawText8x16(uint16 *row_buffer,
+                                          uint16 x,
+                                          const char *text,
+                                          uint16 color)
 {
-    uint8 updated;
-
-    switch(s_data_update_stage)
+    while((*text != '\0') && (x + 7U < IMAGE_SCREEN_PHYSICAL_WIDTH))
     {
-        case 0U:
-            updated = ImageDebugScreen_ShowBeacon(
-                IMAGE_SCREEN_ROW_H, &image_data[Front].beacon_data[0]);
-            break;
-        case 1U:
-            updated = ImageDebugScreen_ShowBeacon(
-                2U * IMAGE_SCREEN_ROW_H, &image_data[Center].beacon_data[0]);
-            break;
-        case 2U:
-            updated = ImageDebugScreen_ShowBeacon(
-                3U * IMAGE_SCREEN_ROW_H, &image_data[Back].beacon_data[0]);
-            break;
-        case 3U:
-            updated = ImageDebugScreen_ShowLamp(
-                5U * IMAGE_SCREEN_ROW_H, &image_data[Front].car_lamp_data[0]);
-            break;
-        case 4U:
-            updated = ImageDebugScreen_ShowLamp(
-                6U * IMAGE_SCREEN_ROW_H, &image_data[Center].car_lamp_data[0]);
-            break;
-        case 5U:
-            updated = ImageDebugScreen_ShowLamp(
-                7U * IMAGE_SCREEN_ROW_H, &image_data[Back].car_lamp_data[0]);
-            break;
-        default:
-            s_data_update_stage = 0U;
-            return 0U;
-    }
+        uint8 character = (uint8)*text;
+        uint8 column;
 
-    if(updated == 0U)
-    {
-        return 0U;
-    }
+        if((character < 32U) || (character > 126U))
+        {
+            character = (uint8)'?';
+        }
+        for(column = 0U; column < 8U; column++)
+        {
+            uint8 top = ascii_font_8x16[character - 32U][column];
+            uint8 bottom = ascii_font_8x16[character - 32U][column + 8U];
+            uint8 row;
 
-    s_data_update_stage++;
-    if(s_data_update_stage < 6U)
-    {
-        return 0U;
+            for(row = 0U; row < 8U; row++)
+            {
+                if((top & (uint8)(1U << row)) != 0U)
+                {
+                    row_buffer[(uint16)row * IMAGE_SCREEN_PHYSICAL_WIDTH +
+                               x + column] = color;
+                }
+                if((bottom & (uint8)(1U << row)) != 0U)
+                {
+                    row_buffer[(uint16)(row + 8U) *
+                               IMAGE_SCREEN_PHYSICAL_WIDTH +
+                               x + column] = color;
+                }
+            }
+        }
+        x += 8U;
+        text++;
     }
-
-    s_data_update_stage = 0U;
-    return 1U;
 }
 
-static void ImageDebugScreen_SetSnapshotPixel(int x, int y, uint8 gray)
+static void ImageDebugScreen_FormatFixed1(char *text,
+                                          size_t text_size,
+                                          float value)
+{
+    int scaled = ImageDebugScreen_RoundToInt(value * 10.0f);
+    unsigned int magnitude;
+
+    if(scaled > 9999) scaled = 9999;
+    else if(scaled < -9999) scaled = -9999;
+    magnitude = (unsigned int)((scaled < 0) ? -scaled : scaled);
+    (void)snprintf(text,
+                   text_size,
+                   "%c%u.%u",
+                   (scaled < 0) ? '-' : '+',
+                   magnitude / 10U,
+                   magnitude % 10U);
+}
+
+static void ImageDebugScreen_PrepareDataRow(uint16 *row_buffer)
+{
+    uint32 pixel;
+
+    for(pixel = 0U;
+        pixel < IMAGE_SCREEN_PHYSICAL_WIDTH * IMAGE_SCREEN_DATA_ROW_HEIGHT;
+        pixel++)
+    {
+        row_buffer[pixel] = RGB565_WHITE;
+    }
+}
+
+static void ImageDebugScreen_ShowBeaconRow(uint16 y,
+                                           char camera,
+                                           const beacon_data *beacon)
+{
+    uint16 *row_buffer = &s_image_rgb565[0][0];
+    uint16 value_color = (image_data_beacon_valid(beacon) != 0U) ?
+                         RGB565_BLACK : RGB565_RED;
+    char label[5] = {camera, ' ', 'x', ':', '\0'};
+    char value[16];
+
+    ImageDebugScreen_PrepareDataRow(row_buffer);
+    ImageDebugScreen_DrawText8x16(row_buffer, 0U, label, RGB565_BLACK);
+    ImageDebugScreen_FormatFixed1(value, sizeof(value), beacon->x);
+    ImageDebugScreen_DrawText8x16(row_buffer,
+                                  IMAGE_SCREEN_X_VALUE,
+                                  value,
+                                  value_color);
+    ImageDebugScreen_DrawText8x16(row_buffer,
+                                  IMAGE_SCREEN_Y_LABEL,
+                                  " y:",
+                                  RGB565_BLACK);
+    ImageDebugScreen_FormatFixed1(value, sizeof(value), beacon->y);
+    ImageDebugScreen_DrawText8x16(row_buffer,
+                                  IMAGE_SCREEN_Y_VALUE,
+                                  value,
+                                  value_color);
+    ImageDebugScreen_DrawText8x16(row_buffer,
+                                  IMAGE_SCREEN_A_LABEL,
+                                  " a:",
+                                  RGB565_BLACK);
+    (void)snprintf(value,
+                   sizeof(value),
+                   "%d",
+                   ImageDebugScreen_RoundToInt(beacon->area));
+    ImageDebugScreen_DrawText8x16(row_buffer,
+                                  IMAGE_SCREEN_A_VALUE,
+                                  value,
+                                  value_color);
+    ImageDebugScreen_ShowRgb565Region(0U,
+                                      y,
+                                      IMAGE_SCREEN_PHYSICAL_WIDTH,
+                                      IMAGE_SCREEN_DATA_ROW_HEIGHT,
+                                      row_buffer);
+}
+
+static void ImageDebugScreen_ShowLampRow(uint16 y,
+                                         char camera,
+                                         const car_lamp_data *lamp)
+{
+    uint16 *row_buffer = &s_image_rgb565[0][0];
+    uint16 value_color = (image_data_car_lamp_valid(lamp) != 0U) ?
+                         RGB565_BLACK : RGB565_RED;
+    char label[5] = {camera, ' ', 'x', ':', '\0'};
+    char value[16];
+
+    ImageDebugScreen_PrepareDataRow(row_buffer);
+    ImageDebugScreen_DrawText8x16(row_buffer, 0U, label, RGB565_BLACK);
+    ImageDebugScreen_FormatFixed1(value, sizeof(value), lamp->cx);
+    ImageDebugScreen_DrawText8x16(row_buffer,
+                                  IMAGE_SCREEN_X_VALUE,
+                                  value,
+                                  value_color);
+    ImageDebugScreen_DrawText8x16(row_buffer,
+                                  IMAGE_SCREEN_Y_LABEL,
+                                  " y:",
+                                  RGB565_BLACK);
+    ImageDebugScreen_FormatFixed1(value, sizeof(value), lamp->cy);
+    ImageDebugScreen_DrawText8x16(row_buffer,
+                                  IMAGE_SCREEN_Y_VALUE,
+                                  value,
+                                  value_color);
+    ImageDebugScreen_ShowRgb565Region(0U,
+                                      y,
+                                      IMAGE_SCREEN_PHYSICAL_WIDTH,
+                                      IMAGE_SCREEN_DATA_ROW_HEIGHT,
+                                      row_buffer);
+}
+
+static void ImageDebugScreen_UpdateData(void)
+{
+    ImageDebugScreen_ShowBeaconRow(
+        IMAGE_SCREEN_ROW_H, 'F', &image_data[Front].beacon_data[0]);
+    ImageDebugScreen_ShowBeaconRow(
+        2U * IMAGE_SCREEN_ROW_H, 'C', &image_data[Center].beacon_data[0]);
+    ImageDebugScreen_ShowBeaconRow(
+        3U * IMAGE_SCREEN_ROW_H, 'B', &image_data[Back].beacon_data[0]);
+    ImageDebugScreen_ShowLampRow(
+        5U * IMAGE_SCREEN_ROW_H, 'F', &image_data[Front].car_lamp_data[0]);
+    ImageDebugScreen_ShowLampRow(
+        6U * IMAGE_SCREEN_ROW_H, 'C', &image_data[Center].car_lamp_data[0]);
+    ImageDebugScreen_ShowLampRow(
+        7U * IMAGE_SCREEN_ROW_H, 'B', &image_data[Back].car_lamp_data[0]);
+}
+
+static void ImageDebugScreen_SetSnapshotPixel(int x, int y, uint16 color)
 {
     if((x >= 0) && (x < (int)IMAGE_SCREEN_WIDTH) &&
        (y >= 0) && (y < (int)IMAGE_SCREEN_HEIGHT))
     {
-        s_image_snapshot[y][x] = gray;
+        s_image_rgb565[y][x] = color;
     }
 }
 
-static void ImageDebugScreen_DrawCross(int cx, int cy)
+static void ImageDebugScreen_DrawCross(int cx, int cy, uint16 color)
 {
     int offset;
     for(offset = -5; offset <= 5; offset++)
     {
-        ImageDebugScreen_SetSnapshotPixel(cx + offset, cy - 1, 255U);
-        ImageDebugScreen_SetSnapshotPixel(cx + offset, cy + 1, 255U);
-        ImageDebugScreen_SetSnapshotPixel(cx - 1, cy + offset, 255U);
-        ImageDebugScreen_SetSnapshotPixel(cx + 1, cy + offset, 255U);
+        ImageDebugScreen_SetSnapshotPixel(cx + offset, cy - 1, RGB565_WHITE);
+        ImageDebugScreen_SetSnapshotPixel(cx + offset, cy + 1, RGB565_WHITE);
+        ImageDebugScreen_SetSnapshotPixel(cx - 1, cy + offset, RGB565_WHITE);
+        ImageDebugScreen_SetSnapshotPixel(cx + 1, cy + offset, RGB565_WHITE);
     }
     for(offset = -5; offset <= 5; offset++)
     {
-        ImageDebugScreen_SetSnapshotPixel(cx + offset, cy, 0U);
-        ImageDebugScreen_SetSnapshotPixel(cx, cy + offset, 0U);
+        ImageDebugScreen_SetSnapshotPixel(cx + offset, cy, color);
+        ImageDebugScreen_SetSnapshotPixel(cx, cy + offset, color);
     }
 }
 
@@ -335,7 +342,7 @@ static void ImageDebugScreen_DrawSnapshotLine(int x0,
                                               int y0,
                                               int x1,
                                               int y1,
-                                              uint8 gray)
+                                              uint16 color)
 {
     int dx = (x1 >= x0) ? (x1 - x0) : (x0 - x1);
     int sx = (x0 < x1) ? 1 : -1;
@@ -346,7 +353,7 @@ static void ImageDebugScreen_DrawSnapshotLine(int x0,
     for(;;)
     {
         int error2;
-        ImageDebugScreen_SetSnapshotPixel(x0, y0, gray);
+        ImageDebugScreen_SetSnapshotPixel(x0, y0, color);
         if((x0 == x1) && (y0 == y1))
         {
             break;
@@ -370,7 +377,7 @@ static void ImageDebugScreen_DrawRotatedRect(int cx,
                                              float half_length,
                                              float half_width,
                                              float angle_deg,
-                                             uint8 gray)
+                                             uint16 color)
 {
     float angle = angle_deg * (IMAGE_SCREEN_PI_F / 180.0f);
     float major_x = cosf(angle) * half_length;
@@ -394,13 +401,143 @@ static void ImageDebugScreen_DrawRotatedRect(int cx,
     {
         uint8 next = (uint8)((corner + 1U) % 4U);
         ImageDebugScreen_DrawSnapshotLine(x[corner], y[corner],
-                                          x[next], y[next], gray);
+                                          x[next], y[next], color);
     }
+}
+
+static uint8 ImageDebugScreen_LineOutCode(float x, float y)
+{
+    uint8 code = 0U;
+
+    if(x < 0.0f) code |= IMAGE_SCREEN_CLIP_LEFT;
+    else if(x > (float)(IMAGE_SCREEN_WIDTH - 1U)) code |= IMAGE_SCREEN_CLIP_RIGHT;
+    if(y < 0.0f) code |= IMAGE_SCREEN_CLIP_TOP;
+    else if(y > (float)(IMAGE_SCREEN_HEIGHT - 1U)) code |= IMAGE_SCREEN_CLIP_BOTTOM;
+    return code;
+}
+
+static uint8 ImageDebugScreen_ClipLine(float *x0,
+                                       float *y0,
+                                       float *x1,
+                                       float *y1)
+{
+    uint8 code0 = ImageDebugScreen_LineOutCode(*x0, *y0);
+    uint8 code1 = ImageDebugScreen_LineOutCode(*x1, *y1);
+
+    for(;;)
+    {
+        uint8 outside;
+        float x;
+        float y;
+
+        if((code0 | code1) == 0U)
+        {
+            return 1U;
+        }
+        if((code0 & code1) != 0U)
+        {
+            return 0U;
+        }
+
+        outside = (code0 != 0U) ? code0 : code1;
+        if((outside & IMAGE_SCREEN_CLIP_BOTTOM) != 0U)
+        {
+            y = (float)(IMAGE_SCREEN_HEIGHT - 1U);
+            x = *x0 + (*x1 - *x0) * (y - *y0) / (*y1 - *y0);
+        }
+        else if((outside & IMAGE_SCREEN_CLIP_TOP) != 0U)
+        {
+            y = 0.0f;
+            x = *x0 + (*x1 - *x0) * (y - *y0) / (*y1 - *y0);
+        }
+        else if((outside & IMAGE_SCREEN_CLIP_RIGHT) != 0U)
+        {
+            x = (float)(IMAGE_SCREEN_WIDTH - 1U);
+            y = *y0 + (*y1 - *y0) * (x - *x0) / (*x1 - *x0);
+        }
+        else
+        {
+            x = 0.0f;
+            y = *y0 + (*y1 - *y0) * (x - *x0) / (*x1 - *x0);
+        }
+
+        if(outside == code0)
+        {
+            *x0 = x;
+            *y0 = y;
+            code0 = ImageDebugScreen_LineOutCode(*x0, *y0);
+        }
+        else
+        {
+            *x1 = x;
+            *y1 = y;
+            code1 = ImageDebugScreen_LineOutCode(*x1, *y1);
+        }
+    }
+}
+
+static void ImageDebugScreen_DrawHorizonBranch(const float *y_values,
+                                                uint16 color)
+{
+    float previous_x = 0.0f;
+    float previous_y = 0.0f;
+    uint8 previous_valid = 0U;
+    uint16 x;
+
+    for(x = 0U; x < IMAGE_DOWN_HORIZON_WIDTH; x++)
+    {
+        float current_x;
+        float current_y;
+
+        if(g_image_down_horizon_column_valid[x] == 0U)
+        {
+            previous_valid = 0U;
+            continue;
+        }
+        current_x = (float)x;
+        current_y = y_values[x];
+        if(previous_valid != 0U)
+        {
+            float x0 = previous_x;
+            float y0 = previous_y;
+            float x1 = current_x;
+            float y1 = current_y;
+
+            if(ImageDebugScreen_ClipLine(&x0, &y0, &x1, &y1) != 0U)
+            {
+                ImageDebugScreen_DrawSnapshotLine(
+                    ImageDebugScreen_RoundToInt(x0),
+                    ImageDebugScreen_RoundToInt(y0),
+                    ImageDebugScreen_RoundToInt(x1),
+                    ImageDebugScreen_RoundToInt(y1),
+                    color);
+            }
+        }
+        previous_x = current_x;
+        previous_y = current_y;
+        previous_valid = 1U;
+    }
+}
+
+static void ImageDebugScreen_DrawHorizon(void)
+{
+    uint16 color;
+
+    if(g_image_down_horizon_valid == 0U)
+    {
+        return;
+    }
+    color = (g_image_down_horizon_extrapolated != 0U) ?
+            IMAGE_SCREEN_HORIZON_EXT_COLOR : IMAGE_SCREEN_HORIZON_COLOR;
+    ImageDebugScreen_DrawHorizonBranch(g_image_down_horizon_top_y, color);
+    ImageDebugScreen_DrawHorizonBranch(g_image_down_horizon_bottom_y, color);
 }
 
 static void ImageDebugScreen_ApplyOverlay(void)
 {
     uint8 index;
+
+    ImageDebugScreen_DrawHorizon();
 
     for(index = 0U; index < IMAGE_MAX_BEACON_COUNT; index++)
     {
@@ -409,7 +546,7 @@ static void ImageDebugScreen_ApplyOverlay(void)
         {
             int cx = (int)(beacon->x + (float)IMAGE_SCREEN_WIDTH * 0.5f + 0.5f);
             int cy = (int)(beacon->y + (float)IMAGE_SCREEN_HEIGHT * 0.5f + 0.5f);
-            ImageDebugScreen_DrawCross(cx, cy);
+            ImageDebugScreen_DrawCross(cx, cy, IMAGE_SCREEN_BEACON_COLOR);
         }
     }
 
@@ -429,11 +566,12 @@ static void ImageDebugScreen_ApplyOverlay(void)
             ImageDebugScreen_DrawRotatedRect(cx, cy,
                                              half_length + 1.0f,
                                              half_width + 1.0f,
-                                             lamp->angle, 255U);
+                                             lamp->angle, RGB565_WHITE);
             ImageDebugScreen_DrawRotatedRect(cx, cy,
                                              half_length,
                                              half_width,
-                                             lamp->angle, 0U);
+                                             lamp->angle,
+                                             IMAGE_SCREEN_LAMP_COLOR);
         }
     }
 }
@@ -552,51 +690,87 @@ static void ImageDebugScreen_CaptureAuxSnapshot(void)
         ImageDebugScreen_SetAuxLine(12U, "LW:--");
         ImageDebugScreen_SetAuxLine(13U, "LL:--");
     }
-    s_aux_frame_active = 1U;
-    s_aux_next_line = 0U;
 }
 
-static uint8 ImageDebugScreen_UpdateAuxPanel(void)
+static void ImageDebugScreen_DrawAuxPanel(void)
 {
-    uint8 end_line;
     uint8 line;
-
-    if((ImageDebugScreen_RefreshAllowed() == 0U) ||
-       (ImageDebugScreen_TaskBacklog() != 0U))
-    {
-        return 0U;
-    }
 
     ips114_set_font(IPS114_6X8_FONT);
     ips114_set_color(RGB565_BLACK, RGB565_WHITE);
-    if(s_aux_next_line == 0U)
-    {
-        ips114_draw_line(IMAGE_SCREEN_WIDTH, 0U,
-                         IMAGE_SCREEN_WIDTH, IMAGE_SCREEN_HEIGHT - 1U,
-                         RGB565_BLACK);
-    }
-    end_line = (uint8)(s_aux_next_line + IMAGE_SCREEN_AUX_LINES_PER_TICK);
-    if(end_line > IMAGE_SCREEN_AUX_LINE_COUNT)
-    {
-        end_line = IMAGE_SCREEN_AUX_LINE_COUNT;
-    }
-    for(line = s_aux_next_line; line < end_line; line++)
+    ips114_draw_line(IMAGE_SCREEN_WIDTH, 0U,
+                     IMAGE_SCREEN_WIDTH, IMAGE_SCREEN_HEIGHT - 1U,
+                     RGB565_BLACK);
+    for(line = 0U; line < IMAGE_SCREEN_AUX_LINE_COUNT; line++)
     {
         ips114_show_string(IMAGE_SCREEN_AUX_X,
                            (uint16)line * IMAGE_SCREEN_AUX_LINE_HEIGHT,
                            s_aux_lines[line]);
     }
-    s_aux_next_line = end_line;
-    if(s_aux_next_line >= IMAGE_SCREEN_AUX_LINE_COUNT)
-    {
-        ImageDebugScreen_AbortAuxFrame();
-    }
-    return 1U;
+}
+
+static uint16 ImageDebugScreen_GrayToRgb565(uint8 gray)
+{
+    return (uint16)((((uint16)gray & 0x00F8U) << 8) |
+                    (((uint16)gray & 0x00FCU) << 3) |
+                    (((uint16)gray & 0x00F8U) >> 3));
+}
+
+static void ImageDebugScreen_ConfigureSpi(void)
+{
+    spi_init(IPS114_SPI,
+             SPI_MODE0,
+             IMAGE_SCREEN_SPI_SPEED,
+             IPS114_SCL_PIN,
+             IPS114_SDA_PIN,
+             IPS114_SDA_IN_PIN,
+             SPI_CS_NULL);
+}
+
+static void ImageDebugScreen_WriteCommand(uint8 command)
+{
+    IPS114_DC(0);
+    spi_write_8bit(IPS114_SPI, command);
+    IPS114_DC(1);
+}
+
+static void ImageDebugScreen_ShowRgb565Region(uint16 x,
+                                              uint16 y,
+                                              uint16 width,
+                                              uint16 height,
+                                              const uint16 *pixels)
+{
+    IPS114_CS(0);
+    ImageDebugScreen_WriteCommand(0x2AU);
+    spi_write_16bit(IPS114_SPI, IMAGE_SCREEN_LCD_X_OFFSET + x);
+    spi_write_16bit(IPS114_SPI,
+                    IMAGE_SCREEN_LCD_X_OFFSET + x + width - 1U);
+    ImageDebugScreen_WriteCommand(0x2BU);
+    spi_write_16bit(IPS114_SPI, IMAGE_SCREEN_LCD_Y_OFFSET + y);
+    spi_write_16bit(IPS114_SPI,
+                    IMAGE_SCREEN_LCD_Y_OFFSET + y + height - 1U);
+    ImageDebugScreen_WriteCommand(0x2CU);
+    spi_write_16bit_array(IPS114_SPI,
+                          pixels,
+                          (uint32)width * (uint32)height);
+    IPS114_CS(1);
+}
+
+static void ImageDebugScreen_ShowRgb565Frame(const uint16 *pixels)
+{
+    ImageDebugScreen_ShowRgb565Region(0U,
+                                      0U,
+                                      IMAGE_SCREEN_WIDTH,
+                                      IMAGE_SCREEN_HEIGHT,
+                                      pixels);
 }
 
 static uint8 ImageDebugScreen_StartImageFrame(void)
 {
     const uint8 *source;
+    uint16 *target = &s_image_rgb565[0][0];
+    uint32 pixel;
+    uint8 binary_mode;
 
     switch(s_screen_mode)
     {
@@ -617,56 +791,39 @@ static uint8 ImageDebugScreen_StartImageFrame(void)
         return 0U;
     }
 
-    memcpy(s_image_snapshot[0], source, sizeof(s_image_snapshot));
+    binary_mode = ((s_screen_mode == IMAGE_DEBUG_SCREEN_MODE_BEACON_BINARY) ||
+                   (s_screen_mode == IMAGE_DEBUG_SCREEN_MODE_LAMP_BINARY)) ?
+                  1U : 0U;
+    for(pixel = 0U; pixel < IMAGE_SCREEN_WIDTH * IMAGE_SCREEN_HEIGHT; pixel++)
+    {
+        uint8 gray = source[pixel];
+        target[pixel] = (binary_mode != 0U) ?
+                        ((gray != 0U) ? RGB565_WHITE : RGB565_BLACK) :
+                        ImageDebugScreen_GrayToRgb565(gray);
+    }
     if(s_screen_mode == IMAGE_DEBUG_SCREEN_MODE_OVERLAY)
     {
         ImageDebugScreen_ApplyOverlay();
     }
-    ImageDebugScreen_CaptureAuxSnapshot();
-    s_image_frame_active = 1U;
-    s_image_next_row = 0U;
+    if(s_aux_refresh_counter == 0U)
+    {
+        ImageDebugScreen_CaptureAuxSnapshot();
+    }
     return 1U;
 }
 
-static uint8 ImageDebugScreen_DrawImageHalf(void)
+static void ImageDebugScreen_DrawImageFrame(void)
 {
-    uint8 end_row;
-    uint8 row;
-    uint8 rows;
-    uint8 threshold;
-
-    end_row = (s_image_next_row == 0U) ?
-              IMAGE_SCREEN_FIRST_HALF_ROWS : IMAGE_SCREEN_HEIGHT;
-    threshold = ((s_screen_mode == IMAGE_DEBUG_SCREEN_MODE_BEACON_BINARY) ||
-                 (s_screen_mode == IMAGE_DEBUG_SCREEN_MODE_LAMP_BINARY)) ? 1U : 0U;
-    for(row = s_image_next_row; row < end_row; row = (uint8)(row + rows))
+    ImageDebugScreen_ShowRgb565Frame(&s_image_rgb565[0][0]);
+    if(s_aux_refresh_counter == 0U)
     {
-        if(ImageDebugScreen_RefreshAllowed() == 0U)
-        {
-            return 0U;
-        }
-
-        rows = (uint8)(end_row - row);
-        if(rows > IMAGE_SCREEN_BLOCK_ROWS)
-        {
-            rows = IMAGE_SCREEN_BLOCK_ROWS;
-        }
-        ips114_show_gray_image(0U,
-                               row,
-                               &s_image_snapshot[row][0],
-                               IMAGE_SCREEN_WIDTH,
-                               rows,
-                               IMAGE_SCREEN_WIDTH,
-                               rows,
-                               threshold);
+        ImageDebugScreen_DrawAuxPanel();
+        s_aux_refresh_counter = IMAGE_SCREEN_AUX_REFRESH_FRAMES - 1U;
     }
-
-    s_image_next_row = end_row;
-    if(s_image_next_row >= IMAGE_SCREEN_HEIGHT)
+    else
     {
-        ImageDebugScreen_AbortImageFrame();
+        s_aux_refresh_counter--;
     }
-    return ImageDebugScreen_RefreshAllowed();
 }
 
 void ImageDebugScreen_Init(void)
@@ -676,11 +833,22 @@ void ImageDebugScreen_Init(void)
     s_screen_mode = IMAGE_DEBUG_SCREEN_MODE_DATA;
     s_hw_initialized = 0U;
     s_refresh_was_enabled = 0U;
+    s_startup_layout_ready = 0U;
+    s_layout_dirty = 0U;
     s_image_frame_pending = 0U;
-    s_aux_frame_active = 0U;
-    s_aux_next_line = 0U;
-    memset(s_clear_block, 0xFF, sizeof(s_clear_block));
-    ImageDebugScreen_MarkLayoutDirty();
+    s_aux_refresh_counter = 0U;
+
+    ips114_set_dir(IPS114_PORTAIT);
+    ips114_init();
+    ImageDebugScreen_ConfigureSpi();
+    s_hw_initialized = 1U;
+    ips114_set_font(IPS114_8X16_FONT);
+    ips114_set_color(RGB565_BLACK, RGB565_WHITE);
+    ImageDebugScreen_RenderDataLayoutTop();
+    ImageDebugScreen_RenderDataLayoutBottom();
+
+    s_layout_dirty = 0U;
+    s_startup_layout_ready = 1U;
 }
 
 void ImageDebugScreen_Tick10ms(void)
@@ -716,8 +884,6 @@ void ImageDebugScreen_Update(uint8 image_frame_updated)
     {
         s_refresh_was_enabled = 0U;
         s_image_frame_pending = 0U;
-        ImageDebugScreen_AbortImageFrame();
-        ImageDebugScreen_AbortAuxFrame();
         return;
     }
 
@@ -725,6 +891,7 @@ void ImageDebugScreen_Update(uint8 image_frame_updated)
     {
         ips114_set_dir(IPS114_PORTAIT);
         ips114_init();
+        ImageDebugScreen_ConfigureSpi();
         s_hw_initialized = 1U;
         ImageDebugScreen_MarkLayoutDirty();
     }
@@ -732,7 +899,16 @@ void ImageDebugScreen_Update(uint8 image_frame_updated)
     if(s_refresh_was_enabled == 0U)
     {
         s_refresh_was_enabled = 1U;
-        ImageDebugScreen_MarkLayoutDirty();
+        if((s_startup_layout_ready != 0U) &&
+           (s_screen_mode == IMAGE_DEBUG_SCREEN_MODE_DATA) &&
+           (s_layout_dirty == 0U))
+        {
+            s_startup_layout_ready = 0U;
+        }
+        else
+        {
+            ImageDebugScreen_MarkLayoutDirty();
+        }
         s_next_refresh_tick = now;
     }
 
@@ -768,50 +944,22 @@ void ImageDebugScreen_Update(uint8 image_frame_updated)
         {
             return;
         }
-        if(ImageDebugScreen_UpdateData() == 0U)
-        {
-            if(ImageDebugScreen_RefreshAllowed() == 0U)
-            {
-                s_refresh_was_enabled = 0U;
-            }
-            s_next_refresh_tick = ImageDebugScreen_Now() + 1U;
-            return;
-        }
+        ImageDebugScreen_UpdateData();
         s_next_refresh_tick =
             ImageDebugScreen_Now() + IMAGE_SCREEN_DATA_PERIOD_TICKS;
         return;
     }
 
-    if((s_image_frame_active == 0U) && (s_aux_frame_active != 0U))
+    if((s_image_frame_pending == 0U) ||
+       (ImageDebugScreen_TaskBacklog() != 0U))
     {
-        if((ImageDebugScreen_TickDue(now, s_next_refresh_tick) == 0U) ||
-           (ImageDebugScreen_UpdateAuxPanel() == 0U))
-        {
-            return;
-        }
-        s_next_refresh_tick = ImageDebugScreen_Now() + 1U;
         return;
     }
-
-    if(s_image_frame_active == 0U)
+    if(ImageDebugScreen_StartImageFrame() == 0U)
     {
-        if((s_image_frame_pending == 0U) ||
-           (ImageDebugScreen_TaskBacklog() != 0U))
-        {
-            return;
-        }
-        if(ImageDebugScreen_StartImageFrame() == 0U)
-        {
-            return;
-        }
-        s_image_frame_pending = 0U;
+        return;
     }
-    if(ImageDebugScreen_DrawImageHalf() == 0U)
-    {
-        s_refresh_was_enabled = 0U;
-        s_image_frame_pending = 0U;
-        ImageDebugScreen_AbortImageFrame();
-        ImageDebugScreen_AbortAuxFrame();
-    }
+    s_image_frame_pending = 0U;
+    ImageDebugScreen_DrawImageFrame();
 
 }

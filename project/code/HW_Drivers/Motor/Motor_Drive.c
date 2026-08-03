@@ -98,12 +98,12 @@ static inline int32 abs_i(int32 value)
 /**
  * @brief   油门值转换为PWM duty值
  * @param   throttle 油门量（0~10000）
- * @return  PWM duty值（4000~8000）
+ * @return  PWM duty值（2000~4000）
  *
  * @note    映射关系：
- *          - 输入0     → duty=4000 (1000us脉宽)
- *          - 输入5000  → duty=6000 (1500us脉宽)
- *          - 输入10000 → duty=8000 (2000us脉宽)
+ *          - 输入0     → duty=2000 (1000us脉宽)
+ *          - 输入5000  → duty=3000 (1500us脉宽)
+ *          - 输入10000 → duty=4000 (2000us脉宽)
  */
 static inline uint32 throttle_to_driver_value(int32 throttle)
 {
@@ -200,7 +200,7 @@ void Motor_Init(void)
         g_motor_state.output[i] = 0;
     }
 
-    /* 初始化4路PWM，频率400Hz，初始duty为最小油门 */
+    /* 初始化4路PWM，频率200Hz，初始duty为最小油门 */
 #if (MOTOR_DRIVER_BACKEND == MOTOR_DRIVER_BACKEND_PWM)
     for (uint8 i = 0; i < MOTOR_NUM; i++)
     {

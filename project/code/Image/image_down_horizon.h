@@ -28,6 +28,7 @@ void image_down_horizon_update(float roll_deg,
                                uint8 height_valid);
 uint8 image_down_horizon_get_point(uint16 index, float *x, float *y);
 uint8 image_down_horizon_get_column(uint16 x, float *top_y, float *bottom_y);
+uint8 image_down_horizon_contains(float x, float y, float margin);
 
 #ifdef __cplusplus
 }

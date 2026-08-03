@@ -5,6 +5,7 @@
 
 #include "zf_device_mt9v03x.h"
 #include "Display/image_debug_screen.h"
+#include "Image/image_down_horizon.h"
 
 #define BEACON_IMAGE_W 188
 #define BEACON_IMAGE_H 120
@@ -26,28 +27,7 @@ typedef struct
 #error "Beacon image algorithm is tuned for MT9V03X 188x120 frames."
 #endif
 
-#define LAMP_MASK_PAD                   2
-#define BEACON_SIDE_EDGE_MARGIN         25
-#define BEACON_TOP_BOTTOM_EDGE_REJECT_MARGIN 8
-#define CLOSE_LAMP_SPLIT_THRESHOLD      250
-#define CLOSE_LAMP_MIN_AREA             120
-#define CLOSE_LAMP_MAX_AREA             260
-#define CLOSE_LAMP_MIN_BBOX_W           14
-#define CLOSE_LAMP_MAX_BBOX_W           28
-#define CLOSE_LAMP_MIN_BBOX_H           12
-#define CLOSE_LAMP_MAX_BBOX_H           28
-#define CLOSE_LAMP_MIN_MEAN             235
-#define CLOSE_LAMP_MAX_ELONGATION       1.35f
-#define CLOSE_LAMP_CORE_MIN_AREA        45
-#define CLOSE_LAMP_CORE_MIN_BBOX_W      14
-#define CLOSE_LAMP_CORE_MAX_BBOX_H      10
-#define CLOSE_BEACON_CORE_MIN_AREA      20
-#define CLOSE_BEACON_CORE_MAX_BBOX_W    12
-#define CLOSE_BEACON_CORE_MAX_BBOX_H    12
-#define CLOSE_CORE_MAX_DISTANCE_SQ      400.0f
-#define CLOSE_MERGED_CORE_MIN_AREA      115
-#define CLOSE_MERGED_CORE_MAX_AREA      150
-#define CLOSE_MERGED_CORE_MIN_BBOX_W    16
+#define LAMP_MASK_PAD                   7
 
 /* Core1图像算法运行时参数。 */
 int32 g_image_down_beacon_binary_threshold = 120;
@@ -71,38 +51,52 @@ int32 g_image_down_max_misses = 3;
 float g_image_down_filter_pos_alpha = 0.65f;
 float g_image_down_filter_vel_alpha = 0.30f;
 static uint8 s_mt9v03x_initialized;
-#define CLOSE_MERGED_CORE_MIN_BBOX_H    14
-#define CAR_LAMP_TRACK_START_AREA       30
-#define CAR_LAMP_TRACK_START_ELONGATION 1.6f
-#define CAR_LAMP_TRACK_START_SCORE      80.0f
-#define CAR_LAMP_LARGE_AREA             90
-#define CAR_LAMP_LARGE_ELONGATION       1.2f
-#define CAR_LAMP_STRONG_AREA            45
-#define CAR_LAMP_SMALL_MIN_SPAN         12
-#define CAR_LAMP_SMALL_BACKGROUND_MAX   60
-#define CAR_LAMP_EDGE_BACKGROUND_MAX    80
-#define CAR_LAMP_SIDE_SUN_BACKGROUND_MAX 70
-#define CAR_LAMP_SIDE_SUN_MARGIN        16
-#define CAR_LAMP_SIDE_SUN_Y             36
-#define CAR_LAMP_EDGE_MARGIN            2
-#define CAR_LAMP_LOCAL_RING_PAD         3
-#define B0_SWITCH_AREA_RATIO            1.45f
 #define CAR_LAMP_EDGE_MAX_MISSES        3
 #define CAR_LAMP_CENTER_MAX_MISSES      24
 #define CAR_LAMP_TEMPORAL_EDGE_MARGIN   8
 #define CAR_LAMP_TEMPORAL_MASK_PAD      5
-#define CAR_LAMP_TEMPORAL_CORE_PAD      2
-#define CAR_LAMP_TEMPORAL_TAKEOVER_PAD  10
-#define CAR_LAMP_TEMPORAL_MIN_BRIGHT_AREA 3
 
 #define IMAGE_QUEUE_SIZE                (BEACON_IMAGE_W * BEACON_IMAGE_H)
 #define PI_F                            3.1415926f
-#define BEACON_AREA_GATE_X_MIN          (-110.0f) /* 信标面积查表的最小中心横坐标 */
-#define BEACON_AREA_GATE_Y_MIN          (-75.0f)  /* 信标面积查表的最小中心纵坐标 */
-#define BEACON_AREA_GATE_X_STEP         (25.0f)   /* 信标面积查表的横向网格宽度，单位像素 */
-#define BEACON_AREA_GATE_Y_STEP         (20.0f)   /* 信标面积查表的纵向网格高度，单位像素 */
-#define BEACON_AREA_GATE_X_COUNT        (9U)      /* 信标面积查表的横向网格数量 */
-#define BEACON_AREA_GATE_Y_COUNT        (7U)      /* 信标面积查表的纵向网格数量 */
+#define DOWN_BEACON_COAST_FRAMES        2U
+#define DOWN_GRAY_MAX_PEAKS             20U
+#define DOWN_GRAY_MAX_CANDIDATES        12U
+#define DOWN_OBJECT_BOUNDARY_MARGIN     3.0f
+#define DOWN_BEACON_BOUNDARY_CLEARANCE  9.0f
+#define DOWN_GRAY_DEDUP_DISTANCE_SQ     25.0f
+#define DOWN_GRAY_PATCH_RADIUS          6
+#define DOWN_GRAY_BACKGROUND_INNER_SQ  49
+#define DOWN_GRAY_BACKGROUND_OUTER_SQ  100
+#define DOWN_BEACON_LEFT_EDGE_MARGIN    24
+#define DOWN_BEACON_RIGHT_EDGE_MARGIN   16
+#define DOWN_GRAY_EDGE_MIN_PEAK         200U
+#define DOWN_GRAY_EDGE_MAX_OCCUPANCY    0.25f
+#define DOWN_EDGE_SUPPORT_RADIUS        12
+#define DOWN_EDGE_SUPPORT_MAX_AREA      48
+#define DOWN_LOCAL_SHAPE_SIZE           (DOWN_EDGE_SUPPORT_RADIUS * 2 + 1)
+#define DOWN_LOCAL_SHAPE_CAPACITY       (DOWN_LOCAL_SHAPE_SIZE * DOWN_LOCAL_SHAPE_SIZE)
+#define DOWN_CAR_MAX_MASKS              12U
+#define DOWN_CAR_MAX_COMPONENTS         32U
+#define DOWN_CAR_ENVELOPE_MIN_PAD       4
+#define DOWN_CAR_ENVELOPE_PAD_SCALE     0.75f
+#define DOWN_CAR_STRONG_SCORE           0.53f
+#define DOWN_CAR_WEAK_SCORE             0.50f
+#define DOWN_CAR_TRACK_SCORE            0.47f
+#define DOWN_CAR_TRACK_SCORE_MARGIN     0.02f
+#define DOWN_CAR_SCORE_ELONGATION_BASE  1.35f
+#define DOWN_CAR_SCORE_ELONGATION_RANGE 2.00f
+#define DOWN_CAR_SCORE_VARIANCE_RANGE   700.0f
+#define DOWN_CAR_SCORE_MEAN_BASE        205.0f
+#define DOWN_CAR_SCORE_MEAN_RANGE       35.0f
+#define DOWN_CAR_SCORE_CONTRAST_BASE    18.0f
+#define DOWN_CAR_SCORE_CONTRAST_RANGE   80.0f
+#define DOWN_CAR_SCORE_AREA_BASE        10.0f
+#define DOWN_CAR_SCORE_AREA_RANGE       70.0f
+
+#define DOWN_CAR_CLASS_NONE             0U
+#define DOWN_CAR_CLASS_TRACK            1U
+#define DOWN_CAR_CLASS_WEAK             2U
+#define DOWN_CAR_CLASS_STRONG           3U
 
 typedef struct
 {
@@ -117,6 +111,9 @@ typedef struct
     float minor;
     float elongation;
     float angle;
+    unsigned long gray_sum;
+    unsigned long gray_sum_sq;
+    unsigned char peak;
     unsigned char valid;
 } component_t;
 
@@ -136,6 +133,65 @@ typedef struct
     float angle;
 } temporal_track_t;
 
+typedef struct
+{
+    signed short response;
+    unsigned char x;
+    unsigned char y;
+} down_gray_peak_t;
+
+typedef struct
+{
+    float x;
+    float y;
+    float area;
+    float score;
+} down_gray_candidate_t;
+
+typedef struct
+{
+    float background;
+    float inner_contrast;
+    float radial_drop;
+    float concentration;
+    float elongation;
+    float offset;
+    float outer_occupancy;
+    float centroid_x;
+    float centroid_y;
+    unsigned char peak;
+    unsigned char half_area;
+} down_gray_features_t;
+
+typedef struct
+{
+    int area;
+    float major;
+    float minor;
+    float elongation;
+    unsigned char touches_artificial_boundary;
+    unsigned char valid;
+} down_local_shape_t;
+
+typedef struct
+{
+    float mean;
+    float variance;
+    float contrast;
+    float score;
+    component_t envelope;
+    unsigned char peak;
+    unsigned char classification;
+} down_car_features_t;
+
+typedef struct
+{
+    component_t component;
+    component_t mask;
+    float score;
+    unsigned char classification;
+} down_car_candidate_t;
+
 uint8 g_image_frame[MT9V03X_H][MT9V03X_W];
 
 static unsigned char g_binary[BEACON_IMAGE_H][BEACON_IMAGE_W];
@@ -146,35 +202,41 @@ static unsigned char g_current_stamp = 0;
 static unsigned char g_queue_x[IMAGE_QUEUE_SIZE];
 static unsigned char g_queue_y[IMAGE_QUEUE_SIZE];
 static const unsigned char (*g_current_image)[BEACON_IMAGE_W] = 0;
-static unsigned char g_has_lamp_track = 0;
 static temporal_track_t g_b0_track;
 static temporal_track_t g_car_track;
-
-/* 下摄跨飞行保守面积上限，0表示该坐标格样本不足并保持原排序。 */
-static const uint8 g_center_beacon_area_upper[BEACON_AREA_GATE_Y_COUNT][BEACON_AREA_GATE_X_COUNT] =
-{
-    {  0U,  31U,  39U,  62U,  61U,  44U,  21U,   0U,   0U},
-    { 17U,  49U,  63U, 107U, 103U,  86U,  42U,  18U,   0U},
-    { 17U,  55U,  79U, 145U, 137U, 121U,  56U,  18U,   0U},
-    { 20U,  49U,  90U, 145U, 156U, 125U,  58U,  24U,   0U},
-    { 22U,  48U,  77U, 132U, 134U, 101U,  39U,  20U,   0U},
-    {  0U,  20U,  57U,  90U,  99U,  89U,  28U,  18U,   0U},
-    {  0U,  20U,  34U,  56U,  57U,  39U,  21U,   0U,   0U}
-};
-
-/* 下摄信标面积下限，0表示该坐标网格不启用下限过滤。 */
-static const uint8 g_center_beacon_area_lower[BEACON_AREA_GATE_Y_COUNT][BEACON_AREA_GATE_X_COUNT] =
-{
-    { 0U,  8U,  8U, 10U,  9U,  8U,  8U, 0U, 0U},
-    { 8U,  9U, 24U, 32U, 35U, 22U,  8U, 8U, 0U},
-    { 8U, 10U, 31U, 52U, 51U, 41U, 11U, 8U, 0U},
-    { 8U, 10U, 36U, 46U, 67U, 46U, 11U, 8U, 0U},
-    { 8U,  8U, 16U, 43U, 52U, 33U,  9U, 8U, 0U},
-    { 0U,  8U, 19U, 32U, 32U, 20U,  8U, 8U, 0U},
-    { 0U,  8U,  8U, 11U, 12U,  8U,  8U, 0U, 0U}
-};
+static component_t g_current_lamp_masks[DOWN_CAR_MAX_MASKS];
+static component_t g_weak_car_pending;
+static unsigned char g_current_lamp_mask_count;
+static unsigned char g_weak_car_pending_hits;
+static unsigned char g_weak_car_pending_misses;
+static unsigned short g_gray_box3_rows[3][BEACON_IMAGE_W];
+static unsigned short g_gray_box9_rows[9][BEACON_IMAGE_W];
+static unsigned short g_gray_box3_sum[BEACON_IMAGE_W];
+static unsigned short g_gray_box9_sum[BEACON_IMAGE_W];
+static signed short g_gray_response_rows[3][BEACON_IMAGE_W];
 
 static void beacon_image_reset_temporal(void);
+static float down_gray_ring_median(
+    const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
+    int center_x,
+    int center_y);
+static unsigned char down_local_shape_measure(
+    const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
+    int center_x,
+    int center_y,
+    int radius,
+    int threshold,
+    int maximum_area,
+    unsigned char reject_artificial_boundary,
+    down_local_shape_t *shape);
+static unsigned char down_gray_edge_support_valid(
+    const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
+    int center_x,
+    int center_y,
+    float background,
+    unsigned char peak,
+    int left_margin,
+    int right_margin);
 
 static void beacon_image_init(void)
 {
@@ -182,8 +244,12 @@ static void beacon_image_init(void)
     memset(g_beacon_binary_snapshot, 0, sizeof(g_beacon_binary_snapshot));
     memset(g_car_lamp_binary_snapshot, 0, sizeof(g_car_lamp_binary_snapshot));
     memset(g_visit_stamp, 0, sizeof(g_visit_stamp));
+    memset(g_current_lamp_masks, 0, sizeof(g_current_lamp_masks));
+    memset(&g_weak_car_pending, 0, sizeof(g_weak_car_pending));
     g_current_image = 0;
-    g_has_lamp_track = 0;
+    g_current_lamp_mask_count = 0U;
+    g_weak_car_pending_hits = 0U;
+    g_weak_car_pending_misses = 0U;
     g_current_stamp = 0;
     beacon_image_reset_temporal();
 }
@@ -192,6 +258,9 @@ static void beacon_image_reset_temporal(void)
 {
     memset(&g_b0_track, 0, sizeof(g_b0_track));
     memset(&g_car_track, 0, sizeof(g_car_track));
+    memset(&g_weak_car_pending, 0, sizeof(g_weak_car_pending));
+    g_weak_car_pending_hits = 0U;
+    g_weak_car_pending_misses = 0U;
 }
 
 static void clear_result(beacon_result_t *result)
@@ -236,26 +305,6 @@ static void threshold_image(
     }
 }
 
-static void threshold_beacon_image(
-    const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W])
-{
-    int x;
-    int y;
-
-    for (y = 0; y < BEACON_IMAGE_H; y++)
-    {
-        for (x = 0; x < BEACON_IMAGE_W; x++)
-        {
-            unsigned char threshold =
-                (x < BEACON_SIDE_EDGE_MARGIN ||
-                 x >= BEACON_IMAGE_W - BEACON_SIDE_EDGE_MARGIN)
-                    ? (unsigned char)g_image_down_side_edge_threshold
-                    : (unsigned char)g_image_down_beacon_binary_threshold;
-            g_binary[y][x] = (image[y][x] >= threshold) ? 255 : 0;
-        }
-    }
-}
-
 static component_t grow_component(unsigned char start_x, unsigned char start_y)
 {
     static const signed char dx[8] = { 1, -1, 0, 0, 1, 1, -1, -1 };
@@ -285,9 +334,16 @@ static component_t grow_component(unsigned char start_x, unsigned char start_y)
         unsigned char i;
         unsigned char x = g_queue_x[head];
         unsigned char y = g_queue_y[head];
+        unsigned int gray = (g_current_image != 0) ? g_current_image[y][x] : 0U;
         head++;
 
         comp.area++;
+        comp.gray_sum += gray;
+        comp.gray_sum_sq += gray * gray;
+        if (gray > comp.peak)
+        {
+            comp.peak = (unsigned char)gray;
+        }
         sum_x += x;
         sum_y += y;
         sum_xx += (float)x * (float)x;
@@ -371,670 +427,678 @@ static component_t grow_component(unsigned char start_x, unsigned char start_y)
     return comp;
 }
 
-static int local_background_average(const component_t *comp, int pad)
+static void finish_component(
+    component_t *comp,
+    int sum_x,
+    int sum_y,
+    float sum_xx,
+    float sum_yy,
+    float sum_xy);
+
+static float car_score_term(float value, float base, float range)
 {
+    value = (value - base) / range;
+    if (value < 0.0f)
+    {
+        return 0.0f;
+    }
+    if (value > 1.0f)
+    {
+        return 1.0f;
+    }
+    return value;
+}
+
+static int car_envelope_pad(const component_t *comp)
+{
+    int pad = (int)(comp->minor * DOWN_CAR_ENVELOPE_PAD_SCALE + 0.5f);
+    return (pad < DOWN_CAR_ENVELOPE_MIN_PAD) ?
+               DOWN_CAR_ENVELOPE_MIN_PAD : pad;
+}
+
+static int car_local_background_median(const component_t *comp, int pad)
+{
+    unsigned short histogram[256];
     int min_x = comp->min_x - pad;
     int max_x = comp->max_x + pad;
     int min_y = comp->min_y - pad;
     int max_y = comp->max_y + pad;
+    int sample_count = 0;
+    int cumulative = 0;
+    int target;
     int x;
     int y;
-    int sum = 0;
-    int count = 0;
 
-    if (g_current_image == 0)
-    {
-        return 0;
-    }
+    memset(histogram, 0, sizeof(histogram));
     if (min_x < 0) min_x = 0;
     if (min_y < 0) min_y = 0;
     if (max_x >= BEACON_IMAGE_W) max_x = BEACON_IMAGE_W - 1;
     if (max_y >= BEACON_IMAGE_H) max_y = BEACON_IMAGE_H - 1;
-
     for (y = min_y; y <= max_y; y++)
     {
         for (x = min_x; x <= max_x; x++)
         {
+            unsigned char gray;
             if (x >= comp->min_x && x <= comp->max_x &&
                 y >= comp->min_y && y <= comp->max_y)
             {
                 continue;
             }
-            sum += g_current_image[y][x];
-            count++;
+            gray = g_current_image[y][x];
+            histogram[gray]++;
+            sample_count++;
         }
     }
-
-    if (count == 0)
+    if (sample_count == 0)
     {
         return 0;
     }
-    return sum / count;
-}
-
-static unsigned char is_lamp_candidate(const component_t *comp)
-{
-    unsigned char touches_top_or_bottom;
-    unsigned char touches_left_or_right;
-    int bbox_w = comp->max_x - comp->min_x + 1;
-    int bbox_h = comp->max_y - comp->min_y + 1;
-    int bbox_span = bbox_w > bbox_h ? bbox_w : bbox_h;
-
-    if (comp->area > g_image_down_car_lamp_max_area)
+    target = (sample_count - 1) / 2;
+    for (x = 0; x < 256; x++)
     {
-        return 0;
-    }
-    if (g_has_lamp_track == 0 &&
-        (comp->area < CAR_LAMP_TRACK_START_AREA ||
-         comp->elongation < CAR_LAMP_TRACK_START_ELONGATION ||
-         (float)comp->area * comp->elongation < CAR_LAMP_TRACK_START_SCORE))
-    {
-        return 0;
-    }
-
-    touches_top_or_bottom =
-        (comp->min_y <= CAR_LAMP_EDGE_MARGIN ||
-         comp->max_y >= BEACON_IMAGE_H - 1 - CAR_LAMP_EDGE_MARGIN) ? 1 : 0;
-    touches_left_or_right =
-        (comp->min_x <= CAR_LAMP_EDGE_MARGIN ||
-         comp->max_x >= BEACON_IMAGE_W - 1 - CAR_LAMP_EDGE_MARGIN) ? 1 : 0;
-
-    if (touches_top_or_bottom != 0 && comp->area < g_image_down_car_lamp_min_area)
-    {
-        return 0;
-    }
-    if (comp->area < g_image_down_car_lamp_min_area)
-    {
-        return 0;
-    }
-    if (comp->elongation < g_image_down_car_lamp_min_elongation &&
-        (comp->area < CAR_LAMP_LARGE_AREA ||
-         comp->elongation < CAR_LAMP_LARGE_ELONGATION))
-    {
-        return 0;
-    }
-    if (comp->major < g_image_down_car_lamp_min_length)
-    {
-        return 0;
-    }
-    if (touches_top_or_bottom != 0 &&
-        comp->area < CAR_LAMP_LARGE_AREA &&
-        local_background_average(comp, CAR_LAMP_LOCAL_RING_PAD) >
-            CAR_LAMP_EDGE_BACKGROUND_MAX)
-    {
-        return 0;
-    }
-    if (touches_left_or_right != 0 &&
-        comp->cy < (float)BEACON_IMAGE_H * 0.5f &&
-        local_background_average(comp, CAR_LAMP_LOCAL_RING_PAD) >
-            CAR_LAMP_EDGE_BACKGROUND_MAX)
-    {
-        return 0;
-    }
-    if (touches_left_or_right != 0 &&
-        comp->cy < CAR_LAMP_SIDE_SUN_Y &&
-        local_background_average(comp, CAR_LAMP_LOCAL_RING_PAD) >
-            CAR_LAMP_SIDE_SUN_BACKGROUND_MAX)
-    {
-        return 0;
-    }
-    if ((comp->min_x <= CAR_LAMP_SIDE_SUN_MARGIN ||
-         comp->max_x >= BEACON_IMAGE_W - 1 - CAR_LAMP_SIDE_SUN_MARGIN) &&
-        comp->cy < CAR_LAMP_SIDE_SUN_Y &&
-        local_background_average(comp, CAR_LAMP_LOCAL_RING_PAD) >
-            CAR_LAMP_SIDE_SUN_BACKGROUND_MAX)
-    {
-        return 0;
-    }
-    if (comp->area < CAR_LAMP_STRONG_AREA &&
-        (bbox_span < CAR_LAMP_SMALL_MIN_SPAN ||
-         local_background_average(comp, CAR_LAMP_LOCAL_RING_PAD) >
-             CAR_LAMP_SMALL_BACKGROUND_MAX))
-    {
-        return 0;
-    }
-    return 1;
-}
-
-static float lamp_score(const component_t *comp)
-{
-    return (float)comp->area * comp->elongation;
-}
-
-static unsigned char is_edge_lamp_candidate(const component_t *comp)
-{
-    if (comp == 0 || comp->valid == 0)
-    {
-        return 0;
-    }
-    if (comp->min_y > 2 && comp->max_y < BEACON_IMAGE_H - 3)
-    {
-        return 0;
-    }
-    return (comp->elongation >= 2.6f &&
-            comp->major >= 16.0f &&
-            comp->minor <= 6.5f) ? 1 : 0;
-}
-
-static unsigned char find_car_lamp(component_t *best_lamp)
-{
-    unsigned char x;
-    unsigned char y;
-    float best_score = 0.0f;
-    unsigned char found = 0;
-
-    memset(best_lamp, 0, sizeof(*best_lamp));
-    begin_visit_pass();
-
-    for (y = 0; y < BEACON_IMAGE_H; y++)
-    {
-        for (x = 0; x < BEACON_IMAGE_W; x++)
+        cumulative += histogram[x];
+        if (cumulative > target)
         {
-            component_t comp;
-            float score;
-
-            if (g_binary[y][x] == 0 || is_visited(x, y))
-            {
-                continue;
-            }
-
-            comp = grow_component(x, y);
-            if (!is_lamp_candidate(&comp))
-            {
-                continue;
-            }
-
-            score = lamp_score(&comp);
-            if (found == 0 || score > best_score)
-            {
-                *best_lamp = comp;
-                best_score = score;
-                found = 1;
-            }
+            return x;
         }
     }
-
-    return found;
+    return 0;
 }
 
-static unsigned char find_edge_car_lamp(component_t *best_lamp)
+static unsigned char car_find_core_seed(const component_t *comp,
+                                        unsigned char *seed_x,
+                                        unsigned char *seed_y)
 {
-    unsigned char x;
-    unsigned char y;
-    float best_score = 0.0f;
-    unsigned char found = 0;
-
-    memset(best_lamp, 0, sizeof(*best_lamp));
-    begin_visit_pass();
-
-    for (y = 0; y < BEACON_IMAGE_H; y++)
-    {
-        for (x = 0; x < BEACON_IMAGE_W; x++)
-        {
-            component_t comp;
-            float score;
-
-            if (g_binary[y][x] == 0 || is_visited(x, y))
-            {
-                continue;
-            }
-
-            comp = grow_component(x, y);
-            if (!is_edge_lamp_candidate(&comp))
-            {
-                continue;
-            }
-
-            score = lamp_score(&comp);
-            if (found == 0 || score > best_score)
-            {
-                *best_lamp = comp;
-                best_score = score;
-                found = 1;
-            }
-        }
-    }
-
-    return found;
-}
-
-static int component_mean_gray(const component_t *comp)
-{
+    float best_distance = 1.0e9f;
     int x;
     int y;
-    int sum = 0;
-    int count = 0;
-
-    if (comp == 0 || comp->valid == 0 || g_current_image == 0)
-    {
-        return 0;
-    }
 
     for (y = comp->min_y; y <= comp->max_y; y++)
     {
         for (x = comp->min_x; x <= comp->max_x; x++)
         {
-            if (g_current_image[y][x] >= g_image_down_car_lamp_binary_threshold)
+            float dx;
+            float dy;
+            float distance;
+            if (g_binary[y][x] == 0U)
             {
-                sum += g_current_image[y][x];
-                count++;
+                continue;
+            }
+            dx = (float)x - comp->cx;
+            dy = (float)y - comp->cy;
+            distance = dx * dx + dy * dy;
+            if (distance < best_distance)
+            {
+                best_distance = distance;
+                *seed_x = (unsigned char)x;
+                *seed_y = (unsigned char)y;
             }
         }
     }
-
-    if (count == 0)
-    {
-        return 0;
-    }
-    return sum / count;
+    return (best_distance < 1.0e9f) ? 1U : 0U;
 }
 
-static unsigned char is_close_compound_candidate(const component_t *comp)
-{
-    int bbox_w;
-    int bbox_h;
-
-    if (comp == 0 || comp->valid == 0)
-    {
-        return 0;
-    }
-
-    bbox_w = comp->max_x - comp->min_x + 1;
-    bbox_h = comp->max_y - comp->min_y + 1;
-    if (comp->area < CLOSE_LAMP_MIN_AREA ||
-        comp->area > CLOSE_LAMP_MAX_AREA ||
-        bbox_w < CLOSE_LAMP_MIN_BBOX_W ||
-        bbox_w > CLOSE_LAMP_MAX_BBOX_W ||
-        bbox_h < CLOSE_LAMP_MIN_BBOX_H ||
-        bbox_h > CLOSE_LAMP_MAX_BBOX_H ||
-        comp->elongation > CLOSE_LAMP_MAX_ELONGATION)
-    {
-        return 0;
-    }
-
-    return component_mean_gray(comp) >= CLOSE_LAMP_MIN_MEAN ? 1 : 0;
-}
-
-static component_t grow_local_threshold_component(
-    unsigned char start_x,
-    unsigned char start_y,
-    const component_t *bounds)
+static component_t grow_car_envelope(const component_t *core,
+                                     int threshold,
+                                     int pad)
 {
     static const signed char dx[8] = { 1, -1, 0, 0, 1, 1, -1, -1 };
     static const signed char dy[8] = { 0, 0, 1, -1, 1, -1, 1, -1 };
-    unsigned short head = 0;
-    unsigned short tail = 0;
+    component_t envelope;
+    unsigned char seed_x = 0U;
+    unsigned char seed_y = 0U;
+    unsigned short head = 0U;
+    unsigned short tail = 0U;
+    int min_x = core->min_x - pad;
+    int max_x = core->max_x + pad;
+    int min_y = core->min_y - pad;
+    int max_y = core->max_y + pad;
     int sum_x = 0;
     int sum_y = 0;
     float sum_xx = 0.0f;
     float sum_yy = 0.0f;
     float sum_xy = 0.0f;
-    component_t comp;
 
-    memset(&comp, 0, sizeof(comp));
-    comp.min_x = start_x;
-    comp.max_x = start_x;
-    comp.min_y = start_y;
-    comp.max_y = start_y;
+    memset(&envelope, 0, sizeof(envelope));
+    if (min_x < 0) min_x = 0;
+    if (min_y < 0) min_y = 0;
+    if (max_x >= BEACON_IMAGE_W) max_x = BEACON_IMAGE_W - 1;
+    if (max_y >= BEACON_IMAGE_H) max_y = BEACON_IMAGE_H - 1;
+    if (car_find_core_seed(core, &seed_x, &seed_y) == 0U)
+    {
+        return envelope;
+    }
 
-    g_queue_x[tail] = start_x;
-    g_queue_y[tail] = start_y;
+    begin_visit_pass();
+    envelope.min_x = seed_x;
+    envelope.max_x = seed_x;
+    envelope.min_y = seed_y;
+    envelope.max_y = seed_y;
+    g_queue_x[tail] = seed_x;
+    g_queue_y[tail] = seed_y;
     tail++;
-    mark_visited(start_x, start_y);
-
+    mark_visited(seed_x, seed_y);
     while (head < tail)
     {
-        unsigned char i;
+        unsigned char index;
         unsigned char x = g_queue_x[head];
         unsigned char y = g_queue_y[head];
+        unsigned int gray = g_current_image[y][x];
         head++;
-
-        comp.area++;
+        envelope.area++;
+        envelope.gray_sum += gray;
+        envelope.gray_sum_sq += gray * gray;
+        if (gray > envelope.peak)
+        {
+            envelope.peak = (unsigned char)gray;
+        }
         sum_x += x;
         sum_y += y;
         sum_xx += (float)x * (float)x;
         sum_yy += (float)y * (float)y;
         sum_xy += (float)x * (float)y;
-
-        if ((int)x < comp.min_x) comp.min_x = x;
-        if ((int)x > comp.max_x) comp.max_x = x;
-        if ((int)y < comp.min_y) comp.min_y = y;
-        if ((int)y > comp.max_y) comp.max_y = y;
-
-        for (i = 0; i < 8; i++)
+        if ((int)x < envelope.min_x) envelope.min_x = x;
+        if ((int)x > envelope.max_x) envelope.max_x = x;
+        if ((int)y < envelope.min_y) envelope.min_y = y;
+        if ((int)y > envelope.max_y) envelope.max_y = y;
+        for (index = 0U; index < 8U; index++)
         {
-            int nx = (int)x + dx[i];
-            int ny = (int)y + dy[i];
-
-            if (nx < bounds->min_x || nx > bounds->max_x ||
-                ny < bounds->min_y || ny > bounds->max_y)
+            int next_x = (int)x + dx[index];
+            int next_y = (int)y + dy[index];
+            if (next_x < min_x || next_x > max_x ||
+                next_y < min_y || next_y > max_y ||
+                g_current_image[next_y][next_x] < threshold ||
+                is_visited((unsigned char)next_x, (unsigned char)next_y) != 0U ||
+                tail >= IMAGE_QUEUE_SIZE)
             {
                 continue;
             }
-            if (g_current_image[ny][nx] < CLOSE_LAMP_SPLIT_THRESHOLD ||
-                is_visited((unsigned char)nx, (unsigned char)ny))
-            {
-                continue;
-            }
-            if (tail >= IMAGE_QUEUE_SIZE)
-            {
-                continue;
-            }
-
-            mark_visited((unsigned char)nx, (unsigned char)ny);
-            g_queue_x[tail] = (unsigned char)nx;
-            g_queue_y[tail] = (unsigned char)ny;
+            mark_visited((unsigned char)next_x, (unsigned char)next_y);
+            g_queue_x[tail] = (unsigned char)next_x;
+            g_queue_y[tail] = (unsigned char)next_y;
             tail++;
         }
     }
+    finish_component(&envelope, sum_x, sum_y, sum_xx, sum_yy, sum_xy);
+    return envelope;
+}
 
-    if (comp.area > 0)
+static unsigned char car_component_features(
+    const component_t *comp,
+    down_car_features_t *features)
+{
+    int pad;
+    int background;
+    int envelope_threshold;
+    float delta;
+    float core_elongation_score;
+    float envelope_elongation_score;
+    float geometry_score;
+    float uniformity_score;
+    float brightness_score;
+    float contrast_score;
+    float area_score;
+    float photometric_score;
+
+    if (comp == 0 || comp->valid == 0U || features == 0 ||
+        g_current_image == 0 || comp->area <= 0 ||
+        comp->area > g_image_down_car_lamp_max_area ||
+        image_down_horizon_contains(comp->cx, comp->cy,
+                                    DOWN_OBJECT_BOUNDARY_MARGIN) == 0U)
     {
-        float inv_area = 1.0f / (float)comp.area;
-        float var_x;
-        float var_y;
-        float cov_xy;
-        float trace;
-        float det;
-        float disc;
-        float eig_major;
-        float eig_minor;
+        return 0U;
+    }
+    memset(features, 0, sizeof(*features));
+    features->peak = comp->peak;
+    features->mean = (float)comp->gray_sum / (float)comp->area;
+    features->variance = (float)comp->gray_sum_sq / (float)comp->area -
+                         features->mean * features->mean;
+    if (features->variance < 0.0f)
+    {
+        features->variance = 0.0f;
+    }
+    pad = car_envelope_pad(comp);
+    background = car_local_background_median(comp, pad);
+    features->contrast = features->mean - (float)background;
+    delta = ((float)features->peak - (float)background) * 0.22f;
+    if (delta < 20.0f)
+    {
+        delta = 20.0f;
+    }
+    envelope_threshold = (int)((float)background + delta + 0.5f);
+    if (envelope_threshold < 90) envelope_threshold = 90;
+    if (envelope_threshold > 255) envelope_threshold = 255;
+    features->envelope = grow_car_envelope(comp, envelope_threshold, pad);
+    if (features->envelope.valid == 0U)
+    {
+        return 0U;
+    }
 
-        comp.cx = (float)sum_x * inv_area;
-        comp.cy = (float)sum_y * inv_area;
-        var_x = sum_xx * inv_area - comp.cx * comp.cx;
-        var_y = sum_yy * inv_area - comp.cy * comp.cy;
-        cov_xy = sum_xy * inv_area - comp.cx * comp.cy;
-        trace = var_x + var_y;
-        det = var_x * var_y - cov_xy * cov_xy;
-        disc = trace * trace * 0.25f - det;
-        if (disc < 0.0f)
+    core_elongation_score = car_score_term(
+        comp->elongation,
+        DOWN_CAR_SCORE_ELONGATION_BASE,
+        DOWN_CAR_SCORE_ELONGATION_RANGE);
+    envelope_elongation_score = car_score_term(
+        features->envelope.elongation,
+        DOWN_CAR_SCORE_ELONGATION_BASE,
+        DOWN_CAR_SCORE_ELONGATION_RANGE);
+    geometry_score = (core_elongation_score < envelope_elongation_score) ?
+                         core_elongation_score : envelope_elongation_score;
+    uniformity_score = 1.0f - car_score_term(
+        features->variance, 0.0f, DOWN_CAR_SCORE_VARIANCE_RANGE);
+    brightness_score = car_score_term(
+        features->mean,
+        DOWN_CAR_SCORE_MEAN_BASE,
+        DOWN_CAR_SCORE_MEAN_RANGE);
+    contrast_score = car_score_term(
+        features->contrast,
+        DOWN_CAR_SCORE_CONTRAST_BASE,
+        DOWN_CAR_SCORE_CONTRAST_RANGE);
+    area_score = car_score_term(
+        (float)features->envelope.area,
+        DOWN_CAR_SCORE_AREA_BASE,
+        DOWN_CAR_SCORE_AREA_RANGE);
+    photometric_score = uniformity_score * 0.30f +
+                        brightness_score * 0.25f +
+                        contrast_score * 0.25f +
+                        area_score * 0.20f;
+    features->score = geometry_score * 0.55f +
+                      photometric_score * 0.45f;
+    if (features->score >= DOWN_CAR_STRONG_SCORE)
+    {
+        features->classification = DOWN_CAR_CLASS_STRONG;
+    }
+    else if (features->score >= DOWN_CAR_WEAK_SCORE)
+    {
+        features->classification = DOWN_CAR_CLASS_WEAK;
+    }
+    else if (features->score >= DOWN_CAR_TRACK_SCORE)
+    {
+        features->classification = DOWN_CAR_CLASS_TRACK;
+    }
+    return (features->classification != DOWN_CAR_CLASS_NONE) ? 1U : 0U;
+}
+
+static void add_car_mask(const component_t *comp)
+{
+    if (comp != 0 && comp->valid != 0 &&
+        g_current_lamp_mask_count < DOWN_CAR_MAX_MASKS)
+    {
+        g_current_lamp_masks[g_current_lamp_mask_count++] = *comp;
+    }
+}
+
+static void finish_component(
+    component_t *comp,
+    int sum_x,
+    int sum_y,
+    float sum_xx,
+    float sum_yy,
+    float sum_xy)
+{
+    float inv_area;
+    float var_x;
+    float var_y;
+    float cov_xy;
+    float trace;
+    float det;
+    float disc;
+    float eig_major;
+    float eig_minor;
+
+    if (comp == 0 || comp->area <= 0)
+    {
+        return;
+    }
+    inv_area = 1.0f / (float)comp->area;
+    comp->cx = (float)sum_x * inv_area;
+    comp->cy = (float)sum_y * inv_area;
+    var_x = sum_xx * inv_area - comp->cx * comp->cx;
+    var_y = sum_yy * inv_area - comp->cy * comp->cy;
+    cov_xy = sum_xy * inv_area - comp->cx * comp->cy;
+    trace = var_x + var_y;
+    det = var_x * var_y - cov_xy * cov_xy;
+    disc = trace * trace * 0.25f - det;
+    if (disc < 0.0f)
+    {
+        disc = 0.0f;
+    }
+    eig_major = trace * 0.5f + sqrtf(disc);
+    eig_minor = trace * 0.5f - sqrtf(disc);
+    if (eig_minor < 0.0f)
+    {
+        eig_minor = 0.0f;
+    }
+    comp->major = 4.0f * sqrtf(eig_major + 0.0001f);
+    comp->minor = 4.0f * sqrtf(eig_minor + 0.0001f);
+    if (comp->minor < 1.0f)
+    {
+        comp->minor = 1.0f;
+    }
+    comp->elongation = comp->major / comp->minor;
+    comp->angle = 0.5f * atan2f(2.0f * cov_xy, var_x - var_y) *
+                  180.0f / PI_F;
+    comp->valid = 1U;
+}
+
+
+static void reset_weak_car_pending(void)
+{
+    memset(&g_weak_car_pending, 0, sizeof(g_weak_car_pending));
+    g_weak_car_pending_hits = 0U;
+    g_weak_car_pending_misses = 0U;
+}
+
+static void age_weak_car_pending(void)
+{
+    if (g_weak_car_pending_hits == 0U)
+    {
+        return;
+    }
+    if (g_weak_car_pending_misses >= 1U)
+    {
+        reset_weak_car_pending();
+        return;
+    }
+    g_weak_car_pending_misses++;
+}
+
+static unsigned char weak_car_matches(const component_t *left,
+                                       const component_t *right)
+{
+    float dx;
+    float dy;
+    float major_ratio;
+    float minor_ratio;
+
+    if (left == 0 || right == 0 || left->valid == 0 || right->valid == 0 ||
+        left->major <= 0.0f || right->major <= 0.0f ||
+        left->minor <= 0.0f || right->minor <= 0.0f)
+    {
+        return 0U;
+    }
+    dx = left->cx - right->cx;
+    dy = left->cy - right->cy;
+    major_ratio = left->major / right->major;
+    minor_ratio = left->minor / right->minor;
+    return (dx * dx + dy * dy <=
+                g_image_down_match_distance * g_image_down_match_distance &&
+            major_ratio >= 0.5f && major_ratio <= 2.0f &&
+            minor_ratio >= 0.5f && minor_ratio <= 2.0f) ? 1U : 0U;
+}
+
+static unsigned char weak_car_confirmed(
+    const component_t *candidate,
+    unsigned char can_start)
+{
+    unsigned char required_hits = 2U;
+
+    if (candidate == 0 || candidate->valid == 0)
+    {
+        return 0U;
+    }
+    if (g_car_track.confirmed != 0U)
+    {
+        float predicted_x = g_car_track.x + (float)BEACON_IMAGE_W * 0.5f +
+                            g_car_track.vx;
+        float predicted_y = g_car_track.y + (float)BEACON_IMAGE_H * 0.5f +
+                            g_car_track.vy;
+        float dx = candidate->cx - predicted_x;
+        float dy = candidate->cy - predicted_y;
+        if (dx * dx + dy * dy <=
+            g_image_down_gate_distance * g_image_down_gate_distance)
         {
-            disc = 0.0f;
+            return 1U;
         }
-
-        eig_major = trace * 0.5f + sqrtf(disc);
-        eig_minor = trace * 0.5f - sqrtf(disc);
-        if (eig_minor < 0.0f)
+    }
+    if (can_start == 0U)
+    {
+        return 0U;
+    }
+    if (g_weak_car_pending_hits != 0U &&
+        g_weak_car_pending_misses <= 1U &&
+        weak_car_matches(candidate, &g_weak_car_pending) != 0U)
+    {
+        if (g_weak_car_pending_hits < 255U)
         {
-            eig_minor = 0.0f;
+            g_weak_car_pending_hits++;
         }
+    }
+    else
+    {
+        reset_weak_car_pending();
+        g_weak_car_pending_hits = 1U;
+    }
+    g_weak_car_pending = *candidate;
+    g_weak_car_pending_misses = 0U;
+    if (g_image_down_confirm_frames > 2)
+    {
+        required_hits = (g_image_down_confirm_frames > 255) ?
+                            255U : (unsigned char)g_image_down_confirm_frames;
+    }
+    return (g_weak_car_pending_hits >= required_hits) ? 1U : 0U;
+}
 
-        comp.major = 4.0f * sqrtf(eig_major + 0.0001f);
-        comp.minor = 4.0f * sqrtf(eig_minor + 0.0001f);
-        if (comp.minor < 1.0f)
+static void store_car_core(component_t cores[DOWN_CAR_MAX_COMPONENTS],
+                           unsigned char *core_count,
+                           const component_t *component)
+{
+    unsigned char index;
+    unsigned char smallest = 0U;
+
+    if (*core_count < DOWN_CAR_MAX_COMPONENTS)
+    {
+        cores[*core_count] = *component;
+        (*core_count)++;
+        return;
+    }
+    for (index = 1U; index < *core_count; index++)
+    {
+        if (cores[index].area < cores[smallest].area)
         {
-            comp.minor = 1.0f;
+            smallest = index;
         }
-        comp.elongation = comp.major / comp.minor;
-        comp.angle = 0.5f * atan2f(2.0f * cov_xy, var_x - var_y) * 180.0f / PI_F;
-        comp.valid = 1;
     }
-
-    return comp;
+    if (component->area > cores[smallest].area)
+    {
+        cores[smallest] = *component;
+    }
 }
 
-static unsigned char is_close_lamp_core(const component_t *comp)
+static unsigned char same_car_candidate(const component_t *left,
+                                        const component_t *right)
 {
-    int bbox_w;
-    int bbox_h;
-
-    if (comp == 0 || comp->valid == 0)
-    {
-        return 0;
-    }
-
-    bbox_w = comp->max_x - comp->min_x + 1;
-    bbox_h = comp->max_y - comp->min_y + 1;
-    return (comp->area >= CLOSE_LAMP_CORE_MIN_AREA &&
-            bbox_w >= CLOSE_LAMP_CORE_MIN_BBOX_W &&
-            bbox_h <= CLOSE_LAMP_CORE_MAX_BBOX_H) ? 1 : 0;
+    float dx = left->cx - right->cx;
+    float dy = left->cy - right->cy;
+    return (dx * dx + dy * dy <= 9.0f) ? 1U : 0U;
 }
 
-static unsigned char is_close_beacon_core(const component_t *comp)
+static void store_car_candidate(
+    down_car_candidate_t candidates[DOWN_CAR_MAX_MASKS],
+    unsigned char *candidate_count,
+    const component_t *core,
+    const down_car_features_t *features)
 {
-    int bbox_w;
-    int bbox_h;
+    unsigned char index;
 
-    if (comp == 0 || comp->valid == 0)
+    for (index = 0U; index < *candidate_count; index++)
     {
-        return 0;
-    }
-
-    bbox_w = comp->max_x - comp->min_x + 1;
-    bbox_h = comp->max_y - comp->min_y + 1;
-    return (comp->area >= CLOSE_BEACON_CORE_MIN_AREA &&
-            bbox_w <= CLOSE_BEACON_CORE_MAX_BBOX_W &&
-            bbox_h <= CLOSE_BEACON_CORE_MAX_BBOX_H) ? 1 : 0;
-}
-
-static unsigned char is_close_merged_core(const component_t *comp)
-{
-    int bbox_w;
-    int bbox_h;
-
-    if (comp == 0 || comp->valid == 0)
-    {
-        return 0;
-    }
-
-    bbox_w = comp->max_x - comp->min_x + 1;
-    bbox_h = comp->max_y - comp->min_y + 1;
-    return (comp->area >= CLOSE_MERGED_CORE_MIN_AREA &&
-            comp->area <= CLOSE_MERGED_CORE_MAX_AREA &&
-            bbox_w >= CLOSE_MERGED_CORE_MIN_BBOX_W &&
-            bbox_h >= CLOSE_MERGED_CORE_MIN_BBOX_H) ? 1 : 0;
-}
-
-static unsigned char make_lower_lamp_core(
-    const component_t *merged_core,
-    component_t *lamp_core)
-{
-    int y_split;
-    int x;
-    int y;
-    int sum_x = 0;
-    int sum_y = 0;
-    float sum_xx = 0.0f;
-    float sum_yy = 0.0f;
-    float sum_xy = 0.0f;
-
-    if (merged_core == 0 || merged_core->valid == 0 || lamp_core == 0)
-    {
-        return 0;
-    }
-
-    memset(lamp_core, 0, sizeof(*lamp_core));
-    y_split = (merged_core->min_y + merged_core->max_y + 1) / 2;
-    lamp_core->min_x = BEACON_IMAGE_W - 1;
-    lamp_core->min_y = BEACON_IMAGE_H - 1;
-
-    for (y = y_split; y <= merged_core->max_y; y++)
-    {
-        for (x = merged_core->min_x; x <= merged_core->max_x; x++)
+        if (same_car_candidate(&candidates[index].mask,
+                               &features->envelope) == 0U)
         {
-            if (g_current_image[y][x] < CLOSE_LAMP_SPLIT_THRESHOLD)
+            continue;
+        }
+        if (features->score > candidates[index].score)
+        {
+            candidates[index].component = *core;
+            candidates[index].mask = features->envelope;
+            candidates[index].score = features->score;
+            candidates[index].classification = features->classification;
+        }
+        return;
+    }
+    if (*candidate_count < DOWN_CAR_MAX_MASKS)
+    {
+        candidates[*candidate_count].component = *core;
+        candidates[*candidate_count].mask = features->envelope;
+        candidates[*candidate_count].score = features->score;
+        candidates[*candidate_count].classification = features->classification;
+        (*candidate_count)++;
+    }
+}
+
+static unsigned char select_car_candidate(
+    const down_car_candidate_t candidates[DOWN_CAR_MAX_MASKS],
+    unsigned char candidate_count,
+    unsigned char classification)
+{
+    unsigned char best = 255U;
+    unsigned char tracked = 255U;
+    unsigned char index;
+    float predicted_x = g_car_track.x + (float)BEACON_IMAGE_W * 0.5f +
+                        g_car_track.vx;
+    float predicted_y = g_car_track.y + (float)BEACON_IMAGE_H * 0.5f +
+                        g_car_track.vy;
+
+    for (index = 0U; index < candidate_count; index++)
+    {
+        if (candidates[index].classification != classification)
+        {
+            continue;
+        }
+        if (best >= candidate_count ||
+            candidates[index].score > candidates[best].score)
+        {
+            best = index;
+        }
+    }
+    if (best >= candidate_count || g_car_track.confirmed == 0U)
+    {
+        return best;
+    }
+    {
+        float best_distance = g_image_down_gate_distance *
+                              g_image_down_gate_distance;
+        for (index = 0U; index < candidate_count; index++)
+        {
+            float dx;
+            float dy;
+            float distance;
+            if (candidates[index].classification != classification)
             {
                 continue;
             }
-
-            lamp_core->area++;
-            sum_x += x;
-            sum_y += y;
-            sum_xx += (float)x * (float)x;
-            sum_yy += (float)y * (float)y;
-            sum_xy += (float)x * (float)y;
-
-            if (x < lamp_core->min_x) lamp_core->min_x = x;
-            if (x > lamp_core->max_x) lamp_core->max_x = x;
-            if (y < lamp_core->min_y) lamp_core->min_y = y;
-            if (y > lamp_core->max_y) lamp_core->max_y = y;
+            dx = candidates[index].component.cx - predicted_x;
+            dy = candidates[index].component.cy - predicted_y;
+            distance = dx * dx + dy * dy;
+            if (distance <= best_distance)
+            {
+                best_distance = distance;
+                tracked = index;
+            }
         }
     }
-
-    if (lamp_core->area > 0)
+    if (tracked < candidate_count &&
+        candidates[tracked].score + DOWN_CAR_TRACK_SCORE_MARGIN >=
+            candidates[best].score)
     {
-        float inv_area = 1.0f / (float)lamp_core->area;
-        float var_x;
-        float var_y;
-        float cov_xy;
-        float trace;
-        float det;
-        float disc;
-        float eig_major;
-        float eig_minor;
-
-        lamp_core->cx = (float)sum_x * inv_area;
-        lamp_core->cy = (float)sum_y * inv_area;
-        var_x = sum_xx * inv_area - lamp_core->cx * lamp_core->cx;
-        var_y = sum_yy * inv_area - lamp_core->cy * lamp_core->cy;
-        cov_xy = sum_xy * inv_area - lamp_core->cx * lamp_core->cy;
-        trace = var_x + var_y;
-        det = var_x * var_y - cov_xy * cov_xy;
-        disc = trace * trace * 0.25f - det;
-        if (disc < 0.0f)
-        {
-            disc = 0.0f;
-        }
-
-        eig_major = trace * 0.5f + sqrtf(disc);
-        eig_minor = trace * 0.5f - sqrtf(disc);
-        if (eig_minor < 0.0f)
-        {
-            eig_minor = 0.0f;
-        }
-
-        lamp_core->major = 4.0f * sqrtf(eig_major + 0.0001f);
-        lamp_core->minor = 4.0f * sqrtf(eig_minor + 0.0001f);
-        if (lamp_core->minor < 1.0f)
-        {
-            lamp_core->minor = 1.0f;
-        }
-        lamp_core->elongation = lamp_core->major / lamp_core->minor;
-        lamp_core->angle =
-            0.5f * atan2f(2.0f * cov_xy, var_x - var_y) * 180.0f / PI_F;
-        lamp_core->valid = 1;
+        return tracked;
     }
-
-    return is_close_lamp_core(lamp_core);
+    return best;
 }
 
-static unsigned char split_close_compound_lamp(
-    const component_t *compound,
-    component_t *best_lamp)
+static unsigned char find_car_lamp(component_t *best_lamp)
 {
-    int x;
-    int y;
-    component_t lamp_core;
-    component_t beacon_core;
-    component_t merged_core;
-    unsigned char has_lamp_core = 0;
-    unsigned char has_beacon_core = 0;
-    unsigned char has_merged_core = 0;
-
-    memset(&lamp_core, 0, sizeof(lamp_core));
-    memset(&beacon_core, 0, sizeof(beacon_core));
-    memset(&merged_core, 0, sizeof(merged_core));
-    begin_visit_pass();
-
-    for (y = compound->min_y; y <= compound->max_y; y++)
-    {
-        for (x = compound->min_x; x <= compound->max_x; x++)
-        {
-            component_t comp;
-
-            if (g_current_image[y][x] < CLOSE_LAMP_SPLIT_THRESHOLD ||
-                is_visited((unsigned char)x, (unsigned char)y))
-            {
-                continue;
-            }
-
-            comp = grow_local_threshold_component((unsigned char)x,
-                                                  (unsigned char)y,
-                                                  compound);
-            if (is_close_lamp_core(&comp) != 0 &&
-                (has_lamp_core == 0 || comp.area > lamp_core.area))
-            {
-                lamp_core = comp;
-                has_lamp_core = 1;
-            }
-            if (is_close_beacon_core(&comp) != 0 &&
-                (has_beacon_core == 0 || comp.area > beacon_core.area))
-            {
-                beacon_core = comp;
-                has_beacon_core = 1;
-            }
-            if (is_close_merged_core(&comp) != 0 &&
-                (has_merged_core == 0 || comp.area > merged_core.area))
-            {
-                merged_core = comp;
-                has_merged_core = 1;
-            }
-        }
-    }
-
-    if (has_lamp_core != 0 && has_beacon_core != 0)
-    {
-        float dx = lamp_core.cx - beacon_core.cx;
-        float dy = lamp_core.cy - beacon_core.cy;
-        if (dx * dx + dy * dy <= CLOSE_CORE_MAX_DISTANCE_SQ)
-        {
-            *best_lamp = lamp_core;
-            return 1;
-        }
-    }
-    if (has_merged_core != 0 && make_lower_lamp_core(&merged_core, best_lamp) != 0)
-    {
-        return 1;
-    }
-
-    return 0;
-}
-
-static unsigned char find_compound_close_lamp(component_t *best_lamp)
-{
+    component_t cores[DOWN_CAR_MAX_COMPONENTS];
+    down_car_candidate_t candidates[DOWN_CAR_MAX_MASKS];
+    unsigned char core_count = 0U;
+    unsigned char candidate_count = 0U;
     unsigned char x;
     unsigned char y;
-    float best_score = 0.0f;
-    unsigned char found = 0;
+    unsigned char index;
+    unsigned char best;
+    unsigned char weak_best;
 
     memset(best_lamp, 0, sizeof(*best_lamp));
+    memset(cores, 0, sizeof(cores));
+    memset(candidates, 0, sizeof(candidates));
+    g_current_lamp_mask_count = 0U;
     begin_visit_pass();
-
-    for (y = 0; y < BEACON_IMAGE_H; y++)
+    for (y = 0U; y < BEACON_IMAGE_H; y++)
     {
-        for (x = 0; x < BEACON_IMAGE_W; x++)
+        for (x = 0U; x < BEACON_IMAGE_W; x++)
         {
-            component_t comp;
-            component_t lamp_core;
-            float score;
-
-            if (g_binary[y][x] == 0 || is_visited(x, y))
+            component_t component;
+            if (g_binary[y][x] == 0U || is_visited(x, y) != 0U)
             {
                 continue;
             }
-
-            comp = grow_component(x, y);
-            if (is_close_compound_candidate(&comp) == 0)
+            component = grow_component(x, y);
+            if (component.valid != 0U)
             {
-                continue;
-            }
-            if (split_close_compound_lamp(&comp, &lamp_core) == 0)
-            {
-                continue;
-            }
-
-            score = lamp_score(&lamp_core);
-            if (found == 0 || score > best_score)
-            {
-                *best_lamp = lamp_core;
-                best_score = score;
-                found = 1;
+                store_car_core(cores, &core_count, &component);
             }
         }
     }
 
-    return found;
+    for (index = 0U; index < core_count; index++)
+    {
+        down_car_features_t features;
+        if (car_component_features(&cores[index], &features) != 0U)
+        {
+            store_car_candidate(candidates, &candidate_count,
+                                &cores[index], &features);
+        }
+    }
+    for (index = 0U; index < candidate_count; index++)
+    {
+        if (candidates[index].classification != DOWN_CAR_CLASS_TRACK)
+        {
+            add_car_mask(&candidates[index].mask);
+        }
+    }
+
+    best = select_car_candidate(candidates, candidate_count,
+                                DOWN_CAR_CLASS_STRONG);
+    if (best < candidate_count)
+    {
+        *best_lamp = candidates[best].component;
+        reset_weak_car_pending();
+        return 1U;
+    }
+
+    weak_best = select_car_candidate(candidates, candidate_count,
+                                     DOWN_CAR_CLASS_WEAK);
+    if (weak_best < candidate_count &&
+        weak_car_confirmed(&candidates[weak_best].component, 1U) != 0U)
+    {
+        *best_lamp = candidates[weak_best].component;
+        return 1U;
+    }
+    best = select_car_candidate(candidates, candidate_count,
+                                DOWN_CAR_CLASS_TRACK);
+    if (best < candidate_count && g_car_track.confirmed != 0U)
+    {
+        float predicted_x = g_car_track.x + (float)BEACON_IMAGE_W * 0.5f +
+                            g_car_track.vx;
+        float predicted_y = g_car_track.y + (float)BEACON_IMAGE_H * 0.5f +
+                            g_car_track.vy;
+        float dx = candidates[best].component.cx - predicted_x;
+        float dy = candidates[best].component.cy - predicted_y;
+        if (dx * dx + dy * dy <=
+            g_image_down_gate_distance * g_image_down_gate_distance)
+        {
+            *best_lamp = candidates[best].component;
+            add_car_mask(&candidates[best].mask);
+            reset_weak_car_pending();
+            return 1U;
+        }
+    }
+    if (weak_best >= candidate_count)
+    {
+        age_weak_car_pending();
+    }
+    return 0U;
 }
 
 static void fill_car_lamp_rect(const component_t *lamp, beacon_rect_t *rect)
@@ -1062,39 +1126,6 @@ static void write_car_lamp(const component_t *lamp, beacon_result_t *result)
     result->car_lamp_count = 1;
 }
 
-static void erase_lamp_rect_from_binary(const component_t *lamp)
-{
-    int min_x;
-    int max_x;
-    int min_y;
-    int max_y;
-    int x;
-    int y;
-
-    if (lamp == 0 || lamp->valid == 0)
-    {
-        return;
-    }
-
-    min_x = lamp->min_x - LAMP_MASK_PAD;
-    max_x = lamp->max_x + LAMP_MASK_PAD;
-    min_y = lamp->min_y - LAMP_MASK_PAD;
-    max_y = lamp->max_y + LAMP_MASK_PAD;
-
-    if (min_x < 0) min_x = 0;
-    if (min_y < 0) min_y = 0;
-    if (max_x >= BEACON_IMAGE_W) max_x = BEACON_IMAGE_W - 1;
-    if (max_y >= BEACON_IMAGE_H) max_y = BEACON_IMAGE_H - 1;
-
-    for (y = min_y; y <= max_y; y++)
-    {
-        for (x = min_x; x <= max_x; x++)
-        {
-            g_binary[y][x] = 0;
-        }
-    }
-}
-
 static unsigned char component_from_temporal_car(
     const temporal_track_t *track,
     component_t *lamp,
@@ -1119,6 +1150,11 @@ static unsigned char component_from_temporal_car(
     {
         image_cx += track->vx;
         image_cy += track->vy;
+    }
+    if (image_down_horizon_contains(image_cx, image_cy,
+                                    DOWN_OBJECT_BOUNDARY_MARGIN) == 0U)
+    {
+        return 0;
     }
 
     half_len = track->length * 0.5f + (float)CAR_LAMP_TEMPORAL_MASK_PAD;
@@ -1155,44 +1191,48 @@ static unsigned char component_from_temporal_car(
     return 1;
 }
 
-static void erase_temporal_lamp_from_binary(const component_t *lamp)
+static int down_gray_reflect_index(int index, int limit)
 {
-    int x;
-    int y;
-    float angle;
-    float cos_a;
-    float sin_a;
-    float half_len;
-    float half_wid;
-
-    if (lamp == 0 || lamp->valid == 0)
+    if (index < 0)
     {
-        return;
+        return -index;
     }
-
-    angle = lamp->angle * (PI_F / 180.0f);
-    cos_a = cosf(angle);
-    sin_a = sinf(angle);
-    half_len = lamp->major * 0.5f + (float)CAR_LAMP_TEMPORAL_MASK_PAD;
-    half_wid = lamp->minor * 0.5f + (float)CAR_LAMP_TEMPORAL_MASK_PAD;
-
-    for (y = lamp->min_y; y <= lamp->max_y; y++)
+    if (index >= limit)
     {
-        for (x = lamp->min_x; x <= lamp->max_x; x++)
-        {
-            float dx = (float)x - lamp->cx;
-            float dy = (float)y - lamp->cy;
-            float major = dx * cos_a + dy * sin_a;
-            float minor = -dx * sin_a + dy * cos_a;
-            if (fabsf(major) <= half_len && fabsf(minor) <= half_wid)
-            {
-                g_binary[y][x] = 0;
-            }
-        }
+        return limit * 2 - 2 - index;
     }
+    return index;
 }
 
-static unsigned char is_component_in_lamp_core(const component_t *comp, const component_t *lamp)
+static unsigned char down_gray_in_bounds(int x, int y)
+{
+    return (x >= 0 && x < BEACON_IMAGE_W &&
+            y >= 0 && y < BEACON_IMAGE_H) ? 1U : 0U;
+}
+
+static float down_gray_scene_mean(
+    const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W])
+{
+    unsigned long sum = 0U;
+    unsigned int count = 0U;
+    int x;
+    int y;
+
+    for (y = 0; y < BEACON_IMAGE_H; y += 4)
+    {
+        for (x = 0; x < BEACON_IMAGE_W; x += 4)
+        {
+            sum += image[y][x];
+            count++;
+        }
+    }
+    return (count > 0U) ? (float)sum / (float)count : 0.0f;
+}
+
+static unsigned char down_gray_point_in_lamp(
+    int x,
+    int y,
+    const component_t *lamp)
 {
     float angle;
     float cos_a;
@@ -1202,157 +1242,962 @@ static unsigned char is_component_in_lamp_core(const component_t *comp, const co
     float major;
     float minor;
 
-    if (comp == 0 || comp->valid == 0 || lamp == 0 || lamp->valid == 0)
-    {
-        return 0;
-    }
-
-    angle = lamp->angle * (PI_F / 180.0f);
-    cos_a = cosf(angle);
-    sin_a = sinf(angle);
-    dx = comp->cx - lamp->cx;
-    dy = comp->cy - lamp->cy;
-    major = dx * cos_a + dy * sin_a;
-    minor = -dx * sin_a + dy * cos_a;
-
-    return (fabsf(major) <= lamp->major * 0.5f + (float)CAR_LAMP_TEMPORAL_CORE_PAD &&
-            fabsf(minor) <= lamp->minor * 0.5f + (float)CAR_LAMP_TEMPORAL_CORE_PAD) ? 1 : 0;
-}
-
-static unsigned char is_near_lamp(const component_t *comp, const component_t *lamp)
-{
-    if (comp == 0 || lamp == 0 || lamp->valid == 0)
-    {
-        return 0;
-    }
-    return (comp->max_x >= lamp->min_x - g_image_down_near_lamp_pad &&
-            comp->min_x <= lamp->max_x + g_image_down_near_lamp_pad &&
-            comp->max_y >= lamp->min_y - g_image_down_near_lamp_pad &&
-            comp->min_y <= lamp->max_y + g_image_down_near_lamp_pad) ? 1 : 0;
-}
-
-static unsigned char is_side_edge_beacon(const component_t *comp)
-{
-    if (comp == 0 || comp->valid == 0)
-    {
-        return 0;
-    }
-    return (comp->min_x < BEACON_SIDE_EDGE_MARGIN ||
-            comp->max_x >= BEACON_IMAGE_W - BEACON_SIDE_EDGE_MARGIN) ? 1 : 0;
-}
-
-static unsigned char is_isolated_near_lamp_beacon(const component_t *comp)
-{
-    if (comp == 0 || comp->valid == 0 ||
-        comp->area < g_image_down_near_lamp_isolated_min_area)
-    {
-        return 0;
-    }
-
-    return local_background_average(comp, CAR_LAMP_LOCAL_RING_PAD) <=
-        g_image_down_near_lamp_background_max ? 1 : 0;
-}
-
-/**
- * @brief 根据下摄信标坐标查表，过滤超出面积上下限的连通域。
- * @return 1表示允许；坐标越界或对应边界为0时不启用该边界。
- */
-static unsigned char is_beacon_area_allowed(
-    float x,
-    float y,
-    float area)
-{
-    int x_index;
-    int y_index;
-    uint8 lower;
-    uint8 upper;
-
-    if ((x < BEACON_AREA_GATE_X_MIN) ||
-        (x >= BEACON_AREA_GATE_X_MIN +
-              BEACON_AREA_GATE_X_STEP * (float)BEACON_AREA_GATE_X_COUNT) ||
-        (y < BEACON_AREA_GATE_Y_MIN) ||
-        (y >= BEACON_AREA_GATE_Y_MIN +
-              BEACON_AREA_GATE_Y_STEP * (float)BEACON_AREA_GATE_Y_COUNT))
-    {
-        return 1U;
-    }
-    x_index = (int)((x - BEACON_AREA_GATE_X_MIN) / BEACON_AREA_GATE_X_STEP);
-    y_index = (int)((y - BEACON_AREA_GATE_Y_MIN) / BEACON_AREA_GATE_Y_STEP);
-    if ((x_index < 0) || (x_index >= (int)BEACON_AREA_GATE_X_COUNT) ||
-        (y_index < 0) || (y_index >= (int)BEACON_AREA_GATE_Y_COUNT))
-    {
-        return 1U;
-    }
-    lower = g_center_beacon_area_lower[y_index][x_index];
-    upper = g_center_beacon_area_upper[y_index][x_index];
-    if ((lower != 0U) && (area < (float)lower))
+    if (lamp == 0 || lamp->valid == 0)
     {
         return 0U;
     }
-    if ((upper != 0U) && (area > (float)upper))
+    if (x < lamp->min_x - LAMP_MASK_PAD ||
+        x > lamp->max_x + LAMP_MASK_PAD ||
+        y < lamp->min_y - LAMP_MASK_PAD ||
+        y > lamp->max_y + LAMP_MASK_PAD)
+    {
+        return 0U;
+    }
+    angle = lamp->angle * (PI_F / 180.0f);
+    cos_a = cosf(angle);
+    sin_a = sinf(angle);
+    dx = (float)x - lamp->cx;
+    dy = (float)y - lamp->cy;
+    major = dx * cos_a + dy * sin_a;
+    minor = -dx * sin_a + dy * cos_a;
+    return (fabsf(major) <= lamp->major * 0.5f + (float)LAMP_MASK_PAD &&
+            fabsf(minor) <= lamp->minor * 0.5f + (float)LAMP_MASK_PAD) ? 1U : 0U;
+}
+
+static unsigned char down_gray_point_in_current_lamps(int x, int y)
+{
+    unsigned char index;
+
+    for (index = 0U; index < g_current_lamp_mask_count; index++)
+    {
+        if (down_gray_point_in_lamp(
+                x, y, &g_current_lamp_masks[index]) != 0U)
+        {
+            return 1U;
+        }
+    }
+    return 0U;
+}
+
+static unsigned char down_gray_point_in_range(int x, int y)
+{
+    float top_y;
+    float bottom_y;
+
+    if (g_image_down_horizon_valid == 0U ||
+        g_image_down_horizon_extrapolated != 0U)
+    {
+        return 1U;
+    }
+    if (image_down_horizon_contains((float)x, (float)y, 0.0f) == 0U)
+    {
+        return 0U;
+    }
+    if (image_down_horizon_get_column(
+            (uint16)x, &top_y, &bottom_y) == 0U)
+    {
+        return 1U;
+    }
+    if (top_y >= 0.0f && top_y <= (float)(BEACON_IMAGE_H - 1) &&
+        (float)y < top_y + DOWN_BEACON_BOUNDARY_CLEARANCE)
+    {
+        return 0U;
+    }
+    if (bottom_y >= 0.0f && bottom_y <= (float)(BEACON_IMAGE_H - 1) &&
+        (float)y > bottom_y - DOWN_BEACON_BOUNDARY_CLEARANCE)
     {
         return 0U;
     }
     return 1U;
 }
 
-static void insert_beacon_by_area(
-    const component_t *comp,
+static void down_gray_horizontal_box_sum(
+    const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
+    int y,
+    int radius,
+    unsigned short output[BEACON_IMAGE_W])
+{
+    unsigned int sum = 0U;
+    int x;
+
+    for (x = -radius; x <= radius; x++)
+    {
+        sum += image[y][down_gray_reflect_index(x, BEACON_IMAGE_W)];
+    }
+    output[0] = (unsigned short)sum;
+    for (x = 1; x < BEACON_IMAGE_W; x++)
+    {
+        sum += image[y][down_gray_reflect_index(x + radius, BEACON_IMAGE_W)];
+        sum -= image[y][down_gray_reflect_index(x - radius - 1, BEACON_IMAGE_W)];
+        output[x] = (unsigned short)sum;
+    }
+}
+
+static void down_gray_insert_peak(
+    down_gray_peak_t peaks[DOWN_GRAY_MAX_PEAKS],
+    unsigned char *count,
+    signed short response,
+    int x,
+    int y)
+{
+    int position;
+    int last;
+
+    if (count == 0 || response <= 0)
+    {
+        return;
+    }
+    last = *count;
+    if (last >= (int)DOWN_GRAY_MAX_PEAKS)
+    {
+        last = (int)DOWN_GRAY_MAX_PEAKS - 1;
+        if (response <= peaks[last].response)
+        {
+            return;
+        }
+    }
+    else
+    {
+        (*count)++;
+    }
+    position = last;
+    while (position > 0 && response > peaks[position - 1].response)
+    {
+        peaks[position] = peaks[position - 1];
+        position--;
+    }
+    peaks[position].response = response;
+    peaks[position].x = (unsigned char)x;
+    peaks[position].y = (unsigned char)y;
+}
+
+static void down_gray_collect_response_row(
+    const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
     const component_t *lamp,
     const component_t *temporal_lamp,
+    float scene_mean,
+    int center_y,
+    int top_slot,
+    int center_slot,
+    int bottom_slot,
+    down_gray_peak_t peaks[DOWN_GRAY_MAX_PEAKS],
+    unsigned char *count)
+{
+    int minimum_peak = (int)(scene_mean + 25.0f);
+    int x;
+
+    if (minimum_peak < 90)
+    {
+        minimum_peak = 90;
+    }
+    for (x = 0; x < BEACON_IMAGE_W; x++)
+    {
+        signed short response = g_gray_response_rows[center_slot][x];
+        int dx;
+        unsigned char local_maximum = 1U;
+
+        if (response <= 0 || image[center_y][x] < minimum_peak ||
+            down_gray_point_in_range(x, center_y) == 0U ||
+            down_gray_point_in_current_lamps(x, center_y) != 0U ||
+            down_gray_point_in_lamp(x, center_y, lamp) != 0U ||
+            down_gray_point_in_lamp(x, center_y, temporal_lamp) != 0U)
+        {
+            continue;
+        }
+        for (dx = -1; dx <= 1; dx++)
+        {
+            int xx = down_gray_reflect_index(x + dx, BEACON_IMAGE_W);
+            if (response < g_gray_response_rows[top_slot][xx] ||
+                response < g_gray_response_rows[center_slot][xx] ||
+                response < g_gray_response_rows[bottom_slot][xx])
+            {
+                local_maximum = 0U;
+                break;
+            }
+        }
+        if (local_maximum != 0U)
+        {
+            down_gray_insert_peak(peaks, count, response, x, center_y);
+        }
+    }
+}
+
+static unsigned char down_gray_find_peaks(
+    const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
+    const component_t *lamp,
+    const component_t *temporal_lamp,
+    float scene_mean,
+    down_gray_peak_t peaks[DOWN_GRAY_MAX_PEAKS])
+{
+    unsigned char count = 0U;
+    int index;
+    int x;
+    int y;
+
+    memset(peaks, 0, sizeof(down_gray_peak_t) * DOWN_GRAY_MAX_PEAKS);
+    memset(g_gray_box3_sum, 0, sizeof(g_gray_box3_sum));
+    memset(g_gray_box9_sum, 0, sizeof(g_gray_box9_sum));
+    for (index = 0; index < 3; index++)
+    {
+        int row = down_gray_reflect_index(index - 1, BEACON_IMAGE_H);
+        down_gray_horizontal_box_sum(image, row, 1, g_gray_box3_rows[index]);
+        for (x = 0; x < BEACON_IMAGE_W; x++)
+        {
+            g_gray_box3_sum[x] += g_gray_box3_rows[index][x];
+        }
+    }
+    for (index = 0; index < 9; index++)
+    {
+        int row = down_gray_reflect_index(index - 4, BEACON_IMAGE_H);
+        down_gray_horizontal_box_sum(image, row, 4, g_gray_box9_rows[index]);
+        for (x = 0; x < BEACON_IMAGE_W; x++)
+        {
+            g_gray_box9_sum[x] += g_gray_box9_rows[index][x];
+        }
+    }
+    for (y = 0; y < BEACON_IMAGE_H; y++)
+    {
+        int response_slot = y % 3;
+        for (x = 0; x < BEACON_IMAGE_W; x++)
+        {
+            int response = 9 * (int)g_gray_box3_sum[x] - (int)g_gray_box9_sum[x];
+            g_gray_response_rows[response_slot][x] = (signed short)response;
+        }
+        if (y == 1)
+        {
+            down_gray_collect_response_row(
+                image, lamp, temporal_lamp, scene_mean,
+                0, 1, 0, 1, peaks, &count);
+        }
+        else if (y >= 2)
+        {
+            down_gray_collect_response_row(
+                image, lamp, temporal_lamp, scene_mean,
+                y - 1, (y - 2) % 3, (y - 1) % 3, y % 3,
+                peaks, &count);
+        }
+        index = y % 3;
+        for (x = 0; x < BEACON_IMAGE_W; x++)
+        {
+            g_gray_box3_sum[x] -= g_gray_box3_rows[index][x];
+        }
+        down_gray_horizontal_box_sum(
+            image, down_gray_reflect_index(y + 2, BEACON_IMAGE_H),
+            1, g_gray_box3_rows[index]);
+        for (x = 0; x < BEACON_IMAGE_W; x++)
+        {
+            g_gray_box3_sum[x] += g_gray_box3_rows[index][x];
+        }
+        index = y % 9;
+        for (x = 0; x < BEACON_IMAGE_W; x++)
+        {
+            g_gray_box9_sum[x] -= g_gray_box9_rows[index][x];
+        }
+        down_gray_horizontal_box_sum(
+            image, down_gray_reflect_index(y + 5, BEACON_IMAGE_H),
+            4, g_gray_box9_rows[index]);
+        for (x = 0; x < BEACON_IMAGE_W; x++)
+        {
+            g_gray_box9_sum[x] += g_gray_box9_rows[index][x];
+        }
+    }
+    down_gray_collect_response_row(
+        image, lamp, temporal_lamp, scene_mean,
+        BEACON_IMAGE_H - 1,
+        (BEACON_IMAGE_H - 2) % 3,
+        (BEACON_IMAGE_H - 1) % 3,
+        (BEACON_IMAGE_H - 2) % 3,
+        peaks, &count);
+    return count;
+}
+
+static float down_gray_ring_median(
+    const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
+    int center_x,
+    int center_y)
+{
+    unsigned short histogram[256];
+    unsigned short count = 0U;
+    unsigned short cumulative = 0U;
+    int min_dx;
+    int max_dx;
+    int min_dy;
+    int max_dy;
+    int dx;
+    int dy;
+    int value;
+
+    memset(histogram, 0, sizeof(histogram));
+    min_dx = (center_x < 10) ? -center_x : -10;
+    max_dx = (center_x + 10 >= BEACON_IMAGE_W) ?
+                 BEACON_IMAGE_W - 1 - center_x : 10;
+    min_dy = (center_y < 10) ? -center_y : -10;
+    max_dy = (center_y + 10 >= BEACON_IMAGE_H) ?
+                 BEACON_IMAGE_H - 1 - center_y : 10;
+    for (dy = min_dy; dy <= max_dy; dy++)
+    {
+        for (dx = min_dx; dx <= max_dx; dx++)
+        {
+            int radius2 = dx * dx + dy * dy;
+            int x = center_x + dx;
+            int y = center_y + dy;
+            if (radius2 < DOWN_GRAY_BACKGROUND_INNER_SQ ||
+                radius2 > DOWN_GRAY_BACKGROUND_OUTER_SQ)
+            {
+                continue;
+            }
+            histogram[image[y][x]]++;
+            count++;
+        }
+    }
+    if (count == 0U)
+    {
+        return 0.0f;
+    }
+    for (value = 0; value < 256; value++)
+    {
+        cumulative += histogram[value];
+        if (cumulative * 2U >= count)
+        {
+            return (float)value;
+        }
+    }
+    return 0.0f;
+}
+
+static unsigned char down_local_shape_measure(
+    const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
+    int center_x,
+    int center_y,
+    int radius,
+    int threshold,
+    int maximum_area,
+    unsigned char reject_artificial_boundary,
+    down_local_shape_t *shape)
+{
+    static const signed char neighbor_x[8] = {1, -1, 0, 0, 1, 1, -1, -1};
+    static const signed char neighbor_y[8] = {0, 0, 1, -1, 1, -1, 1, -1};
+    unsigned char visited[DOWN_LOCAL_SHAPE_SIZE][DOWN_LOCAL_SHAPE_SIZE];
+    unsigned char queue_x[DOWN_LOCAL_SHAPE_CAPACITY];
+    unsigned char queue_y[DOWN_LOCAL_SHAPE_CAPACITY];
+    int min_x;
+    int max_x;
+    int min_y;
+    int max_y;
+    int seed_x = center_x;
+    int seed_y = center_y;
+    int best = -1;
+    int head = 0;
+    int tail = 0;
+    int sum_x = 0;
+    int sum_y = 0;
+    float sum_xx = 0.0f;
+    float sum_yy = 0.0f;
+    float sum_xy = 0.0f;
+    int dx;
+    int dy;
+
+    if (image == 0 || shape == 0 || radius < 1 ||
+        radius > DOWN_EDGE_SUPPORT_RADIUS ||
+        center_x < 0 || center_x >= BEACON_IMAGE_W ||
+        center_y < 0 || center_y >= BEACON_IMAGE_H)
+    {
+        return 0U;
+    }
+    memset(shape, 0, sizeof(*shape));
+    min_x = center_x - radius;
+    max_x = center_x + radius;
+    min_y = center_y - radius;
+    max_y = center_y + radius;
+    if (min_x < 0) min_x = 0;
+    if (min_y < 0) min_y = 0;
+    if (max_x >= BEACON_IMAGE_W) max_x = BEACON_IMAGE_W - 1;
+    if (max_y >= BEACON_IMAGE_H) max_y = BEACON_IMAGE_H - 1;
+    for (dy = -2; dy <= 2; dy++)
+    {
+        int y = center_y + dy;
+        if (y < min_y || y > max_y)
+        {
+            continue;
+        }
+        for (dx = -2; dx <= 2; dx++)
+        {
+            int x = center_x + dx;
+            int value;
+            if (x < min_x || x > max_x)
+            {
+                continue;
+            }
+            value = image[y][x];
+            if (value > best)
+            {
+                best = value;
+                seed_x = x;
+                seed_y = y;
+            }
+        }
+    }
+    if (best < threshold)
+    {
+        return 0U;
+    }
+    memset(visited, 0, sizeof(visited));
+    visited[seed_y - min_y][seed_x - min_x] = 1U;
+    queue_x[tail] = (unsigned char)seed_x;
+    queue_y[tail] = (unsigned char)seed_y;
+    tail++;
+    while (head < tail)
+    {
+        int index;
+        int x = queue_x[head];
+        int y = queue_y[head];
+        float relative_x = (float)(x - center_x);
+        float relative_y = (float)(y - center_y);
+        head++;
+        shape->area++;
+        sum_x += x - center_x;
+        sum_y += y - center_y;
+        sum_xx += relative_x * relative_x;
+        sum_yy += relative_y * relative_y;
+        sum_xy += relative_x * relative_y;
+        if ((x == min_x && min_x > 0) ||
+            (x == max_x && max_x < BEACON_IMAGE_W - 1) ||
+            (y == min_y && min_y > 0) ||
+            (y == max_y && max_y < BEACON_IMAGE_H - 1))
+        {
+            shape->touches_artificial_boundary = 1U;
+            if (reject_artificial_boundary != 0U)
+            {
+                return 0U;
+            }
+        }
+        if (maximum_area > 0 && shape->area > maximum_area)
+        {
+            return 0U;
+        }
+        for (index = 0; index < 8; index++)
+        {
+            int next_x = x + neighbor_x[index];
+            int next_y = y + neighbor_y[index];
+            int visit_x;
+            int visit_y;
+            if (next_x < min_x || next_x > max_x ||
+                next_y < min_y || next_y > max_y)
+            {
+                continue;
+            }
+            visit_x = next_x - min_x;
+            visit_y = next_y - min_y;
+            if (visited[visit_y][visit_x] != 0U ||
+                image[next_y][next_x] < threshold ||
+                tail >= DOWN_LOCAL_SHAPE_CAPACITY)
+            {
+                continue;
+            }
+            visited[visit_y][visit_x] = 1U;
+            queue_x[tail] = (unsigned char)next_x;
+            queue_y[tail] = (unsigned char)next_y;
+            tail++;
+        }
+    }
+    if (shape->area > 0)
+    {
+        float inv_area = 1.0f / (float)shape->area;
+        float centroid_x = (float)sum_x * inv_area;
+        float centroid_y = (float)sum_y * inv_area;
+        float covariance_xx = sum_xx * inv_area - centroid_x * centroid_x;
+        float covariance_yy = sum_yy * inv_area - centroid_y * centroid_y;
+        float covariance_xy = sum_xy * inv_area - centroid_x * centroid_y;
+        float trace = covariance_xx + covariance_yy;
+        float discriminant = (covariance_xx - covariance_yy) *
+                             (covariance_xx - covariance_yy) +
+                             4.0f * covariance_xy * covariance_xy;
+        float eigen_major;
+        float eigen_minor;
+        if (discriminant < 0.0f)
+        {
+            discriminant = 0.0f;
+        }
+        discriminant = sqrtf(discriminant);
+        eigen_major = (trace + discriminant) * 0.5f;
+        eigen_minor = (trace - discriminant) * 0.5f;
+        if (eigen_major < 0.001f) eigen_major = 0.001f;
+        if (eigen_minor < 0.001f) eigen_minor = 0.001f;
+        shape->major = 4.0f * sqrtf(eigen_major);
+        shape->minor = 4.0f * sqrtf(eigen_minor);
+        shape->elongation = sqrtf(eigen_major / eigen_minor);
+        shape->valid = 1U;
+    }
+    return shape->valid;
+}
+
+static unsigned char down_gray_edge_support_valid(
+    const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
+    int center_x,
+    int center_y,
+    float background,
+    unsigned char peak,
+    int left_margin,
+    int right_margin)
+{
+    float delta;
+    int threshold;
+    down_local_shape_t support;
+
+    if (center_x >= left_margin &&
+        center_x < BEACON_IMAGE_W - right_margin)
+    {
+        return 1U;
+    }
+    delta = ((float)peak - background) * 0.10f;
+    if (delta < 12.0f)
+    {
+        delta = 12.0f;
+    }
+    threshold = (int)(background + delta + 0.5f);
+    if (threshold < 0) threshold = 0;
+    if (threshold > 255) threshold = 255;
+    memset(&support, 0, sizeof(support));
+    return down_local_shape_measure(
+        image, center_x, center_y,
+        DOWN_EDGE_SUPPORT_RADIUS, threshold,
+        DOWN_EDGE_SUPPORT_MAX_AREA, 1U, &support);
+}
+
+static unsigned char down_gray_local_features(
+    const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
+    int center_x,
+    int center_y,
+    down_gray_features_t *features)
+{
+    float inner_sum = 0.0f;
+    float middle_sum = 0.0f;
+    float weight_sum = 0.0f;
+    float inner_weight = 0.0f;
+    float weight_x = 0.0f;
+    float weight_y = 0.0f;
+    float weight_xx = 0.0f;
+    float weight_yy = 0.0f;
+    float weight_xy = 0.0f;
+    float centroid_x;
+    float centroid_y;
+    float covariance_xx;
+    float covariance_yy;
+    float covariance_xy;
+    float trace;
+    float discriminant;
+    float eigen_major;
+    float eigen_minor;
+    float background;
+    int inner_count = 0;
+    int middle_count = 0;
+    int outer_count = 0;
+    int outer_bright = 0;
+    int min_dx;
+    int max_dx;
+    int min_dy;
+    int max_dy;
+    int half_min_dx;
+    int half_max_dx;
+    int half_min_dy;
+    int half_max_dy;
+    int dx;
+    int dy;
+    unsigned char peak = 0U;
+    unsigned char half_area = 0U;
+
+    if (features == 0)
+    {
+        return 0U;
+    }
+    memset(features, 0, sizeof(*features));
+    background = down_gray_ring_median(image, center_x, center_y);
+    min_dx = (center_x < 10) ? -center_x : -10;
+    max_dx = (center_x + 10 >= BEACON_IMAGE_W) ?
+                 BEACON_IMAGE_W - 1 - center_x : 10;
+    min_dy = (center_y < 10) ? -center_y : -10;
+    max_dy = (center_y + 10 >= BEACON_IMAGE_H) ?
+                 BEACON_IMAGE_H - 1 - center_y : 10;
+    for (dy = min_dy; dy <= max_dy; dy++)
+    {
+        for (dx = min_dx; dx <= max_dx; dx++)
+        {
+            int radius2 = dx * dx + dy * dy;
+            int x = center_x + dx;
+            int y = center_y + dy;
+            unsigned char pixel = image[y][x];
+            if (radius2 >= DOWN_GRAY_BACKGROUND_INNER_SQ &&
+                radius2 <= DOWN_GRAY_BACKGROUND_OUTER_SQ)
+            {
+                outer_count++;
+                if ((float)pixel >= background + 20.0f)
+                {
+                    outer_bright++;
+                }
+            }
+            if (radius2 > DOWN_GRAY_PATCH_RADIUS * DOWN_GRAY_PATCH_RADIUS)
+            {
+                continue;
+            }
+            if (pixel > peak)
+            {
+                peak = pixel;
+            }
+            if (radius2 <= 4)
+            {
+                inner_sum += pixel;
+                inner_count++;
+            }
+            else if (radius2 <= 16)
+            {
+                middle_sum += pixel;
+                middle_count++;
+            }
+            {
+                float weight = (float)pixel - background;
+                if (weight < 0.0f)
+                {
+                    weight = 0.0f;
+                }
+                weight_sum += weight;
+                weight_x += weight * (float)dx;
+                weight_y += weight * (float)dy;
+                weight_xx += weight * (float)(dx * dx);
+                weight_yy += weight * (float)(dy * dy);
+                weight_xy += weight * (float)(dx * dy);
+                if (radius2 <= 4)
+                {
+                    inner_weight += weight;
+                }
+            }
+        }
+    }
+    if (weight_sum <= 0.0001f || inner_count == 0 || middle_count == 0)
+    {
+        return 0U;
+    }
+    half_min_dx = (center_x < DOWN_GRAY_PATCH_RADIUS) ?
+                      -center_x : -DOWN_GRAY_PATCH_RADIUS;
+    half_max_dx = (center_x + DOWN_GRAY_PATCH_RADIUS >= BEACON_IMAGE_W) ?
+                      BEACON_IMAGE_W - 1 - center_x : DOWN_GRAY_PATCH_RADIUS;
+    half_min_dy = (center_y < DOWN_GRAY_PATCH_RADIUS) ?
+                      -center_y : -DOWN_GRAY_PATCH_RADIUS;
+    half_max_dy = (center_y + DOWN_GRAY_PATCH_RADIUS >= BEACON_IMAGE_H) ?
+                      BEACON_IMAGE_H - 1 - center_y : DOWN_GRAY_PATCH_RADIUS;
+    for (dy = half_min_dy; dy <= half_max_dy; dy++)
+    {
+        for (dx = half_min_dx; dx <= half_max_dx; dx++)
+        {
+            int x = center_x + dx;
+            int y = center_y + dy;
+            if (dx * dx + dy * dy <= DOWN_GRAY_PATCH_RADIUS * DOWN_GRAY_PATCH_RADIUS &&
+                (unsigned int)image[y][x] * 2U >= peak)
+            {
+                half_area++;
+            }
+        }
+    }
+    centroid_x = weight_x / weight_sum;
+    centroid_y = weight_y / weight_sum;
+    covariance_xx = weight_xx / weight_sum - centroid_x * centroid_x;
+    covariance_yy = weight_yy / weight_sum - centroid_y * centroid_y;
+    covariance_xy = weight_xy / weight_sum - centroid_x * centroid_y;
+    trace = covariance_xx + covariance_yy;
+    discriminant = (covariance_xx - covariance_yy) *
+                   (covariance_xx - covariance_yy) +
+                   4.0f * covariance_xy * covariance_xy;
+    if (discriminant < 0.0f)
+    {
+        discriminant = 0.0f;
+    }
+    discriminant = sqrtf(discriminant);
+    eigen_major = (trace + discriminant) * 0.5f;
+    eigen_minor = (trace - discriminant) * 0.5f;
+    if (eigen_minor < 0.001f)
+    {
+        eigen_minor = 0.001f;
+    }
+    features->background = background;
+    features->inner_contrast = inner_sum / (float)inner_count - background;
+    features->radial_drop = inner_sum / (float)inner_count -
+                            middle_sum / (float)middle_count;
+    features->concentration = inner_weight / weight_sum;
+    features->elongation = sqrtf(eigen_major / eigen_minor);
+    features->offset = sqrtf(centroid_x * centroid_x + centroid_y * centroid_y);
+    features->outer_occupancy = (outer_count > 0) ?
+        (float)outer_bright / (float)outer_count : 0.0f;
+    features->centroid_x = centroid_x;
+    features->centroid_y = centroid_y;
+    features->peak = peak;
+    features->half_area = half_area;
+    return 1U;
+}
+
+static unsigned char down_gray_large_shape_valid(
+    const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
+    int center_x,
+    int center_y,
+    const down_gray_features_t *features)
+{
+    enum { RADIUS = 10, SIZE = RADIUS * 2 + 1, CAPACITY = SIZE * SIZE };
+    static const signed char neighbor_x[8] = {1, -1, 0, 0, 1, 1, -1, -1};
+    static const signed char neighbor_y[8] = {0, 0, 1, -1, 1, -1, 1, -1};
+    unsigned char visited[SIZE][SIZE];
+    signed char queue_x[CAPACITY];
+    signed char queue_y[CAPACITY];
+    int head = 0;
+    int tail = 0;
+    int count = 0;
+    int seed_x = 0;
+    int seed_y = 0;
+    int threshold;
+    int best = -1;
+    int dx;
+    int dy;
+    int sum_x = 0;
+    int sum_y = 0;
+    int sum_xx = 0;
+    int sum_yy = 0;
+    int sum_xy = 0;
+    float cx;
+    float cy;
+    float var_x;
+    float var_y;
+    float cov_xy;
+    float trace;
+    float discriminant;
+    float major;
+    float minor;
+
+    if (features == 0)
+    {
+        return 0U;
+    }
+    threshold = (int)(features->background +
+                      ((float)features->peak - features->background) * 0.45f);
+    if (threshold < 120)
+    {
+        threshold = 120;
+    }
+    for (dy = -2; dy <= 2; dy++)
+    {
+        for (dx = -2; dx <= 2; dx++)
+        {
+            int image_x = center_x + dx;
+            int image_y = center_y + dy;
+            int pixel;
+            if (down_gray_in_bounds(image_x, image_y) == 0U)
+            {
+                continue;
+            }
+            pixel = image[image_y][image_x];
+            if (pixel > best)
+            {
+                best = pixel;
+                seed_x = dx;
+                seed_y = dy;
+            }
+        }
+    }
+    if (best < threshold)
+    {
+        return 0U;
+    }
+    memset(visited, 0, sizeof(visited));
+    visited[seed_y + RADIUS][seed_x + RADIUS] = 1U;
+    queue_x[tail] = (signed char)seed_x;
+    queue_y[tail] = (signed char)seed_y;
+    tail++;
+    while (head < tail)
+    {
+        int index;
+        int x = queue_x[head];
+        int y = queue_y[head];
+        head++;
+        if (x == -RADIUS || x == RADIUS || y == -RADIUS || y == RADIUS)
+        {
+            return 0U;
+        }
+        count++;
+        sum_x += x;
+        sum_y += y;
+        sum_xx += x * x;
+        sum_yy += y * y;
+        sum_xy += x * y;
+        for (index = 0; index < 8; index++)
+        {
+            int next_x = x + neighbor_x[index];
+            int next_y = y + neighbor_y[index];
+            int visit_x = next_x + RADIUS;
+            int visit_y = next_y + RADIUS;
+            int image_x = center_x + next_x;
+            int image_y = center_y + next_y;
+            if (visit_x < 0 || visit_x >= SIZE ||
+                visit_y < 0 || visit_y >= SIZE ||
+                visited[visit_y][visit_x] != 0U ||
+                down_gray_in_bounds(image_x, image_y) == 0U ||
+                image[image_y][image_x] < threshold)
+            {
+                continue;
+            }
+            visited[visit_y][visit_x] = 1U;
+            queue_x[tail] = (signed char)next_x;
+            queue_y[tail] = (signed char)next_y;
+            tail++;
+        }
+    }
+    if (count < 20 || count > 140)
+    {
+        return 0U;
+    }
+    cx = (float)sum_x / (float)count;
+    cy = (float)sum_y / (float)count;
+    var_x = (float)sum_xx / (float)count - cx * cx;
+    var_y = (float)sum_yy / (float)count - cy * cy;
+    cov_xy = (float)sum_xy / (float)count - cx * cy;
+    trace = var_x + var_y;
+    discriminant = (var_x - var_y) * (var_x - var_y) + 4.0f * cov_xy * cov_xy;
+    discriminant = sqrtf((discriminant > 0.0f) ? discriminant : 0.0f);
+    major = (trace + discriminant) * 0.5f;
+    minor = (trace - discriminant) * 0.5f;
+    if (minor < 0.001f)
+    {
+        minor = 0.001f;
+    }
+    return (sqrtf(major / minor) <= 2.0f) ? 1U : 0U;
+}
+
+static unsigned char down_gray_candidate_valid(
+    const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
+    int x,
+    int y,
+    float scene_mean,
+    const down_gray_features_t *features,
+    unsigned char peak_clipped)
+{
+    int weak_peak = (int)(scene_mean + 70.0f);
+    unsigned char weak;
+    unsigned char normal;
+    unsigned char medium;
+    unsigned char large;
+
+    if (features == 0 || down_gray_point_in_range(x, y) == 0U)
+    {
+        return 0U;
+    }
+    if ((x < DOWN_BEACON_LEFT_EDGE_MARGIN ||
+         x >= BEACON_IMAGE_W - DOWN_BEACON_RIGHT_EDGE_MARGIN) &&
+        (features->peak < DOWN_GRAY_EDGE_MIN_PEAK ||
+         (features->outer_occupancy > DOWN_GRAY_EDGE_MAX_OCCUPANCY &&
+          (features->half_area > 20U ||
+           features->concentration < 0.45f))))
+    {
+        return 0U;
+    }
+    if (weak_peak < 140)
+    {
+        weak_peak = 140;
+    }
+    weak = ((features->half_area >= 3U) &&
+            (features->half_area <= 20U) &&
+            (features->peak >= weak_peak) &&
+            (features->inner_contrast >= 42.0f) &&
+            (features->radial_drop >= 38.0f) &&
+            (features->concentration >= 0.58f) &&
+            (features->elongation <= 1.75f) &&
+            (features->offset <= 1.70f) &&
+            (features->outer_occupancy <= 0.42f)) ? 1U : 0U;
+    normal = ((features->half_area >= 4U) &&
+              (features->half_area <= 32U) &&
+              (features->peak >= 200U) &&
+              (features->inner_contrast >= 80.0f) &&
+              (features->radial_drop >= 65.0f) &&
+              (features->concentration >= 0.42f) &&
+              (features->elongation <= 1.90f) &&
+              (features->offset <= 2.00f) &&
+              (features->outer_occupancy <= 0.50f)) ? 1U : 0U;
+    medium = ((features->half_area >= 15U) &&
+              (features->half_area <= 42U) &&
+              (features->peak >= 235U) &&
+              (features->inner_contrast >= 105.0f) &&
+              (features->radial_drop >= 58.0f) &&
+              (features->concentration >= 0.36f) &&
+              (features->elongation <= 1.90f) &&
+              (features->offset <= 2.10f) &&
+              (features->outer_occupancy <= 0.56f)) ? 1U : 0U;
+    large = ((features->half_area >= 24U) &&
+             (features->half_area <= 84U) &&
+             (features->peak >= 248U) &&
+             (features->inner_contrast >= 135.0f) &&
+             (features->radial_drop >= 38.0f) &&
+              (features->concentration >= 0.18f) &&
+             (features->elongation <= 2.00f) &&
+             (features->offset <= 2.40f) &&
+             (features->outer_occupancy <= 0.65f) &&
+             (down_gray_large_shape_valid(image, x, y, features) != 0U)) ? 1U : 0U;
+    if (peak_clipped != 0U && weak == 0U && large == 0U)
+    {
+        return 0U;
+    }
+    if (large == 0U &&
+        down_gray_edge_support_valid(
+            image, x, y, features->background, features->peak,
+            DOWN_BEACON_LEFT_EDGE_MARGIN,
+            DOWN_BEACON_RIGHT_EDGE_MARGIN) == 0U)
+    {
+        return 0U;
+    }
+    return (weak != 0U || normal != 0U || medium != 0U || large != 0U) ? 1U : 0U;
+}
+
+static void down_gray_add_candidate(
+    down_gray_candidate_t candidates[DOWN_GRAY_MAX_CANDIDATES],
+    unsigned char *count,
+    const down_gray_candidate_t *candidate)
+{
+    unsigned char index;
+
+    if (count == 0 || candidate == 0)
+    {
+        return;
+    }
+    for (index = 0U; index < *count; index++)
+    {
+        float dx = candidate->x - candidates[index].x;
+        float dy = candidate->y - candidates[index].y;
+        if (dx * dx + dy * dy <= DOWN_GRAY_DEDUP_DISTANCE_SQ)
+        {
+            if (candidate->score > candidates[index].score)
+            {
+                candidates[index] = *candidate;
+            }
+            return;
+        }
+    }
+    if (*count < DOWN_GRAY_MAX_CANDIDATES)
+    {
+        candidates[*count] = *candidate;
+        (*count)++;
+    }
+}
+
+static void down_gray_insert_result(
+    const down_gray_candidate_t *candidate,
     beacon_result_t *result)
 {
-    int i;
-    int slot;
-    int min_area;
     beacon_circle_t circle;
+    int slot;
+    int index;
 
-    if (comp == 0 || comp->valid == 0)
+    if (candidate == 0 || result == 0)
     {
         return;
     }
-    if ((lamp == 0 || lamp->valid == 0) &&
-        (temporal_lamp == 0 || temporal_lamp->valid == 0) &&
-        (comp->max_y <= BEACON_TOP_BOTTOM_EDGE_REJECT_MARGIN ||
-         comp->min_y >= BEACON_IMAGE_H - 1 - BEACON_TOP_BOTTOM_EDGE_REJECT_MARGIN))
-    {
-        return;
-    }
-    min_area = is_side_edge_beacon(comp) != 0
-        ? g_image_down_side_edge_min_area
-        : g_image_down_beacon_min_area;
-    if (comp->area < min_area)
-    {
-        return;
-    }
-    if (is_component_in_lamp_core(comp, lamp) != 0 ||
-        is_component_in_lamp_core(comp, temporal_lamp) != 0)
-    {
-        return;
-    }
-    if ((is_near_lamp(comp, lamp) != 0 ||
-         is_near_lamp(comp, temporal_lamp) != 0) &&
-        comp->area < g_image_down_near_lamp_min_area &&
-        is_isolated_near_lamp_beacon(comp) == 0)
-    {
-        return;
-    }
-
-    circle.x = comp->cx - (float)BEACON_IMAGE_W * 0.5f;
-    circle.y = comp->cy - (float)BEACON_IMAGE_H * 0.5f;
-    circle.radius = sqrtf((float)comp->area / PI_F);
-    circle.area = (float)comp->area;
-    circle.valid = 1;
-    if (is_beacon_area_allowed(circle.x, circle.y, circle.area) == 0U)
-    {
-        return;
-    }
-
     slot = result->beacon_count;
     if (slot >= BEACON_MAX_BEACON_COUNT)
     {
         slot = BEACON_MAX_BEACON_COUNT - 1;
-        if (circle.area <= result->beacons[slot].area)
+        if (candidate->area <= result->beacons[slot].area)
         {
             return;
         }
@@ -1361,16 +2206,60 @@ static void insert_beacon_by_area(
     {
         result->beacon_count++;
     }
-
-    for (i = slot - 1; i >= 0; i--)
+    for (index = slot; index > 0; index--)
     {
-        if (circle.area <= result->beacons[i].area)
+        if (candidate->area <= result->beacons[index - 1].area)
         {
             break;
         }
-        result->beacons[i + 1] = result->beacons[i];
+        result->beacons[index] = result->beacons[index - 1];
     }
-    result->beacons[i + 1] = circle;
+    memset(&circle, 0, sizeof(circle));
+    circle.x = candidate->x - (float)BEACON_IMAGE_W * 0.5f;
+    circle.y = candidate->y - (float)BEACON_IMAGE_H * 0.5f;
+    circle.area = candidate->area;
+    circle.radius = sqrtf(candidate->area / PI_F);
+    circle.valid = 1U;
+    result->beacons[index] = circle;
+}
+
+static void down_gray_build_snapshot(const beacon_result_t *result)
+{
+    unsigned char index;
+
+    memset(g_beacon_binary_snapshot, 0, sizeof(g_beacon_binary_snapshot));
+    if (result == 0)
+    {
+        return;
+    }
+    for (index = 0U; index < result->beacon_count; index++)
+    {
+        int center_x = (int)(result->beacons[index].x +
+                             (float)BEACON_IMAGE_W * 0.5f + 0.5f);
+        int center_y = (int)(result->beacons[index].y +
+                             (float)BEACON_IMAGE_H * 0.5f + 0.5f);
+        int radius = (int)(result->beacons[index].radius + 1.5f);
+        int x;
+        int y;
+
+        if (radius < 2)
+        {
+            radius = 2;
+        }
+        for (y = center_y - radius; y <= center_y + radius; y++)
+        {
+            for (x = center_x - radius; x <= center_x + radius; x++)
+            {
+                if (x >= 0 && x < BEACON_IMAGE_W &&
+                    y >= 0 && y < BEACON_IMAGE_H &&
+                    (x - center_x) * (x - center_x) +
+                    (y - center_y) * (y - center_y) <= radius * radius)
+                {
+                    g_beacon_binary_snapshot[y][x] = 255U;
+                }
+            }
+        }
+    }
 }
 
 static void sync_legacy_beacons(beacon_result_t *result)
@@ -1396,34 +2285,65 @@ static void find_beacons(
     const component_t *temporal_lamp,
     beacon_result_t *result)
 {
-    unsigned char x;
-    unsigned char y;
+    down_gray_peak_t peaks[DOWN_GRAY_MAX_PEAKS];
+    down_gray_candidate_t candidates[DOWN_GRAY_MAX_CANDIDATES];
+    float scene_mean;
+    unsigned char peak_count;
+    unsigned char candidate_count = 0U;
+    unsigned char index;
 
-    result->beacon_count = 0;
-    threshold_beacon_image(image);
-    erase_lamp_rect_from_binary(lamp);
-    erase_temporal_lamp_from_binary(temporal_lamp);
-    memcpy(g_beacon_binary_snapshot, g_binary,
-           sizeof(g_beacon_binary_snapshot));
-    begin_visit_pass();
-
-    for (y = 0; y < BEACON_IMAGE_H; y++)
+    result->beacon_count = 0U;
+    memset(candidates, 0, sizeof(candidates));
+    scene_mean = down_gray_scene_mean(image);
+    peak_count = down_gray_find_peaks(
+        image, lamp, temporal_lamp, scene_mean, peaks);
+    for (index = 0U; index < peak_count; index++)
     {
-        for (x = 0; x < BEACON_IMAGE_W; x++)
+        down_gray_features_t features;
+        down_gray_candidate_t candidate;
+        int x = peaks[index].x;
+        int y = peaks[index].y;
+        unsigned char peak_clipped =
+            (x == 0 || x == BEACON_IMAGE_W - 1 ||
+             y == 0 || y == BEACON_IMAGE_H - 1) ? 1U : 0U;
+
+        if (down_gray_local_features(image, x, y, &features) == 0U)
         {
-            component_t comp;
-
-            if (g_binary[y][x] == 0 || is_visited(x, y))
-            {
-                continue;
-            }
-
-            comp = grow_component(x, y);
-            insert_beacon_by_area(&comp, lamp, temporal_lamp, result);
+            continue;
         }
+        candidate.x = (float)x + features.centroid_x;
+        candidate.y = (float)y + features.centroid_y;
+        if (candidate.x < 0.0f || candidate.x > (float)(BEACON_IMAGE_W - 1) ||
+            candidate.y < 0.0f || candidate.y > (float)(BEACON_IMAGE_H - 1) ||
+            down_gray_point_in_current_lamps(
+                (int)(candidate.x + 0.5f),
+                (int)(candidate.y + 0.5f)) != 0U ||
+            down_gray_point_in_lamp(
+                (int)(candidate.x + 0.5f),
+                (int)(candidate.y + 0.5f), lamp) != 0U ||
+            down_gray_candidate_valid(
+                image, (int)(candidate.x + 0.5f),
+                (int)(candidate.y + 0.5f), scene_mean, &features,
+                peak_clipped) == 0U)
+        {
+            continue;
+        }
+        candidate.area = (float)features.half_area;
+        candidate.score = (float)peaks[index].response +
+                          features.inner_contrast * 8.0f +
+                          features.concentration * 500.0f;
+        down_gray_add_candidate(candidates, &candidate_count, &candidate);
     }
-
+    for (index = 0U; index < candidate_count; index++)
+    {
+        down_gray_insert_result(&candidates[index], result);
+    }
+    if (result->beacon_count > 2U)
+    {
+        result->beacon_count = 2U;
+    }
     sync_legacy_beacons(result);
+    down_gray_build_snapshot(result);
 }
 
 static float square_distance(float ax, float ay, float bx, float by)
@@ -1432,11 +2352,6 @@ static float square_distance(float ax, float ay, float bx, float by)
     float dy = ay - by;
 
     return dx * dx + dy * dy;
-}
-
-static float beacon_area(const beacon_circle_t *beacon)
-{
-    return beacon->radius * beacon->radius * PI_F;
 }
 
 static void reset_track(temporal_track_t *track)
@@ -1458,10 +2373,11 @@ static unsigned char predict_missed_track(temporal_track_t *track, unsigned char
     return 0;
 }
 
-static void start_pending_track(temporal_track_t *track, float x, float y)
+static void start_confirmed_track(temporal_track_t *track, float x, float y)
 {
     reset_track(track);
     track->active = 1;
+    track->confirmed = 1;
     track->hits = 1;
     track->x = x;
     track->y = y;
@@ -1587,183 +2503,40 @@ static unsigned char temporal_car_max_misses(const temporal_track_t *track)
     return CAR_LAMP_CENTER_MAX_MISSES;
 }
 
-static unsigned char can_use_temporal_car_mask(const temporal_track_t *track)
+static void update_current_beacon_track(const beacon_circle_t *measurement)
 {
-    return (track != 0 &&
-            track->confirmed != 0 &&
-            track->misses < temporal_car_max_misses(track)) ? 1 : 0;
-}
+    float distance_limit =
+        g_image_down_new_target_distance * g_image_down_new_target_distance;
 
-static unsigned char find_temporal_car_lamp(component_t *best_lamp)
-{
-    component_t temporal_lamp;
-    component_t best_comp;
-    unsigned char found = 0;
-    int min_x;
-    int max_x;
-    int min_y;
-    int max_y;
-    int x;
-    int y;
-
-    if (best_lamp == 0 || g_current_image == 0 ||
-        component_from_temporal_car(&g_car_track, &temporal_lamp, 1) == 0)
+    if (measurement == 0)
     {
-        return 0;
+        return;
     }
-
-    memset(&best_comp, 0, sizeof(best_comp));
-
-    min_x = temporal_lamp.min_x - CAR_LAMP_TEMPORAL_TAKEOVER_PAD;
-    max_x = temporal_lamp.max_x + CAR_LAMP_TEMPORAL_TAKEOVER_PAD;
-    min_y = temporal_lamp.min_y - CAR_LAMP_TEMPORAL_TAKEOVER_PAD;
-    max_y = temporal_lamp.max_y + CAR_LAMP_TEMPORAL_TAKEOVER_PAD;
-    if (min_x < 0) min_x = 0;
-    if (min_y < 0) min_y = 0;
-    if (max_x >= BEACON_IMAGE_W) max_x = BEACON_IMAGE_W - 1;
-    if (max_y >= BEACON_IMAGE_H) max_y = BEACON_IMAGE_H - 1;
-    if ((max_x < 0) || (max_y < 0) ||
-        (min_x >= BEACON_IMAGE_W) || (min_y >= BEACON_IMAGE_H) ||
-        (min_x > max_x) || (min_y > max_y))
+    if (g_b0_track.active == 0 ||
+        square_distance(g_b0_track.x, g_b0_track.y,
+                        measurement->x, measurement->y) > distance_limit)
     {
-        return 0;
-    }
-
-    threshold_image(g_current_image, (unsigned char)g_image_down_beacon_binary_threshold);
-    begin_visit_pass();
-    for (y = min_y; y <= max_y; y++)
-    {
-        for (x = min_x; x <= max_x; x++)
-        {
-            component_t comp;
-
-            if (g_binary[y][x] == 0 ||
-                is_visited((unsigned char)x, (unsigned char)y))
-            {
-                continue;
-            }
-
-            comp = grow_component((unsigned char)x, (unsigned char)y);
-            if (comp.area >= CAR_LAMP_TEMPORAL_MIN_BRIGHT_AREA &&
-                is_component_in_lamp_core(&comp, &temporal_lamp) != 0)
-            {
-                if (found == 0 || comp.area > best_comp.area)
-                {
-                    best_comp = comp;
-                    found = 1;
-                }
-            }
-        }
-    }
-
-    if (found != 0)
-    {
-        *best_lamp = best_comp;
-    }
-
-    return found;
-}
-
-static int nearest_beacon_index(const beacon_result_t *result, float x, float y)
-{
-    int i;
-    int best = -1;
-    float best_d2 = g_image_down_match_distance * g_image_down_match_distance;
-
-    for (i = 0; i < result->beacon_count; i++)
-    {
-        float d2 = square_distance(result->beacons[i].x, result->beacons[i].y, x, y);
-        if (d2 <= best_d2)
-        {
-            best_d2 = d2;
-            best = i;
-        }
-    }
-
-    return best;
-}
-
-static unsigned char update_temporal_beacon(beacon_result_t *result)
-{
-    int selected = -1;
-    beacon_circle_t *measurement;
-
-    if (result->beacon_count == 0)
-    {
-        return predict_missed_track(&g_b0_track, g_image_down_max_misses);
-    }
-
-    if (g_b0_track.confirmed != 0)
-    {
-        float predict_x = g_b0_track.x + g_b0_track.vx;
-        float predict_y = g_b0_track.y + g_b0_track.vy;
-
-        selected = nearest_beacon_index(result, predict_x, predict_y);
-        if (selected > 0 &&
-            beacon_area(&result->beacons[0]) >
-                beacon_area(&result->beacons[selected]) * B0_SWITCH_AREA_RATIO)
-        {
-            selected = 0;
-        }
-        if (selected < 0 &&
-            square_distance(predict_x, predict_y, result->beacons[0].x, result->beacons[0].y) >
-                g_image_down_new_target_distance * g_image_down_new_target_distance)
-        {
-            start_pending_track(&g_b0_track, result->beacons[0].x, result->beacons[0].y);
-            set_beacon_track_shape(&g_b0_track, &result->beacons[0]);
-            return 0;
-        }
+        reset_track(&g_b0_track);
+        g_b0_track.active = 1U;
+        g_b0_track.confirmed = 1U;
+        g_b0_track.hits = 1U;
+        g_b0_track.x = measurement->x;
+        g_b0_track.y = measurement->y;
     }
     else
     {
-        selected = 0;
+        float dx = measurement->x - g_b0_track.x;
+        float dy = measurement->y - g_b0_track.y;
+        g_b0_track.vx = (1.0f - g_image_down_filter_vel_alpha) * g_b0_track.vx +
+                        g_image_down_filter_vel_alpha * dx;
+        g_b0_track.vy = (1.0f - g_image_down_filter_vel_alpha) * g_b0_track.vy +
+                        g_image_down_filter_vel_alpha * dy;
+        g_b0_track.x = measurement->x;
+        g_b0_track.y = measurement->y;
+        g_b0_track.misses = 0U;
+        g_b0_track.confirmed = 1U;
     }
-
-    if (selected < 0)
-    {
-        return predict_missed_track(&g_b0_track, g_image_down_max_misses);
-    }
-
-    measurement = &result->beacons[selected];
-    if (g_b0_track.active == 0)
-    {
-        start_pending_track(&g_b0_track, measurement->x, measurement->y);
-        set_beacon_track_shape(&g_b0_track, measurement);
-        return 0;
-    }
-
-    if (g_b0_track.confirmed == 0)
-    {
-        if (square_distance(g_b0_track.x, g_b0_track.y, measurement->x, measurement->y) >
-            g_image_down_new_target_distance * g_image_down_new_target_distance)
-        {
-            start_pending_track(&g_b0_track, measurement->x, measurement->y);
-            set_beacon_track_shape(&g_b0_track, measurement);
-            return 0;
-        }
-        update_track_position(&g_b0_track, measurement->x, measurement->y);
-        set_beacon_track_shape(&g_b0_track, measurement);
-        g_b0_track.hits++;
-        if (g_b0_track.hits >= g_image_down_confirm_frames)
-        {
-            g_b0_track.confirmed = 1;
-            return 1;
-        }
-        return 0;
-    }
-
-    if (square_distance(g_b0_track.x + g_b0_track.vx, g_b0_track.y + g_b0_track.vy,
-                        measurement->x, measurement->y) >
-        g_image_down_new_target_distance * g_image_down_new_target_distance)
-    {
-        start_pending_track(&g_b0_track, measurement->x, measurement->y);
-        set_beacon_track_shape(&g_b0_track, measurement);
-        return 0;
-    }
-
-    update_track_position(&g_b0_track, measurement->x, measurement->y);
     set_beacon_track_shape(&g_b0_track, measurement);
-    return 1;
 }
 
 static unsigned char update_temporal_car(beacon_result_t *result)
@@ -1782,58 +2555,69 @@ static unsigned char update_temporal_car(beacon_result_t *result)
 
     if (g_car_track.active == 0)
     {
-        start_pending_track(&g_car_track, measurement->cx, measurement->cy);
+        start_confirmed_track(&g_car_track, measurement->cx, measurement->cy);
         set_car_track_shape(&g_car_track, measurement);
-        return 0;
+        return 1;
     }
     if (g_car_track.confirmed != 0 &&
         square_distance(g_car_track.x + g_car_track.vx, g_car_track.y + g_car_track.vy,
                         measurement->cx, measurement->cy) >
             g_image_down_gate_distance * g_image_down_gate_distance)
     {
-        start_pending_track(&g_car_track, measurement->cx, measurement->cy);
+        start_confirmed_track(&g_car_track, measurement->cx, measurement->cy);
         set_car_track_shape(&g_car_track, measurement);
-        return 0;
-    }
-    if (g_car_track.confirmed == 0 &&
-        square_distance(g_car_track.x, g_car_track.y, measurement->cx, measurement->cy) >
-            g_image_down_new_target_distance * g_image_down_new_target_distance)
-    {
-        start_pending_track(&g_car_track, measurement->cx, measurement->cy);
-        set_car_track_shape(&g_car_track, measurement);
-        return 0;
+        return 1;
     }
 
     update_track_position(&g_car_track, measurement->cx, measurement->cy);
     set_car_track_shape(&g_car_track, measurement);
     g_car_track.hits++;
-    if (g_car_track.confirmed == 0 &&
-        g_car_track.hits >= g_image_down_confirm_frames)
-    {
-        g_car_track.confirmed = 1;
-    }
-
-    return g_car_track.confirmed;
+    g_car_track.confirmed = 1U;
+    return 1U;
 }
 
 static void apply_temporal_beacon(beacon_result_t *result)
 {
-    if (update_temporal_beacon(result) == 0)
+    unsigned char max_misses = DOWN_BEACON_COAST_FRAMES;
+
+    if (result->beacon_count > 0U)
     {
+        update_current_beacon_track(&result->beacons[0]);
         return;
     }
-
-    output_temporal_beacon(&g_b0_track, result);
+    if (g_b0_track.confirmed != 0U &&
+        down_gray_point_in_current_lamps(
+            (int)(g_b0_track.x + (float)BEACON_IMAGE_W * 0.5f + 0.5f),
+            (int)(g_b0_track.y + (float)BEACON_IMAGE_H * 0.5f + 0.5f)) != 0U)
+    {
+        reset_track(&g_b0_track);
+        return;
+    }
+    if (g_image_down_max_misses >= 0 &&
+        g_image_down_max_misses < (int32)max_misses)
+    {
+        max_misses = (unsigned char)g_image_down_max_misses;
+    }
+    if (predict_missed_track(&g_b0_track, max_misses) != 0U)
+    {
+        output_temporal_beacon(&g_b0_track, result);
+    }
 }
 
 static void apply_temporal_car(beacon_result_t *result)
 {
+    unsigned char has_measurement =
+        (result->car_lamp_count > 0U &&
+         result->car_lamps[0].valid != 0U) ? 1U : 0U;
+
     if (update_temporal_car(result) == 0)
     {
         return;
     }
-
-    output_temporal_car(&g_car_track, result);
+    if (has_measurement == 0U)
+    {
+        output_temporal_car(&g_car_track, result);
+    }
 }
 
 static void update_temporal_result(beacon_result_t *result)
@@ -1847,9 +2631,8 @@ static void beacon_image_process(
     beacon_result_t *result)
 {
     component_t lamp;
-    component_t temporal_lamp;
     unsigned char has_lamp;
-    int i;
+    unsigned char i;
 
     if (result == 0)
     {
@@ -1863,41 +2646,17 @@ static void beacon_image_process(
     }
 
     g_current_image = image;
-    memset(&temporal_lamp, 0, sizeof(temporal_lamp));
     threshold_image(image, (unsigned char)g_image_down_car_lamp_binary_threshold);
     memcpy(g_car_lamp_binary_snapshot, g_binary,
            sizeof(g_car_lamp_binary_snapshot));
     has_lamp = find_car_lamp(&lamp);
     if (has_lamp == 0)
     {
-        has_lamp = find_edge_car_lamp(&lamp);
-    }
-    if (has_lamp == 0)
-    {
-        has_lamp = find_compound_close_lamp(&lamp);
-    }
-    if (has_lamp == 0)
-    {
-        has_lamp = find_temporal_car_lamp(&lamp);
-    }
-
-    if (has_lamp == 0)
-    {
         memset(&lamp, 0, sizeof(lamp));
-        g_has_lamp_track = 0;
-    }
-    else
-    {
-        g_has_lamp_track = 1;
-    }
-
-    if (can_use_temporal_car_mask(&g_car_track) != 0)
-    {
-        (void)component_from_temporal_car(&g_car_track, &temporal_lamp, 1);
     }
 
     write_car_lamp(&lamp, result);
-    find_beacons(image, &lamp, &temporal_lamp, result);
+    find_beacons(image, &lamp, 0, result);
     update_temporal_result(result);
 
     for (i = result->car_lamp_count; i < BEACON_MAX_CAR_LAMP_COUNT; i++)

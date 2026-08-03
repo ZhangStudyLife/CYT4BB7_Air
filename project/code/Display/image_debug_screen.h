@@ -13,16 +13,16 @@ extern "C" {
 #define IMAGE_DEBUG_SCREEN_MODE_LAMP_BINARY    (3U)
 #define IMAGE_DEBUG_SCREEN_MODE_OVERLAY        (4U)
 
-/* 只初始化软件状态；IPS114硬件在核0允许刷屏后延迟初始化。 */
+/* 同步初始化IPS114硬件并绘制Data模式静态启动页面。 */
 void ImageDebugScreen_Init(void);
 
-/* 主循环每消费一个10ms任务节拍调用一次，仅推进显示调度时钟。 */
+/* 主循环每消费一个10 ms任务节拍调用一次，仅推进显示调度时钟。 */
 void ImageDebugScreen_Tick10ms(void);
 
 uint8 ImageDebugScreen_SetMode(uint8 mode);
 uint8 ImageDebugScreen_GetMode(void);
 
-/* 新帧到达时启动图像显示，已启动帧分两个100Hz阶段完成。 */
+/* 新帧到达且无任务积压时整帧刷新；Overlay包含彩色检测结果和下摄闭合边界。 */
 void ImageDebugScreen_Update(uint8 image_frame_updated);
 
 #ifdef __cplusplus

@@ -34,25 +34,33 @@ static uint8 image_attitude_poll(void)
 static uint8 Get_Image_data(void)
 {
     uint8 image_frame_updated;
+    uint8 image_frame_ready = (mt9v03x_finish_flag != 0U) ? 1U : 0U;
     uint8 attitude_valid = image_attitude_poll();
     uint8 height_valid =
         (((s_image_attitude.flags & IPC_ATTITUDE_FLAG_HEIGHT_VALID) != 0U) &&
          (attitude_valid != 0U)) ? 1U : 0U;
 
-    image_frame_updated = image_down_update();
-    if(image_frame_updated != 0U)
+    if(image_frame_ready != 0U)
     {
-        image_down_horizon_update(
-            s_image_attitude.roll_deg,
-            s_image_attitude.pitch_deg,
-            s_image_attitude.height_mm,
-            attitude_valid,
-            height_valid);
+        if((attitude_valid != 0U) && (height_valid != 0U))
+        {
+            image_down_horizon_update(
+                s_image_attitude.roll_deg,
+                s_image_attitude.pitch_deg,
+                s_image_attitude.height_mm,
+                attitude_valid,
+                height_valid);
+        }
+        else
+        {
+            image_down_horizon_invalidate();
+        }
     }
     else if((attitude_valid == 0U) || (height_valid == 0U))
     {
         image_down_horizon_invalidate();
     }
+    image_frame_updated = image_down_update();
     CameraSpi_GetSnapshot(image_data);
     return image_frame_updated;
 }

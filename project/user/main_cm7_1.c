@@ -73,7 +73,6 @@ int main(void)
     clock_init(SYSTEM_CLOCK_250M);
     SCB_DisableDCache();
 
-    ImageDebugScreen_Init();
     ipc_communicate_init(IPC_PORT_2, ipc_image_callback);
     ipc_remote_param_core1_init();
     image_data_clear(&image_data[Front]);
@@ -82,6 +81,7 @@ int main(void)
     image_down_init();
     image_down_horizon_init();
     CameraSpi_Init();
+    ImageDebugScreen_Init();
     pit_ms_init(IMAGE_PIT, 10U);
     while(true)
     {
@@ -107,7 +107,7 @@ int main(void)
 
         if(g_image_tick_100hz > 0U)
         {
-            g_image_tick_100hz--;
+            g_image_tick_100hz = 0U;
             ImageDebugScreen_Tick10ms();
             ipc_remote_param_core1_poll();
             CameraSpi_Update();

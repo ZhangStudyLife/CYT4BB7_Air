@@ -65,7 +65,7 @@ void pit0_ch2_isr()                     // 定时器通道 2 周期中断服务函数
 void pit0_ch10_isr()                    // 定时器通道 10 周期中断服务函数      
 {
     pit_isr_flag_clear(PIT_CH10);
-    g_image_tick_100hz++;
+    g_image_tick_100hz = 1U;
 
 }
 

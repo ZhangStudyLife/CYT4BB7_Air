@@ -38,8 +38,12 @@
 #include "zf_driver_delay.h"
 #include "zf_driver_ipc.h"
 
+#define IPC_INTERRUPT_PRIORITY  (7U)
+
 vuint8 ipc_port_save; 
 vuint8 ipc_released; 
+static volatile uint8 ipc_async_released = 1U;
+static communicate_data_t ipc_async_data;
 
 static void ipc_default_callback (uint32 ipc_data);
 
@@ -66,6 +70,11 @@ static void ipc_default_callback (uint32 ipc_data)
 void ipc_release_callback(void)
 {
     ipc_released = 1;
+}
+
+static void ipc_async_release_callback(void)
+{
+    ipc_async_released = 1U;
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -118,6 +127,28 @@ uint8 ipc_send_data(uint32 send_data)
 }
 
 
+uint8 ipc_try_send_data(uint32 send_data)
+{
+    if(ipc_async_released == 0U)
+    {
+        return 1U;
+    }
+
+    ipc_async_data.clientId = 0x01U;
+    ipc_async_data.data = send_data;
+    ipc_async_released = 0U;
+    if(Cy_IPC_Pipe_SendMessage(ipc_port_save == 0U ? 1U : 0U,
+                               &ipc_async_data,
+                               ipc_async_release_callback) != CY_IPC_PIPE_SUCCESS)
+    {
+        ipc_async_released = 1U;
+        return 1U;
+    }
+
+    return 0U;
+}
+
+
 
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     IPC核心间通讯函数
@@ -138,6 +169,8 @@ void ipc_communicate_init(ipc_port_enum ipc_port, ipc_callback_function ipc_call
     Cy_IPC_Pipe_Init(&pipeConfig);
     Cy_IPC_Pipe_RegisterCallback(ipc_received_callback, 0x01u);
     NVIC_ClearPendingIRQ(pipeConfig.epConfigData[(uint8)ipc_port].ipcCpuIntIdx);
+    NVIC_SetPriority(pipeConfig.epConfigData[(uint8)ipc_port].ipcCpuIntIdx,
+                     IPC_INTERRUPT_PRIORITY);
     NVIC_EnableIRQ(pipeConfig.epConfigData[(uint8)ipc_port].ipcCpuIntIdx);
     
     user_callback = ipc_callback;

@@ -58,7 +58,8 @@ typedef void (*ipc_callback_function)(uint32 ipc_data);
 
 //====================================================IPC 基础函数====================================================
 
-uint8 ipc_send_data(uint32 send_data);                                                          // ipc数据发送
+uint8 ipc_send_data(uint32 send_data);
+uint8 ipc_try_send_data(uint32 send_data);
 void  ipc_communicate_init(ipc_port_enum ipc_port, ipc_callback_function ipc_callback);         // ipc初始化函数
 
 //====================================================IPC 基础函数====================================================

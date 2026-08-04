@@ -2373,11 +2373,10 @@ static unsigned char predict_missed_track(temporal_track_t *track, unsigned char
     return 0;
 }
 
-static void start_confirmed_track(temporal_track_t *track, float x, float y)
+static void start_pending_track(temporal_track_t *track, float x, float y)
 {
     reset_track(track);
     track->active = 1;
-    track->confirmed = 1;
     track->hits = 1;
     track->x = x;
     track->y = y;
@@ -2516,12 +2515,7 @@ static void update_current_beacon_track(const beacon_circle_t *measurement)
         square_distance(g_b0_track.x, g_b0_track.y,
                         measurement->x, measurement->y) > distance_limit)
     {
-        reset_track(&g_b0_track);
-        g_b0_track.active = 1U;
-        g_b0_track.confirmed = 1U;
-        g_b0_track.hits = 1U;
-        g_b0_track.x = measurement->x;
-        g_b0_track.y = measurement->y;
+        start_pending_track(&g_b0_track, measurement->x, measurement->y);
     }
     else
     {
@@ -2534,7 +2528,17 @@ static void update_current_beacon_track(const beacon_circle_t *measurement)
         g_b0_track.x = measurement->x;
         g_b0_track.y = measurement->y;
         g_b0_track.misses = 0U;
-        g_b0_track.confirmed = 1U;
+        if (g_b0_track.confirmed == 0U)
+        {
+            if (g_b0_track.hits < 255U)
+            {
+                g_b0_track.hits++;
+            }
+            if (g_b0_track.hits >= g_image_down_confirm_frames)
+            {
+                g_b0_track.confirmed = 1U;
+            }
+        }
     }
     set_beacon_track_shape(&g_b0_track, measurement);
 }
@@ -2555,25 +2559,43 @@ static unsigned char update_temporal_car(beacon_result_t *result)
 
     if (g_car_track.active == 0)
     {
-        start_confirmed_track(&g_car_track, measurement->cx, measurement->cy);
+        start_pending_track(&g_car_track, measurement->cx, measurement->cy);
         set_car_track_shape(&g_car_track, measurement);
-        return 1;
+        return 0;
     }
     if (g_car_track.confirmed != 0 &&
         square_distance(g_car_track.x + g_car_track.vx, g_car_track.y + g_car_track.vy,
                         measurement->cx, measurement->cy) >
             g_image_down_gate_distance * g_image_down_gate_distance)
     {
-        start_confirmed_track(&g_car_track, measurement->cx, measurement->cy);
+        start_pending_track(&g_car_track, measurement->cx, measurement->cy);
         set_car_track_shape(&g_car_track, measurement);
-        return 1;
+        return 0;
+    }
+    if (g_car_track.confirmed == 0 &&
+        square_distance(g_car_track.x, g_car_track.y,
+                        measurement->cx, measurement->cy) >
+            g_image_down_new_target_distance * g_image_down_new_target_distance)
+    {
+        start_pending_track(&g_car_track, measurement->cx, measurement->cy);
+        set_car_track_shape(&g_car_track, measurement);
+        return 0;
     }
 
     update_track_position(&g_car_track, measurement->cx, measurement->cy);
     set_car_track_shape(&g_car_track, measurement);
-    g_car_track.hits++;
-    g_car_track.confirmed = 1U;
-    return 1U;
+    if (g_car_track.confirmed == 0U)
+    {
+        if (g_car_track.hits < 255U)
+        {
+            g_car_track.hits++;
+        }
+        if (g_car_track.hits >= g_image_down_confirm_frames)
+        {
+            g_car_track.confirmed = 1U;
+        }
+    }
+    return g_car_track.confirmed;
 }
 
 static void apply_temporal_beacon(beacon_result_t *result)

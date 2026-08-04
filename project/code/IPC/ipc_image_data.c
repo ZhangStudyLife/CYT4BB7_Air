@@ -19,6 +19,7 @@ volatile ipc_remote_param_mailbox_t g_ipc_remote_param_request;
 #pragma data_alignment=64
 volatile ipc_remote_param_mailbox_t g_ipc_remote_param_response;
 #pragma location=".ipc_attitude_data"
+#pragma data_alignment=64
 volatile ipc_attitude_data_t g_ipc_attitude_data;
 
 #define IPC_FLIGHT_STATE_MAGIC   (0xA5000000UL)
@@ -107,6 +108,7 @@ static volatile uint8 s_remote_param_hint = 0U;
 static uint8 s_remote_param_core0_active = 0U;
 static uint32 s_remote_param_core0_transaction = 0U;
 static uint32 s_remote_param_core0_counter = 0U;
+static volatile uint8 s_image_data_hint = 0U;
 static ipc_remote_param_mailbox_t s_remote_param_core0_request;
 static uint32 s_attitude_sequence = 0U;
 
@@ -133,6 +135,8 @@ void ipc_attitude_publish(float roll_deg,
     g_ipc_attitude_data.flags = (height_valid != 0U) ?
                                 IPC_ATTITUDE_FLAG_HEIGHT_VALID : 0U;
     g_ipc_attitude_data.sequence = s_attitude_sequence;
+    SCB_CleanDCache_by_Addr((volatile void *)&g_ipc_attitude_data,
+                            sizeof(g_ipc_attitude_data));
 #else
     (void)roll_deg;
     (void)pitch_deg;
@@ -145,6 +149,10 @@ void ipc_attitude_get(ipc_attitude_data_t *out)
 {
     if(out != NULL)
     {
+#if defined(CY_CORE_CM7_1)
+        SCB_InvalidateDCache_by_Addr((volatile void *)&g_ipc_attitude_data,
+                                    sizeof(g_ipc_attitude_data));
+#endif
         memcpy(out, (const void *)&g_ipc_attitude_data, sizeof(*out));
     }
 }
@@ -262,7 +270,7 @@ uint8 ipc_flight_state_send(uint8 flying,
     }
     ipc_data |= (((uint32)image_send_enable << IPC_IMAGE_SEND_SHIFT) & IPC_IMAGE_SEND_MASK);
 
-    return ipc_send_data(ipc_data);
+    return ipc_try_send_data(ipc_data);
 #else
     (void)flying;
     (void)image_send_enable;
@@ -707,7 +715,7 @@ void ipc_image_callback(uint32 ipc_data)
     }
     else
     {
-        ipc_image_poll();
+        s_image_data_hint = 1U;
     }
 #elif defined(CY_CORE_CM7_1)
     if((ipc_data & IPC_REMOTE_PARAM_NOTIFY_MASK) == IPC_REMOTE_PARAM_NOTIFY_MAGIC)
@@ -733,7 +741,11 @@ void ipc_image_callback(uint32 ipc_data)
 void ipc_image_poll(void)
 {
 #if defined(CY_CORE_CM7_0)
-    SCB_InvalidateDCache_by_Addr((volatile void *)image_data, sizeof(image_data));
-    SCB_InvalidateDCache_by_Addr((volatile void *)&g_image_data_seq, sizeof(g_image_data_seq));
+    if(s_image_data_hint != 0U)
+    {
+        s_image_data_hint = 0U;
+        SCB_InvalidateDCache_by_Addr((volatile void *)image_data, sizeof(image_data));
+        SCB_InvalidateDCache_by_Addr((volatile void *)&g_image_data_seq, sizeof(g_image_data_seq));
+    }
 #endif
 }

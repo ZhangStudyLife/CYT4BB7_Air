@@ -298,6 +298,28 @@ int main(void)
                                  g_tof_fused_height_mm,
                                  g_tof_fused_valid);
             ipc_image_poll();
+            {
+                ipc_camera_spi_log_t camera_spi_log;
+
+                ipc_camera_spi_log_get(&camera_spi_log);
+                wifi_justfloat((float)g_image_data_seq,
+                               (float)camera_spi_log.seq,
+                               (float)camera_spi_log.board[0].rx_ok_count,
+                               (float)camera_spi_log.board[1].rx_ok_count,
+                               (float)camera_spi_log.board[0].rx_error_count,
+                               (float)camera_spi_log.board[1].rx_error_count,
+                               (float)camera_spi_log.board[0].online,
+                               (float)camera_spi_log.board[1].online,
+                               (float)image_data[Front].car_lamp_data[0].valid,
+                               image_data[Front].car_lamp_data[0].cx,
+                               image_data[Front].car_lamp_data[0].cy,
+                               (float)image_data[Center].car_lamp_data[0].valid,
+                               image_data[Center].car_lamp_data[0].cx,
+                               image_data[Center].car_lamp_data[0].cy,
+                               (float)image_data[Back].car_lamp_data[0].valid,
+                               image_data[Back].car_lamp_data[0].cx,
+                               image_data[Back].car_lamp_data[0].cy);
+            }
             (void)BeaconLostDetector_Update();
 
             car_plan_result_t car_plan = {0};

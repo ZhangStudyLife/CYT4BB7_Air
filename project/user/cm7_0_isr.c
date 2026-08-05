@@ -41,7 +41,6 @@
 
 extern volatile uint32 tick_1000us_cnt;
 extern volatile uint16 g_tick_1000HZ;
-extern volatile uint8 g_tick_100HZ;
 // **************************** PIT中断函数 ****************************
 void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数      
 {
@@ -57,10 +56,6 @@ void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数
 void pit0_ch1_isr()                     // 定时器通道 1 周期中断服务函数      
 {
     pit_isr_flag_clear(PIT_CH1);
-    if (g_tick_100HZ < 100U)
-    {
-        g_tick_100HZ++;
-    }
 }
 
 void pit0_ch2_isr()                     // 定时器通道 2 周期中断服务函数      

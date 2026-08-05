@@ -30,7 +30,6 @@ typedef struct
 {
     uint16 distance_mm[VL53L1X_SENSOR_COUNT]; /* 四路 TOF 距离，单位 mm */
     uint8  valid[VL53L1X_SENSOR_COUNT];       /* 四路 TOF 有效标志，1=有效 */
-    uint8  ready_mask;                        /* 最近一次发布时的数据 ready 通道掩码 */
     uint8  fresh_mask;                        /* 最近一次发布时已安全消费的新数据通道掩码 */
     uint32 sample_seq;                        /* 成功发布测距快照的递增序号 */
 } VL53L1X_data_struct;
@@ -58,9 +57,9 @@ void VL53L1X_RequestUpdate(void);
  * 输入参数：
  *   无
  * 返回值：
- *   本次执行的步骤编号：0=空闲，1=READY，2=STATUS，3=DISTANCE，4=CLEAR/PUBLISH
+ *   无
  */
-uint8 VL53L1X_TaskStep(void);
+void VL53L1X_TaskStep(void);
 
 /*
  * 函数功能：同步完成一次四路 VL53L1X 更新，保留旧调用接口兼容性。

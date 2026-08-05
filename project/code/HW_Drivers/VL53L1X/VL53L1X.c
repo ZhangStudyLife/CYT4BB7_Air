@@ -58,7 +58,6 @@ static VL53L1X_data_struct s_vl53l1x_data =
     },
     {0U, 0U, 0U, 0U},
     0U,
-    0U,
     0U
 };
 
@@ -659,7 +658,6 @@ void VL53L1X_Init(void)
     s_vl53l1x_pending_ready_mask = 0U;
     s_vl53l1x_ack_status = 0U;
     s_vl53l1x_ack_distance = 0U;
-    s_vl53l1x_data.ready_mask = 0U;
     s_vl53l1x_data.fresh_mask = 0U;
     s_vl53l1x_data.sample_seq = 0U;
 
@@ -697,16 +695,15 @@ void VL53L1X_RequestUpdate(void)
  * 输入参数：
  *   无
  * 返回值：
- *   本次执行的步骤编号：0=空闲，1=READY，2=STATUS，3=DISTANCE，4=CLEAR/PUBLISH
+ *   无
  */
-uint8 VL53L1X_TaskStep(void)
+void VL53L1X_TaskStep(void)
 {
     uint8 index = 0U;
     uint8 channel_mask = 0U;
     uint8 ack_ready = 0U;
     uint8 ack_clear = 0U;
     uint8 publish_mask = 0U;
-    uint8 executed_step = (uint8)s_vl53l1x_state;
     uint8 ready_buf[VL53L1X_SENSOR_COUNT][2] = {0U};
     uint16 raw_distance_mm = 0U;
     uint16 clipped_distance_mm = 0U;
@@ -769,7 +766,6 @@ uint8 VL53L1X_TaskStep(void)
 
             if (0U != publish_mask)
             {
-                s_vl53l1x_data.ready_mask = s_vl53l1x_pending_ready_mask;
                 s_vl53l1x_data.fresh_mask = publish_mask;
 
                 for (index = 0U; index < VL53L1X_SENSOR_COUNT; index++)
@@ -813,7 +809,6 @@ uint8 VL53L1X_TaskStep(void)
             break;
     }
 
-    return executed_step;
 }
 
 /*
@@ -828,7 +823,7 @@ void VL53L1X_Update(void)
     VL53L1X_RequestUpdate();
     while (VL53L1X_STATE_IDLE != s_vl53l1x_state)
     {
-        (void)VL53L1X_TaskStep();
+        VL53L1X_TaskStep();
     }
 }
 

@@ -557,7 +557,6 @@ static uint8 air_comm_send_uart(const uint8 *data, uint16 len, uint8 type)
     if ((pending >= AIR_COMM_TX_QUEUE_SIZE) ||
         ((AIR_COMM_MSG_RUN_DATA == type) && (pending >= AIR_COMM_TX_RUN_DATA_LIMIT)))
     {
-        s_air_comm_stats.tx_queue_overflow_count++;
         Cy_SysLib_ExitCriticalSection(interrupt_state);
         return 0U;
     }
@@ -568,11 +567,6 @@ static uint8 air_comm_send_uart(const uint8 *data, uint16 len, uint8 type)
     s_air_comm_tx_queue.tail = (uint8)((tail + 1U) % AIR_COMM_TX_QUEUE_SIZE);
     pending++;
     s_air_comm_tx_queue.count = pending;
-    s_air_comm_stats.tx_pending_frames = pending;
-    if (pending > s_air_comm_stats.tx_queue_high_water)
-    {
-        s_air_comm_stats.tx_queue_high_water = pending;
-    }
 
     Cy_SCB_SetTxInterruptMask(SCB4,
         Cy_SCB_GetTxInterruptMask(SCB4) | CY_SCB_UART_TX_TRIGGER);
@@ -609,7 +603,6 @@ void air_comm_air_uart_tx_isr(void)
             s_air_comm_tx_queue.head = (uint8)((head + 1U) % AIR_COMM_TX_QUEUE_SIZE);
             s_air_comm_tx_queue.count--;
             s_air_comm_tx_queue.offset = 0U;
-            s_air_comm_stats.tx_pending_frames = s_air_comm_tx_queue.count;
             continue;
         }
 
@@ -625,7 +618,6 @@ void air_comm_air_uart_tx_isr(void)
         s_air_comm_tx_queue.head = (uint8)((head + 1U) % AIR_COMM_TX_QUEUE_SIZE);
         s_air_comm_tx_queue.count--;
         s_air_comm_tx_queue.offset = 0U;
-        s_air_comm_stats.tx_pending_frames = s_air_comm_tx_queue.count;
     }
 
     if (s_air_comm_tx_queue.count == 0U)

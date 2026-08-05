@@ -11,28 +11,11 @@
 
 #define WIFI_JUSTFLOAT_MAX_FLOAT_NUM       (61U)  /* Auto timestamp + up to 60 user channels */
 
-/* JustFloat transmit time statistics */
-typedef struct
-{
-    uint32_t last_us;     /* Last transmit cost, unit: us */
-    uint32_t min_us;      /* Minimum transmit cost, unit: us */
-    uint32_t max_us;      /* Maximum transmit cost, unit: us */
-    uint32_t avg_us;      /* Average cost for successful transmissions, unit: us */
-    uint32_t ok_count;    /* Successful transmit count */
-    uint32_t fail_count;  /* Failed transmit count */
-    uint32_t skip_count;  /* Skip count while standby sending is disabled */
-    uint32_t queued_count; /* Successfully queued JustFloat frame count */
-    uint32_t overflow_count; /* Dropped frame count when the RAM queue is full */
-    uint32_t pending_bytes;  /* Bytes currently waiting in the RAM queue */
-} wifi_justfloat_tx_stats_t;
-
 void wifi_justfloat_Init(void);
 uint8_t wifi_justfloat_IsReady(void);
 void wifi_justfloat_SetStandbyContext(uint8_t is_standby);
 void wifi_justfloat_SetStandbyUserEnable(uint8_t enable);
 uint8_t wifi_justfloat_GetStandbyUserEnable(void);
-void wifi_justfloat_ResetTxStats(void);
-void wifi_justfloat_GetTxStats(wifi_justfloat_tx_stats_t *stats);
 uint8_t wifi_justfloat_Poll(void);
 uint8_t wifi_justfloat_Impl(uint8_t declared_num, uint8_t actual_num, ...);
 uint8_t wifi_justfloat_Array(const float *data, uint8_t num);

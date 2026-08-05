@@ -15,41 +15,22 @@
 #define WIFI_JUSTFLOAT_TAIL_1            (0x00U)
 #define WIFI_JUSTFLOAT_TAIL_2            (0x80U)
 #define WIFI_JUSTFLOAT_TAIL_3            (0x7FU)
-#define WIFI_JUSTFLOAT_TIMER_INDEX       (TC_TIME2_CH1)
 #define WIFI_JUSTFLOAT_USER_MAX_NUM      (WIFI_JUSTFLOAT_MAX_FLOAT_NUM - 1U)
 #define WIFI_JUSTFLOAT_FRAME_MAX_BYTES   (WIFI_JUSTFLOAT_MAX_FLOAT_NUM * 4U + 4U)
 #define WIFI_JUSTFLOAT_QUEUE_FRAME_NUM   (256U)
 
 extern volatile uint32 tick_1000us_cnt;
 
-typedef struct
-{
-    uint32_t last_us;
-    uint32_t min_us;
-    uint32_t max_us;
-    uint64_t sum_us;
-    uint32_t ok_count;
-    uint32_t fail_count;
-    uint32_t skip_count;
-    uint32_t queued_count;
-    uint32_t overflow_count;
-} wifi_justfloat_tx_profile_t;
-
-static uint8_t s_wifi_justfloat_timer_inited = 0U;
 static uint8_t s_wifi_justfloat_standby_context = 0U;
 static uint8_t s_wifi_justfloat_standby_user_enable = 1U;
 static uint32_t s_wifi_justfloat_last_queued_tick = 0xFFFFFFFFU;
-static wifi_justfloat_tx_profile_t s_wifi_justfloat_profile = {0};
 
 static uint8_t s_wifi_justfloat_frame_queue[WIFI_JUSTFLOAT_QUEUE_FRAME_NUM][WIFI_JUSTFLOAT_FRAME_MAX_BYTES];
 static uint16_t s_wifi_justfloat_frame_len[WIFI_JUSTFLOAT_QUEUE_FRAME_NUM];
 static uint16_t s_wifi_justfloat_q_head = 0U;
 static uint16_t s_wifi_justfloat_q_tail = 0U;
 static uint16_t s_wifi_justfloat_q_used = 0U;
-static uint32_t s_wifi_justfloat_q_bytes = 0U;
 static uint8_t s_wifi_justfloat_tx_frame[WIFI_JUSTFLOAT_FRAME_MAX_BYTES];
-
-uint8_t wifi_justfloat_Poll(void);
 
 static uint16_t wifi_justfloat_next_index(uint16_t index)
 {
@@ -67,17 +48,7 @@ static void wifi_justfloat_queue_reset(void)
     s_wifi_justfloat_q_head = 0U;
     s_wifi_justfloat_q_tail = 0U;
     s_wifi_justfloat_q_used = 0U;
-    s_wifi_justfloat_q_bytes = 0U;
     interrupt_global_enable(irq_state);
-}
-
-static uint32_t wifi_justfloat_queue_bytes(void)
-{
-    uint32_t bytes;
-    uint32_t irq_state = interrupt_global_disable();
-    bytes = s_wifi_justfloat_q_bytes;
-    interrupt_global_enable(irq_state);
-    return bytes;
 }
 
 static uint8_t wifi_justfloat_queue_push(const uint8_t *frame, uint16_t frame_len)
@@ -102,7 +73,6 @@ static uint8_t wifi_justfloat_queue_push(const uint8_t *frame, uint16_t frame_le
     s_wifi_justfloat_frame_len[head] = frame_len;
     s_wifi_justfloat_q_head = wifi_justfloat_next_index(head);
     s_wifi_justfloat_q_used++;
-    s_wifi_justfloat_q_bytes += frame_len;
     interrupt_global_enable(irq_state);
     return 1U;
 }
@@ -149,26 +119,11 @@ static void wifi_justfloat_queue_commit(uint16_t frame_count)
     for (i = 0U; (i < frame_count) && (s_wifi_justfloat_q_used > 0U); i++)
     {
         uint16_t tail = s_wifi_justfloat_q_tail;
-        uint16_t len = s_wifi_justfloat_frame_len[tail];
         s_wifi_justfloat_frame_len[tail] = 0U;
         s_wifi_justfloat_q_tail = wifi_justfloat_next_index(tail);
         s_wifi_justfloat_q_used--;
-        if (s_wifi_justfloat_q_bytes >= len)
-        {
-            s_wifi_justfloat_q_bytes -= len;
-        }
-        else
-        {
-            s_wifi_justfloat_q_bytes = 0U;
-        }
     }
     interrupt_global_enable(irq_state);
-}
-
-static void wifi_justfloat_profile_reset(void)
-{
-    memset(&s_wifi_justfloat_profile, 0, sizeof(s_wifi_justfloat_profile));
-    s_wifi_justfloat_profile.min_us = 0xFFFFFFFFU;
 }
 
 static uint8_t wifi_justfloat_should_send(void)
@@ -184,28 +139,6 @@ static uint8_t wifi_justfloat_should_send(void)
     }
 
     return 1U;
-}
-
-static void wifi_justfloat_profile_update(uint32_t cost_us, uint8_t ok)
-{
-    s_wifi_justfloat_profile.last_us = cost_us;
-    if (cost_us < s_wifi_justfloat_profile.min_us)
-    {
-        s_wifi_justfloat_profile.min_us = cost_us;
-    }
-    if (cost_us > s_wifi_justfloat_profile.max_us)
-    {
-        s_wifi_justfloat_profile.max_us = cost_us;
-    }
-
-    if (0U == ok)
-    {
-        s_wifi_justfloat_profile.fail_count++;
-        return;
-    }
-
-    s_wifi_justfloat_profile.ok_count++;
-    s_wifi_justfloat_profile.sum_us += (uint64_t)cost_us;
 }
 
 static uint8_t wifi_justfloat_pack_frame(uint32_t timestamp_tick,
@@ -247,42 +180,29 @@ static uint8_t wifi_justfloat_enqueue_frame(const float *data, uint8_t user_num)
 
     if (timestamp_tick == s_wifi_justfloat_last_queued_tick)
     {
-        s_wifi_justfloat_profile.skip_count++;
         return 0U;
     }
 
     if (0U == wifi_justfloat_pack_frame(timestamp_tick, data, user_num, frame, &frame_len))
     {
-        s_wifi_justfloat_profile.fail_count++;
         return 1U;
     }
 
     if (0U == wifi_justfloat_queue_push(frame, frame_len))
     {
-        s_wifi_justfloat_profile.overflow_count++;
         return 1U;
     }
 
     s_wifi_justfloat_last_queued_tick = timestamp_tick;
-    s_wifi_justfloat_profile.queued_count++;
     (void)wifi_justfloat_Poll();
     return 0U;
 }
 
 void wifi_justfloat_Init(void)
 {
-    if (0U == s_wifi_justfloat_timer_inited)
-    {
-        timer_init(WIFI_JUSTFLOAT_TIMER_INDEX, TIMER_US);
-        timer_start(WIFI_JUSTFLOAT_TIMER_INDEX);
-        s_wifi_justfloat_timer_inited = 1U;
-    }
-
-    timer_clear(WIFI_JUSTFLOAT_TIMER_INDEX);
     s_wifi_justfloat_standby_context = 0U;
     s_wifi_justfloat_standby_user_enable = 1U;
     s_wifi_justfloat_last_queued_tick = 0xFFFFFFFFU;
-    wifi_justfloat_profile_reset();
     wifi_justfloat_queue_reset();
 }
 
@@ -306,42 +226,9 @@ uint8_t wifi_justfloat_GetStandbyUserEnable(void)
     return s_wifi_justfloat_standby_user_enable;
 }
 
-void wifi_justfloat_ResetTxStats(void)
-{
-    wifi_justfloat_profile_reset();
-}
-
-void wifi_justfloat_GetTxStats(wifi_justfloat_tx_stats_t *stats)
-{
-    uint64_t avg_us;
-
-    if (NULL == stats)
-    {
-        return;
-    }
-
-    stats->last_us = s_wifi_justfloat_profile.last_us;
-    stats->min_us = (s_wifi_justfloat_profile.min_us == 0xFFFFFFFFU) ? 0U : s_wifi_justfloat_profile.min_us;
-    stats->max_us = s_wifi_justfloat_profile.max_us;
-    stats->ok_count = s_wifi_justfloat_profile.ok_count;
-    stats->fail_count = s_wifi_justfloat_profile.fail_count;
-    stats->skip_count = s_wifi_justfloat_profile.skip_count;
-    stats->queued_count = s_wifi_justfloat_profile.queued_count;
-    stats->overflow_count = s_wifi_justfloat_profile.overflow_count;
-    stats->pending_bytes = wifi_justfloat_queue_bytes();
-
-    avg_us = (s_wifi_justfloat_profile.ok_count > 0U)
-                 ? (s_wifi_justfloat_profile.sum_us / (uint64_t)s_wifi_justfloat_profile.ok_count)
-                 : 0U;
-    stats->avg_us = (uint32_t)avg_us;
-}
-
 uint8_t wifi_justfloat_Poll(void)
 {
     uint16_t len;
-    uint32_t start_us;
-    uint32_t cost_us;
-    uint8_t ok;
 
 #if (1U == WIFI_IMAGE_ENABLE)
     return 0U;
@@ -360,18 +247,12 @@ uint8_t wifi_justfloat_Poll(void)
         return 0U;
     }
 
-    start_us = timer_get(WIFI_JUSTFLOAT_TIMER_INDEX);
-    ok = wifi_cmd_SendBuffer(s_wifi_justfloat_tx_frame, len);
-    cost_us = timer_get(WIFI_JUSTFLOAT_TIMER_INDEX) - start_us;
-
-    if (0U == ok)
+    if (0U == wifi_cmd_SendBuffer(s_wifi_justfloat_tx_frame, len))
     {
-        wifi_justfloat_profile_update(cost_us, 0U);
         return 0U;
     }
 
     wifi_justfloat_queue_commit(1U);
-    wifi_justfloat_profile_update(cost_us, 1U);
     return 1U;
 }
 
@@ -385,19 +266,16 @@ uint8_t wifi_justfloat_Array(const float *data, uint8_t num)
 
     if ((NULL == data) || (num > WIFI_JUSTFLOAT_USER_MAX_NUM))
     {
-        s_wifi_justfloat_profile.fail_count++;
         return 1U;
     }
 
     if (0U == wifi_cmd_IsReady())
     {
-        s_wifi_justfloat_profile.fail_count++;
         return 1U;
     }
 
     if (0U == wifi_justfloat_should_send())
     {
-        s_wifi_justfloat_profile.skip_count++;
         return 0U;
     }
 
@@ -419,25 +297,21 @@ uint8_t wifi_justfloat_Impl(uint8_t declared_num, uint8_t actual_num, ...)
 
     if (actual_num > WIFI_JUSTFLOAT_USER_MAX_NUM)
     {
-        s_wifi_justfloat_profile.fail_count++;
         return 1U;
     }
 
     if (declared_num != actual_num)
     {
-        s_wifi_justfloat_profile.fail_count++;
         return 1U;
     }
 
     if (0U == wifi_cmd_IsReady())
     {
-        s_wifi_justfloat_profile.fail_count++;
         return 1U;
     }
 
     if (0U == wifi_justfloat_should_send())
     {
-        s_wifi_justfloat_profile.skip_count++;
         return 0U;
     }
 

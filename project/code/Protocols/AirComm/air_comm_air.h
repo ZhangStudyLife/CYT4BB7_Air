@@ -81,15 +81,12 @@ typedef struct
     uint32 crc_error_count;        /* CRC 校验失败次数 */
     uint32 rx_oversize_count;      /* 接收帧 payload 超长次数 */
     uint32 rx_queue_overflow_count; /* 接收环形队列溢出次数 */
-    uint32 tx_queue_overflow_count; /* 发送队列满或RUN_DATA限额导致的拒绝次数 */
     uint32 heartbeat_tx_count;     /* 心跳发送次数 */
     uint32 heartbeat_rx_count;     /* 心跳接收次数 */
     uint32 set_param_ok_count;     /* 参数设置成功次数 */
     uint32 set_param_fail_count;   /* 参数设置失败次数 */
     uint32 command_ok_count;       /* 远程命令成功次数 */
     uint32 command_fail_count;     /* 远程命令失败次数 */
-    uint8 tx_pending_frames;       /* 当前等待写入硬件FIFO的帧数 */
-    uint8 tx_queue_high_water;     /* 发送队列历史最高占用帧数 */
     uint8 online_status;           /* 0=未连接 1=在线 2=离线 */
 } air_comm_air_stats_t;
 

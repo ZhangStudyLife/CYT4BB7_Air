@@ -54,13 +54,13 @@ static uint8 s_ready = 0U;
 static uint8 s_miss = HEIGHT_MISS_MAX;
 
 static const float s_roll_corr_m[VL53L1X_SENSOR_COUNT] = {
-    -0.008643f, 0.089082f, -0.058806f, 0.032884f
+    -0.008643f, -0.033776f, 0.009535f, 0.032884f
 };
 static const float s_pitch_corr_m[VL53L1X_SENSOR_COUNT] = {
-    -0.012797f, -0.006581f, 0.088272f, 0.003979f
+    -0.012797f, 0.057124f, -0.048306f, 0.003979f
 };
 static const float s_bias_corr_m[VL53L1X_SENSOR_COUNT] = {
-    -0.002834f, -0.016172f, 0.022442f, -0.003449f
+    -0.002834f, -0.014415f, 0.020698f, -0.003449f
 };
 
 static float Height_Clamp(float x, float min_x, float max_x)

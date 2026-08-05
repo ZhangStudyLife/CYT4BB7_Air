@@ -33,7 +33,7 @@
  * ICM42688 默认配置（1kHz）
  * 1) 陀螺仪量程 2000dps，适合飞控快速机动场景
  * 2) 加速度量程 16g，覆盖常见动态范围
- * 3) AAF 抗混叠 + UI 低延迟输出，主要滤波由软件完成
+ * 3) 二阶滤波 + 合适带宽，兼顾噪声与延迟
  * 4) 上电后进入 LN（Low Noise）模式
  */
 ICM42688_CONFIG_STRUCT ICM42688_CONFIG = {
@@ -41,10 +41,10 @@ ICM42688_CONFIG_STRUCT ICM42688_CONFIG = {
     GYRO_ODR_1000HZ,
     ACC_16G,
     ACC_ODR_1000HZ,
-    _2st,
-    Low_Latency_2,
-    _2st,
-    Low_Latency_2,
+    _3st,
+    Bandwidth_Factor_2,
+    _3st,
+    Bandwidth_Factor_2,
     Bias_On_Chip_Off
 };
 
@@ -287,32 +287,6 @@ static void ICM42688_SET_ACC(ACC_FSR acc_fsr, ACC_ODR acc_odr)
     }
 }
 
-/**
- * 函数功能: 配置 1kHz 采样使用的陀螺仪与加速度计抗混叠滤波器。
- * 输入参数: 无。
- * 返回值: 无。
- */
-static void ICM42688_SET_AAF(void)
-{
-    uint8 gyro_config_static2;
-
-    /* Bank1：陀螺仪 AAF 258Hz，并启用芯片机械谐振陷波。 */
-    SPI_Transfer_16bit(0x7601U);
-    gyro_config_static2 = (uint8)SPI_Transfer_16bit(0x8B00U);
-    SPI_Transfer_16bit((uint16_t)(0x0B00U | (gyro_config_static2 & 0xFCU)));
-    SPI_Transfer_16bit(0x0C06U);
-    SPI_Transfer_16bit(0x0D24U);
-    SPI_Transfer_16bit(0x0EA0U);
-
-    /* Bank2：加速度计 AAF 213Hz。 */
-    SPI_Transfer_16bit(0x7602U);
-    SPI_Transfer_16bit(0x030AU);
-    SPI_Transfer_16bit(0x0419U);
-    SPI_Transfer_16bit(0x05A0U);
-
-    SPI_Transfer_16bit(0x7600U);
-}
-
 /* 配置陀螺仪/加速度计数字滤波器 */
 static void ICM42688_SET_FILTER(Bandwidth_Factor Gyro_Bandwidth_Factor,
                                 Filter_Order Gyro_Filter_Order,
@@ -399,13 +373,13 @@ static void ICM42688_SET_FILTER(Bandwidth_Factor Gyro_Bandwidth_Factor,
     switch (Gyro_Filter_Order)
     {
         case _1st:
-            Gyro_Filter_Ord_Config = 0x12;
+            Gyro_Filter_Ord_Config |= 0x02;
             break;
         case _2st:
-            Gyro_Filter_Ord_Config = 0x16;
+            Gyro_Filter_Ord_Config |= 0x06;
             break;
         case _3st:
-            Gyro_Filter_Ord_Config = 0x1A;
+            Gyro_Filter_Ord_Config |= 0xA0;
             break;
     }
     SPI_Transfer_16bit(((uint16)WRITE_GYRO_CONFIG1 << 8 | Gyro_Filter_Ord_Config));
@@ -413,13 +387,13 @@ static void ICM42688_SET_FILTER(Bandwidth_Factor Gyro_Bandwidth_Factor,
     switch (Acc_Filter_Order)
     {
         case _1st:
-            Acc_Filter_Ord_Config = 0x05;
+            Acc_Filter_Ord_Config |= 0x02;
             break;
         case _2st:
-            Acc_Filter_Ord_Config = 0x0D;
+            Acc_Filter_Ord_Config |= 0x06;
             break;
         case _3st:
-            Acc_Filter_Ord_Config = 0x15;
+            Acc_Filter_Ord_Config |= 0xA0;
             break;
     }
     SPI_Transfer_16bit(((uint16)WRITE_ACCEL_CONFIG1 << 8 | Acc_Filter_Ord_Config));
@@ -555,7 +529,6 @@ void ICM42688_Init(ICM42688_CONFIG_STRUCT *ICM42688_CONFIG)
     Find_ICM42688();
     ICM42688_SET_GYRO((*ICM42688_CONFIG).GYRO_FSR, (*ICM42688_CONFIG).GYRO_ODR);
     ICM42688_SET_ACC((*ICM42688_CONFIG).ACC_FSR, (*ICM42688_CONFIG).ACC_ODR);
-    ICM42688_SET_AAF();
     ICM42688_SET_FILTER((*ICM42688_CONFIG).Gyro_Bandwidth_Factor,
                         (*ICM42688_CONFIG).Gyro_Filter_Order,
                         (*ICM42688_CONFIG).Acc_Bandwidth_Factor,

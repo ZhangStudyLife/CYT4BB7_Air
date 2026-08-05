@@ -20,10 +20,14 @@ float g_imu_acc_norm_g;
 /* IMU 内部滤波器状态 */
 static struct
 {
-    IMUBiquad_t gyro_notch0[IMU_AXIS_NUM]; /* 陀螺仪 300Hz 陷波 */
-    IMUBiquad_t gyro_lpf[IMU_AXIS_NUM];    /* 陀螺仪 80Hz 主低通 */
+    IMUBiquad_t gyro_anti_alias_lpf[IMU_AXIS_NUM]; /* 陀螺仪抗混叠低通 */
+    IMUBiquad_t gyro_notch0[IMU_AXIS_NUM];         /* 陀螺仪第一级陷波 */
+    IMUBiquad_t gyro_notch1[IMU_AXIS_NUM];         /* 陀螺仪第二级陷波 */
+    IMUBiquad_t gyro_lpf[IMU_AXIS_NUM];            /* 陀螺仪主低通 */
 
-    IMUPt2_t accel_lpf[IMU_AXIS_NUM]; /* 加速度计 25Hz PT2 低通 */
+    IMUBiquad_t accel_notch0[IMU_AXIS_NUM]; /* 加速度计第一级陷波 */
+    IMUBiquad_t accel_notch1[IMU_AXIS_NUM]; /* 加速度计第二级陷波 */
+    IMUPt2_t accel_lpf[IMU_AXIS_NUM];       /* 加速度计主低通 */
 
     uint8_t initialized; /* 首帧直通标志 */
     uint16_t shock_hold_count; /* IMU 冲击保持计数，单位 1kHz 采样点 */
@@ -147,11 +151,19 @@ void IMUFilter_Init(void)
 
     for (axis = 0U; axis < IMU_AXIS_NUM; axis++)
     {
-        /* 陀螺仪链路：300Hz 陷波 -> 80Hz 二阶低通 */
+        /* 陀螺仪链路：AntiAliasLPF -> Notch0 -> OptionalNotch1 -> LPF */
+        IMUBiquad_InitLPF(&s_filt.gyro_anti_alias_lpf[axis], IMU_SAMPLE_RATE_HZ, IMU_GYRO_ANTI_ALIAS_LPF_HZ);
         IMUBiquad_InitNotch(&s_filt.gyro_notch0[axis], IMU_SAMPLE_RATE_HZ, IMU_NOTCH0_HZ, IMU_NOTCH0_Q);
+#if (IMU_NOTCH1_ENABLE != 0U)
+        IMUBiquad_InitNotch(&s_filt.gyro_notch1[axis], IMU_SAMPLE_RATE_HZ, IMU_NOTCH1_HZ, IMU_NOTCH1_Q);
+#endif
         IMUBiquad_InitLPF(&s_filt.gyro_lpf[axis], IMU_SAMPLE_RATE_HZ, IMU_GYRO_LPF_HZ);
 
-        /* 加速度计链路：25Hz PT2 低通 */
+        /* 加速度计链路：Notch0 -> OptionalNotch1 -> LPF */
+        IMUBiquad_InitNotch(&s_filt.accel_notch0[axis], IMU_SAMPLE_RATE_HZ, IMU_NOTCH0_HZ, IMU_ACCEL_NOTCH0_Q);
+#if (IMU_NOTCH1_ENABLE != 0U)
+        IMUBiquad_InitNotch(&s_filt.accel_notch1[axis], IMU_SAMPLE_RATE_HZ, IMU_NOTCH1_HZ, IMU_NOTCH1_Q);
+#endif
         IMUPt2_InitLPF(&s_filt.accel_lpf[axis], IMU_SAMPLE_RATE_HZ, IMU_ACCEL_LPF_HZ);
     }
 
@@ -165,7 +177,7 @@ void IMUFilter_Init(void)
 }
 
 /**
- * 函数功能: 以 1kHz 输入 IMU 数据，执行陀螺仪单陷波与低通、加速度计 PT2 低通，
+ * 函数功能: 以 1kHz 输入原始 IMU 数据，依次执行陀螺仪抗混叠、双陷波和低通，
  *           并输出 1000Hz、500Hz、250Hz 三个结构体。
  * 输入参数:
  *   gx, gy, gz - 陀螺仪三轴输入，单位 dps。
@@ -240,12 +252,30 @@ void IMUFilter_Update(float gx, float gy, float gz,
 
     for (axis = 0U; axis < IMU_AXIS_NUM; axis++)
     {
+        float gyro_stage_aa;
         float gyro_stage0;
+        float gyro_stage1;
+        float accel_stage0;
+        float accel_stage1;
 
-        /* 陀螺仪执行单陷波与主低通，加速度计只执行 PT2 低通。 */
-        gyro_stage0 = IMUBiquad_Apply(&s_filt.gyro_notch0[axis], gyro_in[axis]);
-        gyro_out[axis] = IMUBiquad_Apply(&s_filt.gyro_lpf[axis], gyro_stage0);
-        accel_out[axis] = IMUPt2_Apply(&s_filt.accel_lpf[axis], accel_in[axis]);
+        /* 统一陀螺仪链路：先抗混叠，主陷波后按需经过第二陷波，最后 80Hz 低通 */
+        gyro_stage_aa = IMUBiquad_Apply(&s_filt.gyro_anti_alias_lpf[axis], gyro_in[axis]);
+        gyro_stage0 = IMUBiquad_Apply(&s_filt.gyro_notch0[axis], gyro_stage_aa);
+#if (IMU_NOTCH1_ENABLE != 0U)
+        gyro_stage1 = IMUBiquad_Apply(&s_filt.gyro_notch1[axis], gyro_stage0);
+#else
+        gyro_stage1 = gyro_stage0;
+#endif
+        gyro_out[axis] = IMUBiquad_Apply(&s_filt.gyro_lpf[axis], gyro_stage1);
+
+        /* 统一加速度计链路：主陷波后按需经过第二陷波，再进入 15Hz 低通 */
+        accel_stage0 = IMUBiquad_Apply(&s_filt.accel_notch0[axis], accel_in[axis]);
+#if (IMU_NOTCH1_ENABLE != 0U)
+        accel_stage1 = IMUBiquad_Apply(&s_filt.accel_notch1[axis], accel_stage0);
+#else
+        accel_stage1 = accel_stage0;
+#endif
+        accel_out[axis] = IMUPt2_Apply(&s_filt.accel_lpf[axis], accel_stage1);
     }
 
     g_imufilter_1000hz.gyrox = gyro_out[0];

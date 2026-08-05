@@ -37,59 +37,52 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->vel_z_dt = 0.01f;   /* 100Hz */
 
     /* ===== 油门与机械配平参数 ===== */
-    params->base_throttle = 3200;         /* 悬停油门 */
+    params->base_throttle = 3400;         /* 悬停油门 */
     params->roll_mech_trim_deg = 0.5f;    /* Roll 机械配平角 */
-    params->pitch_mech_trim_deg = -1.5f;   /* Pitch 机械配平角 */
-
-    /* ===== Roll/Pitch 前馈与输出滤波参数 ===== */
-    params->gyro_ff_smoothing_ms = 8.0f;
-    params->gyro_ff_limit = 200.0f;
-    params->angle_ff_smoothing_ms = 10.0f;
-    params->angle_ff_limit_dps = 150.0f;
-    params->angle_output_lpf_hz = 50.0f;
+    params->pitch_mech_trim_deg = 1.5f;   /* Pitch 机械配平角 */
 
     /* ===== Roll 轴角速度环参数 ===== */
-    params->roll_gyro_kp = 6.8f;
-    params->roll_gyro_ki = 0.14f;
-    params->roll_gyro_kd = 0.020f;
-    params->roll_gyro_kff = 0.05f;
-    params->roll_gyro_i_limit = 2000.0f;
+    params->roll_gyro_kp = 7.0f;
+    params->roll_gyro_ki = 0.18f;
+    params->roll_gyro_kd = 0.010f;
+    params->roll_gyro_kff = 0.0f;
+    params->roll_gyro_i_limit = 180.0f;
     params->roll_gyro_d_lpf = 60.0f;
 
     /* ===== Pitch 轴角速度环参数 ===== */
-    params->pitch_gyro_kp = 6.8f;
-    params->pitch_gyro_ki = 0.18f;
-    params->pitch_gyro_kd = 0.014f;
-    params->pitch_gyro_kff = 0.05f;
-    params->pitch_gyro_i_limit = 2000.0f;
+    params->pitch_gyro_kp = 7.0f;
+    params->pitch_gyro_ki = 0.14f;
+    params->pitch_gyro_kd = 0.010f;
+    params->pitch_gyro_kff = 0.0f;
+    params->pitch_gyro_i_limit = 140.0f;
     params->pitch_gyro_d_lpf = 60.0f;
 
     /* ===== Yaw 轴角速度环参数 ===== */
-    params->yaw_gyro_kp = 13.0f;
-    params->yaw_gyro_ki = 4.8f;
+    params->yaw_gyro_kp = 15.0f;
+    params->yaw_gyro_ki = 5.0f;
     params->yaw_gyro_kd = 0.0f;
     params->yaw_gyro_kff = 0.0f;
-    params->yaw_gyro_i_limit = 2000.0f;
+    params->yaw_gyro_i_limit = 700.0f;
     params->yaw_gyro_d_lpf = 30.0f;
 
     /* ===== Roll 轴角度环参数 ===== */
-    params->roll_angle_kp = 8.2f;
+    params->roll_angle_kp = 6.0f;
     params->roll_angle_ki = 0.0f;
     params->roll_angle_kd = 0.0f;
-    params->roll_angle_kff = 0.42f;
+    params->roll_angle_kff = 0.0f;
     params->roll_angle_i_limit = 80.0f;
     params->roll_angle_d_lpf = 15.0f;
 
     /* ===== Pitch 轴角度环参数 ===== */
-    params->pitch_angle_kp = 7.5f;
+    params->pitch_angle_kp = 6.2f;
     params->pitch_angle_ki = 0.0f;
     params->pitch_angle_kd = 0.0f;
-    params->pitch_angle_kff = 0.42f;
+    params->pitch_angle_kff = 0.0f;
     params->pitch_angle_i_limit = 80.0f;
     params->pitch_angle_d_lpf = 15.0f;
 
     /* ===== Yaw 轴角度环参数 ===== */
-    params->yaw_angle_kp = 5.4f;
+    params->yaw_angle_kp = 6.0f;
     params->yaw_angle_ki = 0.0f;
     params->yaw_angle_kd = 0.0f;
     params->yaw_angle_kff = 0.0f;
@@ -105,11 +98,11 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pos_z_d_lpf = 0.0f;
 
     /* ===== Z 轴速度环参数 ===== */
-    params->vel_z_kp = 500.0f;
-    params->vel_z_ki = 120.0f;
+    params->vel_z_kp = 1000.0f;
+    params->vel_z_ki = 80.0f;
     params->vel_z_kd =0.0f;
     params->vel_z_kff = 0.0f;
-    params->vel_z_i_limit = 700.0f;
+    params->vel_z_i_limit = 450.0f;
     params->vel_z_d_lpf = 0.0f;
 
     /* ===== 模式 1 跟杆前馈与刹车参数 ===== */
@@ -246,13 +239,13 @@ static void fc_params_fill_defaults(fc_params_t *params)
 
     /* ===== 模式 7 速度环参数 ===== */
     params->mode7_vel_x_kp = 0.2f;
-    params->mode7_vel_x_ki = 0.0f;
+    params->mode7_vel_x_ki = 0.02f;
     params->mode7_vel_x_kd = 0.0f;
     params->mode7_vel_x_kff = 0.0f;
     params->mode7_vel_x_i_limit = 3.0f;
     params->mode7_vel_x_d_lpf = 10.0f;
     params->mode7_vel_y_kp = 0.2f;
-    params->mode7_vel_y_ki = 0.0f;
+    params->mode7_vel_y_ki = 0.02f;
     params->mode7_vel_y_kd = 0.00f;
     params->mode7_vel_y_kff = 0.0f;
     params->mode7_vel_y_i_limit = 3.0f;

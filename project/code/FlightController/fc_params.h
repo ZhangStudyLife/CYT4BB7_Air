@@ -28,13 +28,6 @@ typedef struct
     float roll_mech_trim_deg;    /* Roll 机械配平角，单位 deg */
     float pitch_mech_trim_deg;   /* Pitch 机械配平角，单位 deg */
 
-    /* ===== Roll/Pitch 前馈与输出滤波参数 ===== */
-    float gyro_ff_smoothing_ms;  /* 角速度环前馈 PT3 单级平滑时间，单位 ms */
-    float gyro_ff_limit;         /* 角速度环前馈控制量限幅 */
-    float angle_ff_smoothing_ms; /* 角度环前馈 PT3 单级平滑时间，单位 ms */
-    float angle_ff_limit_dps;    /* 角度环前馈限幅，单位 deg/s */
-    float angle_output_lpf_hz;   /* 角度环输出 PT3 低通截止频率，单位 Hz */
-
     /* ===== Roll 轴角速度环参数 ===== */
     float roll_gyro_kp;
     float roll_gyro_ki;

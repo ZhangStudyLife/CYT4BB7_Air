@@ -51,7 +51,7 @@ extern "C" {
 #define MOTOR_DUTY_MAX          (8000U)     /* 2000us → 80% → duty=8000 */
 
 /* ======================== 安全限制 ======================== */
-#define MOTOR_THROTTLE_LIMIT_MAX    (10000)     /* 最大油门限制：100% = 10000/10000 */
+#define MOTOR_THROTTLE_LIMIT_MAX    (6000)      /* 最大油门限制：60% = 6000/10000 */
 #define MOTOR_THROTTLE_LIMIT_MIN    (0)         /* 最小油门限制：0% = 0/10000 */
 #define MOTOR_DUTY_LIMIT        (MOTOR_DUTY_MIN + ((MOTOR_DUTY_MAX - MOTOR_DUTY_MIN) * MOTOR_THROTTLE_LIMIT_MAX / MOTOR_INPUT_MAX)) /* 最大duty限制 */
 

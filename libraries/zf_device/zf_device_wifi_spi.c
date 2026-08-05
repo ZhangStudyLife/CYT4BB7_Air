@@ -67,7 +67,6 @@
 #define OTHER_TIME_OUT              1000        // ��λ����
 #define WIFI_SPI_TX_DMA_CHANNEL         (30u)   // WiFi SPI(SCB7) TX�����Ӧ DW1 ͨ����
 #define WIFI_SPI_TX_DMA_TRIGGER_1TO1    (TRIG_OUT_1TO1_2_SCB_TX_TO_PDMA17) // SCB7 TX -> DW1_TR_IN[30]
-#define WIFI_SPI_TX_DMA_USE_SW_TRIGGER  (1u)    // DMA������ʽ��0-Ӳ������ 1-��������
 
 char wifi_spi_version[12];                      // ����ģ��̼��汾��Ϣ
 char wifi_spi_mac_addr[20];                     // ����ģ��MAC��ַ��Ϣ
@@ -153,7 +152,7 @@ static uint8 wifi_spi_tx_dma_init (void)
         tx_chnl_config.PDMA_Descriptor    = &wifi_spi_tx_dma_descr;
         tx_chnl_config.preemptable        = 0;
         tx_chnl_config.priority           = 0;
-        tx_chnl_config.enable             = 1;
+        tx_chnl_config.enable             = 0;
         tx_chnl_config.priviledge         = 0;
         tx_chnl_config.non_secure         = 0;
         tx_chnl_config.bufferable         = 0;
@@ -164,12 +163,12 @@ static uint8 wifi_spi_tx_dma_init (void)
             break;
         }
 
-#if (0u == WIFI_SPI_TX_DMA_USE_SW_TRIGGER)
-        if(CY_TRIGMUX_SUCCESS != Cy_TrigMux_Connect1To1(WIFI_SPI_TX_DMA_TRIGGER_1TO1, CY_TR_MUX_TR_INV_DISABLE, TRIGGER_TYPE_LEVEL, 0))
+        if(CY_TRIGMUX_SUCCESS != Cy_TrigMux_Connect1To1(WIFI_SPI_TX_DMA_TRIGGER_1TO1, CY_TR_MUX_TR_INV_DISABLE, TRIGGER_TYPE_SCB_TR_TX_REQ, 0))
         {
             break;
         }
-#endif
+
+        Cy_SCB_SetTxFifoLevel(WIFI_SPI_SCB, Cy_SCB_GetFifoSize(WIFI_SPI_SCB) / 2u);
 
         Cy_PDMA_Chnl_SetInterruptMask(DW1, WIFI_SPI_TX_DMA_CHANNEL);
         Cy_PDMA_Enable(DW1);
@@ -194,7 +193,7 @@ static uint8 wifi_spi_tx_dma_start (const uint8 *data, uint16 len)
 
     do
     {
-        if((NULL == data) || (0 == len))
+        if((NULL == data) || (0 == len) || (len > 256u))
         {
             break;
         }
@@ -218,7 +217,7 @@ static uint8 wifi_spi_tx_dma_start (const uint8 *data, uint16 len)
         tx_descr_config.intrType       = CY_PDMA_INTR_X_LOOP_CMPLT;
         tx_descr_config.trigoutType    = CY_PDMA_TRIGOUT_DESCR_CMPLT;
         tx_descr_config.chStateAtCmplt = CY_PDMA_CH_DISABLED;
-        tx_descr_config.triginType     = (0u == WIFI_SPI_TX_DMA_USE_SW_TRIGGER) ? CY_PDMA_TRIGIN_1ELEMENT : CY_PDMA_TRIGIN_DESCR;
+        tx_descr_config.triginType     = CY_PDMA_TRIGIN_1ELEMENT;
         tx_descr_config.dataSize       = CY_PDMA_BYTE;
         tx_descr_config.srcTxfrSize    = CY_PDMA_TXFR_SIZE_DATA_SIZE;
         tx_descr_config.destTxfrSize   = CY_PDMA_TXFR_SIZE_WORD;
@@ -239,14 +238,9 @@ static uint8 wifi_spi_tx_dma_start (const uint8 *data, uint16 len)
         }
 
         Cy_PDMA_Chnl_ClearInterrupt(DW1, WIFI_SPI_TX_DMA_CHANNEL);
+        Cy_SCB_ClearTxInterrupt(WIFI_SPI_SCB, CY_SCB_TX_INTR_OVERFLOW);
         Cy_PDMA_Chnl_SetDescr(DW1, WIFI_SPI_TX_DMA_CHANNEL, &wifi_spi_tx_dma_descr);
         Cy_PDMA_Chnl_Enable(DW1, WIFI_SPI_TX_DMA_CHANNEL);
-#if defined(CPUSS_SW_TR_PRESENT) && (CPUSS_SW_TR_PRESENT == 1)
-        if(0u != WIFI_SPI_TX_DMA_USE_SW_TRIGGER)
-        {
-            Cy_PDMA_Chnl_SetSwTrigger(DW1, WIFI_SPI_TX_DMA_CHANNEL);
-        }
-#endif
         wifi_spi_tx_dma_busy = 1;
         return_state = 0;
     }while(0);

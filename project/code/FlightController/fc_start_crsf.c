@@ -128,7 +128,6 @@ static uint8_t FC_START_CRSF_TakeoffState_Update(void)
 static void FC_START_CRSF_PrepareTakeoff(void)
 {
     /* Keep 100Hz task non-blocking, avoid tick backlog compressing takeoff timeline. */
-    Motor_Init();
     Motor_Disable();
 }
 

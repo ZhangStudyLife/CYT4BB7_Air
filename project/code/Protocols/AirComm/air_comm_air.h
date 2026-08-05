@@ -73,20 +73,23 @@ typedef void (*air_comm_air_command_fn)(void);
 typedef struct
 {
     uint32 tick_ms;                 /* 模块运行时间（ms），由 tick_1MS 累加 */
-    uint32 tx_frame_count;          /* 已发送帧数 */
+    uint32 tx_frame_count;          /* 成功进入发送队列的帧数 */
     uint32 rx_frame_count;          /* 已接收并校验通过的帧数 */
-    uint32 tx_byte_count;          /* 已发送字节数（含帧头和 CRC） */
+    uint32 tx_byte_count;          /* 成功进入发送队列的字节数（含帧头和 CRC） */
     uint32 rx_byte_count;          /* 已接收字节数（校验通过的帧） */
     uint32 raw_rx_byte_count;      /* 原始接收字节数（中断收到的全部字节） */
     uint32 crc_error_count;        /* CRC 校验失败次数 */
     uint32 rx_oversize_count;      /* 接收帧 payload 超长次数 */
     uint32 rx_queue_overflow_count; /* 接收环形队列溢出次数 */
+    uint32 tx_queue_overflow_count; /* 发送队列满或RUN_DATA限额导致的拒绝次数 */
     uint32 heartbeat_tx_count;     /* 心跳发送次数 */
     uint32 heartbeat_rx_count;     /* 心跳接收次数 */
     uint32 set_param_ok_count;     /* 参数设置成功次数 */
     uint32 set_param_fail_count;   /* 参数设置失败次数 */
     uint32 command_ok_count;       /* 远程命令成功次数 */
     uint32 command_fail_count;     /* 远程命令失败次数 */
+    uint8 tx_pending_frames;       /* 当前等待写入硬件FIFO的帧数 */
+    uint8 tx_queue_high_water;     /* 发送队列历史最高占用帧数 */
     uint8 online_status;           /* 0=未连接 1=在线 2=离线 */
 } air_comm_air_stats_t;
 
@@ -208,6 +211,15 @@ void air_comm_air_update_100HZ(void);
  * 注意：这个函数在中断上下文调用，只做入队，不做解析。
  */
 void air_comm_air_rx_byte(uint8 byte);
+
+/*
+ * 函数功能：在UART2中断中批量填充AirComm发送FIFO。
+ * 输入参数：
+ *   无
+ * 返回值：
+ *   无
+ */
+void air_comm_air_uart_tx_isr(void);
 
 /* 查询小车是否在线。返回 1=在线，0=离线或从未连接。 */
 uint8 air_comm_air_is_car_online(void);

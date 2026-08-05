@@ -197,6 +197,8 @@ void uart2_isr (void)
         
        
     }
+
+    air_comm_air_uart_tx_isr();
 }
 
 void uart3_isr (void)

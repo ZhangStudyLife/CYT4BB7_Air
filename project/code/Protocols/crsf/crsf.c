@@ -233,6 +233,7 @@ void crsf_init(void)
 
 static void crsf_send_attitude(int16_t roll, int16_t pitch, int16_t yaw)
 {
+    volatile stc_SCB_t *crsf_scb = get_scb_module(CRSF_UART_INDEX);
     uint8_t buf[1 + 1 + 1 + CRSF_ATT_PAYLOAD_LEN + 1];
     uint8_t idx = 0;
 
@@ -246,12 +247,15 @@ static void crsf_send_attitude(int16_t roll, int16_t pitch, int16_t yaw)
 
     buf[idx++] = crsf_crc8(&buf[2], (uint8_t)(1 + CRSF_ATT_PAYLOAD_LEN));
 
-    uart_write_buffer(CRSF_UART_INDEX, buf, idx);
+    if ((Cy_SCB_GetFifoSize(crsf_scb) - Cy_SCB_GetNumInTxFifo(crsf_scb)) >= idx)
+    {
+        (void)Cy_SCB_UART_PutArray(crsf_scb, buf, idx);
+    }
 }
 
 
-// 花费0.26ms
-void crsf_send_50hz(void)
+/* 生成并尝试提交低频CRSF姿态回传帧，硬件FIFO忙时直接丢弃。 */
+void crsf_send_10hz(void)
 {
 
     const float k_deg_to_rad_1e4 = 174.532925f; // deg * (pi/180) * 10000

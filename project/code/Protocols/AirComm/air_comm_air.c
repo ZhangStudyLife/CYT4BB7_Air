@@ -19,6 +19,9 @@
 #define AIR_COMM_FRAME_OVERHEAD              (9U)    /* 帧开销：4帧头 + type + seq + len + 2crc */
 #define AIR_COMM_MAX_FRAME                   (AIR_COMM_MAX_PAYLOAD + AIR_COMM_FRAME_OVERHEAD)
 #define AIR_COMM_RX_QUEUE_SIZE               (512U)  /* 接收环形队列大小（字节） */
+#define AIR_COMM_TX_QUEUE_SIZE               (4U)    /* 发送队列固定帧槽数量 */
+#define AIR_COMM_TX_RUN_DATA_LIMIT           (3U)    /* RUN_DATA最多占用的发送帧槽数量 */
+#define AIR_COMM_TX_FIFO_LEVEL               (64U)   /* SCB4发送FIFO触发水位 */
 #define AIR_COMM_PARAM_TABLE_MAX             (384U)  /* 最多注册参数个数 */
 #define AIR_COMM_DEFAULT_PARAM_COUNT         (292U)
 #define AIR_COMM_REMOTE_CANCEL_MS            (400U)
@@ -193,6 +196,17 @@ typedef struct
     volatile uint16 tail;   /* 读指针，poll 更新 */
 } air_comm_air_rx_queue_t;
 
+/* 发送帧队列，主循环入队，UART2中断出队。 */
+typedef struct
+{
+    uint8 data[AIR_COMM_TX_QUEUE_SIZE][AIR_COMM_MAX_FRAME];
+    uint16 len[AIR_COMM_TX_QUEUE_SIZE];
+    volatile uint8 head;           /* UART2中断读取的帧索引 */
+    volatile uint8 tail;           /* 主循环写入的帧索引 */
+    volatile uint8 count;          /* 尚未完全写入硬件FIFO的帧数 */
+    uint16 offset;                 /* 队头帧已写入硬件FIFO的字节数 */
+} air_comm_air_tx_queue_t;
+
 /* 可被小车远程设置的无人机参数（默认值在 init 里重置） */
 float air_min_area = 5.0f;   /* 信标检测最小面积 */
 float air_hold_ms = 30.0f;   /* 跟踪保持时间（ms） */
@@ -209,6 +223,7 @@ static uint32 s_air_comm_last_run_data_ms = 0U; /* 上次收到小车运行数�
 
 static air_comm_air_rx_parser_t s_air_comm_rx;          /* 接收解析器 */
 static air_comm_air_rx_queue_t s_air_comm_rx_queue;     /* 接收环形队列 */
+static air_comm_air_tx_queue_t s_air_comm_tx_queue;     /* 发送帧队列 */
 static air_comm_air_stats_t s_air_comm_stats;           /* 统计计数器 */
 static air_comm_air_param_t s_air_comm_params[AIR_COMM_PARAM_TABLE_MAX]; /* 参数表 */
 /* 远端镜像统一从0开始，仅在目标端成功读回后更新为有效值。 */
@@ -516,16 +531,110 @@ static uint8 air_comm_name_equal(const char *name, const uint8 *bytes, uint8 len
     return (name[len] == '\0') ? 1U : 0U;
 }
 
-/* 通过 UART_2 发送原始字节，直接调用底层驱动 */
-static uint8 air_comm_send_uart(const uint8 *data, uint16 len)
+/*
+ * 函数功能：将完整AirComm帧放入UART2异步发送队列。
+ * 输入参数：
+ *   data：完整帧首地址
+ *   len：完整帧字节数
+ *   type：AirComm消息类型
+ * 返回值：
+ *   1：成功入队
+ *   0：参数无效或发送队列已满
+ */
+static uint8 air_comm_send_uart(const uint8 *data, uint16 len, uint8 type)
 {
-    if((data == NULL) || (len == 0U))
+    uint8 tail;
+    uint8 pending;
+    uint32 interrupt_state;
+
+    if((data == NULL) || (len == 0U) || (len > AIR_COMM_MAX_FRAME))
     {
         return 0U;
     }
 
-    uart_write_buffer(UART_2, data, len);
+    interrupt_state = Cy_SysLib_EnterCriticalSection();
+    pending = s_air_comm_tx_queue.count;
+    if ((pending >= AIR_COMM_TX_QUEUE_SIZE) ||
+        ((AIR_COMM_MSG_RUN_DATA == type) && (pending >= AIR_COMM_TX_RUN_DATA_LIMIT)))
+    {
+        s_air_comm_stats.tx_queue_overflow_count++;
+        Cy_SysLib_ExitCriticalSection(interrupt_state);
+        return 0U;
+    }
+
+    tail = s_air_comm_tx_queue.tail;
+    memcpy(s_air_comm_tx_queue.data[tail], data, len);
+    s_air_comm_tx_queue.len[tail] = len;
+    s_air_comm_tx_queue.tail = (uint8)((tail + 1U) % AIR_COMM_TX_QUEUE_SIZE);
+    pending++;
+    s_air_comm_tx_queue.count = pending;
+    s_air_comm_stats.tx_pending_frames = pending;
+    if (pending > s_air_comm_stats.tx_queue_high_water)
+    {
+        s_air_comm_stats.tx_queue_high_water = pending;
+    }
+
+    Cy_SCB_SetTxInterruptMask(SCB4,
+        Cy_SCB_GetTxInterruptMask(SCB4) | CY_SCB_UART_TX_TRIGGER);
+    Cy_SysLib_ExitCriticalSection(interrupt_state);
     return 1U;
+}
+
+/*
+ * 函数功能：批量把发送队列数据写入SCB4硬件TX FIFO。
+ * 输入参数：
+ *   无
+ * 返回值：
+ *   无
+ * 备注：
+ *   仅在UART2中断上下文调用，不等待物理发送完成。
+ */
+void air_comm_air_uart_tx_isr(void)
+{
+    uint8 head;
+    uint16 remaining;
+    uint32 copied;
+
+    if ((Cy_SCB_GetTxInterruptStatusMasked(SCB4) & CY_SCB_UART_TX_TRIGGER) == 0U)
+    {
+        return;
+    }
+
+    while (s_air_comm_tx_queue.count > 0U)
+    {
+        head = s_air_comm_tx_queue.head;
+        remaining = (uint16)(s_air_comm_tx_queue.len[head] - s_air_comm_tx_queue.offset);
+        if (remaining == 0U)
+        {
+            s_air_comm_tx_queue.head = (uint8)((head + 1U) % AIR_COMM_TX_QUEUE_SIZE);
+            s_air_comm_tx_queue.count--;
+            s_air_comm_tx_queue.offset = 0U;
+            s_air_comm_stats.tx_pending_frames = s_air_comm_tx_queue.count;
+            continue;
+        }
+
+        copied = Cy_SCB_UART_PutArray(SCB4,
+                                      &s_air_comm_tx_queue.data[head][s_air_comm_tx_queue.offset],
+                                      remaining);
+        s_air_comm_tx_queue.offset = (uint16)(s_air_comm_tx_queue.offset + copied);
+        if (s_air_comm_tx_queue.offset < s_air_comm_tx_queue.len[head])
+        {
+            break;
+        }
+
+        s_air_comm_tx_queue.head = (uint8)((head + 1U) % AIR_COMM_TX_QUEUE_SIZE);
+        s_air_comm_tx_queue.count--;
+        s_air_comm_tx_queue.offset = 0U;
+        s_air_comm_stats.tx_pending_frames = s_air_comm_tx_queue.count;
+    }
+
+    if (s_air_comm_tx_queue.count == 0U)
+    {
+        Cy_SCB_SetTxInterruptMask(SCB4,
+            Cy_SCB_GetTxInterruptMask(SCB4) & ~CY_SCB_UART_TX_TRIGGER);
+    }
+
+    Cy_SCB_ClearTxInterrupt(SCB4, CY_SCB_UART_TX_TRIGGER);
 }
 
 /*
@@ -566,7 +675,7 @@ static uint8 air_comm_send_frame(uint8 type, uint8 seq, const uint8 *payload, ui
     frame[pos++] = (uint8)(crc & 0xFFU);
     frame[pos++] = (uint8)((crc >> 8) & 0xFFU);
 
-    if(air_comm_send_uart(frame, pos) == 0U)
+    if(air_comm_send_uart(frame, pos, type) == 0U)
     {
         return 0U;
     }
@@ -582,11 +691,15 @@ static uint8 air_comm_send_frame(uint8 type, uint8 seq, const uint8 *payload, ui
 }
 
 /*
- * 发送心跳包。
- * payload 格式：2 字节保留 + 4 字节当前 tick_ms（小车用来算延迟）。
- * 发送成功才自增 seq。
+ * 函数功能：发送心跳包。
+ * 输入参数：
+ *   无
+ * 返回值：
+ *   1：成功进入发送队列
+ *   0：发送队列已满
+ * 备注：payload 为2字节保留字段和4字节当前 tick_ms，发送成功才自增 seq。
  */
-static void air_comm_send_heartbeat(void)
+static uint8 air_comm_send_heartbeat(void)
 {
     uint8 payload[6];
 
@@ -597,7 +710,10 @@ static void air_comm_send_heartbeat(void)
     if(air_comm_send_frame(AIR_COMM_MSG_HEARTBEAT, s_air_comm_seq, payload, 6U) != 0U)
     {
         s_air_comm_seq++;
+        return 1U;
     }
+
+    return 0U;
 }
 
 /* 发送参数设置回执，告知小车设置结果和实际写入值 */
@@ -1614,6 +1730,7 @@ void air_comm_air_init(void)
     /* 清零所有状态和表 */
     memset(&s_air_comm_rx, 0, sizeof(s_air_comm_rx));
     memset(&s_air_comm_rx_queue, 0, sizeof(s_air_comm_rx_queue));
+    memset(&s_air_comm_tx_queue, 0, sizeof(s_air_comm_tx_queue));
     memset(&s_air_comm_stats, 0, sizeof(s_air_comm_stats));
     memset(s_air_comm_params, 0, sizeof(s_air_comm_params));
     memset(s_air_comm_commands, 0, sizeof(s_air_comm_commands));
@@ -2152,6 +2269,10 @@ void air_comm_air_init(void)
 
     /* 配置 UART_2：波特率 1152000，TX=P10_1，RX=P10_0，开接收中断 */
     uart_init(UART_2, AIR_COMM_AIR_BAUDRATE, UART2_TX_P10_1, UART2_RX_P10_0);
+    Cy_SCB_SetTxFifoLevel(SCB4, AIR_COMM_TX_FIFO_LEVEL);
+    Cy_SCB_ClearTxInterrupt(SCB4, CY_SCB_UART_TX_TRIGGER);
+    Cy_SCB_SetTxInterruptMask(SCB4,
+        Cy_SCB_GetTxInterruptMask(SCB4) & ~CY_SCB_UART_TX_TRIGGER);
     uart_rx_interrupt(UART_2, 1U);
 
     s_air_comm_initialized = 1U;
@@ -2204,8 +2325,10 @@ void air_comm_air_update_100HZ(void)
     /* 每 200ms 发一次心跳，用差值判断避免 tick 溢出问题 */
     if((s_air_comm_tick_ms - s_air_comm_last_heartbeat_ms) >= AIR_COMM_HEARTBEAT_MS)
     {
-        air_comm_send_heartbeat();
-        s_air_comm_last_heartbeat_ms = s_air_comm_tick_ms;
+        if(air_comm_send_heartbeat() != 0U)
+        {
+            s_air_comm_last_heartbeat_ms = s_air_comm_tick_ms;
+        }
     }
 
     if((s_air_comm_active_command != NULL) &&

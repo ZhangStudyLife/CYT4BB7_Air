@@ -2,13 +2,59 @@
 #include "../code/Planner/beacon_lost_detector.h"
 #include "../code/Estimation/Pos_Est/FlowGyroDecoupler_LC302.h"
 
+#define CORE0_PROFILE_DWT_UNLOCK_KEY       (0xC5ACCE55UL) /* Core 0性能计时使用的DWT解锁键 */
+#define CORE0_PROFILE_UPDATE_MAX(target, value)          /* 更新本次100Hz日志周期内的最大耗时 */ \
+    do                                                     \
+    {                                                      \
+        if ((value) > (target))                            \
+        {                                                  \
+            (target) = (value);                            \
+        }                                                  \
+    } while (0)
+#define CORE0_PROFILE_TO_US(cycles, cycles_per_us)       ((float)(cycles) / (cycles_per_us)) /* 将DWT周期数转换为微秒 */
+#define CORE0_PROFILE_CRSF10_UPDATED       (1U << 0) /* 本日志窗口已执行CRSF 10Hz发送 */
+#define CORE0_PROFILE_FC50_UPDATED         (1U << 1) /* 本日志窗口已执行飞控50Hz任务 */
+#define CORE0_PROFILE_STATE10_UPDATED      (1U << 2) /* 本日志窗口已执行起降10Hz状态机 */
+
+typedef struct
+{
+    uint32 imu_max_cycles;
+    uint32 pos1_max_cycles;
+    uint32 pos2_max_cycles;
+    uint32 fc500_max_cycles;
+    uint32 fc1000_max_cycles;
+    uint32 air_poll_max_cycles;
+    uint32 loop1000_max_cycles;
+    uint32 tof_max_cycles;
+    uint32 height_max_cycles;
+    uint32 crsf_max_cycles;
+    uint32 fc100_max_cycles;
+    uint32 air_update_max_cycles;
+    uint32 ipc_max_cycles;
+    uint32 planner_max_cycles;
+    uint32 air_send_max_cycles;
+    uint32 ipc_state_max_cycles;
+    uint32 crsf10_max_cycles;
+    uint32 fc50_max_cycles;
+    uint32 state10_max_cycles;
+    uint32 loop100_max_cycles;
+    uint32 task100_count;
+    uint32 slow_tick_gap_max;
+    uint32 slow_slot_skip_count;
+    uint32 loop100_abort_count;
+    uint16 backlog_max;
+    uint16 guard_max;
+    uint8 tof_max_step;
+    uint8 tail_update_mask;
+    uint8 send_pending;
+} core0_profile_t;
+
 volatile uint32 tick_1000us_cnt = 0U;
 volatile uint16 g_tick_1000HZ = 0U;
 volatile uint8 g_tick_100HZ = 0U;
 
 static uint8 div500 = 0U;
 static uint8 div50 = 0U;
-static uint8 slot50 = 0U;
 static uint8 div10 = 0U;
 static uint8 s_ipc_last_flying = 0xFFU;   /* 上一次成功通知给核1的飞行状态 */
 /* 上一次成功通知给核1的 2BL3 图传发送模式 */
@@ -167,7 +213,30 @@ static void send_air_run_data_100hz(const car_plan_result_t *car_plan,
 
 int main(void)
 {
+    core0_profile_t profile = {0};
+    float profile_cycles_per_us;
+    uint32 profile_start_cycles;
+    uint32 profile_period_start_cycles;
+    uint32 profile_elapsed_cycles;
+    uint32 profile_air_raw_rx_last = 0U;
+    uint32 profile_air_overflow_last = 0U;
+    uint32 profile_air_tx_overflow_last = 0U;
+    uint32 profile_wifi_overflow_last = 0U;
+    uint32 profile_tof_sample_seq_last = 0U;
+    uint32 profile_log_last_cycles = 0U;
+    uint32 profile_loop100_accum_cycles = 0U;
+    uint32 profile_loop100_cycle = 0U;
+    uint32 slow_tick_last = 0U;
+    uint8 profile_loop100_active = 0U;
+    uint8 profile_loop100_phase_mask = 0U;
+    uint8 profile_tof_step;
+
     clock_init(SYSTEM_CLOCK_250M);
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->LAR = CORE0_PROFILE_DWT_UNLOCK_KEY;
+    DWT->CYCCNT = 0U;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+    profile_cycles_per_us = (float)SystemCoreClock / 1000000.0f;
     SCB_DisableDCache();
     Beep_Init();
     pit_ms_init(PIT_CH2, 10);
@@ -210,19 +279,35 @@ int main(void)
     system_delay_ms(500);
     Motor_SetThrottleAll((int32[]){0, 0, 0, 0});
     air_comm_set_run_data_callback(on_car_data);
+    profile_log_last_cycles = DWT->CYCCNT;
+    slow_tick_last = tick_1000us_cnt;
     while (true)
     {
         uint16 guard = 0U;
 
         while ((g_tick_1000HZ > 0U) && (guard < 100U))
         {
+            profile_period_start_cycles = DWT->CYCCNT;
+            if (g_tick_1000HZ > profile.backlog_max)
+            {
+                profile.backlog_max = g_tick_1000HZ;
+            }
             g_tick_1000HZ--;
 
+            profile_start_cycles = DWT->CYCCNT;
             IMU_Update_1000HZ();
+            profile_elapsed_cycles = DWT->CYCCNT - profile_start_cycles;
+            CORE0_PROFILE_UPDATE_MAX(profile.imu_max_cycles, profile_elapsed_cycles);
             // ICM42688_Aux_Update_1000Hz(tick_1000us_cnt);         //对比用的陀螺仪关掉
             // BMI088_Update_1000Hz(tick_1000us_cnt);
+            profile_start_cycles = DWT->CYCCNT;
             Pos_Est_Update_1000HZ();
+            profile_elapsed_cycles = DWT->CYCCNT - profile_start_cycles;
+            CORE0_PROFILE_UPDATE_MAX(profile.pos1_max_cycles, profile_elapsed_cycles);
+            profile_start_cycles = DWT->CYCCNT;
             Pos_Est_Update_1000HZ_2();
+            profile_elapsed_cycles = DWT->CYCCNT - profile_start_cycles;
+            CORE0_PROFILE_UPDATE_MAX(profile.pos2_max_cycles, profile_elapsed_cycles);
             // wifi_justfloat();
             // {
             //     const VL53L1X_data_struct *tof = VL53L1X_GetData();
@@ -274,69 +359,157 @@ int main(void)
             if (div500 >= 2U)
             {
                 div500 = 0U;
+                profile_start_cycles = DWT->CYCCNT;
                 FC_Loop_500Hz();
+                profile_elapsed_cycles = DWT->CYCCNT - profile_start_cycles;
+                CORE0_PROFILE_UPDATE_MAX(profile.fc500_max_cycles, profile_elapsed_cycles);
             }
 
+            profile_start_cycles = DWT->CYCCNT;
             FC_Loop_1000Hz();
+            profile_elapsed_cycles = DWT->CYCCNT - profile_start_cycles;
+            CORE0_PROFILE_UPDATE_MAX(profile.fc1000_max_cycles, profile_elapsed_cycles);
+
+            profile_start_cycles = DWT->CYCCNT;
+            air_comm_air_poll();
+            profile_elapsed_cycles = DWT->CYCCNT - profile_start_cycles;
+            CORE0_PROFILE_UPDATE_MAX(profile.air_poll_max_cycles, profile_elapsed_cycles);
+
+            profile_elapsed_cycles = DWT->CYCCNT - profile_period_start_cycles;
+            CORE0_PROFILE_UPDATE_MAX(profile.loop1000_max_cycles, profile_elapsed_cycles);
             guard++;
+        }
+
+        if (guard > profile.guard_max)
+        {
+            profile.guard_max = guard;
         }
 
 #if (0U == WIFI_IMAGE_ENABLE)
         wifi_cmd_Poll();
 #endif
 
-        if (g_tick_100HZ > 0U)
         {
-            g_tick_100HZ--;
-            Height_Est_update_100HZ();
-            CRSF_Update_100HZ();
-            FC_START_CRSF_UpdateLandingButton100Hz();
-            FC_Loop_100Hz();
-            air_comm_air_update_100HZ();
-            ipc_attitude_publish(g_euler.roll,
-                                 g_euler.pitch,
-                                 g_tof_fused_height_mm,
-                                 g_tof_fused_valid);
-            ipc_image_poll();
-            {
-                ipc_camera_spi_log_t camera_spi_log;
+            uint32 slow_tick_now = tick_1000us_cnt;
 
-                ipc_camera_spi_log_get(&camera_spi_log);
-                wifi_justfloat((float)g_image_data_seq,
-                               (float)camera_spi_log.seq,
-                               (float)camera_spi_log.board[0].rx_ok_count,
-                               (float)camera_spi_log.board[1].rx_ok_count,
-                               (float)camera_spi_log.board[0].rx_error_count,
-                               (float)camera_spi_log.board[1].rx_error_count,
-                               (float)camera_spi_log.board[0].online,
-                               (float)camera_spi_log.board[1].online,
-                               (float)image_data[Front].car_lamp_data[0].valid,
-                               image_data[Front].car_lamp_data[0].cx,
-                               image_data[Front].car_lamp_data[0].cy,
-                               (float)image_data[Center].car_lamp_data[0].valid,
-                               image_data[Center].car_lamp_data[0].cx,
-                               image_data[Center].car_lamp_data[0].cy,
-                               (float)image_data[Back].car_lamp_data[0].valid,
-                               image_data[Back].car_lamp_data[0].cx,
-                               image_data[Back].car_lamp_data[0].cy);
-            }
-            (void)BeaconLostDetector_Update();
-
-            car_plan_result_t car_plan = {0};
-            car_plan_2_result_t car_plan_2 = {0};
-            uint8 car_plan_send_valid;
-            if (FC_START_CRSF_Get_Flight_Mode() != FC_START_CRSF_FLIGHT_MODE_8)
+            if ((g_tick_1000HZ == 0U) && (slow_tick_now != slow_tick_last))
             {
-                (void)CarPlan_Update(&car_plan);
-                (void)CarPlan_2_Update(&car_plan_2);
-                if (Car_Plan_Mode >= 1.5f)
+                uint32 slow_tick_gap = slow_tick_now - slow_tick_last;
+
+                CORE0_PROFILE_UPDATE_MAX(profile.slow_tick_gap_max, slow_tick_gap);
+                if (slow_tick_gap > 1U)
                 {
-                    car_plan.valid = car_plan_2.valid;
-                    car_plan.target_strafe_mps = car_plan_2.target_strafe_mps;
-                    car_plan.target_forward_mps = car_plan_2.target_forward_mps;
+                    profile.slow_slot_skip_count += slow_tick_gap - 1U;
                 }
-            }
-            car_plan_send_valid = ((car_plan.valid != 0U) && (g_tof_fused_height_mm > 500.0f)) ? 1U : 0U;
+                slow_tick_last = slow_tick_now;
+
+                if ((profile_loop100_active != 0U) &&
+                    (profile_loop100_cycle != (slow_tick_now / 10U)))
+                {
+                    profile.loop100_abort_count++;
+                    profile_loop100_active = 0U;
+                    profile_loop100_phase_mask = 0U;
+                }
+
+                switch ((uint8)(slow_tick_now % 10U))
+                {
+                case 0U:
+                    /* 槽0保留为空，100Hz统计在日志成功入队后统一清零。 */
+                    break;
+
+                case 1U:
+                    /* 槽1：按高度、遥控、降落判定、100Hz飞控的依赖顺序执行。 */
+                    g_tick_100HZ = 0U;
+                    profile_period_start_cycles = DWT->CYCCNT;
+                    profile_loop100_accum_cycles = 0U;
+                    profile_loop100_cycle = slow_tick_now / 10U;
+                    profile_loop100_active = 1U;
+                    profile_loop100_phase_mask = 1U;
+
+                    profile_start_cycles = DWT->CYCCNT;
+                    Height_Est_update_100HZ();
+                    profile_elapsed_cycles = DWT->CYCCNT - profile_start_cycles;
+                    CORE0_PROFILE_UPDATE_MAX(profile.height_max_cycles, profile_elapsed_cycles);
+
+                    profile_start_cycles = DWT->CYCCNT;
+                    CRSF_Update_100HZ();
+                    FC_START_CRSF_UpdateLandingButton100Hz();
+                    profile_elapsed_cycles = DWT->CYCCNT - profile_start_cycles;
+                    CORE0_PROFILE_UPDATE_MAX(profile.crsf_max_cycles, profile_elapsed_cycles);
+
+                    profile_start_cycles = DWT->CYCCNT;
+                    FC_Loop_100Hz();
+                    profile_elapsed_cycles = DWT->CYCCNT - profile_start_cycles;
+                    CORE0_PROFILE_UPDATE_MAX(profile.fc100_max_cycles, profile_elapsed_cycles);
+
+                    profile_loop100_accum_cycles += DWT->CYCCNT - profile_period_start_cycles;
+                    break;
+
+                case 2U:
+                case 4U:
+                case 6U:
+                case 8U:
+                    /* 偶数槽：先轮询新的READY请求，再推进一个完整ToF软件IIC事务。 */
+                    VL53L1X_RequestUpdate();
+                    profile_start_cycles = DWT->CYCCNT;
+                    profile_tof_step = VL53L1X_TaskStep();
+                    profile_elapsed_cycles = DWT->CYCCNT - profile_start_cycles;
+                    if (profile_elapsed_cycles > profile.tof_max_cycles)
+                    {
+                        profile.tof_max_cycles = profile_elapsed_cycles;
+                        profile.tof_max_step = profile_tof_step;
+                    }
+                    break;
+
+                case 3U:
+                    /* 槽3：维护空地协议，并在规划前刷新IPC数据。 */
+                    profile_period_start_cycles = DWT->CYCCNT;
+
+                    profile_start_cycles = DWT->CYCCNT;
+                    air_comm_air_update_100HZ();
+                    profile_elapsed_cycles = DWT->CYCCNT - profile_start_cycles;
+                    CORE0_PROFILE_UPDATE_MAX(profile.air_update_max_cycles, profile_elapsed_cycles);
+
+                    profile_start_cycles = DWT->CYCCNT;
+                    ipc_attitude_publish(g_euler.roll,
+                                         g_euler.pitch,
+                                         g_tof_fused_height_mm,
+                                         g_tof_fused_valid);
+                    ipc_image_poll();
+                    profile_elapsed_cycles = DWT->CYCCNT - profile_start_cycles;
+                    CORE0_PROFILE_UPDATE_MAX(profile.ipc_max_cycles, profile_elapsed_cycles);
+
+                    if (profile_loop100_active != 0U)
+                    {
+                        profile_loop100_accum_cycles += DWT->CYCCNT - profile_period_start_cycles;
+                        profile_loop100_phase_mask |= (1U << 1);
+                    }
+                    break;
+
+                case 5U:
+                    /* 槽5：使用已刷新的图像数据规划，并提交本周期空地数据。 */
+                    profile_period_start_cycles = DWT->CYCCNT;
+
+                    profile_start_cycles = DWT->CYCCNT;
+                    (void)BeaconLostDetector_Update();
+
+                    car_plan_result_t car_plan = {0};
+                    car_plan_2_result_t car_plan_2 = {0};
+                    uint8 car_plan_send_valid;
+                    if (FC_START_CRSF_Get_Flight_Mode() != FC_START_CRSF_FLIGHT_MODE_8)
+                    {
+                        (void)CarPlan_Update(&car_plan);
+                        (void)CarPlan_2_Update(&car_plan_2);
+                        if (Car_Plan_Mode >= 1.5f)
+                        {
+                            car_plan.valid = car_plan_2.valid;
+                            car_plan.target_strafe_mps = car_plan_2.target_strafe_mps;
+                            car_plan.target_forward_mps = car_plan_2.target_forward_mps;
+                        }
+                    }
+                    car_plan_send_valid = ((car_plan.valid != 0U) && (g_tof_fused_height_mm > 500.0f)) ? 1U : 0U;
+                    profile_elapsed_cycles = DWT->CYCCNT - profile_start_cycles;
+                    CORE0_PROFILE_UPDATE_MAX(profile.planner_max_cycles, profile_elapsed_cycles);
 
 
     //    wifi_justfloat(  image_data[Front].beacon_data[0].x,          /* I1 */
@@ -392,7 +565,21 @@ int main(void)
     //                     // g_height_fused_vz_mps,
     //                     // CRSF_STD[8]
     //                     );
-            send_air_run_data_100hz(&car_plan, car_plan_send_valid);
+                    profile_start_cycles = DWT->CYCCNT;
+                    send_air_run_data_100hz(&car_plan, car_plan_send_valid);
+                    profile_elapsed_cycles = DWT->CYCCNT - profile_start_cycles;
+                    CORE0_PROFILE_UPDATE_MAX(profile.air_send_max_cycles, profile_elapsed_cycles);
+
+                    if (profile_loop100_active != 0U)
+                    {
+                        profile_loop100_accum_cycles += DWT->CYCCNT - profile_period_start_cycles;
+                        profile_loop100_phase_mask |= (1U << 2);
+                    }
+                    break;
+
+                case 7U:
+                    /* 槽7：维护IPC状态并执行飞控50Hz任务。 */
+                    profile_period_start_cycles = DWT->CYCCNT;
 
             // wifi_justfloat(image_data[Front].car_lamp_data[0].cx,
             //                 image_data[Front].car_lamp_data[0].cy,
@@ -408,79 +595,268 @@ int main(void)
             //                 g_tof_fused_height_mm
             //             );
 
-            wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
-            {
-                uint8 flying = (FC_START_CRSF_STATE_FLYING == FC_START_CRSF_Get_State()) ? 1U : 0U;
-                uint8 image_send_enable = g_2bl3_image_send_enable;
-                uint8 screen_refresh_enable =
-                    ((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) &&
-                     (0U == FC_START_CRSF_Is_Armed())) ? 1U : 0U;
-
-                if(image_send_enable > 2U)
-                {
-                    image_send_enable = 0U;
-                }
-
-                if ((flying != s_ipc_last_flying) ||
-                    (image_send_enable != s_ipc_last_image_send_enable) ||
-                    (screen_refresh_enable != s_ipc_last_screen_refresh_enable) ||
-                    (0U == s_ipc_state_periodic_div))
-                {
-                    if (0U == s_ipc_flying_retry_div)
+                    profile_start_cycles = DWT->CYCCNT;
+                    wifi_justfloat_SetStandbyContext((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
                     {
-                        if (0U == ipc_flight_state_send(flying,
-                                                       image_send_enable,
-                                                       screen_refresh_enable))
+                        uint8 flying = (FC_START_CRSF_STATE_FLYING == FC_START_CRSF_Get_State()) ? 1U : 0U;
+                        uint8 image_send_enable = g_2bl3_image_send_enable;
+                        uint8 screen_refresh_enable =
+                            ((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) &&
+                             (0U == FC_START_CRSF_Is_Armed())) ? 1U : 0U;
+
+                        if(image_send_enable > 2U)
                         {
-                            s_ipc_last_flying = flying;
-                            s_ipc_last_image_send_enable = image_send_enable;
-                            s_ipc_last_screen_refresh_enable = screen_refresh_enable;
-                            s_ipc_state_periodic_div = 100U;
-                            s_ipc_flying_retry_div = 0U;
+                            image_send_enable = 0U;
+                        }
+
+                        if ((flying != s_ipc_last_flying) ||
+                            (image_send_enable != s_ipc_last_image_send_enable) ||
+                            (screen_refresh_enable != s_ipc_last_screen_refresh_enable) ||
+                            (0U == s_ipc_state_periodic_div))
+                        {
+                            if (0U == s_ipc_flying_retry_div)
+                            {
+                                if (0U == ipc_flight_state_send(flying,
+                                                               image_send_enable,
+                                                               screen_refresh_enable))
+                                {
+                                    s_ipc_last_flying = flying;
+                                    s_ipc_last_image_send_enable = image_send_enable;
+                                    s_ipc_last_screen_refresh_enable = screen_refresh_enable;
+                                    s_ipc_state_periodic_div = 100U;
+                                    s_ipc_flying_retry_div = 0U;
+                                }
+                                else
+                                {
+                                    s_ipc_flying_retry_div = 10U;
+                                }
+                            }
+                            else
+                            {
+                                s_ipc_flying_retry_div--;
+                            }
                         }
                         else
                         {
-                            s_ipc_flying_retry_div = 10U;
+                            s_ipc_flying_retry_div = 0U;
+                            s_ipc_state_periodic_div--;
                         }
                     }
-                    else
+                    profile_elapsed_cycles = DWT->CYCCNT - profile_start_cycles;
+                    CORE0_PROFILE_UPDATE_MAX(profile.ipc_state_max_cycles, profile_elapsed_cycles);
+
+                    if (div50 != 0U)
                     {
-                        s_ipc_flying_retry_div--;
+                        profile_start_cycles = DWT->CYCCNT;
+                        FC_Loop_50Hz();
+                        profile_elapsed_cycles = DWT->CYCCNT - profile_start_cycles;
+                        if ((profile.tail_update_mask & CORE0_PROFILE_FC50_UPDATED) == 0U)
+                        {
+                            profile.fc50_max_cycles = profile_elapsed_cycles;
+                            profile.tail_update_mask |= CORE0_PROFILE_FC50_UPDATED;
+                        }
+                        else
+                        {
+                            CORE0_PROFILE_UPDATE_MAX(profile.fc50_max_cycles, profile_elapsed_cycles);
+                        }
                     }
-                }
-                else
-                {
-                    s_ipc_flying_retry_div = 0U;
-                    s_ipc_state_periodic_div--;
-                }
-            }
-            slot50 = div50;
-            if (slot50 == 0U)
-            {
-                crsf_send_50hz();
-            }
-            else
-            {
-                FC_Loop_50Hz();
-            }
 
-            div50++;
-            if (div50 >= 2U)
-            {
-                div50 = 0U;
-            }
-            div10++;
-            if (div10 >= 10U)
-            {
+                    div50++;
+                    if (div50 >= 2U)
+                    {
+                        div50 = 0U;
+                    }
 
-                div10 = 0U;
-                FC_START_CRSF_Update();
+                    if (profile_loop100_active != 0U)
+                    {
+                        profile_loop100_accum_cycles += DWT->CYCCNT - profile_period_start_cycles;
+                        profile_loop100_phase_mask |= (1U << 3);
+                    }
+                    break;
 
-                if (g_euler.roll > 45.0f || g_euler.roll < -45.0f ||
-                    g_euler.pitch > 45.0f || g_euler.pitch < -45.0f)
-                {
-                    FC_START_CRSF_Trigger_Emergency_Stop();
+                case 9U:
+                    /* 槽9：完成100Hz周期，先执行起降状态机，最后尝试低优先级CRSF回传。 */
+                    profile_period_start_cycles = DWT->CYCCNT;
+                    div10++;
+                    if (div10 >= 10U)
+                    {
+                        div10 = 0U;
+                        profile_start_cycles = DWT->CYCCNT;
+                        FC_START_CRSF_Update();
+
+                        if (g_euler.roll > 45.0f || g_euler.roll < -45.0f ||
+                            g_euler.pitch > 45.0f || g_euler.pitch < -45.0f)
+                        {
+                            FC_START_CRSF_Trigger_Emergency_Stop();
+                        }
+                        profile_elapsed_cycles = DWT->CYCCNT - profile_start_cycles;
+                        if ((profile.tail_update_mask & CORE0_PROFILE_STATE10_UPDATED) == 0U)
+                        {
+                            profile.state10_max_cycles = profile_elapsed_cycles;
+                            profile.tail_update_mask |= CORE0_PROFILE_STATE10_UPDATED;
+                        }
+                        else
+                        {
+                            CORE0_PROFILE_UPDATE_MAX(profile.state10_max_cycles, profile_elapsed_cycles);
+                        }
+
+                        /* 1kHz出现新积压时直接放弃本次姿态回传。 */
+                        if (g_tick_1000HZ == 0U)
+                        {
+                            profile_start_cycles = DWT->CYCCNT;
+                            crsf_send_10hz();
+                            profile_elapsed_cycles = DWT->CYCCNT - profile_start_cycles;
+                            if ((profile.tail_update_mask & CORE0_PROFILE_CRSF10_UPDATED) == 0U)
+                            {
+                                profile.crsf10_max_cycles = profile_elapsed_cycles;
+                                profile.tail_update_mask |= CORE0_PROFILE_CRSF10_UPDATED;
+                            }
+                            else
+                            {
+                                CORE0_PROFILE_UPDATE_MAX(profile.crsf10_max_cycles, profile_elapsed_cycles);
+                            }
+                        }
+                    }
+                    if (profile_loop100_active != 0U)
+                    {
+                        profile_loop100_accum_cycles += DWT->CYCCNT - profile_period_start_cycles;
+                        profile_loop100_phase_mask |= (1U << 4);
+                        if (profile_loop100_phase_mask == 0x1FU)
+                        {
+                            CORE0_PROFILE_UPDATE_MAX(profile.loop100_max_cycles, profile_loop100_accum_cycles);
+                            profile.task100_count++;
+                        }
+                        else
+                        {
+                            profile.loop100_abort_count++;
+                        }
+                        profile_loop100_active = 0U;
+                        profile_loop100_phase_mask = 0U;
+                    }
+                    profile.send_pending = 1U;
+                    break;
+
+                default:
+                    break;
                 }
+            }
+        }
+
+        if (profile.send_pending != 0U)
+        {
+            wifi_justfloat_tx_stats_t tx_before;
+            wifi_justfloat_tx_stats_t tx_after;
+            air_comm_air_stats_t air_stats;
+            const VL53L1X_data_struct *tof_data;
+            uint32 air_raw_rx_delta;
+            uint32 air_overflow_delta;
+            uint32 air_tx_overflow_delta;
+            uint32 wifi_overflow_delta;
+            uint32 tof_sample_seq_delta;
+            uint32 log_interval_cycles;
+            uint8 tof_valid_mask;
+
+            wifi_justfloat_GetTxStats(&tx_before);
+            air_comm_air_get_stats(&air_stats);
+            tof_data = VL53L1X_GetData();
+            air_raw_rx_delta = air_stats.raw_rx_byte_count - profile_air_raw_rx_last;
+            air_overflow_delta = air_stats.rx_queue_overflow_count - profile_air_overflow_last;
+            air_tx_overflow_delta = air_stats.tx_queue_overflow_count - profile_air_tx_overflow_last;
+            wifi_overflow_delta = tx_before.overflow_count - profile_wifi_overflow_last;
+            tof_sample_seq_delta = tof_data->sample_seq - profile_tof_sample_seq_last;
+            tof_valid_mask = (uint8)((tof_data->valid[0] << 0U) |
+                                     (tof_data->valid[1] << 1U) |
+                                     (tof_data->valid[2] << 2U) |
+                                     (tof_data->valid[3] << 3U));
+
+            /* 固定42通道的100Hz性能日志，P27单位为毫秒，其余耗时通道单位均为微秒。 */
+            profile_start_cycles = DWT->CYCCNT;
+            log_interval_cycles = profile_start_cycles - profile_log_last_cycles;
+            (void)wifi_justfloat(
+                CORE0_PROFILE_TO_US(profile.imu_max_cycles, profile_cycles_per_us),       /* P01 IMU更新最大耗时 */
+                CORE0_PROFILE_TO_US(profile.pos1_max_cycles, profile_cycles_per_us),      /* P02 位置估计1最大耗时 */
+                CORE0_PROFILE_TO_US(profile.pos2_max_cycles, profile_cycles_per_us),      /* P03 位置估计2最大耗时 */
+                CORE0_PROFILE_TO_US(profile.fc500_max_cycles, profile_cycles_per_us),     /* P04 500Hz控制最大耗时 */
+                CORE0_PROFILE_TO_US(profile.fc1000_max_cycles, profile_cycles_per_us),    /* P05 1000Hz控制最大耗时，不含空地解析 */
+                CORE0_PROFILE_TO_US(profile.loop1000_max_cycles, profile_cycles_per_us),  /* P06 完整1kHz任务最大耗时 */
+                CORE0_PROFILE_TO_US(profile.tof_max_cycles, profile_cycles_per_us),       /* P07 ToF单步最大耗时 */
+                CORE0_PROFILE_TO_US(profile.crsf_max_cycles, profile_cycles_per_us),      /* P08 CRSF接收更新最大耗时 */
+                CORE0_PROFILE_TO_US(profile.fc100_max_cycles, profile_cycles_per_us),     /* P09 100Hz控制最大耗时 */
+                CORE0_PROFILE_TO_US(profile.air_update_max_cycles, profile_cycles_per_us), /* P10 空地100Hz维护最大耗时 */
+                CORE0_PROFILE_TO_US(profile.ipc_max_cycles, profile_cycles_per_us),       /* P11 IPC处理最大耗时 */
+                CORE0_PROFILE_TO_US(profile.planner_max_cycles, profile_cycles_per_us),   /* P12 规划器最大耗时 */
+                CORE0_PROFILE_TO_US(profile.air_send_max_cycles, profile_cycles_per_us),  /* P13 空地发送最大耗时 */
+                CORE0_PROFILE_TO_US(profile.ipc_state_max_cycles, profile_cycles_per_us), /* P14 IPC飞行状态维护最大耗时 */
+                CORE0_PROFILE_TO_US(profile.loop100_max_cycles, profile_cycles_per_us),   /* P15 完整100Hz任务最大耗时 */
+                (float)profile.guard_max,                                                  /* P16 单轮1kHz补跑次数 */
+                (float)profile.backlog_max,                                                /* P17 1kHz最大积压 */
+                (float)g_tick_1000HZ,                                                      /* P18 发送时剩余1kHz积压 */
+                (float)profile.task100_count,                                              /* P19 本窗口完整100Hz周期数 */
+                (float)air_raw_rx_delta,                                                   /* P20 空地串口新增原始字节数 */
+                (float)air_overflow_delta,                                                 /* P21 空地接收队列新增溢出次数 */
+                (float)FC_START_CRSF_Get_State(),                                          /* P22 当前飞行状态 */
+                CORE0_PROFILE_TO_US(profile.air_poll_max_cycles, profile_cycles_per_us),  /* P23 空地串口解析最大耗时 */
+                ((profile.tail_update_mask & CORE0_PROFILE_CRSF10_UPDATED) != 0U)
+                    ? CORE0_PROFILE_TO_US(profile.crsf10_max_cycles, profile_cycles_per_us) : 0.0f, /* P24 CRSF 10Hz发送耗时 */
+                ((profile.tail_update_mask & CORE0_PROFILE_FC50_UPDATED) != 0U)
+                    ? CORE0_PROFILE_TO_US(profile.fc50_max_cycles, profile_cycles_per_us) : 0.0f,   /* P25 飞控50Hz任务耗时 */
+                ((profile.tail_update_mask & CORE0_PROFILE_STATE10_UPDATED) != 0U)
+                    ? CORE0_PROFILE_TO_US(profile.state10_max_cycles, profile_cycles_per_us) : 0.0f, /* P26 起降10Hz状态机耗时 */
+                CORE0_PROFILE_TO_US(log_interval_cycles, profile_cycles_per_us) / 1000.0f, /* P27 成功日志帧间隔，单位毫秒 */
+                CORE0_PROFILE_TO_US(profile.height_max_cycles, profile_cycles_per_us),    /* P28 高度融合最大耗时 */
+                (float)profile.tof_max_step,                                               /* P29 ToF最大耗时步骤编号 */
+                (float)tof_sample_seq_delta,                                               /* P30 ToF快照序号增量 */
+                (float)tof_data->fresh_mask,                                               /* P31 ToF最新快照新鲜通道掩码 */
+                (float)tof_valid_mask,                                                     /* P32 四路ToF有效通道掩码 */
+                (float)g_tof_fused_valid,                                                  /* P33 ToF融合高度有效标志 */
+                g_height_meas_health,                                                      /* P34 高度测量健康度 */
+                (float)air_stats.tx_pending_frames,                                        /* P35 AirComm当前待发帧数 */
+                (float)air_tx_overflow_delta,                                              /* P36 AirComm发送队列新增溢出次数 */
+                (float)profile.slow_tick_gap_max,                                          /* P37 慢任务相邻执行最大间隔，单位毫秒 */
+                (float)profile.slow_slot_skip_count,                                       /* P38 慢任务跳过slot数量 */
+                (float)profile.loop100_abort_count,                                        /* P39 未完整执行的100Hz周期数 */
+                (float)profile.tail_update_mask,                                           /* P40 低频任务本帧更新掩码 */
+                (float)tx_before.pending_bytes,                                            /* P41 WiFi待发送字节数 */
+                (float)wifi_overflow_delta);                                               /* P42 WiFi队列新增溢出次数 */
+            wifi_justfloat_GetTxStats(&tx_after);
+            profile.send_pending = 0U;
+
+            if (tx_after.queued_count != tx_before.queued_count)
+            {
+                profile.imu_max_cycles = 0U;
+                profile.pos1_max_cycles = 0U;
+                profile.pos2_max_cycles = 0U;
+                profile.fc500_max_cycles = 0U;
+                profile.fc1000_max_cycles = 0U;
+                profile.air_poll_max_cycles = 0U;
+                profile.loop1000_max_cycles = 0U;
+                profile.tof_max_cycles = 0U;
+                profile.height_max_cycles = 0U;
+                profile.crsf_max_cycles = 0U;
+                profile.fc100_max_cycles = 0U;
+                profile.air_update_max_cycles = 0U;
+                profile.ipc_max_cycles = 0U;
+                profile.planner_max_cycles = 0U;
+                profile.air_send_max_cycles = 0U;
+                profile.ipc_state_max_cycles = 0U;
+                profile.crsf10_max_cycles = 0U;
+                profile.fc50_max_cycles = 0U;
+                profile.state10_max_cycles = 0U;
+                profile.loop100_max_cycles = 0U;
+                profile.task100_count = 0U;
+                profile.slow_tick_gap_max = 0U;
+                profile.slow_slot_skip_count = 0U;
+                profile.loop100_abort_count = 0U;
+                profile.backlog_max = 0U;
+                profile.guard_max = 0U;
+                profile.tof_max_step = 0U;
+                profile.tail_update_mask = 0U;
+                profile_air_raw_rx_last = air_stats.raw_rx_byte_count;
+                profile_air_overflow_last = air_stats.rx_queue_overflow_count;
+                profile_air_tx_overflow_last = air_stats.tx_queue_overflow_count;
+                profile_wifi_overflow_last = tx_before.overflow_count;
+                profile_tof_sample_seq_last = tof_data->sample_seq;
+                profile_log_last_cycles = profile_start_cycles;
             }
         }
     }

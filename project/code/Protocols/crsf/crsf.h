@@ -55,7 +55,8 @@ void crsf_init(void);
 
 void CRSF_Update_100HZ(void);
 
-void crsf_send_50hz(void);
+/* 生成并尝试提交10Hz姿态回传帧，硬件FIFO忙时直接丢弃。 */
+void crsf_send_10hz(void);
 
 
 

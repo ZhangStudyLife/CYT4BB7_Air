@@ -3,6 +3,8 @@
 #include "../Attitude/IMU_TOP.h"
 #include <math.h>
 
+extern volatile uint32 tick_1000us_cnt; /* 1ms系统墙钟，用于判断ToF数据真实年龄 */
+
 float g_tof_fused_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
 float g_tof1_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
 float g_tof2_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
@@ -27,6 +29,7 @@ float g_height_acc_up_mps2 = 0.0f;
 #define HEIGHT_LOW_OUTLIER_MAX_MM   320.0f
 #define HEIGHT_CONF_MIN             0.12f
 #define HEIGHT_MISS_MAX             300U
+#define HEIGHT_TOF_TIMEOUT_MS       (HEIGHT_MISS_MAX * 10U) /* ToF连续无有效测量超时，单位ms */
 #define HEIGHT_TOF_ALPHA            0.18f
 #define HEIGHT_TOF_ALPHA_STRONG     0.32f
 #define HEIGHT_TOF_ALPHA_MEDIUM     0.18f
@@ -51,7 +54,10 @@ static float s_v_lpf_mps = 0.0f;
 static float s_acc_lpf_mps2 = 0.0f;
 static float s_prev_tof_mm[VL53L1X_SENSOR_COUNT];
 static uint8 s_ready = 0U;
-static uint8 s_miss = HEIGHT_MISS_MAX;
+static uint16 s_miss = HEIGHT_MISS_MAX;
+static uint32 s_last_tof_sample_seq = 0U; /* 高度融合最近一次消费的ToF快照序号 */
+static uint32 s_last_valid_measurement_tick_ms = 0U; /* 最近一次有效ToF测量的墙钟，单位ms */
+static uint8 s_have_valid_measurement = 0U; /* 是否已经接收过有效ToF测量 */
 
 static const float s_roll_corr_m[VL53L1X_SENSOR_COUNT] = {
     -0.008643f, 0.089082f, -0.058806f, 0.032884f
@@ -105,7 +111,8 @@ static float Height_Median(float *v, uint8 n)
 static uint8 Height_RawValid(const VL53L1X_data_struct *tof, uint8 i)
 {
     float d = (float)tof->distance_mm[i];
-    return ((0U != tof->valid[i]) && (d >= HEIGHT_TOF_MIN_MM) &&
+    return (((tof->fresh_mask & (uint8)(1U << i)) != 0U) &&
+        (0U != tof->valid[i]) && (d >= HEIGHT_TOF_MIN_MM) &&
         (d <= HEIGHT_TOF_MAX_MM) && (tof->distance_mm[i] < VL53L1X_INVALID_DISTANCE_MM)) ? 1U : 0U;
 }
 
@@ -154,7 +161,7 @@ static uint8 Height_BuildMeasure(const VL53L1X_data_struct *tof, float *meas_mm,
             h[i] = Height_ChannelMm(tof, i, roll_rad, pitch_rad);
             s[n++] = h[i];
         }
-        else
+        else if ((0 != tof) && ((tof->fresh_mask & (uint8)(1U << i)) != 0U))
         {
             s_prev_tof_mm[i] = -1.0f;
         }
@@ -327,7 +334,9 @@ static void Height_CorrectObserver(float meas_mm, float health, uint8 meas_valid
     float residual_m = 0.0f;
     float old_h_m;
     float inst_v_mps;
+    float measurement_dt_s;
     float tof_alpha;
+    uint32 now_tick_ms = tick_1000us_cnt;
 
     g_height_meas_health = health;
 
@@ -347,6 +356,15 @@ static void Height_CorrectObserver(float meas_mm, float health, uint8 meas_valid
 
     if ((0U != meas_valid) && (health >= HEIGHT_CONF_MIN))
     {
+        if (0U != s_have_valid_measurement)
+        {
+            measurement_dt_s = (float)(now_tick_ms - s_last_valid_measurement_tick_ms) * 0.001f;
+            measurement_dt_s = Height_Clamp(measurement_dt_s, 0.001f, 3.0f);
+        }
+        else
+        {
+            measurement_dt_s = 0.01f;
+        }
         old_h_m = s_h_m;
         residual_m = (meas_mm * 0.001f) - s_h_m;
         residual_m = Height_Clamp(residual_m, -0.45f, 0.45f);
@@ -381,9 +399,11 @@ static void Height_CorrectObserver(float meas_mm, float health, uint8 meas_valid
             }
         }
 
-        inst_v_mps = (s_h_m - old_h_m) * 100.0f;
+        inst_v_mps = (s_h_m - old_h_m) / measurement_dt_s;
         s_v_mps += HEIGHT_VEL_TOF_ALPHA * (inst_v_mps - s_v_mps);
         s_miss = 0U;
+        s_last_valid_measurement_tick_ms = now_tick_ms;
+        s_have_valid_measurement = 1U;
     }
     else if (s_miss < HEIGHT_MISS_MAX)
     {
@@ -395,7 +415,10 @@ static void Height_CorrectObserver(float meas_mm, float health, uint8 meas_valid
     s_v_mps = Height_Clamp(s_v_mps, -3.0f, 3.0f);
 
     g_tof_fused_height_mm = s_h_m * 1000.0f;
-    g_tof_fused_valid = ((0U != s_ready) && (s_miss < HEIGHT_MISS_MAX)) ? 1U : 0U;
+    g_tof_fused_valid = ((0U != s_ready) &&
+                         (s_miss < HEIGHT_MISS_MAX) &&
+                         ((0U == s_have_valid_measurement) ||
+                          ((now_tick_ms - s_last_valid_measurement_tick_ms) < HEIGHT_TOF_TIMEOUT_MS))) ? 1U : 0U;
 }
 
 static void Height_Reset(void)
@@ -413,6 +436,9 @@ static void Height_Reset(void)
     s_acc_lpf_mps2 = 0.0f;
     s_ready = 0U;
     s_miss = HEIGHT_MISS_MAX;
+    s_last_tof_sample_seq = 0U;
+    s_last_valid_measurement_tick_ms = 0U;
+    s_have_valid_measurement = 0U;
     g_tof_fused_height_mm = (float)VL53L1X_VALID_RANGE_MAX;
     g_tof1_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
     g_tof2_height_mm = (float)VL53L1X_INVALID_DISTANCE_MM;
@@ -433,6 +459,13 @@ void TOF_Init(void)
 void Height_Est_predict_1000HZ(void)
 {
     float acc;
+
+    if ((0U != s_have_valid_measurement) &&
+        ((tick_1000us_cnt - s_last_valid_measurement_tick_ms) >= HEIGHT_TOF_TIMEOUT_MS))
+    {
+        g_tof_fused_valid = 0U;
+        g_height_meas_health = 0.0f;
+    }
 
     g_height_acc_up_mps2 = AccelCalibration_GetVerticalAccelUpMps2();
     acc = Height_Clamp(g_height_acc_up_mps2, -HEIGHT_ACC_LIMIT_MPS2, HEIGHT_ACC_LIMIT_MPS2);
@@ -460,8 +493,14 @@ void Height_Est_update_100HZ(void)
     uint8 inlier_count = 0U;
     uint8 meas_valid;
 
-    VL53L1X_Update();
     tof = VL53L1X_GetData();
+    if ((0 == tof) || (tof->sample_seq == s_last_tof_sample_seq))
+    {
+        Height_CorrectObserver(meas_mm, health, 0U, inlier_count);
+        return;
+    }
+
+    s_last_tof_sample_seq = tof->sample_seq;
     meas_valid = Height_BuildMeasure(tof, &meas_mm, &health, &inlier_count);
     Height_CorrectObserver(meas_mm, health, meas_valid, inlier_count);
 }

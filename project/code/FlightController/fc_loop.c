@@ -923,6 +923,4 @@ void FC_Loop_1000Hz(void)
     //     g_motor_state.output[1],
     //     g_motor_state.output[2],
     //     g_motor_state.output[3]);
-
-    air_comm_air_poll();
 }

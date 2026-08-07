@@ -511,18 +511,21 @@ void FC_Loop_100Hz(void)
 
 
 
-    {
-        const VL53L1X_data_struct *tof_raw = VL53L1X_GetData();
-        (void)wifi_justfloat((float)tof_raw->distance_mm[0],
-                             (float)tof_raw->distance_mm[1],
-                             (float)tof_raw->distance_mm[2],
-                             (float)tof_raw->distance_mm[3],
-                             g_euler.roll, g_euler.pitch, g_euler.yaw,
-                             (float)lc302_data.flow_x_integral,
-                             (float)lc302_data.flow_y_integral,
-                             g_imufilter_1000hz.accx, g_imufilter_1000hz.accy, g_imufilter_1000hz.accz,
-                             g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz);
-    }
+    wifi_justfloat(g_tof_fused_height_mm,
+    image_data[Front].car_lamp_data[0].cx,
+    image_data[Front].car_lamp_data[0].cy,
+    image_data[Front].car_lamp_data[0].valid,
+    image_data[Center].car_lamp_data[0].cx,
+    image_data[Center].car_lamp_data[0].cy,
+    image_data[Center].car_lamp_data[0].valid,
+    image_data[Back].car_lamp_data[0].cx,
+    image_data[Back].car_lamp_data[0].cy,
+    image_data[Back].car_lamp_data[0].valid,
+    g_euler.roll,
+    g_euler.pitch,
+    g_euler.yaw);
+
+
 
     if (fc_state == FC_START_CRSF_STATE_LANDING)
     {

@@ -507,6 +507,23 @@ void FC_Loop_100Hz(void)
         height_vel_out -= s_hover_learn_step;
     }
 
+    
+
+
+
+    {
+        const VL53L1X_data_struct *tof_raw = VL53L1X_GetData();
+        (void)wifi_justfloat((float)tof_raw->distance_mm[0],
+                             (float)tof_raw->distance_mm[1],
+                             (float)tof_raw->distance_mm[2],
+                             (float)tof_raw->distance_mm[3],
+                             g_euler.roll, g_euler.pitch, g_euler.yaw,
+                             (float)lc302_data.flow_x_integral,
+                             (float)lc302_data.flow_y_integral,
+                             g_imufilter_1000hz.accx, g_imufilter_1000hz.accy, g_imufilter_1000hz.accz,
+                             g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz);
+    }
+
     if (fc_state == FC_START_CRSF_STATE_LANDING)
     {
         FC_Mode0_100Hz();
@@ -656,6 +673,17 @@ void FC_Loop_500Hz(void)
         s_yaw_target_inited = 0U;
         yaw_gyro_target = 0.0f;
     }
+
+    // wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw,roll_angle_target,pitch_angle_target,yaw_angle_target,
+    //     g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
+    //     roll_gyro_target, pitch_gyro_target, yaw_gyro_target,
+    //     roll_gyro_pid.p_term, roll_gyro_pid.i_term, roll_gyro_pid.d_term,
+    //     pitch_gyro_pid.p_term, pitch_gyro_pid.i_term, pitch_gyro_pid.d_term,
+    //     yaw_gyro_pid.p_term, yaw_gyro_pid.i_term, yaw_gyro_pid.d_term,
+    //     roll_angle_pid.p_term, roll_angle_pid.i_term, roll_angle_pid.d_term,
+    //     pitch_angle_pid.p_term, pitch_angle_pid.i_term, pitch_angle_pid.d_term,
+    //     g_motor_cmd.roll, g_motor_cmd.pitch, g_motor_cmd.yaw, g_motor_cmd.throttle
+    // );
 
 }
 

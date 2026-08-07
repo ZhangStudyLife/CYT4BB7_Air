@@ -377,7 +377,6 @@ int main(void)
     air_comm_air_init();
     wifi_justfloat_SetStandbyContext((0U == FC_START_CRSF_Get_State()) &&
                                      (0U == FC_START_CRSF_Is_Armed()));
-    pit_us_init(PIT_CH0, 1000);
 
     Motor_Enable();
     Motor_SetThrottleAll((int32[]){1200, 0, 0, 0});
@@ -390,6 +389,7 @@ int main(void)
     system_delay_ms(500);
     Motor_SetThrottleAll((int32[]){0, 0, 0, 0});
     air_comm_set_run_data_callback(on_car_data);
+    pit_us_init(PIT_CH0, 1000);
     slow_tick_last = tick_1000us_cnt;
 
     while (true)

@@ -2,8 +2,6 @@
 #include "../Image/image_data.h"
 #include <math.h>
 
-static const float s_lamp_lpf_alpha = 0.500f;
-static const float s_lamp_step_limit_px = 6.0f;
 static const uint8 s_lamp_hold_max_ticks = 20U;
 
 car_lamp_fused_result_t g_car_lamp_fused;
@@ -48,14 +46,11 @@ uint8 CarLampFused_Update50Hz(void)
     float cx;
     float cy;
     float angle;
+    float angle_reference = 0.0f;
     float width;
     float length;
-    float next_cx;
-    float next_cy;
-    float dx;
-    float dy;
-    float step;
-    float scale;
+    float line_x;
+    float line_y;
 
     only_front_see_car_lamp = raw_only_front;
     only_back_see_car_lamp = raw_only_back;
@@ -64,7 +59,8 @@ uint8 CarLampFused_Update50Hz(void)
     {
         x_sum += center_lamp->cx;
         y_sum += center_lamp->cy;
-        angle_sum += center_lamp->angle;
+        angle_reference = center_lamp->angle;
+        angle_sum += angle_reference;
         width_sum += center_lamp->width;
         length_sum += center_lamp->length;
         valid_count++;
@@ -77,11 +73,29 @@ uint8 CarLampFused_Update50Hz(void)
         source_x2 = source_x * source_x;
         source_xy = source_x * source_y;
         source_y2 = source_y * source_y;
-        cx = -3.224193f + 1.123975f * source_x + 0.003353f * source_y +
-             0.000073f * source_x2 - 0.004078f * source_xy - 0.000302f * source_y2;
-        cy = -60.512112f + 0.030475f * source_x + 0.772429f * source_y +
-             0.004336f * source_x2 - 0.000232f * source_xy + 0.004678f * source_y2;
-        angle = 0.098951f - 0.145981f * front_lamp->angle;
+        cx = -2.877714471f + 1.068667486f * source_x + 0.014106778f * source_y -
+             0.000050497f * source_x2 - 0.002795043f * source_xy - 0.000176757f * source_y2;
+        cy = -66.41345462f - 0.041888826f * source_x + 0.803140254f * source_y +
+             0.004303238f * source_x2 + 0.000040255f * source_xy + 0.002781124f * source_y2;
+        angle = front_lamp->angle * 0.017453293f;
+        line_x = cosf(angle);
+        line_y = sinf(angle);
+        angle = atan2f((-0.041888826f + 0.008606475f * source_x + 0.000040255f * source_y) * line_x +
+                       (0.803140254f + 0.000040255f * source_x + 0.005562248f * source_y) * line_y,
+                       (1.068667486f - 0.000100995f * source_x - 0.002795043f * source_y) * line_x +
+                       (0.014106778f - 0.002795043f * source_x - 0.000353513f * source_y) * line_y) * 57.29577951f;
+        if(valid_count == 0U)
+        {
+            angle_reference = angle;
+        }
+        while((angle - angle_reference) > 90.0f)
+        {
+            angle -= 180.0f;
+        }
+        while((angle - angle_reference) < -90.0f)
+        {
+            angle += 180.0f;
+        }
         width = 3.073313f + 0.250410f * front_lamp->width;
         length = 6.702278f + 0.608019f * front_lamp->length;
         x_sum += cx;
@@ -99,11 +113,29 @@ uint8 CarLampFused_Update50Hz(void)
         source_x2 = source_x * source_x;
         source_xy = source_x * source_y;
         source_y2 = source_y * source_y;
-        cx = -10.828701f - 1.119896f * source_x + 0.059751f * source_y -
-             0.000063f * source_x2 + 0.004186f * source_xy - 0.000850f * source_y2;
-        cy = 58.428997f - 0.026951f * source_x - 0.718077f * source_y -
-             0.004166f * source_x2 + 0.000106f * source_xy - 0.004593f * source_y2;
-        angle = 1.206762f - 0.084711f * back_lamp->angle;
+        cx = 1.001882691f - 1.067786481f * source_x - 0.076861896f * source_y +
+             0.000250691f * source_x2 + 0.003736022f * source_xy + 0.000809775f * source_y2;
+        cy = 49.24573601f + 0.024195958f * source_x - 0.747055821f * source_y -
+             0.004815078f * source_x2 - 0.000515285f * source_xy - 0.004288377f * source_y2;
+        angle = back_lamp->angle * 0.017453293f;
+        line_x = cosf(angle);
+        line_y = sinf(angle);
+        angle = atan2f((0.024195958f - 0.009630155f * source_x - 0.000515285f * source_y) * line_x +
+                       (-0.747055821f - 0.000515285f * source_x - 0.008576754f * source_y) * line_y,
+                       (-1.067786481f + 0.000501382f * source_x + 0.003736022f * source_y) * line_x +
+                       (-0.076861896f + 0.003736022f * source_x + 0.001619549f * source_y) * line_y) * 57.29577951f;
+        if(valid_count == 0U)
+        {
+            angle_reference = angle;
+        }
+        while((angle - angle_reference) > 90.0f)
+        {
+            angle -= 180.0f;
+        }
+        while((angle - angle_reference) < -90.0f)
+        {
+            angle += 180.0f;
+        }
         width = 3.109584f + 0.265335f * back_lamp->width;
         length = 8.415704f + 0.525904f * back_lamp->length;
         x_sum += cx;
@@ -143,6 +175,14 @@ uint8 CarLampFused_Update50Hz(void)
     cx = x_sum / (float)valid_count;
     cy = y_sum / (float)valid_count;
     angle = angle_sum / (float)valid_count;
+    while(angle > 90.0f)
+    {
+        angle -= 180.0f;
+    }
+    while(angle < -90.0f)
+    {
+        angle += 180.0f;
+    }
     width = width_sum / (float)valid_count;
     length = length_sum / (float)valid_count;
     s_lamp_hold_ticks = 0U;
@@ -157,21 +197,10 @@ uint8 CarLampFused_Update50Hz(void)
         return 1U;
     }
 
-    next_cx = g_car_lamp_fused.cx + s_lamp_lpf_alpha * (cx - g_car_lamp_fused.cx);
-    next_cy = g_car_lamp_fused.cy + s_lamp_lpf_alpha * (cy - g_car_lamp_fused.cy);
-    dx = next_cx - g_car_lamp_fused.cx;
-    dy = next_cy - g_car_lamp_fused.cy;
-    step = sqrtf(dx * dx + dy * dy);
-    if(step > s_lamp_step_limit_px)
-    {
-        scale = s_lamp_step_limit_px / step;
-        dx *= scale;
-        dy *= scale;
-    }
-    g_car_lamp_fused.cx += dx;
-    g_car_lamp_fused.cy += dy;
-    g_car_lamp_fused.angle += s_lamp_lpf_alpha * (angle - g_car_lamp_fused.angle);
-    g_car_lamp_fused.width += s_lamp_lpf_alpha * (width - g_car_lamp_fused.width);
-    g_car_lamp_fused.length += s_lamp_lpf_alpha * (length - g_car_lamp_fused.length);
+    g_car_lamp_fused.cx = cx;
+    g_car_lamp_fused.cy = cy;
+    g_car_lamp_fused.angle = angle;
+    g_car_lamp_fused.width = width;
+    g_car_lamp_fused.length = length;
     return 1U;
 }

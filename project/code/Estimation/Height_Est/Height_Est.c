@@ -60,13 +60,13 @@ static uint32 s_last_valid_measurement_tick_ms = 0U; /* 最近一次有效ToF测
 static uint8 s_have_valid_measurement = 0U; /* 是否已经接收过有效ToF测量 */
 
 static const float s_roll_corr_m[VL53L1X_SENSOR_COUNT] = {
-    -0.008643f, 0.089082f, -0.058806f, 0.032884f
+    0.022948f, 0.090888f, 0.004973f, -0.118808f
 };
 static const float s_pitch_corr_m[VL53L1X_SENSOR_COUNT] = {
-    -0.012797f, -0.006581f, 0.088272f, 0.003979f
+    -0.132881f, -0.048531f, 0.129657f, 0.051755f
 };
 static const float s_bias_corr_m[VL53L1X_SENSOR_COUNT] = {
-    -0.002834f, -0.016172f, 0.022442f, -0.003449f
+    0.030566f, -0.008795f, -0.019068f, -0.002704f
 };
 
 static float Height_Clamp(float x, float min_x, float max_x)

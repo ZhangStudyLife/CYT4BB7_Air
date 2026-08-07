@@ -512,15 +512,25 @@ void FC_Loop_100Hz(void)
 
 
     wifi_justfloat(g_tof_fused_height_mm,
+
     image_data[Front].car_lamp_data[0].cx,
     image_data[Front].car_lamp_data[0].cy,
-    image_data[Front].car_lamp_data[0].valid,
+    image_data[Front].car_lamp_data[0].width,
+    image_data[Front].car_lamp_data[0].length,
+    image_data[Front].car_lamp_data[0].angle,
+
     image_data[Center].car_lamp_data[0].cx,
     image_data[Center].car_lamp_data[0].cy,
-    image_data[Center].car_lamp_data[0].valid,
+    image_data[Center].car_lamp_data[0].width,
+    image_data[Center].car_lamp_data[0].length,
+    image_data[Center].car_lamp_data[0].angle,
+
     image_data[Back].car_lamp_data[0].cx,
     image_data[Back].car_lamp_data[0].cy,
-    image_data[Back].car_lamp_data[0].valid,
+    image_data[Back].car_lamp_data[0].width,
+    image_data[Back].car_lamp_data[0].length,
+    image_data[Back].car_lamp_data[0].angle,
+
     g_euler.roll,
     g_euler.pitch,
     g_euler.yaw);

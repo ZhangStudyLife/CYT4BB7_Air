@@ -4,6 +4,7 @@
 
 volatile uint32 tick_1000us_cnt = 0U;
 volatile uint16 g_tick_1000HZ = 0U;
+static uint16 s_air_comm_beep_tick = 200U; /* 空地串口断联蜂鸣器的100Hz节拍计数 */
 
 #define AIR_RUN_DATA_CRITICAL_COUNT       (15U) /* 飞行期间下发的关键数据数量 */
 #define AIR_RUN_DATA_DIAGNOSTIC_COUNT     (52U) /* 常态下发的完整诊断数据数量 */
@@ -293,6 +294,24 @@ static void core0_run_slow_slot(uint8 slot)
 
     case 3U:
         air_comm_air_update_100HZ();
+        if (air_comm_air_is_car_online() == 0U)
+        {
+            if (s_air_comm_beep_tick >= 200U)
+            {
+                s_air_comm_beep_tick = 0U;
+                Beep_SetAlarm(BEEP_ALARM_CAR_DATA_LOST, 1U);
+            }
+            else if (s_air_comm_beep_tick == 100U)
+            {
+                Beep_SetAlarm(BEEP_ALARM_CAR_DATA_LOST, 0U);
+            }
+            s_air_comm_beep_tick++;
+        }
+        else if (s_air_comm_beep_tick != 200U)
+        {
+            s_air_comm_beep_tick = 200U;
+            Beep_SetAlarm(BEEP_ALARM_CAR_DATA_LOST, 0U);
+        }
         ipc_attitude_publish(g_euler.roll,
                              g_euler.pitch,
                              g_tof_fused_height_mm,

@@ -511,29 +511,7 @@ void FC_Loop_100Hz(void)
 
 
 
-    wifi_justfloat(g_tof_fused_height_mm,
 
-    image_data[Front].car_lamp_data[0].cx,
-    image_data[Front].car_lamp_data[0].cy,
-    image_data[Front].car_lamp_data[0].width,
-    image_data[Front].car_lamp_data[0].length,
-    image_data[Front].car_lamp_data[0].angle,
-
-    image_data[Center].car_lamp_data[0].cx,
-    image_data[Center].car_lamp_data[0].cy,
-    image_data[Center].car_lamp_data[0].width,
-    image_data[Center].car_lamp_data[0].length,
-    image_data[Center].car_lamp_data[0].angle,
-
-    image_data[Back].car_lamp_data[0].cx,
-    image_data[Back].car_lamp_data[0].cy,
-    image_data[Back].car_lamp_data[0].width,
-    image_data[Back].car_lamp_data[0].length,
-    image_data[Back].car_lamp_data[0].angle,
-
-    g_euler.roll,
-    g_euler.pitch,
-    g_euler.yaw);
 
 
 
@@ -687,6 +665,14 @@ void FC_Loop_500Hz(void)
         yaw_gyro_target = 0.0f;
     }
 
+    float    img_err_x = g_car_lamp_fused.cx - g_projection_center.cx;
+    float    img_err_y = g_car_lamp_fused.cy - g_projection_center.cy;
+
+    wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw,roll_angle_target,pitch_angle_target,yaw_angle_target,
+    img_err_x, img_err_y,
+    g_mode4_imgx_pid.p_term,g_mode4_imgx_pid.d_term,g_mode4_imgx_pid.output,
+    g_mode4_imgy_pid.p_term,g_mode4_imgy_pid.d_term,g_mode4_imgy_pid.output,
+    g_mode4_velx_target, g_mode4_vely_target,-Pos_Est_vel_x_2,-Pos_Est_vel_y_2);
     // wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw,roll_angle_target,pitch_angle_target,yaw_angle_target,
     //     g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
     //     roll_gyro_target, pitch_gyro_target, yaw_gyro_target,

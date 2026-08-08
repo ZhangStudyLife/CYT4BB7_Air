@@ -198,6 +198,12 @@ void FC_Mode2_100Hz(void);
  */
 void FC_Mode2_50Hz(float dt);
 
+/*
+ * 函数名: FC_Mode2_Get_Fixed_Height_M
+ * 功能: 获取模式2固定飞行高度
+ * 输入参数: 无
+ * 返回值: 固定高度，单位 m
+ */
 float FC_Mode2_Get_Fixed_Height_M(void);
 
 /*
@@ -208,12 +214,9 @@ extern pid_t g_mode7_velx_pid;
 extern pid_t g_mode7_vely_pid;
 extern float g_mode7_velx_target;
 extern float g_mode7_vely_target;
-extern pid_t g_mode2_velx_pid;
-extern pid_t g_mode2_vely_pid;
+/* 模式2 X/Y轴图像PD状态，供控制与调试读取。 */
 extern pid_t g_mode2_imgx_pid;
 extern pid_t g_mode2_imgy_pid;
-extern float g_mode2_velx_target;
-extern float g_mode2_vely_target;
 extern pid_t g_mode5_velx_pid;
 extern pid_t g_mode5_vely_pid;
 extern pid_t g_mode5_imgx_pid;

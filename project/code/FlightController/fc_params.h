@@ -119,33 +119,18 @@ typedef struct
     float mode8_img_y_kff;             /* 模式8图像Y位置环前馈增益 */
     float mode8_img_y_i_limit;         /* 模式8图像Y位置环积分限幅 */
     float mode8_img_y_d_lpf;           /* 模式8图像Y位置环D项低通截止频率，单位Hz */
-    /* ===== Mode 2 image and velocity params ===== */
-    float mode2_img_x_kp;
-    float mode2_img_x_ki;
-    float mode2_img_x_kd;
-    float mode2_img_x_kff;
-    float mode2_img_x_i_limit;
-    float mode2_img_x_d_lpf;
-    float mode2_img_y_kp;
-    float mode2_img_y_ki;
-    float mode2_img_y_kd;
-    float mode2_img_y_kff;
-    float mode2_img_y_i_limit;
-    float mode2_img_y_d_lpf;
-    float mode2_vel_x_kp;
-    float mode2_vel_x_ki;
-    float mode2_vel_x_kd;
-    float mode2_vel_x_kff;
-    float mode2_vel_x_i_limit;
-    float mode2_vel_x_d_lpf;
-    float mode2_vel_y_kp;
-    float mode2_vel_y_ki;
-    float mode2_vel_y_kd;
-    float mode2_vel_y_kff;
-    float mode2_vel_y_i_limit;
-    float mode2_vel_y_d_lpf;
-    float mode2_kp_car_x;
-    float mode2_kp_car_y;
+    /* ===== 模式 2 直接图像 PD 与角度前馈参数 ===== */
+    float mode2_img_x_kp;                       /* X轴图像P增益，单位 deg/px */
+    float mode2_img_x_kd;                       /* X轴图像D增益，单位 deg/(px/s) */
+    float mode2_img_x_d_lpf;                    /* X轴D项低通截止频率，单位 Hz */
+    float mode2_img_y_kp;                       /* Y轴图像P增益，单位 deg/px */
+    float mode2_img_y_kd;                       /* Y轴图像D增益，单位 deg/(px/s) */
+    float mode2_img_y_d_lpf;                    /* Y轴D项低通截止频率，单位 Hz */
+    float mode2_car_vel_ff_x_deg_per_mps;       /* X轴车速角度前馈，单位 deg/(m/s) */
+    float mode2_car_vel_ff_y_deg_per_mps;       /* Y轴车速角度前馈，单位 deg/(m/s) */
+    float mode2_turn_accel_ff_gain_x;           /* X轴转向加速度角度前馈增益 */
+    float mode2_turn_accel_ff_gain_y;           /* Y轴转向加速度角度前馈增益 */
+    float mode2_angle_limit_deg;                /* 图像与前馈合成修正限幅，单位 deg */
     /* ===== Mode 5 image and velocity params ===== */
     float mode5_img_x_kp;
     float mode5_img_x_ki;
@@ -266,7 +251,6 @@ typedef struct
     float mode7_vel_y_i_limit;
     float mode7_vel_y_d_lpf;
     /* ===== 各模式航向对准开关：0=关闭，1=开启 ===== */
-    float yaw_change_mode2;
     float yaw_change_mode3;
     float yaw_change_mode4;
     float yaw_change_mode5;

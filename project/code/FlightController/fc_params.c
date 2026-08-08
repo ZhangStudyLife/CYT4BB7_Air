@@ -120,33 +120,18 @@ static void fc_params_fill_defaults(fc_params_t *params)
     /* ===== 位置估计参数 ===== */
     params->pos_est_k_flow = 0.5f;
 
-    /* ===== Mode 2 image and velocity params ===== */
-    params->mode2_img_x_kp = 2.8f;
-    params->mode2_img_x_ki = 0.0f;
-    params->mode2_img_x_kd = 0.15f;
-    params->mode2_img_x_kff = 0.0f;
-    params->mode2_img_x_i_limit = 0.0f;
-    params->mode2_img_x_d_lpf = 1.5f;
-    params->mode2_img_y_kp = 2.0f;
-    params->mode2_img_y_ki = 0.0f;
-    params->mode2_img_y_kd = 0.15f;
-    params->mode2_img_y_kff = 0.0f;
-    params->mode2_img_y_i_limit = 0.0f;
-    params->mode2_img_y_d_lpf = 1.5f;
-    params->mode2_vel_x_kp = 0.2f;
-    params->mode2_vel_x_ki = 0.02f;
-    params->mode2_vel_x_kd = 0.0f;
-    params->mode2_vel_x_kff = 0.0f;
-    params->mode2_vel_x_i_limit = 3.0f;
-    params->mode2_vel_x_d_lpf = 10.0f;
-    params->mode2_vel_y_kp = 0.2f;
-    params->mode2_vel_y_ki = 0.02f;
-    params->mode2_vel_y_kd = 0.00f;
-    params->mode2_vel_y_kff = 0.0f;
-    params->mode2_vel_y_i_limit = 3.0f;
-    params->mode2_vel_y_d_lpf = 10.0f;
-    params->mode2_kp_car_x = 10.0f;
-    params->mode2_kp_car_y = 30.0f;
+    /* ===== 模式 2 直接图像 PD 与角度前馈参数 ===== */
+    params->mode2_img_x_kp = 0.12f;
+    params->mode2_img_x_kd = 0.09f;
+    params->mode2_img_x_d_lpf = 3.0f;
+    params->mode2_img_y_kp = 0.12f;
+    params->mode2_img_y_kd = 0.09f;
+    params->mode2_img_y_d_lpf = 3.0f;
+    params->mode2_car_vel_ff_x_deg_per_mps = 1.0f;
+    params->mode2_car_vel_ff_y_deg_per_mps = 1.0f;
+    params->mode2_turn_accel_ff_gain_x = 0.72f;
+    params->mode2_turn_accel_ff_gain_y = 0.30f;
+    params->mode2_angle_limit_deg = 10.0f;
 
     /* ===== 模式 3 图像、速度与转弯前馈参数 ===== */
     params->mode3_img_x_kp = 2.0f;
@@ -287,7 +272,6 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode8_kp_car_y = 65.0f;
 
     /* ===== 各模式航向对准开关 ===== */
-    params->yaw_change_mode2 = 1.0f;
     params->yaw_change_mode3 = 1.0f;
     params->yaw_change_mode4 = 0.0f;
     params->yaw_change_mode5 = 0.0f;

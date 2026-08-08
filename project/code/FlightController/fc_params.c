@@ -121,17 +121,23 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pos_est_k_flow = 0.5f;
 
     /* ===== 模式 2 直接图像 PD 与角度前馈参数 ===== */
-    params->mode2_img_x_kp = 0.12f;
-    params->mode2_img_x_kd = 0.09f;
+    params->mode2_img_x_kp = 0.136f;
+    params->mode2_img_x_kd = 0.245f;
     params->mode2_img_x_d_lpf = 3.0f;
-    params->mode2_img_y_kp = 0.12f;
-    params->mode2_img_y_kd = 0.09f;
+    params->mode2_img_y_kp = 0.136f;
+    params->mode2_img_y_kd = 0.245f;
     params->mode2_img_y_d_lpf = 3.0f;
-    params->mode2_car_vel_ff_x_deg_per_mps = 1.0f;
-    params->mode2_car_vel_ff_y_deg_per_mps = 1.0f;
+    params->mode2_car_vel_ff_x_deg_per_mps = 0.8f;
+    params->mode2_car_vel_ff_y_deg_per_mps = 0.8f;
+    params->mode2_car_accel_ff_x_deg_per_mps2 = 1.8f;
+    params->mode2_car_accel_ff_y_deg_per_mps2 = 1.8f;
+    params->mode2_car_accel_lpf_hz = 2.0f;
+    params->mode2_car_accel_ff_limit_deg = 3.0f;
+    params->mode2_attitude_fb_gain = -0.32f;
     params->mode2_turn_accel_ff_gain_x = 0.72f;
     params->mode2_turn_accel_ff_gain_y = 0.30f;
-    params->mode2_angle_limit_deg = 10.0f;
+    params->mode2_angle_limit_deg = 6.0f;
+    params->mode2_angle_slew_dps = 60.0f;
 
     /* ===== 模式 3 图像、速度与转弯前馈参数 ===== */
     params->mode3_img_x_kp = 2.0f;
@@ -182,20 +188,20 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode4_img_y_kff = 0.0f;
     params->mode4_img_y_i_limit = 0.0f;
     params->mode4_img_y_d_lpf = 1.5f;
-    params->mode4_vel_x_kp = 0.12f;
+    params->mode4_vel_x_kp = 0.2f;
     params->mode4_vel_x_ki = 0.0f;
     params->mode4_vel_x_kd = 0.0f;
     params->mode4_vel_x_kff = 0.0f;
     params->mode4_vel_x_i_limit = 3.0f;
     params->mode4_vel_x_d_lpf = 10.0f;
-    params->mode4_vel_y_kp = 0.12f;
+    params->mode4_vel_y_kp = 0.2f;
     params->mode4_vel_y_ki = 0.0f;
     params->mode4_vel_y_kd = 0.0f;
     params->mode4_vel_y_kff = 0.0f;
     params->mode4_vel_y_i_limit = 3.0f;
     params->mode4_vel_y_d_lpf = 10.0f;
     params->mode4_kp_car_x = 60.0f;
-    params->mode4_kp_car_y = 70.0f;
+    params->mode4_kp_car_y = 90.0f;
     params->mode4_turn_accel_ff_gain_x = 0.72f;
     params->mode4_turn_accel_ff_gain_y = 0.30f;
     params->mode4_turn_accel_ff_limit_x_deg = 18.0f;

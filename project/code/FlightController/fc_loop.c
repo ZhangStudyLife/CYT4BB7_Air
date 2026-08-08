@@ -3,6 +3,7 @@
 #include <math.h>
 #include "../Estimation/Attitude/IMU_TOP.h"
 #include "../Estimation/Height_Est/Height_Est.h"
+#include "../Estimation/Pos_Est/Pos_Est.h"
 #include "../IPC/ipc_image_data.h"
 #include "../Planner/car_lamp_fused.h"
 #include "../Planner/car_plan.h"
@@ -10,6 +11,7 @@
 #include "../Planner/ProjectionCenter.h"
 #include "../Planner/pull_detect.h"
 #include "../Protocols/AirComm/air_comm_air.h"
+#include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
 
 pid_t roll_gyro_pid;
 pid_t pitch_gyro_pid;
@@ -46,6 +48,7 @@ extern uint32 g_car_last_update_time_ms;
 extern float g_car_vel_x;
 extern float g_car_vel_y;
 extern float g_car_yaw;
+extern float g_car_yaw_rate_dps;
 extern float img_err_x_old;
 extern float img_err_y_old;
 
@@ -396,7 +399,7 @@ void FC_Loop_50Hz(void)
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_1:
-        FC_Mode0_50Hz(dt);
+        FC_Mode1_50Hz(dt);
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_2:
@@ -528,7 +531,7 @@ void FC_Loop_100Hz(void)
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_1:
-        FC_Mode0_100Hz();
+        FC_Mode1_100Hz();
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_2:
@@ -665,14 +668,83 @@ void FC_Loop_500Hz(void)
         yaw_gyro_target = 0.0f;
     }
 
-    float    img_err_x = g_car_lamp_fused.cx - g_projection_center.cx;
-    float    img_err_y = g_car_lamp_fused.cy - g_projection_center.cy;
+    // (void)wifi_justfloat(FC_START_CRSF_Get_State(),
+    //                      FC_START_CRSF_Get_Flight_Mode(),
+    //                      FC_START_CRSF_Is_Armed(),
+    //                      CRSF_STD[0], CRSF_STD[1], CRSF_STD[2],
+    //                      CRSF_STD[3], CRSF_STD[4], CRSF_STD[5],
+    //                      CRSF_STD[6], CRSF_STD[7], CRSF_STD[8],
+    //                      FC_START_CRSF_Get_Unlock_Timer(),
+    //                      FC_START_CRSF_Get_Arm_Delay_Timer(),
+    //                      CRSF_LINK_UP,
+    //                      g_euler.roll, g_euler.pitch, g_euler.yaw,
+    //                      g_tof_fused_valid, g_tof_fused_height_mm);
 
-    wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw,roll_angle_target,pitch_angle_target,yaw_angle_target,
-    img_err_x, img_err_y,
-    g_mode4_imgx_pid.p_term,g_mode4_imgx_pid.d_term,g_mode4_imgx_pid.output,
-    g_mode4_imgy_pid.p_term,g_mode4_imgy_pid.d_term,g_mode4_imgy_pid.output,
-    g_mode4_velx_target, g_mode4_vely_target,-Pos_Est_vel_x_2,-Pos_Est_vel_y_2);
+    /* Mode2/Mode4共用固定列日志，模式专属列按当前模式选择。 */
+    if ((s_flight_mode == FC_START_CRSF_FLIGHT_MODE_2) ||
+        (s_flight_mode == FC_START_CRSF_FLIGHT_MODE_4))
+    {
+        pos_est_flow_telemetry_t flow_telemetry;
+        pid_t *image_pid_x;
+        pid_t *image_pid_y;
+        float car_data_age_ms;
+        uint8_t is_mode2;
+
+        is_mode2 = (s_flight_mode == FC_START_CRSF_FLIGHT_MODE_2) ? 1U : 0U;
+        image_pid_x = (is_mode2 != 0U) ? &g_mode2_imgx_pid : &g_mode4_imgx_pid;
+        image_pid_y = (is_mode2 != 0U) ? &g_mode2_imgy_pid : &g_mode4_imgy_pid;
+        car_data_age_ms = (g_car_sync_time_ms > 0.0f)
+                              ? (float)(tick_now - g_car_last_update_time_ms)
+                              : -1.0f;
+        Pos_Est_GetFlowTelemetry(&flow_telemetry);
+
+        (void)wifi_justfloat((float)s_flight_mode,                                      /* I1  mode */
+                             (float)g_car_lamp_fused_distance_projectioncenter_2.valid, /* I2  image valid */
+                             (float)g_tof_fused_valid,                                  /* I3  height valid */
+                             car_data_age_ms,                                           /* I4  car age, ms */
+                             image_pid_x->error,                                        /* I5  image error X, px */
+                             image_pid_y->error,                                        /* I6  image error Y, px */
+                             image_pid_x->d_term,                                       /* I7  filtered image D X */
+                             image_pid_y->d_term,                                       /* I8  filtered image D Y */
+                             g_car_vel_x,                                               /* I9  car velocity X, m/s */
+                             g_car_vel_y,                                               /* I10 car velocity Y, m/s */
+                             g_car_yaw,                                                 /* I11 car yaw, deg */
+                             g_car_yaw_rate_dps,                                        /* I12 car yaw rate, deg/s */
+                             (is_mode2 != 0U) ? g_mode2_car_accel_angle_ff_x_deg
+                                              : g_mode4_velx_target,                    /* I13 M2 accel FF / M4 velocity target X */
+                             (is_mode2 != 0U) ? g_mode2_car_accel_angle_ff_y_deg
+                                              : g_mode4_vely_target,                    /* I14 M2 accel FF / M4 velocity target Y */
+                             roll_angle_target,                                         /* I15 roll target, deg */
+                             pitch_angle_target,                                        /* I16 pitch target, deg */
+                             g_euler.roll,                                              /* I17 roll actual, deg */
+                             g_euler.pitch,                                             /* I18 pitch actual, deg */
+                             g_euler.yaw,                                               /* I19 aircraft yaw, deg */
+                             g_tof_fused_height_mm,                                     /* I20 height, mm */
+                             (is_mode2 != 0U) ? g_mode2_car_accel_x_mps2
+                                              : (float)0.0f,                             /* I21 M2 accel X / reserved M4 */
+                             (is_mode2 != 0U) ? g_mode2_car_accel_y_mps2
+                                              : (float)0.0f,                             /* I22 M2 accel Y / reserved M4 */
+                             (is_mode2 != 0U) ? g_mode2_raw_roll_correction_deg
+                                              : g_mode4_velx_pid.i_term,                 /* I23 M2 raw roll / M4 velocity I X */
+                             (is_mode2 != 0U) ? g_mode2_raw_pitch_correction_deg
+                                              : g_mode4_vely_pid.i_term,                 /* I24 M2 raw pitch / M4 velocity I Y */
+                             (is_mode2 == 0U) ? g_mode4_velx_pid.ff_term : 0.0f,         /* I25 M4 velocity FF X */
+                             (is_mode2 == 0U) ? g_mode4_vely_pid.ff_term : 0.0f,         /* I26 M4 velocity FF Y */
+                             g_imufilter_1000hz.gyrox,                                   /* I27 actual roll gyro, deg/s */
+                             g_imufilter_1000hz.gyroy,                                   /* I28 actual pitch gyro, deg/s */
+                             flow_telemetry.raw_flow_x_integral,                        /* I29 raw flow X */
+                             flow_telemetry.raw_flow_y_integral,                        /* I30 raw flow Y */
+                             flow_telemetry.decoupled_flow_x,                           /* I31 decoupled flow X */
+                             flow_telemetry.decoupled_flow_y,                           /* I32 decoupled flow Y */
+                             (float)flow_telemetry.frame_valid,                          /* I33 flow valid */
+                             flow_telemetry.data_age_ms);                               /* I34 flow age, ms */
+    }
+
+    // wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw,roll_angle_target,pitch_angle_target,yaw_angle_target,
+    // img_err_x, img_err_y,
+    // g_mode4_imgx_pid.p_term,g_mode4_imgx_pid.d_term,g_mode4_imgx_pid.output,
+    // g_mode4_imgy_pid.p_term,g_mode4_imgy_pid.d_term,g_mode4_imgy_pid.output,
+    // g_mode4_velx_target, g_mode4_vely_target,-Pos_Est_vel_x_2,-Pos_Est_vel_y_2);
     // wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw,roll_angle_target,pitch_angle_target,yaw_angle_target,
     //     g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
     //     roll_gyro_target, pitch_gyro_target, yaw_gyro_target,

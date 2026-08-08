@@ -23,6 +23,10 @@ pid_t g_mode4_velx_pid;
 pid_t g_mode4_vely_pid;
 float g_mode4_velx_target = 0.0f;
 float g_mode4_vely_target = 0.0f;
+float g_mode4_car_velocity_ff_x_cmps = 0.0f; /* 模式4车速前馈X速度目标，单位cm/s。 */
+float g_mode4_car_velocity_ff_y_cmps = 0.0f; /* 模式4车速前馈Y速度目标，单位cm/s。 */
+float g_mode4_turn_angle_ff_x_deg = 0.0f; /* 模式4转向加速度前馈Roll角度，单位deg。 */
+float g_mode4_turn_angle_ff_y_deg = 0.0f; /* 模式4转向加速度前馈Pitch角度，单位deg。 */
 
 static float s_mode4_prev_velx_target = 0.0f;
 static float s_mode4_prev_vely_target = 0.0f;
@@ -62,6 +66,10 @@ void FC_Mode4_Reset(void)
     PID_Reset(&g_mode4_vely_pid);
     g_mode4_velx_target = 0.0f;
     g_mode4_vely_target = 0.0f;
+    g_mode4_car_velocity_ff_x_cmps = 0.0f;
+    g_mode4_car_velocity_ff_y_cmps = 0.0f;
+    g_mode4_turn_angle_ff_x_deg = 0.0f;
+    g_mode4_turn_angle_ff_y_deg = 0.0f;
     s_mode4_prev_velx_target = 0.0f;
     s_mode4_prev_vely_target = 0.0f;
     s_mode4_velx_ff_lpf = 0.0f;
@@ -249,6 +257,10 @@ void FC_Mode4_50Hz(float dt)
 
     roll_angle_target = FC_Mode_Clamp(velx_out + roll_trim, -angle_target_max, angle_target_max);
     pitch_angle_target = FC_Mode_Clamp(vely_out + pitch_trim, -angle_target_max, angle_target_max);
+    g_mode4_car_velocity_ff_x_cmps = car_ff_x;
+    g_mode4_car_velocity_ff_y_cmps = car_ff_y;
+    g_mode4_turn_angle_ff_x_deg = turn_ff_x;
+    g_mode4_turn_angle_ff_y_deg = turn_ff_y;
     // wifi_justfloat(g_car_vel_x,                 /* I1 */
     //              g_car_vel_y,                   /* I2 */
     //              Pos_Est_vel_x,                 /* I3 */

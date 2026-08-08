@@ -130,6 +130,10 @@ void FC_Mode1_50Hz(float dt)
     velx_out = FC_Mode_Clamp(velx_out, -s_mode1_angle_limit_deg, s_mode1_angle_limit_deg);
     vely_out = FC_Mode_Clamp(vely_out, -s_mode1_angle_limit_deg, s_mode1_angle_limit_deg);
 
-    roll_angle_target = velx_out + FC_Mode_Get_Roll_Mech_Trim_Deg();
-    pitch_angle_target = vely_out + FC_Mode_Get_Pitch_Mech_Trim_Deg();
+    // roll_angle_target = velx_out + FC_Mode_Get_Roll_Mech_Trim_Deg();
+    // pitch_angle_target = vely_out + FC_Mode_Get_Pitch_Mech_Trim_Deg();
+
+    // 8月9日临时修改
+    roll_angle_target =  FC_Mode_Get_Roll_Mech_Trim_Deg();
+    pitch_angle_target =  FC_Mode_Get_Pitch_Mech_Trim_Deg();
 }

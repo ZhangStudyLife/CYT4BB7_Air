@@ -128,9 +128,15 @@ typedef struct
     float mode2_img_y_d_lpf;                    /* Y轴D项低通截止频率，单位 Hz */
     float mode2_car_vel_ff_x_deg_per_mps;       /* X轴车速角度前馈，单位 deg/(m/s) */
     float mode2_car_vel_ff_y_deg_per_mps;       /* Y轴车速角度前馈，单位 deg/(m/s) */
+    float mode2_car_accel_ff_x_deg_per_mps2;    /* X轴车加速度角度前馈，单位 deg/(m/s^2) */
+    float mode2_car_accel_ff_y_deg_per_mps2;    /* Y轴车加速度角度前馈，单位 deg/(m/s^2) */
+    float mode2_car_accel_lpf_hz;               /* 车加速度低通截止频率，单位 Hz */
+    float mode2_car_accel_ff_limit_deg;         /* 车加速度角度前馈限幅，单位 deg */
+    float mode2_attitude_fb_gain;               /* 实际姿态状态反馈增益 */
     float mode2_turn_accel_ff_gain_x;           /* X轴转向加速度角度前馈增益 */
     float mode2_turn_accel_ff_gain_y;           /* Y轴转向加速度角度前馈增益 */
     float mode2_angle_limit_deg;                /* 图像与前馈合成修正限幅，单位 deg */
+    float mode2_angle_slew_dps;                 /* 姿态修正变化率限幅，单位 deg/s */
     /* ===== Mode 5 image and velocity params ===== */
     float mode5_img_x_kp;
     float mode5_img_x_ki;

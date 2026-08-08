@@ -140,8 +140,10 @@ static float s_common_acc_y_cmss = 0.0f;
 static float s_common_yaw_rate_dps = 0.0f;
 static uint8_t s_common_accel_bias_locked = 0U;
 
-/* 旧估计器唯一消费LC302后发布的解耦光流快照。 */
+/* 旧估计器唯一消费LC302后发布的原始积分和解耦光流快照。 */
 static uint32_t s_common_flow_sequence = 0U;
+static float s_common_flow_raw_x = 0.0f;
+static float s_common_flow_raw_y = 0.0f;
 static float s_common_flow_dec_x = 0.0f;
 static float s_common_flow_dec_y = 0.0f;
 static float s_common_flow_height_mm = 0.0f;
@@ -520,6 +522,8 @@ void Pos_Est_Init(void)
     s_common_yaw_rate_dps = 0.0f;
     s_common_accel_bias_locked = 0U;
     s_common_flow_sequence = 0U;
+    s_common_flow_raw_x = 0.0f;
+    s_common_flow_raw_y = 0.0f;
     s_common_flow_dec_x = 0.0f;
     s_common_flow_dec_y = 0.0f;
     s_common_flow_height_mm = 0.0f;
@@ -528,6 +532,23 @@ void Pos_Est_Init(void)
     s_common_flow_height_valid = 0U;
     s_common_flow_reset_sequence = 0U;
     Pos_Est_ResetFlowState(tick_1000us_cnt);
+}
+
+/*
+ * 函数功能：读取最近一帧LC302原始积分和姿态解耦光流快照。
+ * 输入参数：telemetry - 输出快照指针。
+ * 返回值：无，结果写入telemetry指向的结构体。
+ */
+void Pos_Est_GetFlowTelemetry(pos_est_flow_telemetry_t *telemetry)
+{
+    telemetry->raw_flow_x_integral = s_common_flow_raw_x;
+    telemetry->raw_flow_y_integral = s_common_flow_raw_y;
+    telemetry->decoupled_flow_x = s_common_flow_dec_x;
+    telemetry->decoupled_flow_y = s_common_flow_dec_y;
+    telemetry->frame_valid = s_common_flow_valid;
+    telemetry->data_age_ms = (s_common_flow_sequence == 0U)
+                                 ? -1.0f
+                                 : (float)(tick_1000us_cnt - s_common_flow_time_ms);
 }
 
 void Pos_Est_Update_1000HZ(void)
@@ -685,8 +706,10 @@ void Pos_Est_Update_1000HZ(void)
                                  tick_1000us_cnt);
 
         /* 序号最后更新，保证新估计器看到的是完整的同一帧快照。 */
-        s_common_flow_dec_x = FlowGyroDecoupler_LC302_GetDecX();
-        s_common_flow_dec_y = FlowGyroDecoupler_LC302_GetDecY();
+        s_common_flow_raw_x = (float)frame_flow_x;
+        s_common_flow_raw_y = (float)frame_flow_y;
+        s_common_flow_dec_x = (frame_valid != 0U) ? FlowGyroDecoupler_LC302_GetDecX() : 0.0f;
+        s_common_flow_dec_y = (frame_valid != 0U) ? FlowGyroDecoupler_LC302_GetDecY() : 0.0f;
         s_common_flow_height_mm = g_tof_fused_height_mm;
         s_common_flow_time_ms = tick_1000us_cnt;
         s_common_flow_valid = frame_valid;

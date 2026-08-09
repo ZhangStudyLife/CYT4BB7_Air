@@ -7,7 +7,7 @@
 #include "syslib/cy_syslib.h"
 
 #define CAMERA_SPI_TRANSFER_LEN             (128U) /* 适配2BL3 SCB 128字节FIFO的单次全双工传输长度。 */
-#define CAMERA_SPI_APP_DATA_CAPACITY        (110U) /* SPI v5图像应用数据容量。 */
+#define CAMERA_SPI_APP_DATA_CAPACITY        (110U) /* 双来源紧凑透传包占满的应用数据容量。 */
 #define CAMERA_SPI_PARAM_APP_LEN             (24U) /* 参数命令声明长度。 */
 #define CAMERA_SPI_PARAM_ACK_APP_LEN         (20U) /* 参数应答长度。 */
 #define CAMERA_SPI_ATTITUDE_APP_LEN          (43U) /* 姿态数据应用长度。 */
@@ -31,8 +31,7 @@
 #define CAMERA_SPI_READY_REARM_TIMEOUT_US   (200U) /* 未捕获READY低脉冲时的防死锁上限。 */
 #define CAMERA_SPI_TRANSFER_TIMEOUT_US      (2000U)
 #define CAMERA_SPI_TRANSFER_TIMEOUT_POLLS   (100000U)
-#define CAMERA_SPI_CYCLE_TIMEOUT_US         (8000U) /* 单轮控制加透传的等待上限。 */
-#define CAMERA_SPI_MAX_TRANSFERS_PER_CYCLE  (6U) /* 两笔控制加四笔透传。 */
+#define CAMERA_SPI_MAX_TRANSFERS_PER_CYCLE  (4U) /* 两笔控制加两笔合并透传。 */
 #define CAMERA_SPI_BITS_PER_BYTE            (8UL) /* SPI每字节的线路位数。 */
 #define CAMERA_SPI_CONTROL_PERIOD_US        (10000UL) /* 100Hz调度周期。 */
 #define CAMERA_SPI_TRANSFER_WIRE_US \
@@ -47,8 +46,8 @@
 #define CAMERA_SPI_IMAGE_STALE_CYCLES       (5U)
 #define CAMERA_SPI_LINK_STALE_CYCLES        (10U)
 #define CAMERA_SPI_ALL_BOARD_MASK           ((1U << CAMERA_SPI_BOARD_COUNT) - 1U)
-#define CAMERA_SPI_NO_RELAY_SOURCE          (0xFFU) /* 当前事务不携带透传图像。 */
-#define CAMERA_SPI_FRAME_STALE_MS           (50U) /* 同步组来源帧最大存活时间。 */
+#define CAMERA_SPI_SYNC_FRESH_MS            (50U)  /* 严格同步诊断允许的最大接收年龄。 */
+#define CAMERA_SPI_CROSS_CHECK_HOLD_MS      (500U) /* 公共轨迹允许保留最新来源帧的时间。 */
 #define CAMERA_SPI_DWT_UNLOCK_KEY           (0xC5ACCE55UL)
 #define CAMERA_SPI_READY0_PIN               P01_0
 #define CAMERA_SPI_READY1_PIN               P01_1
@@ -94,15 +93,15 @@
 #define CAMERA_SPI_TIME_SYNC_MASTER_MS_OFFSET (45U) /* 核心1毫秒时间偏移。 */
 #define CAMERA_SPI_TIME_SYNC_SEQUENCE_OFFSET  (49U) /* 主时钟事务序号偏移。 */
 
-#define CAMERA_SPI_IMAGE_MAGIC                 (0xB1U) /* SPI v5图像包魔数。 */
-#define CAMERA_SPI_IMAGE_PROTOCOL_VERSION      (5U) /* 图像透传协议版本。 */
+#define CAMERA_SPI_IMAGE_MAGIC                 (0xB1U) /* SPI v6单摄上行图像包魔数。 */
+#define CAMERA_SPI_IMAGE_PROTOCOL_VERSION      (6U) /* 3信标、1车灯上行协议版本。 */
 #define CAMERA_SPI_IMAGE_MAGIC_OFFSET           (0U) /* 图像包魔数字节偏移。 */
 #define CAMERA_SPI_IMAGE_VERSION_OFFSET         (1U) /* 图像包版本字节偏移。 */
 #define CAMERA_SPI_IMAGE_SOURCE_OFFSET          (2U) /* 摄像头来源字节偏移。 */
 #define CAMERA_SPI_IMAGE_FLAGS_OFFSET           (3U) /* 帧有效标志字节偏移。 */
 #define CAMERA_SPI_IMAGE_BEACON_COUNT_OFFSET    (4U) /* 有效信标数量字节偏移。 */
 #define CAMERA_SPI_IMAGE_LAMP_COUNT_OFFSET      (5U) /* 有效车灯数量字节偏移。 */
-#define CAMERA_SPI_IMAGE_MEASURED_MASK_OFFSET   (6U) /* 双车灯实测位图字节偏移。 */
+#define CAMERA_SPI_IMAGE_MEASURED_MASK_OFFSET   (6U) /* 单车灯实测位字节偏移。 */
 #define CAMERA_SPI_IMAGE_FRAME_SEQUENCE_OFFSET  (8U) /* 来源帧号字节偏移。 */
 #define CAMERA_SPI_IMAGE_CAPTURE_TIME_OFFSET    (12U) /* 统一采集时间字节偏移。 */
 #define CAMERA_SPI_IMAGE_HEADER_SIZE            (16U) /* 图像包固定头长度。 */
@@ -113,7 +112,7 @@
 #define CAMERA_SPI_IMAGE_BEACON_Y_OFFSET       (5U)  /* float LE: centered image y, down positive */
 #define CAMERA_SPI_IMAGE_BEACON_AREA_OFFSET    (9U)
 #define CAMERA_SPI_IMAGE_BEACON_SLOT_SIZE      (13U)
-#define CAMERA_SPI_IMAGE_BEACON_COUNT          (4U)
+#define CAMERA_SPI_IMAGE_BEACON_COUNT          (3U)
 #define CAMERA_SPI_IMAGE_LAMP_VALID_OFFSET     (0U)
 #define CAMERA_SPI_IMAGE_LAMP_CX_OFFSET        (1U)  /* float LE: centered image x, right positive */
 #define CAMERA_SPI_IMAGE_LAMP_CY_OFFSET        (5U)  /* float LE: centered image y, down positive */
@@ -121,7 +120,7 @@
 #define CAMERA_SPI_IMAGE_LAMP_LENGTH_OFFSET    (13U)
 #define CAMERA_SPI_IMAGE_LAMP_ANGLE_OFFSET     (17U)
 #define CAMERA_SPI_IMAGE_LAMP_SLOT_SIZE        (21U)
-#define CAMERA_SPI_IMAGE_LAMP_COUNT            (2U) /* 协议车灯槽位数量。 */
+#define CAMERA_SPI_IMAGE_LAMP_COUNT            (1U) /* 协议车灯槽位数量。 */
 #define CAMERA_SPI_IMAGE_BEACON_PACKET_OFFSET  CAMERA_SPI_IMAGE_HEADER_SIZE
 #define CAMERA_SPI_IMAGE_LAMP_PACKET_OFFSET \
     (CAMERA_SPI_IMAGE_BEACON_PACKET_OFFSET + \
@@ -131,29 +130,61 @@
     (CAMERA_SPI_IMAGE_LAMP_PACKET_OFFSET + \
      (CAMERA_SPI_IMAGE_LAMP_COUNT * CAMERA_SPI_IMAGE_LAMP_SLOT_SIZE))
 
-#if (CAMERA_SPI_IMAGE_PACKET_SIZE != CAMERA_SPI_APP_DATA_CAPACITY)
-#error "Camera SPI v5 image packet size mismatch."
+#if (CAMERA_SPI_IMAGE_PACKET_SIZE != 76U)
+#error "Camera SPI v6 image packet size mismatch."
 #endif
 
-#if (CAMERA_SPI_IMAGE_LAMP_COUNT != CAMERA_SPI_MAX_CAR_LAMPS) || \
+#if (CAMERA_SPI_IMAGE_BEACON_COUNT > IMAGE_MAX_BEACON_COUNT) || \
+    (CAMERA_SPI_IMAGE_LAMP_COUNT > CAMERA_SPI_MAX_CAR_LAMPS) || \
     (CAMERA_SPI_MAX_CAR_LAMPS != IMAGE_MAX_CAR_LAMP_COUNT)
-#error "Camera SPI and image-data car-lamp counts must match."
+#error "Camera SPI image counts exceed image-data storage."
+#endif
+
+/* 每块2BL3一次接收另外两摄的紧凑互补数据。 */
+#define CAMERA_SPI_RELAY_MAGIC                     (0xB2U)
+#define CAMERA_SPI_RELAY_PROTOCOL_VERSION          (1U)
+#define CAMERA_SPI_RELAY_SOURCE_COUNT              (2U)
+#define CAMERA_SPI_RELAY_HEADER_SIZE               (2U)
+#define CAMERA_SPI_RELAY_RECORD_SOURCE_OFFSET      (0U)
+#define CAMERA_SPI_RELAY_RECORD_FLAGS_OFFSET       (1U)
+#define CAMERA_SPI_RELAY_RECORD_BEACON_MASK_OFFSET (2U)
+#define CAMERA_SPI_RELAY_RECORD_LAMP_FLAGS_OFFSET  (3U)
+#define CAMERA_SPI_RELAY_RECORD_FRAME_OFFSET       (4U)
+#define CAMERA_SPI_RELAY_RECORD_TIME_OFFSET        (8U)
+#define CAMERA_SPI_RELAY_RECORD_BEACON_OFFSET      (12U)
+#define CAMERA_SPI_RELAY_BEACON_X_OFFSET           (0U)
+#define CAMERA_SPI_RELAY_BEACON_Y_OFFSET           (4U)
+#define CAMERA_SPI_RELAY_BEACON_AREA_OFFSET        (8U)
+#define CAMERA_SPI_RELAY_BEACON_SLOT_SIZE          (10U)
+#define CAMERA_SPI_RELAY_RECORD_LAMP_OFFSET \
+    (CAMERA_SPI_RELAY_RECORD_BEACON_OFFSET + \
+     (CAMERA_SPI_IMAGE_BEACON_COUNT * CAMERA_SPI_RELAY_BEACON_SLOT_SIZE))
+#define CAMERA_SPI_RELAY_LAMP_CX_OFFSET            (0U)
+#define CAMERA_SPI_RELAY_LAMP_CY_OFFSET            (4U)
+#define CAMERA_SPI_RELAY_LAMP_LENGTH_OFFSET        (8U)
+#define CAMERA_SPI_RELAY_LAMP_SLOT_SIZE            (12U)
+#define CAMERA_SPI_RELAY_RECORD_SIZE \
+    (CAMERA_SPI_RELAY_RECORD_LAMP_OFFSET + CAMERA_SPI_RELAY_LAMP_SLOT_SIZE)
+#define CAMERA_SPI_RELAY_PACKET_SIZE \
+    (CAMERA_SPI_RELAY_HEADER_SIZE + \
+     (CAMERA_SPI_RELAY_SOURCE_COUNT * CAMERA_SPI_RELAY_RECORD_SIZE))
+#define CAMERA_SPI_RELAY_LAMP_VALID                (0x01U)
+#define CAMERA_SPI_RELAY_LAMP_MEASURED             (0x02U)
+
+#if (CAMERA_SPI_RELAY_PACKET_SIZE != CAMERA_SPI_APP_DATA_CAPACITY)
+#error "Camera SPI compact relay packet must fill the application payload."
 #endif
 
 #if (CAMERA_SPI_RESP_FRAME_LEN != CAMERA_SPI_TRANSFER_LEN)
-#error "Camera SPI v5 transfer length mismatch."
+#error "Camera SPI v6 transfer length mismatch."
 #endif
 
 #if (CAMERA_SPI_TRANSFER_LEN != 128U)
 #error "Camera SPI transfer must fit the 2BL3 128-byte SCB FIFO."
 #endif
 
-#if (CAMERA_SPI_BUSY_CYCLE_TOTAL_US >= CAMERA_SPI_CYCLE_TIMEOUT_US)
-#error "Camera SPI v5 busy-cycle time exceeds the cycle timeout."
-#endif
-
 #if (CAMERA_SPI_BUSY_CYCLE_TOTAL_US >= CAMERA_SPI_CONTROL_PERIOD_US)
-#error "Camera SPI v5 busy-cycle wire time exceeds the 100 Hz period."
+#error "Camera SPI v6 busy-cycle wire time exceeds the 100 Hz period."
 #endif
 
 #define CAMERA_SPI_ERR_OK                   (0U)
@@ -198,13 +229,7 @@ typedef struct
 {
     struct image_data data;
     image_frame_meta_t meta;
-    uint8 pending;
-} camera_spi_relay_slot_t;
-
-typedef struct
-{
-    struct image_data data;
-    image_frame_meta_t meta;
+    uint32 received_time_ms;
 } camera_spi_history_entry_t;
 
 typedef enum
@@ -251,7 +276,7 @@ typedef struct
 } camera_spi_param_rollback_cache_t;
 
 static camera_spi_board_state_t s_boards[CAMERA_SPI_BOARD_COUNT]; /* 两块物理图像板的链路和目标状态。 */
-static camera_spi_relay_slot_t s_relay[CAMERA_SPI_BOARD_COUNT][IMAGE_CAMERA_COUNT]; /* 每个目标板和来源的最新透传帧。 */
+static uint8 s_relay_pending[CAMERA_SPI_BOARD_COUNT]; /* 各目标板待合并发送的来源位图。 */
 static camera_spi_history_entry_t s_history[IMAGE_CAMERA_COUNT][IMAGE_SYNC_HISTORY_DEPTH]; /* 三摄最近两帧缓存。 */
 static uint8 s_history_count[IMAGE_CAMERA_COUNT]; /* 各摄像头当前有效缓存深度。 */
 static cy_stc_scb_spi_context_t s_spi_context;
@@ -260,7 +285,8 @@ static uint8 s_rx_frame[CAMERA_SPI_TRANSFER_LEN];
 static uint8 s_initialized;
 static uint8 s_active;
 static uint8 s_active_board;
-static uint8 s_active_relay_source; /* 当前事务携带的透传来源，无透传时为0xFF。 */
+static uint8 s_active_relay; /* 当前事务为合并透传时置1。 */
+static uint8 s_active_relay_mask; /* 当前合并事务已取走的来源待发位。 */
 static uint8 s_flight_state;
 /* 核0同步的参数写锁，1表示当前禁止2BL3参数SET。 */
 static uint8 s_param_write_locked;
@@ -270,13 +296,12 @@ static uint8 s_ready_mask;
 static uint8 s_ready_rearm_mask; /* 上一事务结束后，等待各板READY先回到低电平。 */
 static uint8 s_cycle_active;
 static uint8 s_cycle_pending_mask;
+static uint8 s_cycle_relay_sent_mask; /* 本轮每块板最多发送一次合并透传。 */
 static uint32 s_active_poll_count;
 static uint32 s_active_start_cycles;
 static uint32 s_transfer_timeout_cycles;
 static uint32 s_ready_rearm_start_cycles[CAMERA_SPI_BOARD_COUNT];
 static uint32 s_ready_rearm_timeout_cycles;
-static uint32 s_cycle_start_cycles; /* 当前100Hz事务轮次的起始DWT计数。 */
-static uint32 s_cycle_timeout_cycles; /* 单轮等待READY的DWT周期上限。 */
 static uint32 s_log_seq;
 static uint32 s_time_sync_sequence; /* 核心1下发主时间的事务序号。 */
 static ipc_attitude_data_t s_attitude;
@@ -402,6 +427,7 @@ static uint8 camera_spi_history_push(image_camera_e source,
     }
     entries[0].data = *data;
     entries[0].meta = *meta;
+    entries[0].received_time_ms = g_image_master_time_ms;
     if(s_history_count[source] < IMAGE_SYNC_HISTORY_DEPTH)
     {
         s_history_count[source]++;
@@ -410,127 +436,158 @@ static uint8 camera_spi_history_push(image_camera_e source,
 }
 
 /**
- * @brief 覆盖目标板指定来源的latest-only透传槽。
+ * @brief 标记目标板需要发送指定来源的最新缓存。
  * @param board_id 目标物理板编号，范围0到1。
  * @param source 透传数据的摄像头来源。
- * @param data 识别结果的只读指针。
- * @param meta 来源帧元数据的只读指针。
  * @return 无。
  */
 static void camera_spi_queue_relay(uint8 board_id,
-                                   image_camera_e source,
-                                   const struct image_data *data,
-                                   const image_frame_meta_t *meta)
+                                   image_camera_e source)
 {
-    camera_spi_relay_slot_t *slot;
-
     if((board_id >= CAMERA_SPI_BOARD_COUNT) ||
-       (source >= IMAGE_CAMERA_COUNT) || (data == NULL) || (meta == NULL))
+       (source >= IMAGE_CAMERA_COUNT))
     {
         return;
     }
-
-    slot = &s_relay[board_id][source];
-    slot->data = *data;
-    slot->meta = *meta;
-    slot->pending = 1U;
+    s_relay_pending[board_id] |= (uint8)(1U << source);
 }
 
 /**
  * @brief 根据来源将新帧加入另外两摄所在芯片的透传槽。
  * @param source 新帧的摄像头来源。
- * @param data 识别结果的只读指针。
- * @param meta 来源帧元数据的只读指针。
  * @return 无。
  */
-static void camera_spi_relay_new_source(image_camera_e source,
-                                        const struct image_data *data,
-                                        const image_frame_meta_t *meta)
+static void camera_spi_relay_new_source(image_camera_e source)
 {
     if(source == Front)
     {
-        camera_spi_queue_relay(1U, source, data, meta);
+        camera_spi_queue_relay(1U, source);
     }
     else if(source == Center)
     {
-        camera_spi_queue_relay(0U, source, data, meta);
-        camera_spi_queue_relay(1U, source, data, meta);
+        camera_spi_queue_relay(0U, source);
+        camera_spi_queue_relay(1U, source);
     }
     else if(source == Back)
     {
-        camera_spi_queue_relay(0U, source, data, meta);
+        camera_spi_queue_relay(0U, source);
     }
 }
 
-/**
- * @brief 将四信标、双车灯和帧元数据序列化为SPI v5图像包。
- * @param data 待发送识别结果的只读指针。
- * @param meta 待发送帧元数据的只读指针。
- * @param app 输出110字节应用数据缓冲区。
- * @return 成功返回110，参数无效返回0。
- */
-static uint16 camera_spi_serialize_image(const struct image_data *data,
-                                         const image_frame_meta_t *meta,
-                                         uint8 *app)
+static uint16 camera_spi_relay_area_u16(float area)
 {
-    uint8 i;
-    uint8 beacon_count = 0U;
-    uint8 lamp_count = 0U;
+    if(area <= 0.0f)
+    {
+        return 0U;
+    }
+    if(area >= 65535.0f)
+    {
+        return 65535U;
+    }
+    return (uint16)(area + 0.5f);
+}
 
-    if((data == NULL) || (meta == NULL) || (app == NULL))
+/* 将单个来源压缩为54字节，只保留跨摄校验需要的3信标和1车灯字段。 */
+static void camera_spi_serialize_relay_record(
+    image_camera_e source,
+    const struct image_data *data,
+    const image_frame_meta_t *meta,
+    uint8 *record)
+{
+    const car_lamp_data *lamp;
+    uint8 beacon_mask = 0U;
+    uint8 lamp_flags = 0U;
+    uint8 i;
+
+    memset(record, 0, CAMERA_SPI_RELAY_RECORD_SIZE);
+    record[CAMERA_SPI_RELAY_RECORD_SOURCE_OFFSET] = (uint8)source;
+    if((data == NULL) || (meta == NULL) ||
+       (meta->source_camera != (uint8)source))
+    {
+        return;
+    }
+
+    record[CAMERA_SPI_RELAY_RECORD_FLAGS_OFFSET] =
+        ((meta->frame_valid != 0U) ? CAMERA_SPI_IMAGE_FLAG_FRAME_VALID : 0U) |
+        ((meta->timestamp_valid != 0U) ? CAMERA_SPI_IMAGE_FLAG_TIMESTAMP_VALID : 0U);
+    camera_spi_write_u32_le(&record[CAMERA_SPI_RELAY_RECORD_FRAME_OFFSET],
+                            meta->frame_sequence);
+    camera_spi_write_u32_le(&record[CAMERA_SPI_RELAY_RECORD_TIME_OFFSET],
+                            meta->capture_time_ms);
+
+    for(i = 0U; i < CAMERA_SPI_IMAGE_BEACON_COUNT; i++)
+    {
+        const beacon_data *beacon = &data->beacon_data[i];
+        uint8 *slot = &record[CAMERA_SPI_RELAY_RECORD_BEACON_OFFSET +
+                              ((uint16)i * CAMERA_SPI_RELAY_BEACON_SLOT_SIZE)];
+
+        if(image_data_beacon_valid(beacon) != 0U)
+        {
+            beacon_mask |= (uint8)(1U << i);
+            camera_spi_write_float_le(&slot[CAMERA_SPI_RELAY_BEACON_X_OFFSET],
+                                      beacon->x);
+            camera_spi_write_float_le(&slot[CAMERA_SPI_RELAY_BEACON_Y_OFFSET],
+                                      beacon->y);
+            camera_spi_write_u16_le(&slot[CAMERA_SPI_RELAY_BEACON_AREA_OFFSET],
+                                    camera_spi_relay_area_u16(beacon->area));
+        }
+    }
+    record[CAMERA_SPI_RELAY_RECORD_BEACON_MASK_OFFSET] = beacon_mask;
+
+    lamp = &data->car_lamp_data[0];
+    if(image_data_car_lamp_valid(lamp) != 0U)
+    {
+        uint8 *slot = &record[CAMERA_SPI_RELAY_RECORD_LAMP_OFFSET];
+
+        lamp_flags |= CAMERA_SPI_RELAY_LAMP_VALID;
+        if((data->car_lamp_measured_mask & 0x01U) != 0U)
+        {
+            lamp_flags |= CAMERA_SPI_RELAY_LAMP_MEASURED;
+        }
+        camera_spi_write_float_le(&slot[CAMERA_SPI_RELAY_LAMP_CX_OFFSET],
+                                  lamp->cx);
+        camera_spi_write_float_le(&slot[CAMERA_SPI_RELAY_LAMP_CY_OFFSET],
+                                  lamp->cy);
+        camera_spi_write_float_le(&slot[CAMERA_SPI_RELAY_LAMP_LENGTH_OFFSET],
+                                  lamp->length);
+    }
+    record[CAMERA_SPI_RELAY_RECORD_LAMP_FLAGS_OFFSET] = lamp_flags;
+}
+
+/* 每个目标板一次接收另外两摄，固定前摄收Center/Back，后摄收Front/Center。 */
+static uint16 camera_spi_serialize_relay_bundle(uint8 board_id, uint8 *app)
+{
+    static const image_camera_e sources[CAMERA_SPI_BOARD_COUNT]
+                                         [CAMERA_SPI_RELAY_SOURCE_COUNT] =
+    {
+        {Center, Back},
+        {Front, Center}
+    };
+    uint8 index;
+
+    if((board_id >= CAMERA_SPI_BOARD_COUNT) || (app == NULL))
     {
         return 0U;
     }
 
     memset(app, 0, CAMERA_SPI_APP_DATA_CAPACITY);
-    app[CAMERA_SPI_IMAGE_MAGIC_OFFSET] = CAMERA_SPI_IMAGE_MAGIC;
-    app[CAMERA_SPI_IMAGE_VERSION_OFFSET] = CAMERA_SPI_IMAGE_PROTOCOL_VERSION;
-    app[CAMERA_SPI_IMAGE_SOURCE_OFFSET] = meta->source_camera;
-    app[CAMERA_SPI_IMAGE_FLAGS_OFFSET] =
-        ((meta->frame_valid != 0U) ? CAMERA_SPI_IMAGE_FLAG_FRAME_VALID : 0U) |
-        ((meta->timestamp_valid != 0U) ? CAMERA_SPI_IMAGE_FLAG_TIMESTAMP_VALID : 0U);
-    app[CAMERA_SPI_IMAGE_MEASURED_MASK_OFFSET] =
-        data->car_lamp_measured_mask & 0x03U;
-    camera_spi_write_u32_le(&app[CAMERA_SPI_IMAGE_FRAME_SEQUENCE_OFFSET],
-                            meta->frame_sequence);
-    camera_spi_write_u32_le(&app[CAMERA_SPI_IMAGE_CAPTURE_TIME_OFFSET],
-                            meta->capture_time_ms);
-
-    for(i = 0U; i < CAMERA_SPI_IMAGE_BEACON_COUNT; i++)
+    app[0] = CAMERA_SPI_RELAY_MAGIC;
+    app[1] = CAMERA_SPI_RELAY_PROTOCOL_VERSION;
+    for(index = 0U; index < CAMERA_SPI_RELAY_SOURCE_COUNT; index++)
     {
-        uint8 *slot = &app[CAMERA_SPI_IMAGE_BEACON_PACKET_OFFSET +
-                           ((uint16)i * CAMERA_SPI_IMAGE_BEACON_SLOT_SIZE)];
-        const beacon_data *beacon = &data->beacon_data[i];
+        image_camera_e source = sources[board_id][index];
+        const camera_spi_history_entry_t *relay =
+            (s_history_count[source] != 0U) ? &s_history[source][0] : NULL;
+        uint8 *record = &app[CAMERA_SPI_RELAY_HEADER_SIZE +
+                             ((uint16)index * CAMERA_SPI_RELAY_RECORD_SIZE)];
 
-        slot[CAMERA_SPI_IMAGE_BEACON_VALID_OFFSET] = beacon->valid;
-        camera_spi_write_float_le(&slot[CAMERA_SPI_IMAGE_BEACON_X_OFFSET], beacon->x);
-        camera_spi_write_float_le(&slot[CAMERA_SPI_IMAGE_BEACON_Y_OFFSET], beacon->y);
-        camera_spi_write_float_le(&slot[CAMERA_SPI_IMAGE_BEACON_AREA_OFFSET], beacon->area);
-        if(image_data_beacon_valid(beacon) != 0U)
-        {
-            beacon_count++;
-        }
+        camera_spi_serialize_relay_record(
+            source,
+            (relay != NULL) ? &relay->data : NULL,
+            (relay != NULL) ? &relay->meta : NULL,
+            record);
     }
-    for(i = 0U; i < CAMERA_SPI_IMAGE_LAMP_COUNT; i++)
-    {
-        uint8 *slot = &app[CAMERA_SPI_IMAGE_LAMP_PACKET_OFFSET +
-                           ((uint16)i * CAMERA_SPI_IMAGE_LAMP_SLOT_SIZE)];
-        const car_lamp_data *lamp = &data->car_lamp_data[i];
-
-        slot[CAMERA_SPI_IMAGE_LAMP_VALID_OFFSET] = lamp->valid;
-        camera_spi_write_float_le(&slot[CAMERA_SPI_IMAGE_LAMP_CX_OFFSET], lamp->cx);
-        camera_spi_write_float_le(&slot[CAMERA_SPI_IMAGE_LAMP_CY_OFFSET], lamp->cy);
-        camera_spi_write_float_le(&slot[CAMERA_SPI_IMAGE_LAMP_WIDTH_OFFSET], lamp->width);
-        camera_spi_write_float_le(&slot[CAMERA_SPI_IMAGE_LAMP_LENGTH_OFFSET], lamp->length);
-        camera_spi_write_float_le(&slot[CAMERA_SPI_IMAGE_LAMP_ANGLE_OFFSET], lamp->angle);
-        if(image_data_car_lamp_valid(lamp) != 0U)
-        {
-            lamp_count++;
-        }
-    }
-    app[CAMERA_SPI_IMAGE_BEACON_COUNT_OFFSET] = beacon_count;
-    app[CAMERA_SPI_IMAGE_LAMP_COUNT_OFFSET] = lamp_count;
-    return CAMERA_SPI_APP_DATA_CAPACITY;
+    return CAMERA_SPI_RELAY_PACKET_SIZE;
 }
 
 static void camera_spi_set_cs(uint8 board_id, uint8 selected)
@@ -618,11 +675,9 @@ static uint16 camera_spi_build_downlink_app(uint8 board_id, uint8 *app)
     uint32 transaction;
     uint32 value_bits;
 
-    if(s_active_relay_source < IMAGE_CAMERA_COUNT)
+    if(s_active_relay != 0U)
     {
-        const camera_spi_relay_slot_t *relay =
-            &s_relay[board_id][s_active_relay_source];
-        return camera_spi_serialize_image(&relay->data, &relay->meta, app);
+        return camera_spi_serialize_relay_bundle(board_id, app);
     }
 
     memset(app, 0, CAMERA_SPI_APP_DATA_CAPACITY);
@@ -846,9 +901,9 @@ static void camera_spi_update_freshness(void)
 }
 
 /**
- * @brief 解析指定图像板返回的SPI v5图像应用数据。
+ * @brief 解析指定图像板返回的SPI v6单摄上行图像数据。
  * @param board_id 图像板编号，范围为 0 到 CAMERA_SPI_BOARD_COUNT-1。
- * @param data 指向110字节图像应用数据的只读指针。
+ * @param data 指向76字节图像应用数据的只读指针。
  * @return CAMERA_SPI_ERR_OK 表示解析成功，否则返回协议版本错误码。
  */
 static uint8 camera_spi_parse_image_payload(uint8 board_id, const uint8 *data)
@@ -906,7 +961,7 @@ static uint8 camera_spi_parse_image_payload(uint8 board_id, const uint8 *data)
     }
 
     decoded.car_lamp_measured_mask =
-        data[CAMERA_SPI_IMAGE_MEASURED_MASK_OFFSET] & 0x03U;
+        data[CAMERA_SPI_IMAGE_MEASURED_MASK_OFFSET] & 0x01U;
     for(i = 0U; i < CAMERA_SPI_IMAGE_LAMP_COUNT; i++)
     {
         car_lamp_data *lamp = &decoded.car_lamp_data[i];
@@ -929,21 +984,21 @@ static uint8 camera_spi_parse_image_payload(uint8 board_id, const uint8 *data)
     if(camera_spi_history_push(expected_source, &decoded, &meta) != 0U)
     {
         board->beacon_count = data[CAMERA_SPI_IMAGE_BEACON_COUNT_OFFSET];
-        if(board->beacon_count > IMAGE_MAX_BEACON_COUNT)
+        if(board->beacon_count > CAMERA_SPI_IMAGE_BEACON_COUNT)
         {
-            board->beacon_count = IMAGE_MAX_BEACON_COUNT;
+            board->beacon_count = CAMERA_SPI_IMAGE_BEACON_COUNT;
         }
         board->car_lamp_count = data[CAMERA_SPI_IMAGE_LAMP_COUNT_OFFSET];
-        if(board->car_lamp_count > IMAGE_MAX_CAR_LAMP_COUNT)
+        if(board->car_lamp_count > CAMERA_SPI_IMAGE_LAMP_COUNT)
         {
-            board->car_lamp_count = IMAGE_MAX_CAR_LAMP_COUNT;
+            board->car_lamp_count = CAMERA_SPI_IMAGE_LAMP_COUNT;
         }
         memcpy(board->beacons, decoded.beacon_data, sizeof(board->beacons));
         memcpy(board->car_lamps, decoded.car_lamp_data, sizeof(board->car_lamps));
         board->car_lamp_measured_mask = decoded.car_lamp_measured_mask;
         board->meta = meta;
         board->image_age_cycles = 0U;
-        camera_spi_relay_new_source(expected_source, &decoded, &meta);
+        camera_spi_relay_new_source(expected_source);
     }
     return CAMERA_SPI_ERR_OK;
 }
@@ -1082,7 +1137,7 @@ static uint8 camera_spi_parse_response(uint8 board_id)
             return ack_error;
         }
     }
-    else if(app_len == CAMERA_SPI_APP_DATA_CAPACITY)
+    else if(app_len == CAMERA_SPI_IMAGE_PACKET_SIZE)
     {
         uint8 image_error =
             camera_spi_parse_image_payload(board_id, &payload[10]);
@@ -1407,12 +1462,12 @@ static void camera_spi_init_scb(void)
 }
 
 /**
- * @brief 启动一笔异步SPI控制或图像透传事务。
+ * @brief 启动一笔异步SPI控制或合并透传事务。
  * @param board_id 目标物理板编号，范围0到1。
- * @param relay_source 透传来源编号；0xFF表示控制事务。
+ * @param relay 非0表示合并透传事务，0表示控制事务。
  * @return 无，启动结果写入板状态和活动事务状态。
  */
-static void camera_spi_start_transfer(uint8 board_id, uint8 relay_source)
+static void camera_spi_start_transfer(uint8 board_id, uint8 relay)
 {
     cy_en_scb_spi_status_t status;
     uint8 board_mask;
@@ -1423,7 +1478,8 @@ static void camera_spi_start_transfer(uint8 board_id, uint8 relay_source)
         return;
     }
 
-    s_active_relay_source = relay_source;
+    s_active_relay = (relay != 0U) ? 1U : 0U;
+    s_active_relay_mask = 0U;
     camera_spi_build_request_frame(board_id);
     memset(s_rx_frame, 0, sizeof(s_rx_frame));
     Cy_SCB_SPI_ClearRxFifo(CAMERA_SPI_SCB);
@@ -1435,7 +1491,7 @@ static void camera_spi_start_transfer(uint8 board_id, uint8 relay_source)
     {
         /* READY在CS建立期间撤销，取消空事务并保留latest-only透传帧。 */
         camera_spi_set_cs(board_id, 0U);
-        s_active_relay_source = CAMERA_SPI_NO_RELAY_SOURCE;
+        s_active_relay = 0U;
         return;
     }
     status = Cy_SCB_SPI_Transfer(CAMERA_SPI_SCB,
@@ -1449,16 +1505,17 @@ static void camera_spi_start_transfer(uint8 board_id, uint8 relay_source)
         s_active_board = board_id;
         s_active_poll_count = 0U;
         s_active_start_cycles = DWT->CYCCNT;
-        if(relay_source < IMAGE_CAMERA_COUNT)
+        if(s_active_relay != 0U)
         {
-            s_relay[board_id][relay_source].pending = 0U;
+            s_active_relay_mask = s_relay_pending[board_id];
+            s_relay_pending[board_id] = 0U;
         }
     }
     else
     {
         camera_spi_set_cs(board_id, 0U);
         camera_spi_record_error(board_id, CAMERA_SPI_ERR_HW);
-        s_active_relay_source = CAMERA_SPI_NO_RELAY_SOURCE;
+        s_active_relay = 0U;
     }
 }
 
@@ -1476,13 +1533,14 @@ static void camera_spi_abort_active(uint8 error)
     Cy_SCB_SPI_Disable(CAMERA_SPI_SCB, &s_spi_context);
     Cy_SCB_SPI_Enable(CAMERA_SPI_SCB);
     camera_spi_record_error(s_active_board, error);
-    if(s_active_relay_source < IMAGE_CAMERA_COUNT)
+    if(s_active_relay != 0U)
     {
-        s_relay[s_active_board][s_active_relay_source].pending = 1U;
+        s_relay_pending[s_active_board] |= s_active_relay_mask;
     }
     s_active_poll_count = 0U;
     s_active = 0U;
-    s_active_relay_source = CAMERA_SPI_NO_RELAY_SOURCE;
+    s_active_relay = 0U;
+    s_active_relay_mask = 0U;
 }
 
 /* 使用DWT真实时间和轮询次数双重判断传输超时。 */
@@ -1538,7 +1596,8 @@ static void camera_spi_finish_active(void)
     camera_spi_record_error(s_active_board, error);
     s_active_poll_count = 0U;
     s_active = 0U;
-    s_active_relay_source = CAMERA_SPI_NO_RELAY_SOURCE;
+    s_active_relay = 0U;
+    s_active_relay_mask = 0U;
 }
 
 /**
@@ -1548,84 +1607,28 @@ static void camera_spi_finish_active(void)
 static uint8 camera_spi_start_next_relay(void)
 {
     uint8 board_id;
-    uint8 source;
     uint8 ready_mask = camera_spi_ready_mask();
 
     for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
     {
-        if((ready_mask & (uint8)(1U << board_id)) == 0U)
+        uint8 board_mask = (uint8)(1U << board_id);
+
+        if(((ready_mask & board_mask) == 0U) ||
+           ((s_cycle_relay_sent_mask & board_mask) != 0U))
         {
             continue;
         }
-        for(source = 0U; source < IMAGE_CAMERA_COUNT; source++)
+        if(s_relay_pending[board_id] != 0U)
         {
-            if(s_relay[board_id][source].pending != 0U)
+            camera_spi_start_transfer(board_id, 1U);
+            if(s_active != 0U)
             {
-                camera_spi_start_transfer(board_id, source);
-                return (s_active != 0U) ? 1U : 0U;
+                s_cycle_relay_sent_mask |= board_mask;
             }
+            return (s_active != 0U) ? 1U : 0U;
         }
     }
     return 0U;
-}
-
-/**
- * @brief 汇总当前仍待发送透传帧的目标板位图。
- * @return 位0/1分别表示物理板0/1仍有latest-only透传帧待发送。
- */
-static uint8 camera_spi_relay_pending_mask(void)
-{
-    uint8 board_id;
-    uint8 source;
-    uint8 pending_mask = 0U;
-
-    for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
-    {
-        for(source = 0U; source < IMAGE_CAMERA_COUNT; source++)
-        {
-            if(s_relay[board_id][source].pending != 0U)
-            {
-                pending_mask |= (uint8)(1U << board_id);
-                break;
-            }
-        }
-    }
-    return pending_mask;
-}
-
-/**
- * @brief 在指定来源最近两帧中选择最接近锚点时间的帧。
- * @param source 待查找的摄像头来源。
- * @param anchor_time_ms 核心1统一时间域中的锚点时间，单位ms。
- * @return 最近有效缓存项的只读指针；不存在时返回NULL。
- */
-static const camera_spi_history_entry_t *camera_spi_find_nearest(
-    image_camera_e source,
-    uint32 anchor_time_ms)
-{
-    const camera_spi_history_entry_t *best = NULL;
-    uint32 best_difference = 0xFFFFFFFFUL;
-    uint8 index;
-
-    for(index = 0U; index < s_history_count[source]; index++)
-    {
-        const camera_spi_history_entry_t *candidate = &s_history[source][index];
-        uint32 difference;
-
-        if((candidate->meta.frame_valid == 0U) ||
-           (candidate->meta.timestamp_valid == 0U))
-        {
-            continue;
-        }
-        difference = image_frame_time_difference_ms(
-            candidate->meta.capture_time_ms, anchor_time_ms);
-        if(difference < best_difference)
-        {
-            best = candidate;
-            best_difference = difference;
-        }
-    }
-    return best;
 }
 
 static void camera_spi_publish_log(void)
@@ -1665,6 +1668,7 @@ static void camera_spi_publish_log(void)
 static void camera_spi_complete_cycle(void)
 {
     s_cycle_active = 0U;
+    s_cycle_relay_sent_mask = 0U;
     camera_spi_param_schedule_next();
     camera_spi_param_evaluate();
     camera_spi_publish_log();
@@ -1706,7 +1710,7 @@ uint8 CameraSpi_Service(void)
                 break;
             }
 
-            camera_spi_start_transfer(board_id, CAMERA_SPI_NO_RELAY_SOURCE);
+            camera_spi_start_transfer(board_id, 0U);
             break;
         }
 
@@ -1717,14 +1721,6 @@ uint8 CameraSpi_Service(void)
     }
 
     if((s_cycle_active != 0U) && (camera_spi_start_next_relay() != 0U))
-    {
-        return 1U;
-    }
-
-    /* 从机完成事务后会短暂拉低READY；在本轮预算内等待其重装TX FIFO。 */
-    if((s_cycle_active != 0U) &&
-       ((camera_spi_relay_pending_mask() & s_ready_mask) != 0U) &&
-       ((uint32)(DWT->CYCCNT - s_cycle_start_cycles) < s_cycle_timeout_cycles))
     {
         return 1U;
     }
@@ -1742,7 +1738,7 @@ void CameraSpi_Init(void)
     uint8 board_id;
 
     memset(s_boards, 0, sizeof(s_boards));
-    memset(s_relay, 0, sizeof(s_relay));
+    memset(s_relay_pending, 0, sizeof(s_relay_pending));
     memset(s_history, 0, sizeof(s_history));
     memset(s_history_count, 0, sizeof(s_history_count));
     memset(s_tx_frame, 0, sizeof(s_tx_frame));
@@ -1753,7 +1749,8 @@ void CameraSpi_Init(void)
     s_initialized = 0U;
     s_active = 0U;
     s_active_board = 0U;
-    s_active_relay_source = CAMERA_SPI_NO_RELAY_SOURCE;
+    s_active_relay = 0U;
+    s_active_relay_mask = 0U;
     s_flight_state = (ipc_core0_is_flying() != 0U) ? 1U : 0U;
     s_param_write_locked =
         (ipc_core0_screen_refresh_enable() != 0U) ?
@@ -1767,13 +1764,12 @@ void CameraSpi_Init(void)
     s_ready_rearm_mask = 0U;
     s_cycle_active = 0U;
     s_cycle_pending_mask = 0U;
+    s_cycle_relay_sent_mask = 0U;
     s_active_poll_count = 0U;
     s_active_start_cycles = 0U;
     s_transfer_timeout_cycles = 0U;
     memset(s_ready_rearm_start_cycles, 0, sizeof(s_ready_rearm_start_cycles));
     s_ready_rearm_timeout_cycles = 0U;
-    s_cycle_start_cycles = 0U;
-    s_cycle_timeout_cycles = 0U;
     s_log_seq = 0U;
     s_time_sync_sequence = 0U;
 
@@ -1806,13 +1802,6 @@ void CameraSpi_Init(void)
     {
         s_ready_rearm_timeout_cycles = 1U;
     }
-    s_cycle_timeout_cycles =
-        (SystemCoreClock / 1000000U) * CAMERA_SPI_CYCLE_TIMEOUT_US;
-    if(s_cycle_timeout_cycles == 0U)
-    {
-        s_cycle_timeout_cycles = 1U;
-    }
-
     s_initialized = 1U;
 }
 
@@ -1834,7 +1823,7 @@ void CameraSpi_Update(void)
     camera_spi_refresh_flight_state();
     s_ready_mask = camera_spi_ready_mask();
     s_cycle_pending_mask = s_ready_mask & CAMERA_SPI_ALL_BOARD_MASK;
-    s_cycle_start_cycles = DWT->CYCCNT;
+    s_cycle_relay_sent_mask = 0U;
     s_cycle_active = 1U;
     (void)CameraSpi_Service();
 }
@@ -1863,7 +1852,7 @@ void CameraSpi_GetSnapshot(struct image_data camera[IMAGE_CAMERA_COUNT])
 
     {
         image_sync_set_t sync_set;
-        (void)CameraSpi_GetAlignedSet(&sync_set);
+        (void)CameraSpi_GetLatestSet(&sync_set);
     }
 }
 
@@ -1883,23 +1872,22 @@ void CameraSpi_SubmitLocalFrame(const struct image_data *data,
     }
     if(camera_spi_history_push(Center, data, meta) != 0U)
     {
-        camera_spi_relay_new_source(Center, data, meta);
+        camera_spi_relay_new_source(Center);
     }
 }
 
 /**
- * @brief 以下摄最新帧为锚点选择三摄最近帧并执行10ms时间门控。
- * @param out 输出只读同步组快照。
- * @return 1表示三路时间有效、未过期且最大时差不超过10ms，否则返回0。
+ * @brief 读取三摄最新帧；严格同步使用50ms，公共轨迹保留500ms。
+ * @param out 输出只读最新帧组；max_skew_ms仅保留为采集时差诊断。
+ * @return 1表示三路均处于严格新鲜且时间有效状态，否则返回0。
  */
-uint8 CameraSpi_GetAlignedSet(image_sync_set_t *out)
+uint8 CameraSpi_GetLatestSet(image_sync_set_t *out)
 {
     const camera_spi_history_entry_t *selected[IMAGE_CAMERA_COUNT];
-    const camera_spi_history_entry_t *anchor;
     uint32 max_skew = 0U;
     uint32 difference;
     uint8 source;
-    uint8 valid = 1U;
+    uint8 strict_valid = 1U;
 
     if(out == NULL)
     {
@@ -1907,52 +1895,58 @@ uint8 CameraSpi_GetAlignedSet(image_sync_set_t *out)
     }
     memset(out, 0, sizeof(*out));
     memset(selected, 0, sizeof(selected));
-    anchor = (s_history_count[Center] != 0U) ? &s_history[Center][0] : NULL;
-    if((anchor == NULL) || (anchor->meta.frame_valid == 0U) ||
-       (anchor->meta.timestamp_valid == 0U))
-    {
-        valid = 0U;
-    }
-    else
-    {
-        selected[Center] = anchor;
-        selected[Front] = camera_spi_find_nearest(
-            Front, anchor->meta.capture_time_ms);
-        selected[Back] = camera_spi_find_nearest(
-            Back, anchor->meta.capture_time_ms);
-    }
 
     for(source = 0U; source < IMAGE_CAMERA_COUNT; source++)
     {
-        if(selected[source] == NULL)
+        const camera_spi_history_entry_t *latest =
+            (s_history_count[source] != 0U) ? &s_history[source][0] : NULL;
+        uint32 age_ms;
+
+        if((latest == NULL) || (latest->meta.frame_valid == 0U) ||
+           (latest->meta.frame_sequence == 0U) ||
+           (latest->meta.source_camera != source))
         {
-            valid = 0U;
+            strict_valid = 0U;
             continue;
         }
-        out->camera[source] = selected[source]->data;
-        out->meta[source] = selected[source]->meta;
-        if(image_frame_time_difference_ms(g_image_master_time_ms,
-             selected[source]->meta.capture_time_ms) >= CAMERA_SPI_FRAME_STALE_MS)
+        age_ms = image_frame_time_difference_ms(
+            g_image_master_time_ms, latest->received_time_ms);
+        if(age_ms >= CAMERA_SPI_CROSS_CHECK_HOLD_MS)
         {
-            valid = 0U;
+            strict_valid = 0U;
+            continue;
+        }
+        selected[source] = latest;
+        out->camera[source] = latest->data;
+        out->meta[source] = latest->meta;
+        if((age_ms >= CAMERA_SPI_SYNC_FRESH_MS) ||
+           (latest->meta.timestamp_valid == 0U))
+        {
+            strict_valid = 0U;
         }
     }
 
-    if((selected[Front] != NULL) && (selected[Center] != NULL))
+    if((selected[Front] != NULL) && (selected[Center] != NULL) &&
+       (selected[Front]->meta.timestamp_valid != 0U) &&
+       (selected[Center]->meta.timestamp_valid != 0U))
     {
         difference = image_frame_time_difference_ms(
             selected[Front]->meta.capture_time_ms,
             selected[Center]->meta.capture_time_ms);
         if(difference > max_skew) { max_skew = difference; }
     }
-    if((selected[Front] != NULL) && (selected[Back] != NULL))
+    if((selected[Front] != NULL) && (selected[Back] != NULL) &&
+       (selected[Front]->meta.timestamp_valid != 0U) &&
+       (selected[Back]->meta.timestamp_valid != 0U))
     {
         difference = image_frame_time_difference_ms(
             selected[Front]->meta.capture_time_ms,
             selected[Back]->meta.capture_time_ms);
         if(difference > max_skew) { max_skew = difference; }
     }
-    if((selected[Center] != NULL) && (selected[Back] != NULL))
+    if((selected[Center] != NULL) && (selected[Back] != NULL) &&
+       (selected[Center]->meta.timestamp_valid != 0U) &&
+       (selected[Back]->meta.timestamp_valid != 0U))
     {
         difference = image_frame_time_difference_ms(
             selected[Center]->meta.capture_time_ms,
@@ -1961,9 +1955,10 @@ uint8 CameraSpi_GetAlignedSet(image_sync_set_t *out)
     }
 
     out->max_skew_ms = max_skew;
-    out->valid = ((valid != 0U) && (max_skew <= IMAGE_SYNC_MAX_SKEW_MS)) ? 1U : 0U;
+    out->valid = strict_valid;
     g_image_sync_diag.anchor_sequence =
-        (anchor != NULL) ? anchor->meta.frame_sequence : 0U;
+        (selected[Center] != NULL) ?
+        selected[Center]->meta.frame_sequence : 0U;
     g_image_sync_diag.max_skew_ms = max_skew;
     g_image_sync_diag.valid = out->valid;
     g_image_sync_diag.reserved[0] = 0U;

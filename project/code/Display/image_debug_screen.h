@@ -22,7 +22,7 @@ void ImageDebugScreen_Tick10ms(void);
 uint8 ImageDebugScreen_SetMode(uint8 mode);
 uint8 ImageDebugScreen_GetMode(void);
 
-/* 新帧到达且无任务积压时整帧刷新；Overlay包含彩色检测结果和下摄闭合边界。 */
+/* 新帧到达且无任务积压时整帧刷新；Overlay包含检测结果、下摄边界和车灯ROI。 */
 void ImageDebugScreen_Update(uint8 image_frame_updated);
 
 #ifdef __cplusplus

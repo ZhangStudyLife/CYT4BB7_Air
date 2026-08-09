@@ -13,7 +13,7 @@ volatile uint32 g_image_data_seq;
 #pragma location=".ipc_image_meta"
 image_frame_meta_t image_frame_meta[IMAGE_CAMERA_COUNT]; /* 三摄最新帧号和统一采集时间共享区。 */
 #pragma location=".ipc_image_sync_diag"
-volatile image_sync_diag_t g_image_sync_diag; /* 核心1发布给核心0的10ms同步门控诊断。 */
+volatile image_sync_diag_t g_image_sync_diag; /* 核心1发布给核心0的最新帧新鲜度和采集时差诊断。 */
 #pragma location=".ipc_car_lamp_cross_check"
 volatile car_lamp_cross_check_diag_t g_ipc_car_lamp_cross_check_diag; /* 三摄公共轨迹影子诊断共享区。 */
 #pragma location=".ipc_camera_spi_log"

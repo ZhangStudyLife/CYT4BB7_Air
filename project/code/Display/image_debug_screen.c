@@ -6,6 +6,7 @@
 
 #include "zf_common_headfile.h"
 #include "Estimation/Pos_Est/image_down.h"
+#include "Image/car_lamp_cross_check.h"
 #include "Image/image_down_horizon.h"
 #include "IPC/ipc_image_data.h"
 
@@ -28,6 +29,7 @@
 #define IMAGE_SCREEN_LAMP_COLOR         (RGB565_YELLOW)
 #define IMAGE_SCREEN_HORIZON_COLOR      (RGB565_GREEN)
 #define IMAGE_SCREEN_HORIZON_EXT_COLOR  (RGB565_CYAN)
+#define IMAGE_SCREEN_TRACK_ROI_COLOR    (RGB565_GREEN)
 
 #define IMAGE_SCREEN_CLIP_LEFT          (0x01U)
 #define IMAGE_SCREEN_CLIP_RIGHT         (0x02U)
@@ -372,6 +374,48 @@ static void ImageDebugScreen_DrawSnapshotLine(int x0,
     }
 }
 
+static void ImageDebugScreen_DrawCenteredRoi(float centered_x,
+                                              float centered_y,
+                                              float half_size,
+                                              uint16 color)
+{
+    int cx;
+    int cy;
+    int half;
+
+    if((half_size <= 0.0f) || (half_size > 1000.0f))
+    {
+        return;
+    }
+    cx = ImageDebugScreen_RoundToInt(
+        centered_x + (float)IMAGE_SCREEN_WIDTH * 0.5f);
+    cy = ImageDebugScreen_RoundToInt(
+        centered_y + (float)IMAGE_SCREEN_HEIGHT * 0.5f);
+    half = ImageDebugScreen_RoundToInt(half_size);
+    ImageDebugScreen_DrawSnapshotLine(cx - half, cy - half,
+                                      cx + half, cy - half, color);
+    ImageDebugScreen_DrawSnapshotLine(cx + half, cy - half,
+                                      cx + half, cy + half, color);
+    ImageDebugScreen_DrawSnapshotLine(cx + half, cy + half,
+                                      cx - half, cy + half, color);
+    ImageDebugScreen_DrawSnapshotLine(cx - half, cy + half,
+                                      cx - half, cy - half, color);
+}
+
+static void ImageDebugScreen_DrawLampRois(void)
+{
+    const car_lamp_cross_check_diag_t *diag = CarLampCrossCheck_GetDiag();
+
+    if((diag != NULL) &&
+       ((diag->roi_valid_mask & CAR_LAMP_CAMERA_BIT(Center)) != 0U))
+    {
+        ImageDebugScreen_DrawCenteredRoi(diag->expected_x[Center],
+                                         diag->expected_y[Center],
+                                         diag->roi_half_size[Center],
+                                         IMAGE_SCREEN_TRACK_ROI_COLOR);
+    }
+}
+
 static void ImageDebugScreen_DrawRotatedRect(int cx,
                                              int cy,
                                              float half_length,
@@ -538,6 +582,7 @@ static void ImageDebugScreen_ApplyOverlay(void)
     uint8 index;
 
     ImageDebugScreen_DrawHorizon();
+    ImageDebugScreen_DrawLampRois();
 
     for(index = 0U; index < IMAGE_MAX_BEACON_COUNT; index++)
     {

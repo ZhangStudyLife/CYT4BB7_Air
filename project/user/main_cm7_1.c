@@ -74,7 +74,7 @@ static uint8 Get_Image_data(void)
     {
         image_sync_set_t sync_set;
 
-        (void)CameraSpi_GetAlignedSet(&sync_set);
+        (void)CameraSpi_GetLatestSet(&sync_set);
         (void)CarLampCrossCheck_Update(
             &sync_set,
             s_image_attitude.roll_deg,
@@ -114,11 +114,7 @@ int main(void)
     {
         if(image_task_pending != 0U)
         {
-            if(CameraSpi_Service() != 0U)
-            {
-                continue;
-            }
-
+            /* 图像采集与识别优先，SPI硬件事务在本帧处理完成后继续推进。 */
             image_frame_updated = Get_Image_data();
             ipc_remote_param_core1_poll();
             ipc_image_publish();

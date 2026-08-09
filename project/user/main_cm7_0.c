@@ -17,35 +17,209 @@ static uint8 s_ipc_last_screen_refresh_enable = 0xFFU;
 static uint8 s_ipc_flying_retry_div = 0U; /* 飞行状态 IPC 通知失败后的 100Hz 重试分频 */
 static uint8 s_ipc_state_periodic_div = 0U;
 
+#define IMAGE_LOG_LAMP_WIDTH_SCALE       (4.0f) /* 6位，0.25像素分辨率。 */
+#define IMAGE_LOG_LAMP_LENGTH_SCALE      (2.0f) /* 7位，0.5像素分辨率。 */
+#define IMAGE_LOG_LAMP_ANGLE_STEP_DEG    (2.0f) /* 7位，覆盖-90到90度。 */
+#define IMAGE_LOG_BEACON_DISTANCE_STEP   (4.0f) /* 4位，量化车灯到最近信标的距离。 */
+#define IMAGE_LOG_BEACON_COUNT           (2U)
+#define IMAGE_LOG_CAR_DATA_TIMEOUT_MS    (200U)
+#define IMAGE_LOG_USER_CHANNEL_COUNT     (35U)
+
+extern float g_car_yaw;
+extern float g_car_sync_time_ms;
+extern uint32 g_car_last_update_time_ms;
+
+static uint8 image_log_quantize(float value, float scale, uint8 maximum)
+{
+    float quantized;
+
+    if(value <= 0.0f)
+    {
+        return 0U;
+    }
+    quantized = value * scale + 0.5f;
+    if(quantized >= (float)maximum)
+    {
+        return maximum;
+    }
+    return (uint8)quantized;
+}
+
+/* 0到14表示0到56像素，15表示没有有效信标或距离超过记录范围。 */
+static uint8 image_nearest_beacon_distance_log(image_camera_e camera,
+                                                const car_lamp_data *lamp)
+{
+    float minimum_distance_squared = 0.0f;
+    uint8 found = 0U;
+    uint8 index;
+
+    for(index = 0U; index < IMAGE_LOG_BEACON_COUNT; index++)
+    {
+        const beacon_data *beacon = &image_data[camera].beacon_data[index];
+        float dx;
+        float dy;
+        float distance_squared;
+
+        if(image_data_beacon_valid(beacon) == 0U)
+        {
+            continue;
+        }
+        dx = lamp->cx - beacon->x;
+        dy = lamp->cy - beacon->y;
+        distance_squared = dx * dx + dy * dy;
+        if((found == 0U) || (distance_squared < minimum_distance_squared))
+        {
+            minimum_distance_squared = distance_squared;
+            found = 1U;
+        }
+    }
+    if(found == 0U)
+    {
+        return 15U;
+    }
+    {
+        float distance = sqrtf(minimum_distance_squared);
+        uint8 quantized;
+
+        if(distance > 56.0f)
+        {
+            return 15U;
+        }
+        quantized = (uint8)(distance / IMAGE_LOG_BEACON_DISTANCE_STEP + 0.5f);
+        return (quantized > 14U) ? 14U : quantized;
+    }
+}
+
 /**
- * @brief 将轨迹状态、同步状态和中心采集时间低9位压缩为单个精确整数浮点值。
- * @return 位0至2为状态，位3至5为来源，位6至8为ROI命中，位9至11为冲突，位12至14为投影、10ms同步和三摄时间有效位，位15至23为中心时间。
+ * @brief 将单摄车灯宽度、长度、角度和最近信标距离压缩为24位精确整数。
+ * @param camera 摄像头来源。
+ * @return 位0至5为宽度，位6至12为长度，位13至19为角度，位20至23为信标距离。
+ */
+static float image_lamp_shape_pack_log(image_camera_e camera)
+{
+    const car_lamp_data *lamp = &image_data[camera].car_lamp_data[0];
+    float angle;
+    uint8 width;
+    uint8 length;
+    uint8 angle_code;
+    uint8 beacon_distance;
+    uint32 packed;
+
+    if(image_data_car_lamp_valid(lamp) == 0U)
+    {
+        return 0.0f;
+    }
+    width = image_log_quantize(
+        lamp->width, IMAGE_LOG_LAMP_WIDTH_SCALE, 63U);
+    length = image_log_quantize(
+        lamp->length, IMAGE_LOG_LAMP_LENGTH_SCALE, 127U);
+    angle = lamp->angle;
+    if(angle < -90.0f) { angle = -90.0f; }
+    if(angle > 90.0f) { angle = 90.0f; }
+    angle_code = (uint8)((angle + 90.0f) /
+                         IMAGE_LOG_LAMP_ANGLE_STEP_DEG + 0.5f);
+    beacon_distance = image_nearest_beacon_distance_log(camera, lamp);
+    packed = ((uint32)width & 0x3FU) |
+             (((uint32)length & 0x7FU) << 6U) |
+             (((uint32)angle_code & 0x7FU) << 13U) |
+             (((uint32)beacon_distance & 0x0FU) << 20U);
+    return (float)packed;
+}
+
+static float image_relative_yaw_log(void)
+{
+    float relative_yaw;
+
+    if((g_car_sync_time_ms == 0.0f) ||
+       ((tick_1000us_cnt - g_car_last_update_time_ms) >
+        IMAGE_LOG_CAR_DATA_TIMEOUT_MS))
+    {
+        return IMAGE_DATA_INVALID_VALUE;
+    }
+
+    relative_yaw = g_car_yaw - g_euler.yaw;
+    while(relative_yaw > 180.0f) { relative_yaw -= 360.0f; }
+    while(relative_yaw < -180.0f) { relative_yaw += 360.0f; }
+    return relative_yaw;
+}
+
+/**
+ * @brief 将公共轨迹坐标和下摄ROI半尺寸压缩为24位精确整数。
+ * @return 位0至8为公共x，位9至16为公共y，位17至22为ROI半尺寸，位23为有效位。
+ */
+static float image_track_geometry_pack_log(void)
+{
+    const volatile car_lamp_cross_check_diag_t *diag =
+        &g_ipc_car_lamp_cross_check_diag;
+    float center_x = diag->center_x;
+    float center_y = diag->center_y;
+    float half_size = diag->roi_half_size[Center];
+    uint32 x_code;
+    uint32 y_code;
+    uint32 half_size_code = 0U;
+
+    if((center_x == IMAGE_DATA_INVALID_VALUE) ||
+       (center_y == IMAGE_DATA_INVALID_VALUE))
+    {
+        return 0.0f;
+    }
+    if(center_x < -140.0f) { center_x = -140.0f; }
+    if(center_x > 140.0f) { center_x = 140.0f; }
+    if(center_y < -110.0f) { center_y = -110.0f; }
+    if(center_y > 110.0f) { center_y = 110.0f; }
+    if(((diag->roi_valid_mask & CAR_LAMP_CAMERA_BIT(Center)) != 0U) &&
+       (half_size > 0.0f))
+    {
+        half_size_code = (uint32)(half_size + 0.5f);
+        if(half_size_code > 63U) { half_size_code = 63U; }
+    }
+    x_code = (uint32)(center_x + 140.0f + 0.5f);
+    y_code = (uint32)(center_y + 110.0f + 0.5f);
+    return (float)((x_code & 0x1FFU) |
+                   ((y_code & 0xFFU) << 9U) |
+                   ((half_size_code & 0x3FU) << 17U) |
+                   (1UL << 23U));
+}
+
+/**
+ * @brief 将三摄轨迹、ROI、冲突、回退和实测状态压缩为24位精确整数。
+ * @return 位0至2为轨迹状态，位3至5为来源，位6至8为ROI有效，位9至11为ROI命中，
+ *         位12至14为冲突，位15为投影，位16至18为全图回退，位19为人工标记，
+ *         位20至22为真实实测，位23保留。
  */
 static float image_cross_check_pack_log(void)
 {
-    uint8 all_time_valid =
-        ((image_frame_meta[Front].frame_valid != 0U) &&
-         (image_frame_meta[Front].timestamp_valid != 0U) &&
-         (image_frame_meta[Center].frame_valid != 0U) &&
-         (image_frame_meta[Center].timestamp_valid != 0U) &&
-         (image_frame_meta[Back].frame_valid != 0U) &&
-         (image_frame_meta[Back].timestamp_valid != 0U)) ? 1U : 0U;
-    uint32 packed =
+    uint8 camera;
+    uint8 measured_mask = 0U;
+    uint32 packed;
+
+    for(camera = 0U; camera < IMAGE_CAMERA_COUNT; camera++)
+    {
+        uint8 camera_bit = CAR_LAMP_CAMERA_BIT(camera);
+
+        if((image_data[camera].car_lamp_measured_mask & 0x01U) != 0U)
+        {
+            measured_mask |= camera_bit;
+        }
+    }
+
+    packed =
         ((uint32)g_ipc_car_lamp_cross_check_diag.state & 0x07U) |
         (((uint32)g_ipc_car_lamp_cross_check_diag.support_camera_mask & 0x07U) << 3U) |
-        (((uint32)g_ipc_car_lamp_cross_check_diag.roi_hit_mask & 0x07U) << 6U) |
-        (((uint32)g_ipc_car_lamp_cross_check_diag.conflict_camera_mask & 0x07U) << 9U) |
-        (((uint32)g_ipc_car_lamp_cross_check_diag.projection_enabled & 0x01U) << 12U) |
-        (((uint32)g_image_sync_diag.valid & 0x01U) << 13U) |
-        (((uint32)all_time_valid & 0x01U) << 14U) |
-        ((image_frame_meta[Center].capture_time_ms & 0x01FFU) << 15U);
+        (((uint32)g_ipc_car_lamp_cross_check_diag.roi_valid_mask & 0x07U) << 6U) |
+        (((uint32)g_ipc_car_lamp_cross_check_diag.roi_hit_mask & 0x07U) << 9U) |
+        (((uint32)g_ipc_car_lamp_cross_check_diag.conflict_camera_mask & 0x07U) << 12U) |
+        (((uint32)g_ipc_car_lamp_cross_check_diag.projection_enabled & 0x01U) << 15U) |
+        (((uint32)g_ipc_car_lamp_cross_check_diag.full_frame_fallback_mask & 0x07U) << 16U) |
+        (((CRSF_STD[8] != 0U) ? 1UL : 0UL) << 19U) |
+        (((uint32)measured_mask & 0x07U) << 20U);
 
     return (float)packed;
 }
 
 /**
- * @brief 将前、下、后三摄来源帧号低7位及各自时间有效位压缩为单个精确整数浮点值。
- * @return 每摄占8位，其中低7位为帧号，高1位为帧和时间同时有效标志。
+ * @brief 将三摄帧号低7位和来源帧有效位压缩为24位精确整数。
+ * @return 每摄占8位，低7位为帧号，高1位为来源帧有效位。
  */
 static float image_frame_sequence_pack_log(void)
 {
@@ -56,15 +230,62 @@ static float image_frame_sequence_pack_log(void)
     {
         uint32 value = image_frame_meta[camera].frame_sequence & 0x7FU;
 
-        if((image_frame_meta[camera].frame_valid != 0U) &&
-           (image_frame_meta[camera].timestamp_valid != 0U))
+        if(image_frame_meta[camera].frame_valid != 0U)
         {
             value |= 0x80U;
         }
         packed |= value << (camera * 8U);
     }
-
     return (float)packed;
+}
+
+static void image_log_send_100hz(void)
+{
+    float log_data[IMAGE_LOG_USER_CHANNEL_COUNT] = {0.0f};
+    uint8 index = 0U;
+    uint8 camera;
+    uint8 beacon_index;
+
+    /* I1..I6：前、下、后摄单车灯中心。 */
+    for(camera = 0U; camera < IMAGE_CAMERA_COUNT; camera++)
+    {
+        const car_lamp_data *lamp = &image_data[camera].car_lamp_data[0];
+        uint8 valid = image_data_car_lamp_valid(lamp);
+
+        log_data[index++] = (valid != 0U) ? lamp->cx : IMAGE_DATA_INVALID_VALUE;
+        log_data[index++] = (valid != 0U) ? lamp->cy : IMAGE_DATA_INVALID_VALUE;
+    }
+
+    /* I7..I9：姿态与高度；I10..I12：三摄车灯形状压缩。 */
+    log_data[index++] = g_euler.roll;
+    log_data[index++] = g_euler.pitch;
+    log_data[index++] = g_tof_fused_height_mm;
+    log_data[index++] = image_lamp_shape_pack_log(Front);
+    log_data[index++] = image_lamp_shape_pack_log(Center);
+    log_data[index++] = image_lamp_shape_pack_log(Back);
+
+    /* I13..I30：每摄前两个信标的x、y、area，无效槽使用-999、-999、0。 */
+    for(camera = 0U; camera < IMAGE_CAMERA_COUNT; camera++)
+    {
+        for(beacon_index = 0U; beacon_index < IMAGE_LOG_BEACON_COUNT; beacon_index++)
+        {
+            const beacon_data *beacon = &image_data[camera].beacon_data[beacon_index];
+            uint8 valid = image_data_beacon_valid(beacon);
+
+            log_data[index++] = (valid != 0U) ? beacon->x : IMAGE_DATA_INVALID_VALUE;
+            log_data[index++] = (valid != 0U) ? beacon->y : IMAGE_DATA_INVALID_VALUE;
+            log_data[index++] = (valid != 0U) ? beacon->area : 0.0f;
+        }
+    }
+
+    /* I31..I35：公共轨迹、状态、帧号、相对yaw和三摄最大帧时差。 */
+    log_data[index++] = image_track_geometry_pack_log();
+    log_data[index++] = image_cross_check_pack_log();
+    log_data[index++] = image_frame_sequence_pack_log();
+    log_data[index++] = image_relative_yaw_log();
+    log_data[index++] = (float)g_image_sync_diag.max_skew_ms;
+
+    (void)wifi_justfloat_Array(log_data, index);
 }
 
 #define AIR_RUN_DATA_CRITICAL_COUNT       (15U) /* 飞行期间下发的关键数据数量 */
@@ -348,27 +569,7 @@ int main(void)
                                  g_tof_fused_height_mm,
                                  g_tof_fused_valid);
             ipc_image_poll();
-            {
-                wifi_justfloat(
-                    ((image_data[Front].car_lamp_measured_mask & 0x01U) != 0U) ?
-                        image_data[Front].car_lamp_data[0].cx : IMAGE_DATA_INVALID_VALUE,
-                    ((image_data[Front].car_lamp_measured_mask & 0x01U) != 0U) ?
-                        image_data[Front].car_lamp_data[0].cy : IMAGE_DATA_INVALID_VALUE,
-                    ((image_data[Center].car_lamp_measured_mask & 0x01U) != 0U) ?
-                        image_data[Center].car_lamp_data[0].cx : IMAGE_DATA_INVALID_VALUE,
-                    ((image_data[Center].car_lamp_measured_mask & 0x01U) != 0U) ?
-                        image_data[Center].car_lamp_data[0].cy : IMAGE_DATA_INVALID_VALUE,
-                    ((image_data[Back].car_lamp_measured_mask & 0x01U) != 0U) ?
-                        image_data[Back].car_lamp_data[0].cx : IMAGE_DATA_INVALID_VALUE,
-                    ((image_data[Back].car_lamp_measured_mask & 0x01U) != 0U) ?
-                        image_data[Back].car_lamp_data[0].cy : IMAGE_DATA_INVALID_VALUE,
-                    g_euler.roll,
-                    g_euler.pitch,
-                    g_tof_fused_height_mm,
-                    (float)g_image_sync_diag.max_skew_ms,
-                    image_cross_check_pack_log(),
-                    image_frame_sequence_pack_log());
-            }
+            image_log_send_100hz();
             (void)BeaconLostDetector_Update();
 
             car_plan_result_t car_plan = {0};

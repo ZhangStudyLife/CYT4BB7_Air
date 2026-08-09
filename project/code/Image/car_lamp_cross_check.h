@@ -50,14 +50,14 @@ extern uint32 g_car_lamp_full_frame_fallback_count; /* 实际ROI启用后的全�
 
 /**
  * @brief 初始化单车灯三摄公共轨迹影子状态机。
- * @param local_camera 当前芯片本地摄像头，用作同步快照锚点。
+ * @param local_camera 当前芯片本地摄像头，用作最新帧组更新锚点。
  * @return 无。
  */
 void CarLampCrossCheck_Init(image_camera_e local_camera);
 
 /**
- * @brief 使用只读三摄同步快照更新公共轨迹和影子ROI诊断。
- * @param frames 最近两帧缓存选出的三摄快照；valid为0时仍可使用其中满足独立时序条件的帧。
+ * @brief 使用只读三摄最新帧组更新公共轨迹和影子ROI诊断。
+ * @param frames 三摄最新帧快照；valid为0时仍可使用其中独立未过期的帧。
  * @param roll_deg 当前横滚角，单位deg。
  * @param pitch_deg 当前俯仰角，单位deg。
  * @param height_mm 当前融合高度，单位mm。

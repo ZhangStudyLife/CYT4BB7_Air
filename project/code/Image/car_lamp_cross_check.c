@@ -5,9 +5,9 @@
 
 #define CAR_LAMP_ACQUIRE_SINGLE_FRAMES (3U) /* 单摄建立公共轨迹所需连续实测帧数。 */
 #define CAR_LAMP_ACQUIRE_PAIR_FRAMES   (2U) /* 双摄一致建立公共轨迹所需连续同步帧数。 */
-#define CAR_LAMP_ACQUIRE_MAX_GAP_MS    (30U) /* 连续获取帧允许的最大采集间隔。 */
+#define CAR_LAMP_ACQUIRE_MAX_GAP_MS    (500U) /* 相邻来源实测帧允许的最大到达间隔。 */
+#define CAR_LAMP_ACQUIRE_TOTAL_WINDOW_MS (1000U) /* 单次连续获取允许的最大总时间。 */
 #define CAR_LAMP_TRACK_COAST_MAX_MS    (50U) /* 无原始实测时允许速度预测的最长时间。 */
-#define CAR_LAMP_TRACK_MAX_SKEW_MS     (10U) /* 跨摄观测允许的最大采集时差。 */
 #define CAR_LAMP_TRACK_FRONT_GATE_PX   (8.0f) /* 前摄投影到公共坐标后的匹配门限。 */
 #define CAR_LAMP_TRACK_CENTER_GATE_PX  (8.0f) /* 下摄公共坐标内的匹配门限。 */
 #define CAR_LAMP_TRACK_BACK_GATE_PX    (12.0f) /* 后摄投影到公共坐标后的匹配门限。 */
@@ -17,7 +17,7 @@
 #define CAR_LAMP_TRACK_NEW_VELOCITY    (0.3f) /* 速度低通中本帧测量速度权重。 */
 #define CAR_LAMP_TRACK_MIN_HEIGHT_MM   (800.0f) /* 投影启用的最低融合高度。 */
 #define CAR_LAMP_TRACK_MAX_HEIGHT_MM   (1300.0f) /* 投影启用的最高融合高度。 */
-#define CAR_LAMP_TRACK_MAX_TILT_DEG    (10.0f) /* 投影启用的最大横滚或俯仰绝对值。 */
+#define CAR_LAMP_TRACK_MAX_TILT_DEG    (30.0f) /* 大姿态日志验证20至30度投影误差仍位于匹配门限内。 */
 #define CAR_LAMP_TRACK_ROI_FRONT_PX    (20.0f) /* 前摄影子ROI基础半尺寸。 */
 #define CAR_LAMP_TRACK_ROI_CENTER_PX   (20.0f) /* 下摄影子ROI基础半尺寸。 */
 #define CAR_LAMP_TRACK_ROI_BACK_PX     (24.0f) /* 后摄影子ROI基础半尺寸。 */
@@ -48,10 +48,14 @@ typedef struct
     uint8 acquire_pair_count;
     uint32 last_anchor_sequence;
     uint32 last_frame_sequence[IMAGE_CAMERA_COUNT];
+    uint32 accepted_frame_sequence[IMAGE_CAMERA_COUNT];
+    uint32 acquire_first_time_ms[IMAGE_CAMERA_COUNT];
     uint32 acquire_time_ms[IMAGE_CAMERA_COUNT];
+    uint32 acquire_pair_sequence[IMAGE_CAMERA_COUNT];
+    uint32 acquire_pair_first_time_ms;
     uint32 acquire_pair_time_ms;
     uint32 last_update_time_ms;
-    uint32 last_measurement_time_ms;
+    uint32 last_support_time_ms;
     float last_lamp_length[IMAGE_CAMERA_COUNT];
     car_lamp_projection_point_t acquire_point[IMAGE_CAMERA_COUNT];
     car_lamp_projection_point_t position;
@@ -187,7 +191,6 @@ static uint8 car_lamp_cross_check_projection_enabled(
     uint8 height_valid)
 {
     if((anchor == 0) || (anchor->frame_valid == 0U) ||
-       (anchor->timestamp_valid == 0U) ||
        (attitude_valid == 0U) || (height_valid == 0U))
     {
         return 0U;
@@ -203,16 +206,67 @@ static uint8 car_lamp_cross_check_projection_enabled(
 }
 
 /**
- * @brief 从同步快照提取本轮可用于公共轨迹的原始实测。
+ * @brief 将公共轨迹投影为ROI中心，并保留仍与图像相交的边缘ROI。
+ * @param camera 目标摄像头。
+ * @param center 公共坐标中的预测中心。
+ * @param half_size ROI半尺寸，单位像素。
+ * @param source 输出摄像头坐标；边缘相交时夹紧到图像边界。
+ * @return 1表示ROI与目标摄像头图像相交，0表示完全位于视野外。
+ */
+static uint8 car_lamp_cross_check_project_roi(
+    image_camera_e camera,
+    const car_lamp_projection_point_t *center,
+    float half_size,
+    car_lamp_projection_point_t *source)
+{
+    if((source == 0) || (half_size <= 0.0f))
+    {
+        return 0U;
+    }
+
+    source->x = IMAGE_DATA_INVALID_VALUE;
+    source->y = IMAGE_DATA_INVALID_VALUE;
+    if(CarLampProjection_FromCenter(camera, center, source) != 0U)
+    {
+        return 1U;
+    }
+    if((source->x < (-CAR_LAMP_IMAGE_HALF_WIDTH - half_size)) ||
+       (source->x > (CAR_LAMP_IMAGE_HALF_WIDTH + half_size)) ||
+       (source->y < (-CAR_LAMP_IMAGE_HALF_HEIGHT - half_size)) ||
+       (source->y > (CAR_LAMP_IMAGE_HALF_HEIGHT + half_size)))
+    {
+        return 0U;
+    }
+
+    if(source->x < -CAR_LAMP_IMAGE_HALF_WIDTH)
+    {
+        source->x = -CAR_LAMP_IMAGE_HALF_WIDTH;
+    }
+    else if(source->x > CAR_LAMP_IMAGE_HALF_WIDTH)
+    {
+        source->x = CAR_LAMP_IMAGE_HALF_WIDTH;
+    }
+    if(source->y < -CAR_LAMP_IMAGE_HALF_HEIGHT)
+    {
+        source->y = -CAR_LAMP_IMAGE_HALF_HEIGHT;
+    }
+    else if(source->y > CAR_LAMP_IMAGE_HALF_HEIGHT)
+    {
+        source->y = CAR_LAMP_IMAGE_HALF_HEIGHT;
+    }
+    return 1U;
+}
+
+/**
+ * @brief 从各摄最新帧快照提取本轮可用于公共轨迹的原始实测。
  * @param frames 三摄只读快照。
- * @param anchor_time_ms 本摄锚点采集时间。
  * @param observations 输出三摄观测数组。
  * @return 当前存在原始实测的摄像头位掩码。
  */
 static uint8 car_lamp_cross_check_build_observations(
     const image_sync_set_t *frames,
-    uint32 anchor_time_ms,
-    car_lamp_observation_t observations[IMAGE_CAMERA_COUNT])
+    car_lamp_observation_t observations[IMAGE_CAMERA_COUNT],
+    uint32 anchor_time_ms)
 {
     uint8 camera;
     uint8 measured_mask = 0U;
@@ -225,19 +279,11 @@ static uint8 car_lamp_cross_check_build_observations(
         const struct image_data *data = &frames->camera[camera];
         car_lamp_observation_t *observation = &observations[camera];
         const car_lamp_data *lamp = &data->car_lamp_data[0];
-        uint32 skew_ms;
 
         observation->camera = (image_camera_e)camera;
         observation->error = CAR_LAMP_CROSS_CHECK_INVALID_ERROR;
-        if((meta->frame_valid == 0U) || (meta->timestamp_valid == 0U) ||
-           (meta->frame_sequence == 0U) ||
+        if((meta->frame_valid == 0U) || (meta->frame_sequence == 0U) ||
            (meta->source_camera != camera))
-        {
-            continue;
-        }
-        skew_ms = image_frame_time_difference_ms(
-            meta->capture_time_ms, anchor_time_ms);
-        if(skew_ms > CAR_LAMP_TRACK_MAX_SKEW_MS)
         {
             continue;
         }
@@ -265,7 +311,9 @@ static uint8 car_lamp_cross_check_build_observations(
         }
         observation->valid = 1U;
         observation->sequence = meta->frame_sequence;
-        observation->time_ms = meta->capture_time_ms;
+        observation->time_ms =
+            (meta->timestamp_valid != 0U) ?
+            meta->capture_time_ms : anchor_time_ms;
         observation->length = lamp->length;
         if(observation->fresh != 0U)
         {
@@ -331,30 +379,42 @@ static uint8 car_lamp_cross_check_acquire(
 {
     uint8 camera;
     uint8 fresh_mask = 0U;
+    uint8 valid_mask = 0U;
+    uint8 pending_mask = 0U;
     uint8 pair_mask;
+    uint8 pair_changed = 0U;
     uint8 support_mask = 0U;
     car_lamp_projection_point_t initial = {0.0f, 0.0f};
 
     for(camera = 0U; camera < IMAGE_CAMERA_COUNT; camera++)
     {
         car_lamp_observation_t *observation = &observations[camera];
+        uint8 camera_bit = CAR_LAMP_CAMERA_BIT(camera);
 
         observation->aligned_center = observation->center;
+        if(observation->valid != 0U)
+        {
+            valid_mask |= camera_bit;
+        }
         if(observation->fresh == 0U)
         {
             continue;
         }
+        fresh_mask |= camera_bit;
         if(observation->valid == 0U)
         {
             s_tracker.acquire_count[camera] = 0U;
+            s_tracker.acquire_first_time_ms[camera] = 0U;
             continue;
         }
 
-        fresh_mask |= CAR_LAMP_CAMERA_BIT(camera);
         if((s_tracker.acquire_count[camera] != 0U) &&
-           ((uint32)(observation->time_ms -
+           ((uint32)(anchor_time_ms -
                      s_tracker.acquire_time_ms[camera]) <=
             CAR_LAMP_ACQUIRE_MAX_GAP_MS) &&
+           ((uint32)(anchor_time_ms -
+                     s_tracker.acquire_first_time_ms[camera]) <=
+            CAR_LAMP_ACQUIRE_TOTAL_WINDOW_MS) &&
            (car_lamp_cross_check_distance(
                 &s_tracker.acquire_point[camera],
                 &observation->center) <=
@@ -368,38 +428,86 @@ static uint8 car_lamp_cross_check_acquire(
         else
         {
             s_tracker.acquire_count[camera] = 1U;
+            s_tracker.acquire_first_time_ms[camera] = anchor_time_ms;
         }
         s_tracker.acquire_point[camera] = observation->center;
-        s_tracker.acquire_time_ms[camera] = observation->time_ms;
+        s_tracker.acquire_time_ms[camera] = anchor_time_ms;
     }
 
-    pair_mask = car_lamp_cross_check_best_pair(observations, fresh_mask);
-    if(pair_mask != 0U)
+    for(camera = 0U; camera < IMAGE_CAMERA_COUNT; camera++)
     {
-        if((pair_mask == s_tracker.acquire_pair_mask) &&
+        if((s_tracker.acquire_count[camera] != 0U) &&
            ((uint32)(anchor_time_ms -
-                     s_tracker.acquire_pair_time_ms) <=
+                     s_tracker.acquire_time_ms[camera]) >
             CAR_LAMP_ACQUIRE_MAX_GAP_MS))
         {
-            if(s_tracker.acquire_pair_count < 0xFFU)
+            s_tracker.acquire_count[camera] = 0U;
+            s_tracker.acquire_first_time_ms[camera] = 0U;
+        }
+    }
+
+    pair_mask = car_lamp_cross_check_best_pair(observations, valid_mask);
+    if((pair_mask != 0U) && ((fresh_mask & pair_mask) != 0U))
+    {
+        for(camera = 0U; camera < IMAGE_CAMERA_COUNT; camera++)
+        {
+            if(((pair_mask & CAR_LAMP_CAMERA_BIT(camera)) != 0U) &&
+               (observations[camera].sequence !=
+                s_tracker.acquire_pair_sequence[camera]))
             {
-                s_tracker.acquire_pair_count++;
+                pair_changed = 1U;
             }
         }
-        else
+        if(pair_changed != 0U)
         {
-            s_tracker.acquire_pair_mask = pair_mask;
-            s_tracker.acquire_pair_count = 1U;
+            if((pair_mask == s_tracker.acquire_pair_mask) &&
+               (s_tracker.acquire_pair_count != 0U) &&
+               ((uint32)(anchor_time_ms -
+                         s_tracker.acquire_pair_time_ms) <=
+                CAR_LAMP_ACQUIRE_MAX_GAP_MS) &&
+               ((uint32)(anchor_time_ms -
+                         s_tracker.acquire_pair_first_time_ms) <=
+                CAR_LAMP_ACQUIRE_TOTAL_WINDOW_MS))
+            {
+                if(s_tracker.acquire_pair_count < 0xFFU)
+                {
+                    s_tracker.acquire_pair_count++;
+                }
+            }
+            else
+            {
+                s_tracker.acquire_pair_mask = pair_mask;
+                s_tracker.acquire_pair_count = 1U;
+                s_tracker.acquire_pair_first_time_ms = anchor_time_ms;
+            }
+            memset(s_tracker.acquire_pair_sequence, 0,
+                   sizeof(s_tracker.acquire_pair_sequence));
+            for(camera = 0U; camera < IMAGE_CAMERA_COUNT; camera++)
+            {
+                if((pair_mask & CAR_LAMP_CAMERA_BIT(camera)) != 0U)
+                {
+                    s_tracker.acquire_pair_sequence[camera] =
+                        observations[camera].sequence;
+                }
+            }
+            s_tracker.acquire_pair_time_ms = anchor_time_ms;
         }
-        s_tracker.acquire_pair_time_ms = anchor_time_ms;
     }
-    else
+    else if((s_tracker.acquire_pair_count != 0U) &&
+            (((fresh_mask & s_tracker.acquire_pair_mask) != 0U) ||
+             ((uint32)(anchor_time_ms -
+                       s_tracker.acquire_pair_time_ms) >
+              CAR_LAMP_ACQUIRE_MAX_GAP_MS)))
     {
         s_tracker.acquire_pair_mask = 0U;
         s_tracker.acquire_pair_count = 0U;
+        s_tracker.acquire_pair_first_time_ms = 0U;
+        memset(s_tracker.acquire_pair_sequence, 0,
+               sizeof(s_tracker.acquire_pair_sequence));
     }
 
-    if(s_tracker.acquire_pair_count >= CAR_LAMP_ACQUIRE_PAIR_FRAMES)
+    if((s_tracker.acquire_pair_count >= CAR_LAMP_ACQUIRE_PAIR_FRAMES) &&
+       (pair_mask == s_tracker.acquire_pair_mask))
     {
         for(camera = 0U; camera < IMAGE_CAMERA_COUNT; camera++)
         {
@@ -430,9 +538,17 @@ static uint8 car_lamp_cross_check_acquire(
 
     if(support_mask == 0U)
     {
+        for(camera = 0U; camera < IMAGE_CAMERA_COUNT; camera++)
+        {
+            if(s_tracker.acquire_count[camera] != 0U)
+            {
+                pending_mask |= CAR_LAMP_CAMERA_BIT(camera);
+            }
+        }
         car_lamp_cross_check_set_state(
-            (fresh_mask != 0U) ? CAR_LAMP_TRACK_ACQUIRE :
-                                 CAR_LAMP_TRACK_SEARCH);
+            ((pending_mask != 0U) ||
+             (s_tracker.acquire_pair_count != 0U)) ?
+            CAR_LAMP_TRACK_ACQUIRE : CAR_LAMP_TRACK_SEARCH);
         return 0U;
     }
 
@@ -441,8 +557,22 @@ static uint8 car_lamp_cross_check_acquire(
     s_tracker.velocity.x = 0.0f;
     s_tracker.velocity.y = 0.0f;
     s_tracker.last_update_time_ms = anchor_time_ms;
-    s_tracker.last_measurement_time_ms = anchor_time_ms;
+    s_tracker.last_support_time_ms = anchor_time_ms;
     s_tracker.support_camera_mask = support_mask;
+    for(camera = 0U; camera < IMAGE_CAMERA_COUNT; camera++)
+    {
+        s_tracker.accepted_frame_sequence[camera] =
+            ((support_mask & CAR_LAMP_CAMERA_BIT(camera)) != 0U) ?
+            observations[camera].sequence : 0U;
+    }
+    memset(s_tracker.acquire_count, 0, sizeof(s_tracker.acquire_count));
+    memset(s_tracker.acquire_first_time_ms, 0,
+           sizeof(s_tracker.acquire_first_time_ms));
+    s_tracker.acquire_pair_mask = 0U;
+    s_tracker.acquire_pair_count = 0U;
+    s_tracker.acquire_pair_first_time_ms = 0U;
+    memset(s_tracker.acquire_pair_sequence, 0,
+           sizeof(s_tracker.acquire_pair_sequence));
     car_lamp_cross_check_set_state(CAR_LAMP_TRACK_TRACKED);
     return 1U;
 }
@@ -561,6 +691,7 @@ static uint8 car_lamp_cross_check_update_track(
     car_lamp_projection_point_t measurement;
     uint8 camera;
     uint8 match_mask = 0U;
+    uint8 retained_mask = 0U;
     uint8 selected_mask;
     uint32 delta_ms;
     float delta_s;
@@ -573,8 +704,20 @@ static uint8 car_lamp_cross_check_update_track(
         car_lamp_projection_point_t predicted_at_frame;
         car_lamp_observation_t *observation = &observations[camera];
 
-        if((observation->valid == 0U) || (observation->fresh == 0U))
+        if(observation->valid == 0U)
         {
+            continue;
+        }
+        if(observation->fresh == 0U)
+        {
+            uint8 camera_bit = CAR_LAMP_CAMERA_BIT(camera);
+
+            if(((s_tracker.support_camera_mask & camera_bit) != 0U) &&
+               (observation->sequence ==
+                s_tracker.accepted_frame_sequence[camera]))
+            {
+                retained_mask |= camera_bit;
+            }
             continue;
         }
         car_lamp_cross_check_predict(
@@ -600,8 +743,18 @@ static uint8 car_lamp_cross_check_update_track(
         (uint8)(measured_mask & (uint8)(~selected_mask));
     if(selected_mask == 0U)
     {
+        if(retained_mask != 0U)
+        {
+            s_tracker.position = predicted;
+            s_tracker.last_update_time_ms = anchor_time_ms;
+            s_tracker.last_support_time_ms = anchor_time_ms;
+            s_tracker.support_camera_mask = retained_mask;
+            car_lamp_cross_check_set_state(CAR_LAMP_TRACK_TRACKED);
+            return retained_mask;
+        }
+
         uint32 coast_ms =
-            (uint32)(anchor_time_ms - s_tracker.last_measurement_time_ms);
+            (uint32)(anchor_time_ms - s_tracker.last_support_time_ms);
         uint32 coast_step_ms =
             (uint32)(anchor_time_ms - s_tracker.last_update_time_ms);
 
@@ -623,10 +776,17 @@ static uint8 car_lamp_cross_check_update_track(
             s_tracker.support_camera_mask = 0U;
             s_tracker.velocity.x = 0.0f;
             s_tracker.velocity.y = 0.0f;
+            memset(s_tracker.accepted_frame_sequence, 0,
+                   sizeof(s_tracker.accepted_frame_sequence));
             memset(s_tracker.acquire_count, 0,
                    sizeof(s_tracker.acquire_count));
+            memset(s_tracker.acquire_first_time_ms, 0,
+                   sizeof(s_tracker.acquire_first_time_ms));
             s_tracker.acquire_pair_mask = 0U;
             s_tracker.acquire_pair_count = 0U;
+            s_tracker.acquire_pair_first_time_ms = 0U;
+            memset(s_tracker.acquire_pair_sequence, 0,
+                   sizeof(s_tracker.acquire_pair_sequence));
             car_lamp_cross_check_set_state(CAR_LAMP_TRACK_LOST);
         }
         return 0U;
@@ -655,7 +815,7 @@ static uint8 car_lamp_cross_check_update_track(
         CAR_LAMP_TRACK_OLD_VELOCITY * s_tracker.velocity.y +
         CAR_LAMP_TRACK_NEW_VELOCITY * measured_velocity_y;
     s_tracker.last_update_time_ms = anchor_time_ms;
-    s_tracker.last_measurement_time_ms = anchor_time_ms;
+    s_tracker.last_support_time_ms = anchor_time_ms;
     if(selected_mask != s_tracker.support_camera_mask)
     {
         g_car_lamp_source_handoff_count++;
@@ -663,6 +823,12 @@ static uint8 car_lamp_cross_check_update_track(
             g_car_lamp_source_handoff_count;
     }
     s_tracker.support_camera_mask = selected_mask;
+    for(camera = 0U; camera < IMAGE_CAMERA_COUNT; camera++)
+    {
+        s_tracker.accepted_frame_sequence[camera] =
+            ((selected_mask & CAR_LAMP_CAMERA_BIT(camera)) != 0U) ?
+            observations[camera].sequence : 0U;
+    }
     car_lamp_cross_check_set_state(CAR_LAMP_TRACK_TRACKED);
     return selected_mask;
 }
@@ -693,8 +859,10 @@ static void car_lamp_cross_check_update_roi(
             ((camera == Front) ? CAR_LAMP_TRACK_ROI_FRONT_PX :
                                  CAR_LAMP_TRACK_ROI_CENTER_PX);
 
-        if(CarLampProjection_FromCenter((image_camera_e)camera,
-                                        &predicted, &expected) == 0U)
+        if(car_lamp_cross_check_project_roi(
+               (image_camera_e)camera, &predicted,
+               base_half_size + CAR_LAMP_TRACK_ROI_MARGIN_PX,
+               &expected) == 0U)
         {
             continue;
         }
@@ -722,9 +890,9 @@ static void car_lamp_cross_check_update_roi(
 
             car_lamp_cross_check_predict(
                 observations[camera].time_ms, &frame_prediction);
-            if(CarLampProjection_FromCenter(
-                   (image_camera_e)camera,
-                   &frame_prediction, &frame_expected) == 0U)
+            if(car_lamp_cross_check_project_roi(
+                   (image_camera_e)camera, &frame_prediction,
+                   half_size, &frame_expected) == 0U)
             {
                 continue;
             }
@@ -745,7 +913,7 @@ static void car_lamp_cross_check_update_roi(
 
 /**
  * @brief 初始化单车灯三摄公共轨迹影子状态机。
- * @param local_camera 当前芯片本地摄像头，用作同步快照锚点。
+ * @param local_camera 当前芯片本地摄像头，用作最新帧组更新锚点。
  * @return 无。
  */
 void CarLampCrossCheck_Init(image_camera_e local_camera)
@@ -774,8 +942,8 @@ void CarLampCrossCheck_Init(image_camera_e local_camera)
 }
 
 /**
- * @brief 使用只读三摄同步快照更新公共轨迹和影子ROI诊断。
- * @param frames 最近两帧缓存选出的三摄快照；valid为0时仍可使用其中满足独立时序条件的帧。
+ * @brief 使用只读三摄最新帧组更新公共轨迹和影子ROI诊断。
+ * @param frames 三摄最新帧快照；valid为0时仍可使用其中独立未过期的帧。
  * @param roll_deg 当前横滚角，单位deg。
  * @param pitch_deg 当前俯仰角，单位deg。
  * @param height_mm 当前融合高度，单位mm。
@@ -832,19 +1000,7 @@ uint8 CarLampCrossCheck_Update(const image_sync_set_t *frames,
     if(s_tracker.diag.projection_enabled != 0U)
     {
         measured_mask = car_lamp_cross_check_build_observations(
-            frames, anchor->capture_time_ms, observations);
-        if(s_tracker.active == 0U)
-        {
-            (void)car_lamp_cross_check_acquire(
-                observations, anchor->capture_time_ms);
-        }
-        else
-        {
-            car_lamp_cross_check_update_roi(
-                observations, anchor->capture_time_ms);
-            (void)car_lamp_cross_check_update_track(
-                observations, measured_mask, anchor->capture_time_ms);
-        }
+            frames, observations, anchor->capture_time_ms);
         for(camera = 0U; camera < IMAGE_CAMERA_COUNT; camera++)
         {
             if((observations[camera].valid != 0U) &&
@@ -853,6 +1009,21 @@ uint8 CarLampCrossCheck_Update(const image_sync_set_t *frames,
                 s_tracker.last_lamp_length[camera] =
                     observations[camera].length;
             }
+        }
+        if(s_tracker.active == 0U)
+        {
+            (void)car_lamp_cross_check_acquire(
+                observations, anchor->capture_time_ms);
+        }
+        else
+        {
+            (void)car_lamp_cross_check_update_track(
+                observations, measured_mask, anchor->capture_time_ms);
+        }
+        if(s_tracker.active != 0U)
+        {
+            car_lamp_cross_check_update_roi(
+                observations, anchor->capture_time_ms);
         }
     }
     else if(s_tracker.active != 0U)

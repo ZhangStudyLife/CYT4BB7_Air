@@ -7,7 +7,6 @@
 #define IMAGE_MAX_CAR_LAMP_COUNT   (2U)
 #define IMAGE_DATA_INVALID_VALUE   (-999.0f)
 #define IMAGE_SYNC_HISTORY_DEPTH   (2U)  /* 每摄像头保留的最近帧数量。 */
-#define IMAGE_SYNC_MAX_SKEW_MS     (10U) /* 三摄同步组允许的最大时差。 */
 
 typedef enum
 {
@@ -173,6 +172,6 @@ static inline uint32 image_frame_time_difference_ms(uint32 left,
 
 extern struct image_data image_data[IMAGE_CAMERA_COUNT];
 extern image_frame_meta_t image_frame_meta[IMAGE_CAMERA_COUNT]; /* 三摄最新来源帧元数据共享区。 */
-extern volatile image_sync_diag_t g_image_sync_diag; /* 核心1发布给核心0的同步门控诊断。 */
+extern volatile image_sync_diag_t g_image_sync_diag; /* 核心1发布给核心0的最新帧新鲜度和采集时差诊断。 */
 
 #endif /* IMAGE_DATA_H_ */

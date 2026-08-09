@@ -14,7 +14,8 @@ from pathlib import Path
 
 CAMERAS = ("front", "center", "back")
 INVALID_VALUE = -999.0
-FRAME_GAP_LIMIT_MS = 30.0
+FRAME_GAP_LIMIT_MS = 50.0
+NEW_LOG_COLUMN_COUNT = 36  # I0时间 + I1..I35用户数据
 
 
 def _number(row: dict[str, str], column: str, default: float = math.nan) -> float:
@@ -135,7 +136,7 @@ def _compact_v12(rows: list[dict[str, str]]) -> dict[str, object]:
         )
 
     time_ready = [((status >> 14) & 1) != 0 for status in statuses]
-    sync_10_valid = [((status >> 13) & 1) != 0 for status in statuses]
+    latest_group_valid = [((status >> 13) & 1) != 0 for status in statuses]
     skews = [_number(row, "I9", math.nan) for row in rows]
     ready_skews = [
         skew
@@ -176,8 +177,8 @@ def _compact_v12(rows: list[dict[str, str]]) -> dict[str, object]:
         "frames": frames,
         "sync": {
             "time_ready_rate": sum(time_ready) / len(rows) if rows else 0.0,
-            "reported_10ms_valid_rate": (
-                sum(sync_10_valid) / len(rows) if rows else 0.0
+            "reported_latest_group_valid_rate": (
+                sum(latest_group_valid) / len(rows) if rows else 0.0
             ),
             "threshold_coverage": threshold_coverage,
             "max_skew_ms": max(ready_skews, default=0.0),
@@ -206,6 +207,352 @@ def _compact_v12(rows: list[dict[str, str]]) -> dict[str, object]:
         },
         "raw_lamp_detection_rate": detection,
     }
+
+
+def _decode_lamp_shape(value: float) -> dict[str, float | int] | None:
+    if not math.isfinite(value):
+        return None
+    packed = int(round(value))
+    if packed == 0:
+        return None
+    return {
+        "width_px": (packed & 0x3F) / 4.0,
+        "length_px": ((packed >> 6) & 0x7F) / 2.0,
+        "angle_deg": ((packed >> 13) & 0x7F) * 2.0 - 90.0,
+        "nearest_beacon_distance_px": (
+            math.nan
+            if ((packed >> 20) & 0x0F) == 15
+            else ((packed >> 20) & 0x0F) * 4.0
+        ),
+    }
+
+
+def _decode_geometry(value: float) -> dict[str, float | bool]:
+    if not math.isfinite(value):
+        return {"valid": False, "x": math.nan, "y": math.nan, "roi_half_size": math.nan}
+    packed = int(round(value))
+    valid = ((packed >> 23) & 1) != 0
+    return {
+        "valid": valid,
+        "x": float((packed & 0x1FF) - 140),
+        "y": float(((packed >> 9) & 0xFF) - 110),
+        "roi_half_size": float((packed >> 17) & 0x3F),
+    }
+
+
+def _decode_status(value: float) -> dict[str, int]:
+    packed = int(round(value)) if math.isfinite(value) else 0
+    return {
+        "state": packed & 0x07,
+        "support": (packed >> 3) & 0x07,
+        "roi_valid": (packed >> 6) & 0x07,
+        "roi_hit": (packed >> 9) & 0x07,
+        "conflict": (packed >> 12) & 0x07,
+        "projection_enabled": (packed >> 15) & 0x01,
+        "full_frame_fallback": (packed >> 16) & 0x07,
+        "button_marker": (packed >> 19) & 0x01,
+        "measured": (packed >> 20) & 0x07,
+    }
+
+
+def _compact_v35(rows: list[dict[str, str]]) -> dict[str, object]:
+    times_ms = [_number(row, "I0") for row in rows]
+    frame_words = [int(round(_number(row, "I33", 0.0))) for row in rows]
+    frames: dict[str, object] = {}
+    for camera_index, camera in enumerate(CAMERAS):
+        values = [(word >> (camera_index * 8)) & 0xFF for word in frame_words]
+        valid = [((value >> 7) & 1) != 0 for value in values]
+        sequences = [value & 0x7F for value in values]
+        frames[camera] = _frame_stats(sequences, valid, times_ms, 1 << 7)
+
+    skews = [_number(row, "I35") for row in rows]
+    finite_skews = [value for value in skews if math.isfinite(value) and value >= 0.0]
+    threshold_coverage = {
+        f"{threshold}_ms": (
+            sum(value <= threshold for value in finite_skews) / len(finite_skews)
+            if finite_skews
+            else 0.0
+        )
+        for threshold in (10, 15, 20)
+    }
+
+    lamp_detection: dict[str, float] = {}
+    lamp_shapes: dict[str, dict[str, object]] = {}
+    for camera_index, camera in enumerate(CAMERAS):
+        x_column = f"I{1 + camera_index * 2}"
+        y_column = f"I{2 + camera_index * 2}"
+        detected = [
+            _number(row, x_column) != INVALID_VALUE
+            and _number(row, y_column) != INVALID_VALUE
+            for row in rows
+        ]
+        lamp_detection[camera] = sum(detected) / len(detected) if detected else 0.0
+        decoded_shapes = [
+            _decode_lamp_shape(_number(row, f"I{10 + camera_index}"))
+            for row in rows
+        ]
+        valid_shapes = [shape for shape in decoded_shapes if shape is not None]
+        finite_beacon_distances = [
+            float(shape["nearest_beacon_distance_px"])
+            for shape in valid_shapes
+            if math.isfinite(float(shape["nearest_beacon_distance_px"]))
+        ]
+        lamp_shapes[camera] = {
+            "valid_rate": len(valid_shapes) / len(rows) if rows else 0.0,
+            "mean_width_px": (
+                statistics.mean(float(shape["width_px"]) for shape in valid_shapes)
+                if valid_shapes
+                else 0.0
+            ),
+            "mean_length_px": (
+                statistics.mean(float(shape["length_px"]) for shape in valid_shapes)
+                if valid_shapes
+                else 0.0
+            ),
+            "mean_angle_deg": (
+                statistics.mean(float(shape["angle_deg"]) for shape in valid_shapes)
+                if valid_shapes
+                else 0.0
+            ),
+            "nearest_beacon_distance_valid_rate": (
+                len(finite_beacon_distances) / len(valid_shapes)
+                if valid_shapes
+                else 0.0
+            ),
+            "mean_nearest_beacon_distance_px": (
+                statistics.mean(finite_beacon_distances)
+                if finite_beacon_distances
+                else 0.0
+            ),
+        }
+
+    beacon_data: dict[str, list[dict[str, float | int]]] = {}
+    for camera_index, camera in enumerate(CAMERAS):
+        beacon_data[camera] = []
+        for slot_index in range(2):
+            column = 13 + camera_index * 6 + slot_index * 3
+            valid_rows = [
+                row
+                for row in rows
+                if _number(row, f"I{column}") != INVALID_VALUE
+                and _number(row, f"I{column + 1}") != INVALID_VALUE
+                and _number(row, f"I{column + 2}", 0.0) > 0.0
+            ]
+            areas = [_number(row, f"I{column + 2}") for row in valid_rows]
+            beacon_data[camera].append(
+                {
+                    "slot": slot_index,
+                    "valid_rate": len(valid_rows) / len(rows) if rows else 0.0,
+                    "mean_area": statistics.mean(areas) if areas else 0.0,
+                    "max_area": max(areas, default=0.0),
+                }
+            )
+
+    statuses = [_decode_status(_number(row, "I32")) for row in rows]
+    states = [status["state"] for status in statuses]
+    support = [status["support"] for status in statuses]
+    roi_valid = [status["roi_valid"] for status in statuses]
+    roi_hits = [status["roi_hit"] for status in statuses]
+    conflicts = [status["conflict"] for status in statuses]
+
+    def mask_rate(key: str, index: int) -> float:
+        return (
+            sum((status[key] & (1 << index)) != 0 for status in statuses) / len(rows)
+            if rows
+            else 0.0
+        )
+
+    relative_yaw_values = [
+        _number(row, "I34")
+        for row in rows
+        if math.isfinite(_number(row, "I34"))
+        and _number(row, "I34") != INVALID_VALUE
+    ]
+    geometries = [_decode_geometry(_number(row, "I31")) for row in rows]
+    return {
+        "format": "single_lamp_shadow_v35",
+        "rows": len(rows),
+        "frames": frames,
+        "sync": {
+            "max_skew_ms": max(finite_skews, default=0.0),
+            "mean_skew_ms": statistics.mean(finite_skews) if finite_skews else 0.0,
+            "threshold_coverage": threshold_coverage,
+        },
+        "track": {
+            "state_rows": dict(Counter(states)),
+            "source_switches": sum(
+                left != right and left != 0 and right != 0
+                for left, right in zip(support, support[1:])
+            ),
+            "support_rate": {
+                camera: mask_rate("support", index)
+                for index, camera in enumerate(CAMERAS)
+            },
+            "roi_valid_rate": {
+                camera: mask_rate("roi_valid", index)
+                for index, camera in enumerate(CAMERAS)
+            },
+            "roi_hit_rate": {
+                camera: mask_rate("roi_hit", index)
+                for index, camera in enumerate(CAMERAS)
+            },
+            "conflict_rate": {
+                camera: mask_rate("conflict", index)
+                for index, camera in enumerate(CAMERAS)
+            },
+            "measured_rate": {
+                camera: mask_rate("measured", index)
+                for index, camera in enumerate(CAMERAS)
+            },
+            "projection_enabled_rate": (
+                sum(status["projection_enabled"] != 0 for status in statuses) / len(rows)
+                if rows
+                else 0.0
+            ),
+            "full_frame_fallback_rate": {
+                camera: mask_rate("full_frame_fallback", index)
+                for index, camera in enumerate(CAMERAS)
+            },
+            "geometry_valid_rate": (
+                sum(bool(geometry["valid"]) for geometry in geometries) / len(rows)
+                if rows
+                else 0.0
+            ),
+        },
+        "raw_lamp_detection_rate": lamp_detection,
+        "lamp_shapes": lamp_shapes,
+        "beacons": beacon_data,
+        "button_marker": {
+            "pressed_rows": sum(status["button_marker"] != 0 for status in statuses),
+            "pressed_rate": (
+                sum(status["button_marker"] != 0 for status in statuses) / len(rows)
+                if rows
+                else 0.0
+            ),
+        },
+        "relative_yaw": {
+            "valid_rate": len(relative_yaw_values) / len(rows) if rows else 0.0,
+            "mean_deg": statistics.mean(relative_yaw_values) if relative_yaw_values else 0.0,
+        },
+    }
+
+def _roi_debug_v12(rows: list[dict[str, str]]) -> dict[str, object]:
+    statuses = [int(round(_number(row, "I9", 0.0))) for row in rows]
+    markers = [int(round(_number(row, "I11", 0.0))) for row in rows]
+
+    detection: dict[str, float] = {}
+    for camera_index, camera in enumerate(CAMERAS):
+        x_column = f"I{camera_index * 2}"
+        y_column = f"I{camera_index * 2 + 1}"
+        detected = [
+            _number(row, x_column) != INVALID_VALUE
+            and _number(row, y_column) != INVALID_VALUE
+            for row in rows
+        ]
+        detection[camera] = sum(detected) / len(detected) if detected else 0.0
+
+    states = [status & 0x07 for status in statuses]
+    support = [(status >> 3) & 0x07 for status in statuses]
+    roi_valid = [(status >> 6) & 0x07 for status in statuses]
+    roi_hits = [(status >> 9) & 0x07 for status in statuses]
+    conflicts = [(status >> 12) & 0x07 for status in statuses]
+    projection_enabled = [((status >> 15) & 1) != 0 for status in statuses]
+    latest_group_valid = [((status >> 16) & 1) != 0 for status in statuses]
+    all_time_valid = [((status >> 17) & 1) != 0 for status in statuses]
+    measured = [(status >> 18) & 0x07 for status in statuses]
+    source_frame_valid = [(status >> 21) & 0x07 for status in statuses]
+    center_roi_half_size = [_number(row, "I10") for row in rows]
+
+    source_switches = sum(
+        left != right and left != 0 and right != 0
+        for left, right in zip(support, support[1:])
+    )
+
+    def mask_rate(masks: list[int], index: int) -> float:
+        return (
+            sum((mask & (1 << index)) != 0 for mask in masks) / len(rows)
+            if rows
+            else 0.0
+        )
+
+    return {
+        "format": "single_lamp_roi_debug_v12",
+        "rows": len(rows),
+        "frames": None,
+        "sync": {
+            "latest_group_valid_rate": (
+                sum(latest_group_valid) / len(rows) if rows else 0.0
+            ),
+            "all_timestamp_valid_rate": (
+                sum(all_time_valid) / len(rows) if rows else 0.0
+            ),
+        },
+        "track": {
+            "state_rows": dict(Counter(states)),
+            "source_switches": source_switches,
+            "projection_enabled_rate": (
+                sum(projection_enabled) / len(rows) if rows else 0.0
+            ),
+            "support_rate": {
+                camera: mask_rate(support, index)
+                for index, camera in enumerate(CAMERAS)
+            },
+            "roi_valid_rate": {
+                camera: mask_rate(roi_valid, index)
+                for index, camera in enumerate(CAMERAS)
+            },
+            "roi_hit_rate": {
+                camera: mask_rate(roi_hits, index)
+                for index, camera in enumerate(CAMERAS)
+            },
+            "conflict_rate": {
+                camera: mask_rate(conflicts, index)
+                for index, camera in enumerate(CAMERAS)
+            },
+            "measured_rate": {
+                camera: mask_rate(measured, index)
+                for index, camera in enumerate(CAMERAS)
+            },
+            "source_frame_valid_rate": {
+                camera: mask_rate(source_frame_valid, index)
+                for index, camera in enumerate(CAMERAS)
+            },
+            "center_roi_visible_rate": (
+                sum(value != INVALID_VALUE for value in center_roi_half_size)
+                / len(rows)
+                if rows
+                else 0.0
+            ),
+        },
+        "button_marker": {
+            "pressed_rows": sum(marker != 0 for marker in markers),
+            "pressed_rate": (
+                sum(marker != 0 for marker in markers) / len(rows)
+                if rows
+                else 0.0
+            ),
+        },
+        "lamp_output_valid_rate": detection,
+    }
+
+
+def _looks_like_roi_debug_v12(rows: list[dict[str, str]]) -> bool:
+    markers = [_number(row, "I11") for row in rows]
+    roi_sizes = [_number(row, "I10") for row in rows]
+    return (
+        bool(rows)
+        and all(
+            math.isfinite(value)
+            and abs(value - round(value)) < 1e-6
+            and int(round(value)) in (0, 1)
+            for value in markers
+        )
+        and all(
+            math.isfinite(value)
+            and (value == INVALID_VALUE or 0.0 <= value <= 512.0)
+            for value in roi_sizes
+        )
+    )
 
 
 def _sync_v57(rows: list[dict[str, str]]) -> dict[str, object]:
@@ -251,8 +598,14 @@ def analyze_csv(path: Path) -> dict[str, object]:
 
     if not rows or "I0" not in columns:
         raise ValueError(f"{path}: missing I0 header or data rows")
-    if all(f"I{index}" in columns for index in range(12)) and "I12" not in columns:
-        result = _compact_v12(rows)
+    if all(f"I{index}" in columns for index in range(NEW_LOG_COLUMN_COUNT)):
+        result = _compact_v35(rows)
+    elif all(f"I{index}" in columns for index in range(12)) and "I12" not in columns:
+        result = (
+            _roi_debug_v12(rows)
+            if _looks_like_roi_debug_v12(rows)
+            else _compact_v12(rows)
+        )
     elif "I57" in columns:
         result = _sync_v57(rows)
     else:

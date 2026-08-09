@@ -51,12 +51,6 @@ extern float g_car_yaw;
 extern float g_car_yaw_rate_dps;
 extern float img_err_x_old;
 extern float img_err_y_old;
-extern float g_mode2_car_velocity_ff_x_deg;
-extern float g_mode2_car_velocity_ff_y_deg;
-extern float g_mode2_angle_limited_roll_deg;
-extern float g_mode2_angle_limited_pitch_deg;
-extern float g_mode2_final_reference_roll_deg;
-extern float g_mode2_final_reference_pitch_deg;
 extern float g_mode2_img_error_rate_x_pxps;
 extern float g_mode2_img_error_rate_y_pxps;
 extern float g_mode2_car_dt_ms;
@@ -750,12 +744,16 @@ void FC_Loop_500Hz(void)
                              flow_telemetry.data_age_ms,                                /* I34 flow age, ms */
                              (is_mode2 != 0U) ? g_mode2_imgx_pid.p_term : 0.0f,          /* I35 M2 image P X, deg */
                              (is_mode2 != 0U) ? g_mode2_imgy_pid.p_term : 0.0f,          /* I36 M2 image P Y, deg */
-                             (is_mode2 != 0U) ? g_mode2_car_velocity_ff_x_deg : 0.0f,    /* I37 M2 speed FF X, deg */
-                             (is_mode2 != 0U) ? g_mode2_car_velocity_ff_y_deg : 0.0f,    /* I38 M2 speed FF Y, deg */
-                             (is_mode2 != 0U) ? g_mode2_angle_limited_roll_deg : 0.0f,   /* I39 M2 limited roll request, deg */
-                             (is_mode2 != 0U) ? g_mode2_angle_limited_pitch_deg : 0.0f,  /* I40 M2 limited pitch request, deg */
-                             (is_mode2 != 0U) ? g_mode2_final_reference_roll_deg : 0.0f, /* I41 M2 final roll correction, deg */
-                             (is_mode2 != 0U) ? g_mode2_final_reference_pitch_deg : 0.0f,/* I42 M2 final pitch correction, deg */
+                             0.0f,                                                      /* I37 M2 speed FF removed */
+                             0.0f,                                                      /* I38 M2 speed FF removed */
+                             (is_mode2 != 0U) ? roll_angle_target : 0.0f,               /* I39 M2 final roll target, deg */
+                             (is_mode2 != 0U) ? pitch_angle_target : 0.0f,              /* I40 M2 final pitch target, deg */
+                             (is_mode2 != 0U) ? roll_angle_target -
+                                                  FC_Mode_Get_Roll_Mech_Trim_Deg()
+                                              : 0.0f,                                   /* I41 M2 final roll correction, deg */
+                             (is_mode2 != 0U) ? pitch_angle_target -
+                                                  FC_Mode_Get_Pitch_Mech_Trim_Deg()
+                                              : 0.0f,                                   /* I42 M2 final pitch correction, deg */
                              (is_mode2 != 0U) ? g_mode2_img_error_rate_x_pxps : 0.0f,    /* I43 M2 error rate X, px/s */
                              (is_mode2 != 0U) ? g_mode2_img_error_rate_y_pxps : 0.0f,    /* I44 M2 error rate Y, px/s */
                              (is_mode2 != 0U) ? g_mode2_car_dt_ms : 0.0f);               /* I45 M2 car dt, ms */

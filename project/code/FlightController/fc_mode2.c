@@ -7,7 +7,7 @@
 static const float s_mode2_two_pi = 6.283185307179586f;
 static const float s_mode2_deg_to_rad = 0.017453292519943295f;
 static const float s_mode2_img_kp = 0.2f;
-static const float s_mode2_img_kd = 0.08f;
+static const float s_mode2_img_kd = 0.1f;
 static const float s_mode2_img_d_lpf_hz = 1.4f;
 static const float s_mode2_car_accel_ff = 5.0f;
 static const float s_mode2_car_accel_lpf_hz = 0.9f;

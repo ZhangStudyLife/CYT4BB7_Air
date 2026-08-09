@@ -209,7 +209,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode4_vel_y_i_limit = 3.0f;
     params->mode4_vel_y_d_lpf = 10.0f;
     params->mode4_kp_car_x = 60.0f;
-    params->mode4_kp_car_y = 90.0f;
+    params->mode4_kp_car_y = 75.0f;
     params->mode4_turn_accel_ff_gain_x = 0.72f;
     params->mode4_turn_accel_ff_gain_y = 0.30f;
     params->mode4_turn_accel_ff_limit_x_deg = 18.0f;

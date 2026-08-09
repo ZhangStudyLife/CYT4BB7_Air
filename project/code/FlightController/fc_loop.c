@@ -721,9 +721,9 @@ void FC_Loop_500Hz(void)
                              g_euler.yaw,                                               /* I19 aircraft yaw, deg */
                              g_tof_fused_height_mm,                                     /* I20 height, mm */
                              (is_mode2 != 0U) ? g_mode2_car_accel_x_mps2
-                                              : (float)0.0f,                             /* I21 M2 accel X / reserved M4 */
+                                              : Pos_Est_vel_x_2,                         /* I21 M2 accel X m/s^2 / M4 velocity X cm/s */
                              (is_mode2 != 0U) ? g_mode2_car_accel_y_mps2
-                                              : (float)0.0f,                             /* I22 M2 accel Y / reserved M4 */
+                                              : Pos_Est_vel_y_2,                         /* I22 M2 accel Y m/s^2 / M4 velocity Y cm/s */
                              (is_mode2 != 0U) ? g_mode2_raw_roll_correction_deg
                                               : g_mode4_velx_pid.i_term,                 /* I23 M2 raw roll / M4 velocity I X */
                              (is_mode2 != 0U) ? g_mode2_raw_pitch_correction_deg

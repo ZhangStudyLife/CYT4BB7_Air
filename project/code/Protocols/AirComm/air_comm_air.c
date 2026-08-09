@@ -23,7 +23,7 @@
 #define AIR_COMM_TX_RUN_DATA_LIMIT           (3U)    /* RUN_DATA最多占用的发送帧槽数量 */
 #define AIR_COMM_TX_FIFO_LEVEL               (64U)   /* SCB4发送FIFO触发水位 */
 #define AIR_COMM_PARAM_TABLE_MAX             (384U)  /* 最多注册参数个数 */
-#define AIR_COMM_DEFAULT_PARAM_COUNT         (282U)
+#define AIR_COMM_DEFAULT_PARAM_COUNT         (290U)
 #define AIR_COMM_REMOTE_CANCEL_MS            (400U)
 #define AIR_COMM_REMOTE_TIMEOUT_MS           (700U)
 #define AIR_COMM_REMOTE_EXP_CANCEL_MS        (1800U)
@@ -2148,22 +2148,30 @@ void air_comm_air_init(void)
                                 IPC_REMOTE_PARAM_ID_BL3_SAT_T_GRAY);
 
     AIR_COMM_REGISTER_FLOAT(mode2_img_x_kp, g_fc_params.mode2_img_x_kp, 0.0f, 0.3f);
+    AIR_COMM_REGISTER_FLOAT(mode2_img_x_kp2, g_fc_params.mode2_img_x_kp2, 0.0f, 1.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_img_x_kd, g_fc_params.mode2_img_x_kd, 0.0f, 0.5f);
+    AIR_COMM_REGISTER_FLOAT(mode2_img_x_kd_slope, g_fc_params.mode2_img_x_kd_slope, 0.0f, 0.1f);
     AIR_COMM_REGISTER_FLOAT(mode2_img_x_d_lpf, g_fc_params.mode2_img_x_d_lpf, 0.0f, 10.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_img_y_kp, g_fc_params.mode2_img_y_kp, 0.0f, 0.3f);
+    AIR_COMM_REGISTER_FLOAT(mode2_img_y_kp2, g_fc_params.mode2_img_y_kp2, 0.0f, 1.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_img_y_kd, g_fc_params.mode2_img_y_kd, 0.0f, 0.5f);
+    AIR_COMM_REGISTER_FLOAT(mode2_img_y_kd_slope, g_fc_params.mode2_img_y_kd_slope, 0.0f, 0.1f);
     AIR_COMM_REGISTER_FLOAT(mode2_img_y_d_lpf, g_fc_params.mode2_img_y_d_lpf, 0.0f, 10.0f);
+    AIR_COMM_REGISTER_FLOAT(mode2_img_d_limit_deg, g_fc_params.mode2_img_d_limit_deg, 0.0f, 10.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_car_vel_ff_x_deg_per_mps, g_fc_params.mode2_car_vel_ff_x_deg_per_mps, 0.0f, 10.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_car_vel_ff_y_deg_per_mps, g_fc_params.mode2_car_vel_ff_y_deg_per_mps, 0.0f, 10.0f);
-    AIR_COMM_REGISTER_FLOAT(mode2_accel_ff_x_deg_per_mps2, g_fc_params.mode2_car_accel_ff_x_deg_per_mps2, 0.0f, 5.0f);
-    AIR_COMM_REGISTER_FLOAT(mode2_accel_ff_y_deg_per_mps2, g_fc_params.mode2_car_accel_ff_y_deg_per_mps2, 0.0f, 5.0f);
+    AIR_COMM_REGISTER_FLOAT(mode2_accel_ff_x_deg_per_mps2, g_fc_params.mode2_car_accel_ff_x_deg_per_mps2, 0.0f, 8.0f);
+    AIR_COMM_REGISTER_FLOAT(mode2_accel_ff_y_deg_per_mps2, g_fc_params.mode2_car_accel_ff_y_deg_per_mps2, 0.0f, 8.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_car_accel_lpf_hz, g_fc_params.mode2_car_accel_lpf_hz, 0.1f, 10.0f);
+    AIR_COMM_REGISTER_FLOAT(mode2_car_accel_lead_s, g_fc_params.mode2_car_accel_lead_s, 0.0f, 0.3f);
+    AIR_COMM_REGISTER_FLOAT(mode2_car_accel_raw_limit_mps2, g_fc_params.mode2_car_accel_raw_limit_mps2, 0.5f, 10.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_car_accel_ff_limit_deg, g_fc_params.mode2_car_accel_ff_limit_deg, 0.0f, 10.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_attitude_fb_gain, g_fc_params.mode2_attitude_fb_gain, -1.0f, 0.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_turn_accel_ff_gain_x, g_fc_params.mode2_turn_accel_ff_gain_x, 0.0f, 2.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_turn_accel_ff_gain_y, g_fc_params.mode2_turn_accel_ff_gain_y, 0.0f, 2.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_angle_limit_deg, g_fc_params.mode2_angle_limit_deg, 1.0f, 20.0f);
     AIR_COMM_REGISTER_FLOAT(mode2_angle_slew_dps, g_fc_params.mode2_angle_slew_dps, 10.0f, 300.0f);
+    AIR_COMM_REGISTER_FLOAT(mode2_angle_brake_slew_dps, g_fc_params.mode2_angle_brake_slew_dps, 10.0f, 400.0f);
     AIR_COMM_REGISTER_FLOAT(Car_Speed, Car_Speed, 0.0f, 3.0f);
     AIR_COMM_REGISTER_FLOAT(Car_Speed_Fast, Car_Speed_Fast, 0.0f, 4.0f);
     AIR_COMM_REGISTER_FLOAT(Car_Plan_Mode, Car_Plan_Mode, 1.0f, 2.0f);

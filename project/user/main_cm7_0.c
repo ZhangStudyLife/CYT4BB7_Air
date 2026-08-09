@@ -17,6 +17,56 @@ static uint8 s_ipc_last_screen_refresh_enable = 0xFFU;
 static uint8 s_ipc_flying_retry_div = 0U; /* 飞行状态 IPC 通知失败后的 100Hz 重试分频 */
 static uint8 s_ipc_state_periodic_div = 0U;
 
+/**
+ * @brief 将轨迹状态、同步状态和中心采集时间低9位压缩为单个精确整数浮点值。
+ * @return 位0至2为状态，位3至5为来源，位6至8为ROI命中，位9至11为冲突，位12至14为投影、10ms同步和三摄时间有效位，位15至23为中心时间。
+ */
+static float image_cross_check_pack_log(void)
+{
+    uint8 all_time_valid =
+        ((image_frame_meta[Front].frame_valid != 0U) &&
+         (image_frame_meta[Front].timestamp_valid != 0U) &&
+         (image_frame_meta[Center].frame_valid != 0U) &&
+         (image_frame_meta[Center].timestamp_valid != 0U) &&
+         (image_frame_meta[Back].frame_valid != 0U) &&
+         (image_frame_meta[Back].timestamp_valid != 0U)) ? 1U : 0U;
+    uint32 packed =
+        ((uint32)g_ipc_car_lamp_cross_check_diag.state & 0x07U) |
+        (((uint32)g_ipc_car_lamp_cross_check_diag.support_camera_mask & 0x07U) << 3U) |
+        (((uint32)g_ipc_car_lamp_cross_check_diag.roi_hit_mask & 0x07U) << 6U) |
+        (((uint32)g_ipc_car_lamp_cross_check_diag.conflict_camera_mask & 0x07U) << 9U) |
+        (((uint32)g_ipc_car_lamp_cross_check_diag.projection_enabled & 0x01U) << 12U) |
+        (((uint32)g_image_sync_diag.valid & 0x01U) << 13U) |
+        (((uint32)all_time_valid & 0x01U) << 14U) |
+        ((image_frame_meta[Center].capture_time_ms & 0x01FFU) << 15U);
+
+    return (float)packed;
+}
+
+/**
+ * @brief 将前、下、后三摄来源帧号低7位及各自时间有效位压缩为单个精确整数浮点值。
+ * @return 每摄占8位，其中低7位为帧号，高1位为帧和时间同时有效标志。
+ */
+static float image_frame_sequence_pack_log(void)
+{
+    uint8 camera;
+    uint32 packed = 0U;
+
+    for(camera = 0U; camera < IMAGE_CAMERA_COUNT; camera++)
+    {
+        uint32 value = image_frame_meta[camera].frame_sequence & 0x7FU;
+
+        if((image_frame_meta[camera].frame_valid != 0U) &&
+           (image_frame_meta[camera].timestamp_valid != 0U))
+        {
+            value |= 0x80U;
+        }
+        packed |= value << (camera * 8U);
+    }
+
+    return (float)packed;
+}
+
 #define AIR_RUN_DATA_CRITICAL_COUNT       (15U) /* 飞行期间下发的关键数据数量 */
 #define AIR_RUN_DATA_DIAGNOSTIC_COUNT     (52U) /* 常态下发的完整诊断数据数量 */
 #define AIR_RUN_CRITICAL_STATE            (0U)  /* 飞机运行状态 */
@@ -299,26 +349,25 @@ int main(void)
                                  g_tof_fused_valid);
             ipc_image_poll();
             {
-                ipc_camera_spi_log_t camera_spi_log;
-
-                ipc_camera_spi_log_get(&camera_spi_log);
-                wifi_justfloat((float)g_image_data_seq,
-                               (float)camera_spi_log.seq,
-                               (float)camera_spi_log.board[0].rx_ok_count,
-                               (float)camera_spi_log.board[1].rx_ok_count,
-                               (float)camera_spi_log.board[0].rx_error_count,
-                               (float)camera_spi_log.board[1].rx_error_count,
-                               (float)camera_spi_log.board[0].online,
-                               (float)camera_spi_log.board[1].online,
-                               (float)image_data[Front].car_lamp_data[0].valid,
-                               image_data[Front].car_lamp_data[0].cx,
-                               image_data[Front].car_lamp_data[0].cy,
-                               (float)image_data[Center].car_lamp_data[0].valid,
-                               image_data[Center].car_lamp_data[0].cx,
-                               image_data[Center].car_lamp_data[0].cy,
-                               (float)image_data[Back].car_lamp_data[0].valid,
-                               image_data[Back].car_lamp_data[0].cx,
-                               image_data[Back].car_lamp_data[0].cy);
+                wifi_justfloat(
+                    ((image_data[Front].car_lamp_measured_mask & 0x01U) != 0U) ?
+                        image_data[Front].car_lamp_data[0].cx : IMAGE_DATA_INVALID_VALUE,
+                    ((image_data[Front].car_lamp_measured_mask & 0x01U) != 0U) ?
+                        image_data[Front].car_lamp_data[0].cy : IMAGE_DATA_INVALID_VALUE,
+                    ((image_data[Center].car_lamp_measured_mask & 0x01U) != 0U) ?
+                        image_data[Center].car_lamp_data[0].cx : IMAGE_DATA_INVALID_VALUE,
+                    ((image_data[Center].car_lamp_measured_mask & 0x01U) != 0U) ?
+                        image_data[Center].car_lamp_data[0].cy : IMAGE_DATA_INVALID_VALUE,
+                    ((image_data[Back].car_lamp_measured_mask & 0x01U) != 0U) ?
+                        image_data[Back].car_lamp_data[0].cx : IMAGE_DATA_INVALID_VALUE,
+                    ((image_data[Back].car_lamp_measured_mask & 0x01U) != 0U) ?
+                        image_data[Back].car_lamp_data[0].cy : IMAGE_DATA_INVALID_VALUE,
+                    g_euler.roll,
+                    g_euler.pitch,
+                    g_tof_fused_height_mm,
+                    (float)g_image_sync_diag.max_skew_ms,
+                    image_cross_check_pack_log(),
+                    image_frame_sequence_pack_log());
             }
             (void)BeaconLostDetector_Update();
 

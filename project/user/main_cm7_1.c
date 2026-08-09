@@ -2,11 +2,14 @@
 #include "Estimation/Pos_Est/image_down.h"
 #include "Display/image_debug_screen.h"
 #include "Image/image_down_horizon.h"
+#include "Image/car_lamp_cross_check.h"
 
 #define IMAGE_PIT  (PIT_CH10)
+#define IMAGE_TIME_PIT  (PIT_CH11)
 #define IMAGE_ATTITUDE_TIMEOUT_TICKS  (5U)
 
 volatile uint8 g_image_tick_100hz = 0U;
+volatile uint32 g_image_master_time_ms = 0U; /* 核心1统一毫秒时间。 */
 
 static ipc_attitude_data_t s_image_attitude;
 static uint32 s_image_attitude_sequence;
@@ -61,7 +64,25 @@ static uint8 Get_Image_data(void)
         image_down_horizon_invalidate();
     }
     image_frame_updated = image_down_update();
+    if(image_frame_updated != 0U)
+    {
+        CameraSpi_SubmitLocalFrame(&image_data[Center],
+                                   &image_frame_meta[Center]);
+    }
     CameraSpi_GetSnapshot(image_data);
+    if(image_frame_updated != 0U)
+    {
+        image_sync_set_t sync_set;
+
+        (void)CameraSpi_GetAlignedSet(&sync_set);
+        (void)CarLampCrossCheck_Update(
+            &sync_set,
+            s_image_attitude.roll_deg,
+            s_image_attitude.pitch_deg,
+            s_image_attitude.height_mm,
+            attitude_valid,
+            height_valid);
+    }
     return image_frame_updated;
 }
 
@@ -72,15 +93,21 @@ int main(void)
 
     clock_init(SYSTEM_CLOCK_250M);
     SCB_DisableDCache();
+    pit_ms_init(IMAGE_TIME_PIT, 1U);
 
     ipc_communicate_init(IPC_PORT_2, ipc_image_callback);
     ipc_remote_param_core1_init();
     image_data_clear(&image_data[Front]);
     image_data_clear(&image_data[Center]);
     image_data_clear(&image_data[Back]);
+    image_frame_meta_clear(&image_frame_meta[Front], Front);
+    image_frame_meta_clear(&image_frame_meta[Center], Center);
+    image_frame_meta_clear(&image_frame_meta[Back], Back);
+    memset((void *)&g_image_sync_diag, 0, sizeof(g_image_sync_diag));
     image_down_init();
     image_down_horizon_init();
     CameraSpi_Init();
+    CarLampCrossCheck_Init(Center);
     ImageDebugScreen_Init();
     pit_ms_init(IMAGE_PIT, 10U);
     while(true)

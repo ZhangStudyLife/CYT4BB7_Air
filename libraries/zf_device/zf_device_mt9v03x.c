@@ -58,6 +58,8 @@
 vuint8 mt9v03x_finish_flag = 0;                                                 // 一场图像采集完成标志位
 uint8 mt9v03x_image[MT9V03X_H][MT9V03X_W];     
 uint16 g_mt9v03x_exp_time = 400U;                                                // 运行时曝光时间
+volatile uint32 mt9v03x_frame_sequence = 0U;                                    // 最近完成采集的源帧号
+volatile uint32 mt9v03x_frame_timestamp_ms = 0U;                                // 最近完成采集帧的核心1毫秒时间
 
 static uint8 perfect_proportion = 0;
 static uint8 s_mt9v03x_trig_initialized = 0U;
@@ -72,6 +74,13 @@ __no_init uint16 mt9v03x_w_num;
 void camera_finish_callback(void)
 {  
     Cy_Tcpwm_Counter_ClearTC_Intr(TCPWM0_GRP0_CNT59);
+
+    mt9v03x_frame_timestamp_ms = g_image_master_time_ms;
+    mt9v03x_frame_sequence++;
+    if(mt9v03x_frame_sequence == 0U)
+    {
+        mt9v03x_frame_sequence = 1U;
+    }
     
     SCB_InvalidateDCache_by_Addr(mt9v03x_image_temp[0], MT9V03X_IMAGE_SIZE);
 

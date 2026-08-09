@@ -1129,6 +1129,18 @@
         <group>
             <name>Display</name>
             <file>
+                <name>$PROJ_DIR$\..\..\code\Image\car_lamp_cross_check.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Image\car_lamp_cross_check.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Image\car_lamp_projection.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Image\car_lamp_projection.h</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\..\..\code\Display\image_debug_screen.c</name>
             </file>
             <file>

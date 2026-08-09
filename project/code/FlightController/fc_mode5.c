@@ -83,6 +83,8 @@ void FC_Mode5_100Hz(void)
         return;
     }
 
+    /* 三摄影子验证期间仅允许核心0主循环发送固定12通道日志。 */
+#if 0
     wifi_justfloat(g_car_vel_x, g_car_vel_y, g_car_yaw, g_car_yaw_rate_dps,
                    g_euler.roll, g_euler.pitch, g_euler.yaw,
                    roll_angle_target, pitch_angle_target, yaw_angle_target,
@@ -93,6 +95,7 @@ void FC_Mode5_100Hz(void)
                    g_mode5_velx_pid.output + g_mode5_velx_pid.ff_term,
                    g_mode5_vely_pid.output + g_mode5_vely_pid.ff_term,
                    Pos_Est_vel_x, Pos_Est_vel_y);
+#endif
 }
 
 void FC_Mode5_50Hz(float dt)
@@ -310,6 +313,8 @@ void FC_Mode5_50Hz(float dt)
     //                yaw_angle_target,                       /* I37 */
     //                yaw_gyro_target,                        /* I38 */
     //                yaw_gyro_pid.output);                   /* I39 */
+    /* 保留旧调参字段供后续恢复，但禁止与固定三摄日志交错发送。 */
+#if 0
     wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw,
                    roll_angle_target, pitch_angle_target, yaw_angle_target,
                    g_tof_fused_height_mm,g_height_fused_vz_mps,
@@ -329,6 +334,7 @@ void FC_Mode5_50Hz(float dt)
                    g_mode5_velx_pid.d_term, g_mode5_vely_pid.d_term,
                    g_car_sync_time_ms
                    );
+#endif
 }
 
 float FC_Mode5_Get_Fixed_Height_M(void)

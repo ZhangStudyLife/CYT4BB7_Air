@@ -10,6 +10,12 @@
 struct image_data image_data[IMAGE_CAMERA_COUNT];
 #pragma location=".ipc_image_seq"
 volatile uint32 g_image_data_seq;
+#pragma location=".ipc_image_meta"
+image_frame_meta_t image_frame_meta[IMAGE_CAMERA_COUNT]; /* 三摄最新帧号和统一采集时间共享区。 */
+#pragma location=".ipc_image_sync_diag"
+volatile image_sync_diag_t g_image_sync_diag; /* 核心1发布给核心0的10ms同步门控诊断。 */
+#pragma location=".ipc_car_lamp_cross_check"
+volatile car_lamp_cross_check_diag_t g_ipc_car_lamp_cross_check_diag; /* 三摄公共轨迹影子诊断共享区。 */
 #pragma location=".ipc_camera_spi_log"
 volatile ipc_camera_spi_log_t g_ipc_camera_spi_log;
 #pragma location=".ipc_remote_param_request"
@@ -95,9 +101,23 @@ static ipc_remote_param_core1_set_cache_t s_remote_param_core1_set_cache;
 
 void ipc_image_publish(void)
 {
+    const car_lamp_cross_check_diag_t *cross_check_diag;
+
     s_tx_seq++;
     g_image_data_seq = s_tx_seq;
+    cross_check_diag = CarLampCrossCheck_GetDiag();
+    if(cross_check_diag != NULL)
+    {
+        memcpy((void *)&g_ipc_car_lamp_cross_check_diag,
+               cross_check_diag, sizeof(g_ipc_car_lamp_cross_check_diag));
+    }
     SCB_CleanDCache_by_Addr((volatile void *)image_data, sizeof(image_data));
+    SCB_CleanDCache_by_Addr((volatile void *)image_frame_meta,
+                            sizeof(image_frame_meta));
+    SCB_CleanDCache_by_Addr((volatile void *)&g_image_sync_diag,
+                            sizeof(g_image_sync_diag));
+    SCB_CleanDCache_by_Addr((volatile void *)&g_ipc_car_lamp_cross_check_diag,
+                            sizeof(g_ipc_car_lamp_cross_check_diag));
     SCB_CleanDCache_by_Addr((volatile void *)&g_image_data_seq, sizeof(g_image_data_seq));
     (void)ipc_send_data(s_tx_seq);
 }
@@ -745,6 +765,12 @@ void ipc_image_poll(void)
     {
         s_image_data_hint = 0U;
         SCB_InvalidateDCache_by_Addr((volatile void *)image_data, sizeof(image_data));
+        SCB_InvalidateDCache_by_Addr((volatile void *)image_frame_meta,
+                                     sizeof(image_frame_meta));
+        SCB_InvalidateDCache_by_Addr((volatile void *)&g_image_sync_diag,
+                                     sizeof(g_image_sync_diag));
+        SCB_InvalidateDCache_by_Addr((volatile void *)&g_ipc_car_lamp_cross_check_diag,
+                                     sizeof(g_ipc_car_lamp_cross_check_diag));
         SCB_InvalidateDCache_by_Addr((volatile void *)&g_image_data_seq, sizeof(g_image_data_seq));
     }
 #endif

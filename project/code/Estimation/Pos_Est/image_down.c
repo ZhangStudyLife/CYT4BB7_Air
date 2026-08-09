@@ -21,6 +21,7 @@ typedef struct
     unsigned char beacon_count;
     beacon_rect_t car_lamps[BEACON_MAX_CAR_LAMP_COUNT];
     unsigned char car_lamp_count;
+    unsigned char car_lamp_measured_mask;
 } beacon_result_t;
 
 #if (MT9V03X_W != BEACON_IMAGE_W) || (MT9V03X_H != BEACON_IMAGE_H)
@@ -51,6 +52,7 @@ int32 g_image_down_max_misses = 3;
 float g_image_down_filter_pos_alpha = 0.65f;
 float g_image_down_filter_vel_alpha = 0.30f;
 static uint8 s_mt9v03x_initialized;
+static uint32 s_image_down_latched_frame_sequence; /* 最近完成算法锁存的下摄来源帧号。 */
 
 #define CAR_LAMP_EDGE_MAX_MISSES        3
 #define CAR_LAMP_CENTER_MAX_MISSES      24
@@ -1330,12 +1332,14 @@ static void write_car_lamp(const component_t *lamp, beacon_result_t *result)
     if (lamp->valid == 0)
     {
         result->car_lamp_count = 0;
+        result->car_lamp_measured_mask = 0U;
         return;
     }
 
     rect = &result->car_lamps[0];
     fill_car_lamp_rect(lamp, rect);
     result->car_lamp_count = 1;
+    result->car_lamp_measured_mask = 0x01U;
 }
 
 static unsigned char component_from_temporal_car(
@@ -3137,13 +3141,38 @@ static void beacon_image_process(
 
 static uint8 image_down_latch_frame(void)
 {
-    if(0U == mt9v03x_finish_flag)
+    uint32 frame_sequence;
+    uint32 frame_timestamp_ms;
+    uint32 interrupt_state;
+
+    if((mt9v03x_frame_sequence == 0U) ||
+       (mt9v03x_frame_sequence == s_image_down_latched_frame_sequence))
     {
         return 0U;
     }
 
-    memcpy(g_image_frame[0], mt9v03x_image[0], MT9V03X_IMAGE_SIZE);
-    mt9v03x_finish_flag = 0U;
+    /* 若帧完成中断在复制期间更新源缓冲区，则重拷一次最新完整帧。 */
+    do
+    {
+        frame_sequence = mt9v03x_frame_sequence;
+        frame_timestamp_ms = mt9v03x_frame_timestamp_ms;
+        memcpy(g_image_frame[0], mt9v03x_image[0], MT9V03X_IMAGE_SIZE);
+    }
+    while(frame_sequence != mt9v03x_frame_sequence);
+
+    s_image_down_latched_frame_sequence = frame_sequence;
+    image_frame_meta[Center].frame_sequence = frame_sequence;
+    image_frame_meta[Center].capture_time_ms = frame_timestamp_ms;
+    image_frame_meta[Center].source_camera = (uint8)Center;
+    image_frame_meta[Center].frame_valid = 1U;
+    image_frame_meta[Center].timestamp_valid = 1U;
+    image_frame_meta[Center].reserved = 0U;
+    interrupt_state = interrupt_global_disable();
+    if(mt9v03x_frame_sequence == frame_sequence)
+    {
+        mt9v03x_finish_flag = 0U;
+    }
+    interrupt_global_enable(interrupt_state);
     return 1U;
 }
 
@@ -3184,12 +3213,16 @@ static void image_down_store_result(const beacon_result_t *result)
         image_data[Center].car_lamp_data[i].length = result->car_lamps[i].length;
         image_data[Center].car_lamp_data[i].angle = result->car_lamps[i].angle;
     }
+    image_data[Center].car_lamp_measured_mask =
+        result->car_lamp_measured_mask & 0x01U;
 }
 
 void image_down_init(void)
 {
     memset(g_image_frame, 0, MT9V03X_IMAGE_SIZE);
     image_down_clear_results();
+    image_frame_meta_clear(&image_frame_meta[Center], Center);
+    s_image_down_latched_frame_sequence = 0U;
     beacon_image_init();
     mt9v03x_finish_flag = 0U;
     s_mt9v03x_initialized = (mt9v03x_init() == 0U) ? 1U : 0U;

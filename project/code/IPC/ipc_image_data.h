@@ -3,6 +3,7 @@
 
 #include "zf_common_headfile.h"
 #include "Image/image_data.h"
+#include "Image/car_lamp_cross_check.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -185,6 +186,7 @@ typedef char ipc_attitude_data_size_must_be_20[
     (sizeof(ipc_attitude_data_t) == 20U) ? 1 : -1];
 
 extern volatile uint32 g_image_data_seq;
+extern volatile car_lamp_cross_check_diag_t g_ipc_car_lamp_cross_check_diag; /* 核心1发布给核心0的公共轨迹影子诊断。 */
 extern volatile ipc_camera_spi_log_t g_ipc_camera_spi_log;
 extern volatile ipc_remote_param_mailbox_t g_ipc_remote_param_request;
 extern volatile ipc_remote_param_mailbox_t g_ipc_remote_param_response;

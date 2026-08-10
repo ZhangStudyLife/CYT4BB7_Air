@@ -48,8 +48,19 @@ extern int32 g_image_down_confirm_frames;
 extern int32 g_image_down_max_misses;
 extern float g_image_down_filter_pos_alpha;
 extern float g_image_down_filter_vel_alpha;
+extern volatile uint32 g_image_down_car_lamp_scan_pixels;
+extern volatile uint32 g_image_down_car_lamp_roi_fast_hits;
+extern volatile uint32 g_image_down_car_lamp_roi_snapshot_stale;
+extern volatile uint32 g_image_down_car_lamp_roi_fallbacks;
+extern volatile uint32 g_image_down_car_lamp_search_cycles;
+extern volatile uint8 g_image_down_car_lamp_roi_diag;
 
 void image_down_init(void);
+void image_down_set_roi_context(float roll_deg,
+                                float pitch_deg,
+                                float height_mm,
+                                uint8 attitude_valid,
+                                uint8 height_valid);
 uint8 image_down_update(void);
 uint8 *image_down_get_frame_buffer(void);
 const uint8 *image_down_get_binary_buffer(void);

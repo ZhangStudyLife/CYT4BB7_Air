@@ -15,6 +15,7 @@
 #define IMAGE_SCREEN_PHYSICAL_WIDTH    (240U)
 #define IMAGE_SCREEN_DATA_ROW_HEIGHT   (16U)
 #define IMAGE_SCREEN_DATA_PERIOD_TICKS (1U)
+#define IMAGE_SCREEN_DATA_ROW_COUNT    (6U)
 #define IMAGE_SCREEN_SPI_SPEED         (20U * 1000U * 1000U)
 #define IMAGE_SCREEN_AUX_REFRESH_FRAMES (5U)
 #define IMAGE_SCREEN_LCD_X_OFFSET       (40U)
@@ -47,6 +48,15 @@ typedef char image_debug_screen_size_must_match_camera[
     ((MT9V03X_W == IMAGE_SCREEN_WIDTH) &&
      (MT9V03X_H == IMAGE_SCREEN_HEIGHT)) ? 1 : -1];
 
+typedef struct
+{
+    int x10;
+    int y10;
+    int area;
+    uint8 valid;
+    uint8 initialized;
+} image_screen_data_row_cache_t;
+
 static volatile uint32 s_screen_tick_10ms;
 static uint32 s_next_refresh_tick;
 static uint8 s_screen_mode;
@@ -56,6 +66,9 @@ static uint8 s_startup_layout_ready;
 static uint8 s_layout_dirty;
 static uint8 s_image_frame_pending;
 static uint8 s_aux_refresh_counter;
+static uint8 s_data_row_index;
+static image_screen_data_row_cache_t
+    s_data_row_cache[IMAGE_SCREEN_DATA_ROW_COUNT];
 static uint16 s_image_rgb565[IMAGE_SCREEN_HEIGHT][IMAGE_SCREEN_WIDTH];
 static char s_aux_lines[IMAGE_SCREEN_AUX_LINE_COUNT][IMAGE_SCREEN_AUX_TEXT_LENGTH + 1U];
 
@@ -63,10 +76,16 @@ extern volatile uint8 g_image_tick_100hz;
 
 static int ImageDebugScreen_RoundToInt(float value);
 static void ImageDebugScreen_ShowRgb565Region(uint16 x,
-                                              uint16 y,
-                                              uint16 width,
-                                              uint16 height,
-                                              const uint16 *pixels);
+                                               uint16 y,
+                                               uint16 width,
+                                               uint16 height,
+                                               const uint16 *pixels);
+static void ImageDebugScreen_ShowBeaconRow(uint16 y,
+                                           char camera,
+                                           const beacon_data *beacon);
+static void ImageDebugScreen_ShowLampRow(uint16 y,
+                                         char camera,
+                                         const car_lamp_data *lamp);
 
 /* 已消费节拍与ISR待处理节拍之和等于当前真实10ms序号。 */
 static uint32 ImageDebugScreen_Now(void)
@@ -98,6 +117,8 @@ static void ImageDebugScreen_MarkLayoutDirty(void)
     s_layout_dirty = 1U;
     s_image_frame_pending = 0U;
     s_aux_refresh_counter = 0U;
+    s_data_row_index = 0U;
+    memset(s_data_row_cache, 0, sizeof(s_data_row_cache));
 }
 
 static void ImageDebugScreen_RenderDataLayoutTop(void)
@@ -185,15 +206,22 @@ static void ImageDebugScreen_DrawText8x16(uint16 *row_buffer,
     }
 }
 
+static int ImageDebugScreen_Fixed1Scaled(float value)
+{
+    int scaled = ImageDebugScreen_RoundToInt(value * 10.0f);
+
+    if(scaled > 9999) scaled = 9999;
+    else if(scaled < -9999) scaled = -9999;
+    return scaled;
+}
+
 static void ImageDebugScreen_FormatFixed1(char *text,
                                           size_t text_size,
                                           float value)
 {
-    int scaled = ImageDebugScreen_RoundToInt(value * 10.0f);
+    int scaled = ImageDebugScreen_Fixed1Scaled(value);
     unsigned int magnitude;
 
-    if(scaled > 9999) scaled = 9999;
-    else if(scaled < -9999) scaled = -9999;
     magnitude = (unsigned int)((scaled < 0) ? -scaled : scaled);
     (void)snprintf(text,
                    text_size,
@@ -201,6 +229,70 @@ static void ImageDebugScreen_FormatFixed1(char *text,
                    (scaled < 0) ? '-' : '+',
                    magnitude / 10U,
                    magnitude % 10U);
+}
+
+static uint8 ImageDebugScreen_DataRowChanged(uint8 row,
+                                             uint8 valid,
+                                             int x10,
+                                             int y10,
+                                             int area)
+{
+    image_screen_data_row_cache_t *cache;
+
+    if(row >= IMAGE_SCREEN_DATA_ROW_COUNT)
+    {
+        return 0U;
+    }
+    cache = &s_data_row_cache[row];
+    if((cache->initialized != 0U) &&
+       (cache->valid == valid) &&
+       (cache->x10 == x10) &&
+       (cache->y10 == y10) &&
+       (cache->area == area))
+    {
+        return 0U;
+    }
+
+    cache->valid = valid;
+    cache->x10 = x10;
+    cache->y10 = y10;
+    cache->area = area;
+    cache->initialized = 1U;
+    return 1U;
+}
+
+static void ImageDebugScreen_UpdateBeaconDataRow(uint8 row,
+                                                 uint16 y,
+                                                 char camera,
+                                                 const beacon_data *beacon)
+{
+    if((beacon != NULL) &&
+       (ImageDebugScreen_DataRowChanged(
+            row,
+            image_data_beacon_valid(beacon),
+            ImageDebugScreen_Fixed1Scaled(beacon->x),
+            ImageDebugScreen_Fixed1Scaled(beacon->y),
+            ImageDebugScreen_RoundToInt(beacon->area)) != 0U))
+    {
+        ImageDebugScreen_ShowBeaconRow(y, camera, beacon);
+    }
+}
+
+static void ImageDebugScreen_UpdateLampDataRow(uint8 row,
+                                               uint16 y,
+                                               char camera,
+                                               const car_lamp_data *lamp)
+{
+    if((lamp != NULL) &&
+       (ImageDebugScreen_DataRowChanged(
+            row,
+            image_data_car_lamp_valid(lamp),
+            ImageDebugScreen_Fixed1Scaled(lamp->cx),
+            ImageDebugScreen_Fixed1Scaled(lamp->cy),
+            0) != 0U))
+    {
+        ImageDebugScreen_ShowLampRow(y, camera, lamp);
+    }
 }
 
 static void ImageDebugScreen_PrepareDataRow(uint16 *row_buffer)
@@ -295,18 +387,57 @@ static void ImageDebugScreen_ShowLampRow(uint16 y,
 
 static void ImageDebugScreen_UpdateData(void)
 {
-    ImageDebugScreen_ShowBeaconRow(
-        IMAGE_SCREEN_ROW_H, 'F', &image_data[Front].beacon_data[0]);
-    ImageDebugScreen_ShowBeaconRow(
-        2U * IMAGE_SCREEN_ROW_H, 'C', &image_data[Center].beacon_data[0]);
-    ImageDebugScreen_ShowBeaconRow(
-        3U * IMAGE_SCREEN_ROW_H, 'B', &image_data[Back].beacon_data[0]);
-    ImageDebugScreen_ShowLampRow(
-        5U * IMAGE_SCREEN_ROW_H, 'F', &image_data[Front].car_lamp_data[0]);
-    ImageDebugScreen_ShowLampRow(
-        6U * IMAGE_SCREEN_ROW_H, 'C', &image_data[Center].car_lamp_data[0]);
-    ImageDebugScreen_ShowLampRow(
-        7U * IMAGE_SCREEN_ROW_H, 'B', &image_data[Back].car_lamp_data[0]);
+    switch(s_data_row_index)
+    {
+        case 0U:
+            ImageDebugScreen_UpdateBeaconDataRow(
+                s_data_row_index,
+                IMAGE_SCREEN_ROW_H,
+                'F',
+                &image_data[Front].beacon_data[0]);
+            break;
+        case 1U:
+            ImageDebugScreen_UpdateBeaconDataRow(
+                s_data_row_index,
+                2U * IMAGE_SCREEN_ROW_H,
+                'C',
+                &image_data[Center].beacon_data[0]);
+            break;
+        case 2U:
+            ImageDebugScreen_UpdateBeaconDataRow(
+                s_data_row_index,
+                3U * IMAGE_SCREEN_ROW_H,
+                'B',
+                &image_data[Back].beacon_data[0]);
+            break;
+        case 3U:
+            ImageDebugScreen_UpdateLampDataRow(
+                s_data_row_index,
+                5U * IMAGE_SCREEN_ROW_H,
+                'F',
+                &image_data[Front].car_lamp_data[0]);
+            break;
+        case 4U:
+            ImageDebugScreen_UpdateLampDataRow(
+                s_data_row_index,
+                6U * IMAGE_SCREEN_ROW_H,
+                'C',
+                &image_data[Center].car_lamp_data[0]);
+            break;
+        default:
+            ImageDebugScreen_UpdateLampDataRow(
+                s_data_row_index,
+                7U * IMAGE_SCREEN_ROW_H,
+                'B',
+                &image_data[Back].car_lamp_data[0]);
+            break;
+    }
+
+    s_data_row_index++;
+    if(s_data_row_index >= IMAGE_SCREEN_DATA_ROW_COUNT)
+    {
+        s_data_row_index = 0U;
+    }
 }
 
 static void ImageDebugScreen_SetSnapshotPixel(int x, int y, uint16 color)
@@ -882,6 +1013,8 @@ void ImageDebugScreen_Init(void)
     s_layout_dirty = 0U;
     s_image_frame_pending = 0U;
     s_aux_refresh_counter = 0U;
+    s_data_row_index = 0U;
+    memset(s_data_row_cache, 0, sizeof(s_data_row_cache));
 
     ips114_set_dir(IPS114_PORTAIT);
     ips114_init();

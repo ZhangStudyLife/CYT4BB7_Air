@@ -68,6 +68,7 @@ class AnalyzeSingleLampShadowTest(unittest.TestCase):
             | (0x01 << 16)
             | (1 << 19)
             | (0x03 << 20)
+            | (1 << 23)
         )
         geometry = (
             ((12 + 140) & 0x1FF)
@@ -121,6 +122,7 @@ class AnalyzeSingleLampShadowTest(unittest.TestCase):
         self.assertAlmostEqual(result["sync"]["threshold_coverage"]["10_ms"], 0.5)
         self.assertEqual(result["track"]["state_rows"], {2: 4})
         self.assertEqual(result["track"]["geometry_valid_rate"], 1.0)
+        self.assertEqual(result["track"]["actual_roi_mode_rate"], 1.0)
         self.assertEqual(result["button_marker"]["pressed_rows"], 4)
         self.assertEqual(result["raw_lamp_detection_rate"]["back"], 0.0)
         self.assertEqual(result["lamp_shapes"]["front"]["mean_angle_deg"], 30.0)

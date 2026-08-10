@@ -185,7 +185,7 @@ static float image_track_geometry_pack_log(void)
  * @brief 将三摄轨迹、ROI、冲突、回退和实测状态压缩为24位精确整数。
  * @return 位0至2为轨迹状态，位3至5为来源，位6至8为ROI有效，位9至11为ROI命中，
  *         位12至14为冲突，位15为投影，位16至18为全图回退，位19为人工标记，
- *         位20至22为真实实测，位23保留。
+ *         位20至22为真实实测，位23为实际ROI模式。
  */
 static float image_cross_check_pack_log(void)
 {
@@ -212,7 +212,8 @@ static float image_cross_check_pack_log(void)
         (((uint32)g_ipc_car_lamp_cross_check_diag.projection_enabled & 0x01U) << 15U) |
         (((uint32)g_ipc_car_lamp_cross_check_diag.full_frame_fallback_mask & 0x07U) << 16U) |
         (((CRSF_STD[8] != 0U) ? 1UL : 0UL) << 19U) |
-        (((uint32)measured_mask & 0x07U) << 20U);
+        (((uint32)measured_mask & 0x07U) << 20U) |
+        (((uint32)g_ipc_car_lamp_cross_check_diag.roi_mode & 0x01U) << 23U);
 
     return (float)packed;
 }

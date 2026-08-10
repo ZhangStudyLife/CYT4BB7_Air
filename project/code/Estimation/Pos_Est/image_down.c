@@ -5,6 +5,7 @@
 
 #include "zf_device_mt9v03x.h"
 #include "Display/image_debug_screen.h"
+#include "Image/car_lamp_cross_check.h"
 #include "Image/image_down_horizon.h"
 
 #define BEACON_IMAGE_W 188
@@ -53,6 +54,41 @@ float g_image_down_filter_pos_alpha = 0.65f;
 float g_image_down_filter_vel_alpha = 0.30f;
 static uint8 s_mt9v03x_initialized;
 static uint32 s_image_down_latched_frame_sequence; /* 最近完成算法锁存的下摄来源帧号。 */
+static car_lamp_roi_t s_image_down_car_lamp_roi; /* 本帧采集时刻对应的核心1权威ROI。 */
+static uint32 s_image_down_processed_frames;
+static uint8 s_image_down_roi_fallback;
+static uint8 s_image_down_roi_conflict;
+static uint8 s_image_down_authority_support_mask;
+static float s_image_down_roi_roll_deg;
+static float s_image_down_roi_pitch_deg;
+static float s_image_down_roi_height_mm;
+static uint8 s_image_down_roi_attitude_valid;
+static uint8 s_image_down_roi_height_valid;
+
+#define IMAGE_DOWN_ROI_DIAG_VALID        (0x01U)
+#define IMAGE_DOWN_ROI_DIAG_HIT          (0x02U)
+#define IMAGE_DOWN_ROI_DIAG_FALLBACK     (0x04U)
+#define IMAGE_DOWN_ROI_DIAG_CONFLICT     (0x08U)
+#define IMAGE_DOWN_ROI_DIAG_ACTUAL       (0x10U)
+#define IMAGE_DOWN_ROI_DIAG_FORCED_FULL  (0x20U)
+#define IMAGE_DOWN_ROI_FULL_RECHECK_PERIOD (5U)
+#define IMAGE_DOWN_ROI_MIN_HEIGHT_MM      (800.0f)
+#define IMAGE_DOWN_ROI_MAX_HEIGHT_MM      (1300.0f)
+#define IMAGE_DOWN_ROI_MAX_TILT_DEG       (30.0f)
+#define IMAGE_DOWN_ROI_CLOSURE_GATE_PX    (8.0f)
+#define IMAGE_DOWN_ROI_LENGTH_MAX_AGE_MS   (80U) /* 灯条长度可用于扩张ROI的最大帧龄。 */
+#define IMAGE_DOWN_ROI_DEFAULT_HALF_PX     (6.0f) /* 没有新鲜实测时的灯条半长。 */
+
+#define IMAGE_DOWN_ROI_POLICY_SCAN         (0x01U)
+#define IMAGE_DOWN_ROI_POLICY_FINAL_MASK   (0x02U)
+#define IMAGE_DOWN_ROI_POLICY_STRONG_RULES (0x04U)
+
+volatile uint32 g_image_down_car_lamp_scan_pixels;
+volatile uint32 g_image_down_car_lamp_roi_fast_hits;
+volatile uint32 g_image_down_car_lamp_roi_snapshot_stale;
+volatile uint32 g_image_down_car_lamp_roi_fallbacks;
+volatile uint32 g_image_down_car_lamp_search_cycles;
+volatile uint8 g_image_down_car_lamp_roi_diag;
 
 #define CAR_LAMP_EDGE_MAX_MISSES        3
 #define CAR_LAMP_CENTER_MAX_MISSES      24
@@ -1207,110 +1243,412 @@ static unsigned char select_car_candidate(
 #if defined(__ICCARM__)
 #pragma inline=never
 #endif
-static unsigned char find_car_lamp(component_t *best_lamp)
+static unsigned char down_car_candidate_matches_authority_roi(
+    const down_car_candidate_t *candidate,
+    const car_lamp_roi_t *roi)
+{
+    car_lamp_projection_point_t source;
+
+    if (candidate == 0 || roi == 0 || roi->valid == 0U)
+    {
+        return 0U;
+    }
+    source.x = candidate->component.cx - (float)BEACON_IMAGE_W * 0.5f;
+    source.y = candidate->component.cy - (float)BEACON_IMAGE_H * 0.5f;
+    return CarLampCrossCheck_CandidateMatchesRoi(
+        roi, Center, &source, IMAGE_DOWN_ROI_CLOSURE_GATE_PX);
+}
+
+static unsigned char down_car_roi_policy(const car_lamp_roi_t *roi)
+{
+    unsigned char policy = 0U;
+
+    if((roi == 0) || (roi->valid == 0U) ||
+       ((g_image_down_car_lamp_roi_diag &
+         IMAGE_DOWN_ROI_DIAG_ACTUAL) == 0U))
+    {
+        return 0U;
+    }
+
+    if(roi->evidence_level == (uint8)CAR_LAMP_EVIDENCE_LOCATE)
+    {
+        return IMAGE_DOWN_ROI_POLICY_SCAN;
+    }
+    if(roi->evidence_level == (uint8)CAR_LAMP_EVIDENCE_POSITIVE)
+    {
+        return (uint8)(IMAGE_DOWN_ROI_POLICY_SCAN |
+                       IMAGE_DOWN_ROI_POLICY_FINAL_MASK);
+    }
+    if(roi->evidence_level == (uint8)CAR_LAMP_EVIDENCE_STRONG)
+    {
+        policy = (uint8)(IMAGE_DOWN_ROI_POLICY_SCAN |
+                         IMAGE_DOWN_ROI_POLICY_FINAL_MASK);
+        if((g_image_down_car_lamp_roi_diag &
+            IMAGE_DOWN_ROI_DIAG_FORCED_FULL) == 0U)
+        {
+            policy |= IMAGE_DOWN_ROI_POLICY_STRONG_RULES;
+        }
+    }
+    return policy;
+}
+
+static unsigned char down_car_authority_has_dual_support(
+    const car_lamp_roi_t *roi)
+{
+    uint8 mask = s_image_down_authority_support_mask & 0x07U;
+
+    return ((roi != 0) &&
+            (roi->evidence_level ==
+             (uint8)CAR_LAMP_EVIDENCE_STRONG) &&
+            ((mask & (uint8)(mask - 1U)) != 0U)) ? 1U : 0U;
+}
+
+static float down_car_remote_beacon_gate(image_camera_e camera)
+{
+    return (camera == Back) ? 12.0f : 8.0f;
+}
+
+static unsigned char down_car_candidate_matches_remote_beacon(
+    const down_car_candidate_t *candidate,
+    unsigned char strong_rules)
+{
+    car_lamp_projection_point_t source;
+    car_lamp_projection_point_t center;
+    uint8 camera;
+
+    if(candidate == 0 || strong_rules == 0U ||
+       image_frame_meta[Center].timestamp_valid == 0U)
+    {
+        return 0U;
+    }
+    source.x = candidate->component.cx - (float)BEACON_IMAGE_W * 0.5f;
+    source.y = candidate->component.cy - (float)BEACON_IMAGE_H * 0.5f;
+    if(CarLampProjection_ToCenter(Center, &source, &center) == 0U)
+    {
+        return 0U;
+    }
+    for(camera = 0U; camera < IMAGE_CAMERA_COUNT; camera++)
+    {
+        const image_frame_meta_t *meta = &image_frame_meta[camera];
+        uint8 beacon_index;
+
+        if((camera == (uint8)Center) ||
+           (meta->frame_valid == 0U) ||
+           (meta->timestamp_valid == 0U) ||
+           (meta->source_camera != camera) ||
+           (image_frame_time_difference_ms(
+                image_frame_meta[Center].capture_time_ms,
+                meta->capture_time_ms) > 30U))
+        {
+            continue;
+        }
+        for(beacon_index = 0U;
+            beacon_index < IMAGE_MAX_BEACON_COUNT;
+            beacon_index++)
+        {
+            const beacon_data *beacon =
+                &image_data[camera].beacon_data[beacon_index];
+            car_lamp_projection_point_t beacon_source;
+            car_lamp_projection_point_t beacon_center;
+            float dx;
+            float dy;
+            float gate;
+
+            if(image_data_beacon_valid(beacon) == 0U)
+            {
+                continue;
+            }
+            beacon_source.x = beacon->x;
+            beacon_source.y = beacon->y;
+            if(CarLampProjection_ToCenter(
+                   (image_camera_e)camera,
+                   &beacon_source,
+                   &beacon_center) == 0U)
+            {
+                continue;
+            }
+            dx = center.x - beacon_center.x;
+            dy = center.y - beacon_center.y;
+            gate = down_car_remote_beacon_gate((image_camera_e)camera);
+            if(dx * dx + dy * dy <= gate * gate)
+            {
+                return 1U;
+            }
+        }
+    }
+    return 0U;
+}
+
+static unsigned char find_car_lamp(component_t *best_lamp,
+                                   const car_lamp_roi_t *roi)
 {
     component_t cores[DOWN_CAR_MAX_COMPONENTS];
     down_car_candidate_t candidates[DOWN_CAR_MAX_MASKS];
     unsigned char core_count = 0U;
-    unsigned char candidate_count = 0U;
-    unsigned char x;
-    unsigned char y;
-    unsigned char index;
-    unsigned char best;
-    unsigned char weak_best;
+    unsigned char actual_roi = 0U;
+    unsigned char pass_count = 1U;
+    unsigned char pass;
+    unsigned char roi_min_x = 0U;
+    unsigned char roi_max_x = 0U;
+    unsigned char roi_min_y = 0U;
+    unsigned char roi_max_y = 0U;
+    unsigned char roi_policy = down_car_roi_policy(roi);
+    unsigned char selective_lamp_mask =
+        ((roi_policy & IMAGE_DOWN_ROI_POLICY_FINAL_MASK) != 0U) ? 1U : 0U;
+    unsigned char strong_rules =
+        ((roi_policy & IMAGE_DOWN_ROI_POLICY_STRONG_RULES) != 0U) ? 1U : 0U;
 
     memset(best_lamp, 0, sizeof(*best_lamp));
     memset(cores, 0, sizeof(cores));
-    memset(candidates, 0, sizeof(candidates));
     g_current_lamp_mask_count = 0U;
+    if ((roi_policy & IMAGE_DOWN_ROI_POLICY_SCAN) != 0U &&
+        roi != 0 && roi->valid != 0U && roi->roi_mode != 0U &&
+        isfinite(roi->min_x) != 0 && isfinite(roi->max_x) != 0 &&
+        isfinite(roi->min_y) != 0 && isfinite(roi->max_y) != 0)
+    {
+        int min_x = (int)ceilf(
+            roi->min_x + (float)BEACON_IMAGE_W * 0.5f);
+        int max_x = (int)floorf(
+            roi->max_x + (float)BEACON_IMAGE_W * 0.5f);
+        int min_y = (int)ceilf(
+            roi->min_y + (float)BEACON_IMAGE_H * 0.5f);
+        int max_y = (int)floorf(
+            roi->max_y + (float)BEACON_IMAGE_H * 0.5f);
+
+        if (min_x < 0) min_x = 0;
+        if (max_x >= BEACON_IMAGE_W) max_x = BEACON_IMAGE_W - 1;
+        if (min_y < 0) min_y = 0;
+        if (max_y >= BEACON_IMAGE_H) max_y = BEACON_IMAGE_H - 1;
+        if (min_x <= max_x && min_y <= max_y)
+        {
+            roi_min_x = (unsigned char)min_x;
+            roi_max_x = (unsigned char)max_x;
+            roi_min_y = (unsigned char)min_y;
+            roi_max_y = (unsigned char)max_y;
+            actual_roi = 1U;
+            pass_count = 2U;
+        }
+    }
+
     begin_visit_pass();
-    for (y = 0U; y < BEACON_IMAGE_H; y++)
+    for (pass = 0U; pass < pass_count; pass++)
     {
-        x = 0U;
-        while (x < BEACON_IMAGE_W)
+        unsigned char candidate_count = 0U;
+        unsigned char x;
+        unsigned char y;
+        unsigned char index;
+        unsigned char best;
+        unsigned char weak_best;
+        unsigned char weak_authority_confirmed = 0U;
+        unsigned char min_x = 0U;
+        unsigned char max_x = BEACON_IMAGE_W - 1U;
+        unsigned char min_y = 0U;
+        unsigned char max_y = BEACON_IMAGE_H - 1U;
+
+        if (actual_roi != 0U && pass == 0U)
         {
-            component_t component;
+            min_x = roi_min_x;
+            max_x = roi_max_x;
+            min_y = roi_min_y;
+            max_y = roi_max_y;
+        }
+
+        memset(candidates, 0, sizeof(candidates));
+        if(actual_roi != 0U && pass != 0U)
+        {
+            g_image_down_car_lamp_scan_pixels +=
+                (uint32)(BEACON_IMAGE_W * BEACON_IMAGE_H) -
+                (((uint32)roi_max_x - (uint32)roi_min_x + 1U) *
+                 ((uint32)roi_max_y - (uint32)roi_min_y + 1U));
+        }
+        else
+        {
+            g_image_down_car_lamp_scan_pixels +=
+                ((uint32)max_x - (uint32)min_x + 1U) *
+                ((uint32)max_y - (uint32)min_y + 1U);
+        }
+        for (y = min_y; y <= max_y; y++)
+        {
+            x = min_x;
+            while (x <= max_x)
+            {
+                component_t component;
+
+                if(actual_roi != 0U && pass != 0U &&
+                   y >= roi_min_y && y <= roi_max_y &&
+                   x >= roi_min_x && x <= roi_max_x)
+                {
+                    x = (unsigned char)(roi_max_x + 1U);
+                    continue;
+                }
 #if defined(__ICCARM__)
-            if ((x <= BEACON_IMAGE_W - 4U) &&
-                (__UNALIGNED_UINT32_READ(&g_binary[y][x]) == 0U))
-            {
-                x = (unsigned char)(x + 4U);
-                continue;
-            }
+                if (((unsigned int)x + 3U <= (unsigned int)max_x) &&
+                    (__UNALIGNED_UINT32_READ(&g_binary[y][x]) == 0U))
+                {
+                    x = (unsigned char)(x + 4U);
+                    continue;
+                }
 #endif
-            if (g_binary[y][x] == 0U || is_visited(x, y) != 0U)
-            {
+                if (g_binary[y][x] == 0U || is_visited(x, y) != 0U)
+                {
+                    x++;
+                    continue;
+                }
+                component = grow_component(x, y);
+                if (component.valid != 0U)
+                {
+                    store_car_core(cores, &core_count, &component);
+                }
                 x++;
-                continue;
             }
-            component = grow_component(x, y);
-            if (component.valid != 0U)
+        }
+
+        /* LOCATE/POSITIVE只改变扫描顺序，候选状态仅在完整帧上更新一次。 */
+        if(actual_roi != 0U && pass == 0U && strong_rules == 0U)
+        {
+            continue;
+        }
+
+        for (index = 0U; index < core_count; index++)
+        {
+            down_car_features_t features;
+            if (car_component_features(&cores[index], &features) != 0U)
             {
-                store_car_core(cores, &core_count, &component);
+                store_car_candidate(candidates, &candidate_count,
+                                    &cores[index], &features);
             }
-            x++;
         }
-    }
-
-    for (index = 0U; index < core_count; index++)
-    {
-        down_car_features_t features;
-        if (car_component_features(&cores[index], &features) != 0U)
+        if (selective_lamp_mask == 0U)
         {
-            store_car_candidate(candidates, &candidate_count,
-                                &cores[index], &features);
+            /* 影子模式保持已提交基线的候选屏蔽行为不变。 */
+            for (index = 0U; index < candidate_count; index++)
+            {
+                if (candidates[index].classification !=
+                    DOWN_CAR_CLASS_TRACK)
+                {
+                    add_car_mask(&candidates[index].mask);
+                }
+            }
         }
-    }
-    for (index = 0U; index < candidate_count; index++)
-    {
-        if (candidates[index].classification != DOWN_CAR_CLASS_TRACK)
+        if (actual_roi != 0U && pass == 0U)
         {
-            add_car_mask(&candidates[index].mask);
+            unsigned char strong_count = 0U;
+            unsigned char matching = 255U;
+
+            for (index = 0U; index < candidate_count; index++)
+            {
+                if (candidates[index].classification ==
+                    DOWN_CAR_CLASS_STRONG)
+                {
+                    strong_count++;
+                    if (down_car_candidate_matches_authority_roi(
+                            &candidates[index], roi) != 0U)
+                    {
+                        matching = index;
+                    }
+                }
+            }
+            if (candidate_count == 1U && strong_count == 1U &&
+                matching < candidate_count && strong_rules != 0U)
+            {
+                *best_lamp = candidates[matching].component;
+                component_resolve_angle(best_lamp);
+                add_car_mask(&candidates[matching].mask);
+                reset_weak_car_pending();
+                g_image_down_car_lamp_roi_fast_hits++;
+                return 1U;
+            }
+            if ((candidate_count > 1U) ||
+                (strong_count != 0U && matching >= candidate_count))
+            {
+                s_image_down_roi_conflict = 1U;
+            }
+            s_image_down_roi_fallback = 1U;
+            g_image_down_car_lamp_roi_fallbacks++;
+            continue;
         }
-    }
-
-    best = select_car_candidate(candidates, candidate_count,
-                                DOWN_CAR_CLASS_STRONG);
-    if (best < candidate_count)
-    {
-        *best_lamp = candidates[best].component;
-        component_resolve_angle(best_lamp);
-        reset_weak_car_pending();
-        return 1U;
-    }
-
-    weak_best = select_car_candidate(candidates, candidate_count,
-                                     DOWN_CAR_CLASS_WEAK);
-    if (weak_best < candidate_count &&
-        weak_car_confirmed(&candidates[weak_best].component, 1U) != 0U)
-    {
-        *best_lamp = candidates[weak_best].component;
-        component_resolve_angle(best_lamp);
-        return 1U;
-    }
-    best = select_car_candidate(candidates, candidate_count,
-                                DOWN_CAR_CLASS_TRACK);
-    if (best < candidate_count && g_car_track.confirmed != 0U)
-    {
-        float predicted_x = g_car_track.x + (float)BEACON_IMAGE_W * 0.5f +
-                            g_car_track.vx;
-        float predicted_y = g_car_track.y + (float)BEACON_IMAGE_H * 0.5f +
-                            g_car_track.vy;
-        float dx = candidates[best].component.cx - predicted_x;
-        float dy = candidates[best].component.cy - predicted_y;
-        if (dx * dx + dy * dy <=
-            g_image_down_gate_distance * g_image_down_gate_distance)
+        best = select_car_candidate(candidates, candidate_count,
+                                    DOWN_CAR_CLASS_STRONG);
+        if (best < candidate_count)
         {
             *best_lamp = candidates[best].component;
             component_resolve_angle(best_lamp);
-            add_car_mask(&candidates[best].mask);
+            if (selective_lamp_mask != 0U)
+            {
+                add_car_mask(&candidates[best].mask);
+            }
             reset_weak_car_pending();
             return 1U;
         }
-    }
-    if (weak_best >= candidate_count)
-    {
-        age_weak_car_pending();
+
+        weak_best = select_car_candidate(candidates, candidate_count,
+                                         DOWN_CAR_CLASS_WEAK);
+        if(weak_best < candidate_count &&
+           down_car_candidate_matches_remote_beacon(
+               &candidates[weak_best], strong_rules) != 0U)
+        {
+            s_image_down_roi_conflict = 1U;
+            weak_best = 255U;
+        }
+        if((candidate_count == 1U) &&
+           (weak_best < candidate_count) &&
+           (strong_rules != 0U) &&
+           (down_car_authority_has_dual_support(roi) != 0U) &&
+           (down_car_candidate_matches_authority_roi(
+                &candidates[weak_best], roi) != 0U))
+        {
+            weak_authority_confirmed = 1U;
+        }
+        if (weak_best < candidate_count &&
+            ((weak_authority_confirmed != 0U) ||
+             (weak_car_confirmed(
+                  &candidates[weak_best].component, 1U) != 0U)))
+        {
+            *best_lamp = candidates[weak_best].component;
+            component_resolve_angle(best_lamp);
+            if (selective_lamp_mask != 0U)
+            {
+                add_car_mask(&candidates[weak_best].mask);
+            }
+            if(weak_authority_confirmed != 0U)
+            {
+                reset_weak_car_pending();
+            }
+            return 1U;
+        }
+        best = select_car_candidate(candidates, candidate_count,
+                                    DOWN_CAR_CLASS_TRACK);
+        if(best < candidate_count &&
+           down_car_candidate_matches_remote_beacon(
+               &candidates[best], strong_rules) != 0U)
+        {
+            s_image_down_roi_conflict = 1U;
+            best = 255U;
+        }
+        if (best < candidate_count && g_car_track.confirmed != 0U)
+        {
+            float predicted_x =
+                g_car_track.x + (float)BEACON_IMAGE_W * 0.5f +
+                g_car_track.vx;
+            float predicted_y =
+                g_car_track.y + (float)BEACON_IMAGE_H * 0.5f +
+                g_car_track.vy;
+            float dx = candidates[best].component.cx - predicted_x;
+            float dy = candidates[best].component.cy - predicted_y;
+            if (dx * dx + dy * dy <=
+                g_image_down_gate_distance * g_image_down_gate_distance)
+            {
+                *best_lamp = candidates[best].component;
+                component_resolve_angle(best_lamp);
+                add_car_mask(&candidates[best].mask);
+                reset_weak_car_pending();
+                return 1U;
+            }
+        }
+        if (weak_best >= candidate_count)
+        {
+            age_weak_car_pending();
+        }
     }
     return 0U;
 }
@@ -3106,6 +3444,7 @@ static void beacon_image_process(
     float scene_mean;
     unsigned char has_lamp;
     unsigned char i;
+    uint32 car_search_start;
 
     if (result == 0)
     {
@@ -3118,18 +3457,20 @@ static void beacon_image_process(
         return;
     }
 
+    car_search_start = DWT->CYCCNT;
     g_current_image = image;
     scene_mean = threshold_image(
         image, (unsigned char)g_image_down_car_lamp_binary_threshold);
     memcpy(g_car_lamp_binary_snapshot, g_binary,
            sizeof(g_car_lamp_binary_snapshot));
-    has_lamp = find_car_lamp(&lamp);
+    has_lamp = find_car_lamp(&lamp, &s_image_down_car_lamp_roi);
     if (has_lamp == 0)
     {
         memset(&lamp, 0, sizeof(lamp));
     }
 
     write_car_lamp(&lamp, result);
+    g_image_down_car_lamp_search_cycles = DWT->CYCCNT - car_search_start;
     find_beacons(image, &lamp, 0, scene_mean, result);
     update_temporal_result(result);
 
@@ -3217,9 +3558,180 @@ static void image_down_store_result(const beacon_result_t *result)
         result->car_lamp_measured_mask & 0x01U;
 }
 
+static uint8 image_down_roi_context_valid(void)
+{
+    return ((s_image_down_roi_attitude_valid != 0U) &&
+            (s_image_down_roi_height_valid != 0U) &&
+            (s_image_down_roi_height_mm >= IMAGE_DOWN_ROI_MIN_HEIGHT_MM) &&
+            (s_image_down_roi_height_mm <= IMAGE_DOWN_ROI_MAX_HEIGHT_MM) &&
+            (fabsf(s_image_down_roi_roll_deg) <=
+             IMAGE_DOWN_ROI_MAX_TILT_DEG) &&
+            (fabsf(s_image_down_roi_pitch_deg) <=
+            IMAGE_DOWN_ROI_MAX_TILT_DEG)) ? 1U : 0U;
+}
+
+/**
+ * @brief 从三摄最近真实实测中取得保守灯条半长，用于扩张本帧下摄ROI。
+ * @param capture_time_ms 当前下摄帧的核心1统一采集时间，单位ms。
+ * @return 最近80ms内最大灯条半长，缺少实测时返回6像素。
+ */
+static float image_down_recent_lamp_half_length(uint32 capture_time_ms)
+{
+    float half_length = IMAGE_DOWN_ROI_DEFAULT_HALF_PX;
+    uint8 camera;
+
+    for(camera = 0U; camera < IMAGE_CAMERA_COUNT; camera++)
+    {
+        const image_frame_meta_t *meta = &image_frame_meta[camera];
+        const car_lamp_data *lamp = &image_data[camera].car_lamp_data[0];
+        float candidate;
+
+        if((meta->frame_valid == 0U) ||
+           (meta->timestamp_valid == 0U) ||
+           (meta->source_camera != camera) ||
+           (image_frame_time_difference_ms(
+                capture_time_ms, meta->capture_time_ms) >
+            IMAGE_DOWN_ROI_LENGTH_MAX_AGE_MS) ||
+           ((image_data[camera].car_lamp_measured_mask & 0x01U) == 0U) ||
+           (image_data_car_lamp_valid(lamp) == 0U) ||
+           (lamp->length <= 0.0f) || (lamp->length != lamp->length))
+        {
+            continue;
+        }
+        candidate = lamp->length * 0.5f;
+        if(candidate > half_length)
+        {
+            half_length = candidate;
+        }
+    }
+    return half_length;
+}
+
+static void image_down_prepare_authority_roi(void)
+{
+    car_lamp_track_snapshot_t snapshot;
+
+    memset(&snapshot, 0, sizeof(snapshot));
+    memset(&s_image_down_car_lamp_roi, 0,
+           sizeof(s_image_down_car_lamp_roi));
+    s_image_down_roi_fallback = 0U;
+    s_image_down_roi_conflict = 0U;
+    s_image_down_authority_support_mask = 0U;
+    g_image_down_car_lamp_scan_pixels = 0U;
+    g_image_down_car_lamp_roi_diag = 0U;
+    if((image_frame_meta[Center].timestamp_valid == 0U) ||
+       (image_down_roi_context_valid() == 0U))
+    {
+        g_image_down_car_lamp_roi_snapshot_stale++;
+        return;
+    }
+
+    CarLampCrossCheck_GetSnapshot(&snapshot);
+    if((snapshot.sequence == 0U) ||
+       (snapshot.quality == (uint8)CAR_LAMP_EVIDENCE_NONE))
+    {
+        g_image_down_car_lamp_roi_snapshot_stale++;
+        return;
+    }
+    s_image_down_authority_support_mask =
+        snapshot.support_camera_mask & 0x07U;
+    if(CarLampCrossCheck_GetRoiAtWithLampHalfLength(
+           &snapshot,
+           Center,
+           image_frame_meta[Center].capture_time_ms,
+           image_down_recent_lamp_half_length(
+               image_frame_meta[Center].capture_time_ms),
+           &s_image_down_car_lamp_roi) == 0U)
+    {
+        return;
+    }
+    g_image_down_car_lamp_roi_diag |= IMAGE_DOWN_ROI_DIAG_VALID;
+    if(snapshot.roi_mode == 0U)
+    {
+        return;
+    }
+    g_image_down_car_lamp_roi_diag |= IMAGE_DOWN_ROI_DIAG_ACTUAL;
+    if((s_image_down_processed_frames %
+        IMAGE_DOWN_ROI_FULL_RECHECK_PERIOD) == 0U)
+    {
+        s_image_down_car_lamp_roi.roi_mode = 0U;
+        g_image_down_car_lamp_roi_diag |=
+            IMAGE_DOWN_ROI_DIAG_FORCED_FULL;
+    }
+}
+
+static void image_down_finalize_authority_roi(const beacon_result_t *result)
+{
+    uint8 measured =
+        ((result != 0) &&
+         ((result->car_lamp_measured_mask & 0x01U) != 0U) &&
+         (result->car_lamp_count != 0U) &&
+         (result->car_lamps[0].valid != 0U)) ? 1U : 0U;
+
+    if(s_image_down_roi_fallback != 0U)
+    {
+        g_image_down_car_lamp_roi_diag |= IMAGE_DOWN_ROI_DIAG_FALLBACK;
+    }
+    if((measured != 0U) && (s_image_down_roi_conflict != 0U))
+    {
+        g_image_down_car_lamp_roi_diag |= IMAGE_DOWN_ROI_DIAG_CONFLICT;
+    }
+    if((measured != 0U) &&
+       (s_image_down_car_lamp_roi.valid != 0U))
+    {
+        const beacon_rect_t *lamp = &result->car_lamps[0];
+
+        if((lamp->cx >= s_image_down_car_lamp_roi.min_x) &&
+           (lamp->cx <= s_image_down_car_lamp_roi.max_x) &&
+           (lamp->cy >= s_image_down_car_lamp_roi.min_y) &&
+           (lamp->cy <= s_image_down_car_lamp_roi.max_y))
+        {
+            g_image_down_car_lamp_roi_diag |= IMAGE_DOWN_ROI_DIAG_HIT;
+        }
+        else if((down_car_roi_policy(&s_image_down_car_lamp_roi) &
+                 IMAGE_DOWN_ROI_POLICY_STRONG_RULES) != 0U)
+        {
+            g_image_down_car_lamp_roi_diag |=
+                IMAGE_DOWN_ROI_DIAG_CONFLICT;
+        }
+    }
+}
+
+void image_down_set_roi_context(float roll_deg,
+                                float pitch_deg,
+                                float height_mm,
+                                uint8 attitude_valid,
+                                uint8 height_valid)
+{
+    s_image_down_roi_roll_deg = roll_deg;
+    s_image_down_roi_pitch_deg = pitch_deg;
+    s_image_down_roi_height_mm = height_mm;
+    s_image_down_roi_attitude_valid =
+        (attitude_valid != 0U) ? 1U : 0U;
+    s_image_down_roi_height_valid =
+        (height_valid != 0U) ? 1U : 0U;
+}
+
 void image_down_init(void)
 {
     memset(g_image_frame, 0, MT9V03X_IMAGE_SIZE);
+    memset(&s_image_down_car_lamp_roi, 0,
+           sizeof(s_image_down_car_lamp_roi));
+    s_image_down_processed_frames = 0U;
+    s_image_down_roi_fallback = 0U;
+    s_image_down_roi_conflict = 0U;
+    s_image_down_authority_support_mask = 0U;
+    s_image_down_roi_roll_deg = 0.0f;
+    s_image_down_roi_pitch_deg = 0.0f;
+    s_image_down_roi_height_mm = 0.0f;
+    s_image_down_roi_attitude_valid = 0U;
+    s_image_down_roi_height_valid = 0U;
+    g_image_down_car_lamp_scan_pixels = 0U;
+    g_image_down_car_lamp_roi_fast_hits = 0U;
+    g_image_down_car_lamp_roi_snapshot_stale = 0U;
+    g_image_down_car_lamp_roi_fallbacks = 0U;
+    g_image_down_car_lamp_search_cycles = 0U;
+    g_image_down_car_lamp_roi_diag = 0U;
     image_down_clear_results();
     image_frame_meta_clear(&image_frame_meta[Center], Center);
     s_image_down_latched_frame_sequence = 0U;
@@ -3237,7 +3749,10 @@ uint8 image_down_update(void)
         return 0U;
     }
 
+    s_image_down_processed_frames++;
+    image_down_prepare_authority_roi();
     beacon_image_process(g_image_frame, &result);
+    image_down_finalize_authority_roi(&result);
     image_down_store_result(&result);
     return 1U;
 }

@@ -1,5 +1,6 @@
 #include "camera_spi.h"
 
+#include "Image/car_lamp_cross_check.h"
 #include "IPC/ipc_image_data.h"
 #include "gpio/cy_gpio.h"
 #include "scb/cy_scb_spi.h"
@@ -8,10 +9,11 @@
 
 #define CAMERA_SPI_TRANSFER_LEN             (128U) /* 适配2BL3 SCB 128字节FIFO的单次全双工传输长度。 */
 #define CAMERA_SPI_APP_DATA_CAPACITY        (110U) /* 双来源紧凑透传包占满的应用数据容量。 */
-#define CAMERA_SPI_PARAM_APP_LEN             (24U) /* 参数命令声明长度。 */
+#define CAMERA_SPI_PARAM_FIELDS_LEN          (24U) /* 参数命令字段结束位置。 */
 #define CAMERA_SPI_PARAM_ACK_APP_LEN         (20U) /* 参数应答长度。 */
 #define CAMERA_SPI_ATTITUDE_APP_LEN          (43U) /* 姿态数据应用长度。 */
-#define CAMERA_SPI_TIME_SYNC_APP_LEN         (53U) /* 含主时钟的控制数据应用长度。 */
+#define CAMERA_SPI_TIME_SYNC_APP_LEN         (53U) /* 权威轨迹快照起始位置。 */
+#define CAMERA_SPI_CONTROL_APP_LEN           (85U) /* 含32字节权威轨迹的控制应用长度。 */
 
 #define CAMERA_SPI_FRAME_HEAD_0             (0xAAU)
 #define CAMERA_SPI_FRAME_HEAD_1             (0x55U)
@@ -31,7 +33,16 @@
 #define CAMERA_SPI_READY_REARM_TIMEOUT_US   (200U) /* 未捕获READY低脉冲时的防死锁上限。 */
 #define CAMERA_SPI_TRANSFER_TIMEOUT_US      (2000U)
 #define CAMERA_SPI_TRANSFER_TIMEOUT_POLLS   (100000U)
+#define CAMERA_SPI_DEBUG_WARMUP_TICKS       (100U)
+#define CAMERA_SPI_DEBUG_WINDOW_TICKS       (1000U)
+#define CAMERA_SPI_DEBUG_AUTO_BREAK_ENABLE  (0U)
+/* 临时性能对照：1=只发送两笔控制事务，0=恢复完整relay透传。 */
+#define CAMERA_SPI_TEST_DISABLE_RELAY      (0U)
+#if (CAMERA_SPI_TEST_DISABLE_RELAY != 0U)
+#define CAMERA_SPI_MAX_TRANSFERS_PER_CYCLE  (2U) /* 临时测试仅保留两笔控制。 */
+#else
 #define CAMERA_SPI_MAX_TRANSFERS_PER_CYCLE  (4U) /* 两笔控制加两笔合并透传。 */
+#endif
 #define CAMERA_SPI_BITS_PER_BYTE            (8UL) /* SPI每字节的线路位数。 */
 #define CAMERA_SPI_CONTROL_PERIOD_US        (10000UL) /* 100Hz调度周期。 */
 #define CAMERA_SPI_TRANSFER_WIRE_US \
@@ -48,6 +59,7 @@
 #define CAMERA_SPI_ALL_BOARD_MASK           ((1U << CAMERA_SPI_BOARD_COUNT) - 1U)
 #define CAMERA_SPI_SYNC_FRESH_MS            (50U)  /* 严格同步诊断允许的最大接收年龄。 */
 #define CAMERA_SPI_CROSS_CHECK_HOLD_MS      (500U) /* 公共轨迹允许保留最新来源帧的时间。 */
+#define CAMERA_SPI_FRAME_REBASE_MS          (50U)  /* 来源静默后允许以更新采集时间重建帧号基线。 */
 #define CAMERA_SPI_DWT_UNLOCK_KEY           (0xC5ACCE55UL)
 #define CAMERA_SPI_READY0_PIN               P01_0
 #define CAMERA_SPI_READY1_PIN               P01_1
@@ -93,6 +105,18 @@
 #define CAMERA_SPI_TIME_SYNC_MASTER_MS_OFFSET (45U) /* 核心1毫秒时间偏移。 */
 #define CAMERA_SPI_TIME_SYNC_SEQUENCE_OFFSET  (49U) /* 主时钟事务序号偏移。 */
 
+#define CAMERA_SPI_TRACK_SEQUENCE_OFFSET       (53U)
+#define CAMERA_SPI_TRACK_REFERENCE_MS_OFFSET   (57U)
+#define CAMERA_SPI_TRACK_LAST_SUPPORT_OFFSET   (61U)
+#define CAMERA_SPI_TRACK_CENTER_X_OFFSET       (65U)
+#define CAMERA_SPI_TRACK_CENTER_Y_OFFSET       (69U)
+#define CAMERA_SPI_TRACK_VELOCITY_X_OFFSET     (73U)
+#define CAMERA_SPI_TRACK_VELOCITY_Y_OFFSET     (77U)
+#define CAMERA_SPI_TRACK_STATE_OFFSET          (81U)
+#define CAMERA_SPI_TRACK_SUPPORT_OFFSET        (82U)
+#define CAMERA_SPI_TRACK_QUALITY_OFFSET        (83U)
+#define CAMERA_SPI_TRACK_ROI_MODE_OFFSET       (84U)
+
 #define CAMERA_SPI_IMAGE_MAGIC                 (0xB1U) /* SPI v6单摄上行图像包魔数。 */
 #define CAMERA_SPI_IMAGE_PROTOCOL_VERSION      (6U) /* 3信标、1车灯上行协议版本。 */
 #define CAMERA_SPI_IMAGE_MAGIC_OFFSET           (0U) /* 图像包魔数字节偏移。 */
@@ -102,6 +126,7 @@
 #define CAMERA_SPI_IMAGE_BEACON_COUNT_OFFSET    (4U) /* 有效信标数量字节偏移。 */
 #define CAMERA_SPI_IMAGE_LAMP_COUNT_OFFSET      (5U) /* 有效车灯数量字节偏移。 */
 #define CAMERA_SPI_IMAGE_MEASURED_MASK_OFFSET   (6U) /* 单车灯实测位字节偏移。 */
+#define CAMERA_SPI_IMAGE_ROI_DIAG_OFFSET        (7U) /* 图像板ROI运行诊断位。 */
 #define CAMERA_SPI_IMAGE_FRAME_SEQUENCE_OFFSET  (8U) /* 来源帧号字节偏移。 */
 #define CAMERA_SPI_IMAGE_CAPTURE_TIME_OFFSET    (12U) /* 统一采集时间字节偏移。 */
 #define CAMERA_SPI_IMAGE_HEADER_SIZE            (16U) /* 图像包固定头长度。 */
@@ -173,6 +198,12 @@
 
 #if (CAMERA_SPI_RELAY_PACKET_SIZE != CAMERA_SPI_APP_DATA_CAPACITY)
 #error "Camera SPI compact relay packet must fill the application payload."
+#endif
+
+#if (CAMERA_SPI_PARAM_FIELDS_LEN > CAMERA_SPI_TIME_SYNC_APP_LEN) || \
+    (CAMERA_SPI_TRACK_ROI_MODE_OFFSET + 1U != CAMERA_SPI_CONTROL_APP_LEN) || \
+    (CAMERA_SPI_CONTROL_APP_LEN > CAMERA_SPI_APP_DATA_CAPACITY)
+#error "Camera SPI authority-track control layout mismatch."
 #endif
 
 #if (CAMERA_SPI_RESP_FRAME_LEN != CAMERA_SPI_TRANSFER_LEN)
@@ -309,6 +340,331 @@ static ipc_attitude_data_t s_attitude;
 static camera_spi_param_transaction_t s_param_transaction;
 /* 最近一次已被上层消费的成功SET回滚快照，用于处理迟到取消。 */
 static camera_spi_param_rollback_cache_t s_param_rollback_cache;
+volatile uint8 g_camera_spi_roi_diag[IMAGE_CAMERA_COUNT];
+volatile uint8 g_camera_spi_debug_window_done;
+volatile uint32 g_camera_spi_debug_scheduler_ticks;
+volatile uint32 g_camera_spi_debug_cycles_started;
+volatile uint32 g_camera_spi_debug_cycles_completed;
+volatile uint32 g_camera_spi_debug_busy_ticks;
+volatile uint32 g_camera_spi_debug_elapsed_ms;
+volatile float g_camera_spi_debug_scheduler_hz;
+volatile float g_camera_spi_debug_average_cycle_us;
+volatile float g_camera_spi_debug_max_cycle_us;
+volatile camera_spi_debug_board_t
+    g_camera_spi_debug_board[CAMERA_SPI_BOARD_COUNT];
+
+static uint8 s_debug_window_active;
+static uint8 s_debug_stop_requested;
+static uint8 s_debug_cycle_recording;
+static uint8 s_debug_transfer_recording;
+static uint32 s_debug_warmup_ticks;
+static uint32 s_debug_window_start_ms;
+static uint32 s_debug_cycle_start_cycles;
+static uint64 s_debug_cycle_cycles_sum;
+static uint32 s_debug_cycle_cycles_max;
+static uint64 s_debug_transfer_cycles_sum[CAMERA_SPI_BOARD_COUNT];
+static uint32 s_debug_transfer_cycles_max[CAMERA_SPI_BOARD_COUNT];
+
+static float camera_spi_debug_cycles_to_us(uint64 cycles)
+{
+    if(SystemCoreClock == 0U)
+    {
+        return 0.0f;
+    }
+    return ((float)cycles * 1000000.0f) / (float)SystemCoreClock;
+}
+
+static void camera_spi_debug_reset_window(void)
+{
+    uint8 board_id;
+
+    g_camera_spi_debug_window_done = 0U;
+    g_camera_spi_debug_scheduler_ticks = 0U;
+    g_camera_spi_debug_cycles_started = 0U;
+    g_camera_spi_debug_cycles_completed = 0U;
+    g_camera_spi_debug_busy_ticks = 0U;
+    g_camera_spi_debug_elapsed_ms = 0U;
+    g_camera_spi_debug_scheduler_hz = 0.0f;
+    g_camera_spi_debug_average_cycle_us = 0.0f;
+    g_camera_spi_debug_max_cycle_us = 0.0f;
+    memset((void *)g_camera_spi_debug_board, 0,
+           sizeof(g_camera_spi_debug_board));
+    memset(s_debug_transfer_cycles_sum, 0,
+           sizeof(s_debug_transfer_cycles_sum));
+    memset(s_debug_transfer_cycles_max, 0,
+           sizeof(s_debug_transfer_cycles_max));
+    s_debug_cycle_recording = 0U;
+    s_debug_transfer_recording = 0U;
+    s_debug_cycle_start_cycles = 0U;
+    s_debug_cycle_cycles_sum = 0U;
+    s_debug_cycle_cycles_max = 0U;
+    for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
+    {
+        g_camera_spi_debug_board[board_id].last_frame_sequence =
+            s_boards[board_id].meta.frame_sequence;
+    }
+}
+
+static uint8 camera_spi_debug_scheduler_tick(uint8 busy)
+{
+    if(g_camera_spi_debug_window_done != 0U)
+    {
+        return 0U;
+    }
+    if(s_debug_window_active == 0U)
+    {
+        if(s_debug_warmup_ticks < CAMERA_SPI_DEBUG_WARMUP_TICKS)
+        {
+            s_debug_warmup_ticks++;
+            return 0U;
+        }
+        camera_spi_debug_reset_window();
+        s_debug_window_active = 1U;
+        s_debug_window_start_ms = g_image_master_time_ms;
+    }
+    if(s_debug_stop_requested != 0U)
+    {
+        return 0U;
+    }
+
+    g_camera_spi_debug_scheduler_ticks++;
+    if(busy != 0U)
+    {
+        g_camera_spi_debug_busy_ticks++;
+    }
+    if(g_camera_spi_debug_scheduler_ticks >=
+       CAMERA_SPI_DEBUG_WINDOW_TICKS)
+    {
+        s_debug_stop_requested = 1U;
+    }
+    return 1U;
+}
+
+static void camera_spi_debug_record_ready(uint8 raw_mask,
+                                          uint8 eligible_mask)
+{
+    uint8 board_id;
+
+    if(s_debug_window_active == 0U)
+    {
+        return;
+    }
+    for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
+    {
+        uint8 board_mask = (uint8)(1U << board_id);
+        volatile camera_spi_debug_board_t *diag =
+            &g_camera_spi_debug_board[board_id];
+
+        if((raw_mask & board_mask) != 0U)
+        {
+            diag->ready_raw_high_ticks++;
+            if((eligible_mask & board_mask) != 0U)
+            {
+                diag->ready_eligible_ticks++;
+            }
+            else
+            {
+                diag->ready_rearm_block_ticks++;
+            }
+        }
+        else
+        {
+            diag->ready_low_ticks++;
+        }
+    }
+}
+
+static void camera_spi_debug_record_image(uint8 board_id,
+                                          const image_frame_meta_t *meta,
+                                          uint8 accepted)
+{
+    volatile camera_spi_debug_board_t *diag;
+    uint32 delta;
+
+    if((s_debug_window_active == 0U) ||
+       (board_id >= CAMERA_SPI_BOARD_COUNT) || (meta == NULL))
+    {
+        return;
+    }
+    diag = &g_camera_spi_debug_board[board_id];
+    diag->image_response_count++;
+    if((meta->frame_valid == 0U) || (meta->frame_sequence == 0U))
+    {
+        diag->invalid_image_count++;
+        return;
+    }
+    if(diag->last_frame_sequence == 0U)
+    {
+        if(accepted != 0U)
+        {
+            diag->new_frame_count++;
+            diag->source_frame_count++;
+            diag->last_frame_sequence = meta->frame_sequence;
+        }
+        else
+        {
+            diag->invalid_image_count++;
+        }
+        return;
+    }
+
+    delta = meta->frame_sequence - diag->last_frame_sequence;
+    if(delta == 0U)
+    {
+        diag->duplicate_frame_count++;
+    }
+    else if(delta < 0x80000000UL)
+    {
+        if(accepted != 0U)
+        {
+            diag->new_frame_count++;
+            diag->source_frame_count += delta;
+            diag->skipped_frame_count += delta - 1U;
+            if(delta > diag->max_frame_delta)
+            {
+                diag->max_frame_delta = delta;
+            }
+            diag->last_frame_sequence = meta->frame_sequence;
+        }
+        else
+        {
+            diag->invalid_image_count++;
+        }
+    }
+    else
+    {
+        diag->out_of_order_frame_count++;
+        if(accepted != 0U)
+        {
+            diag->new_frame_count++;
+            diag->source_frame_count++;
+            diag->last_frame_sequence = meta->frame_sequence;
+        }
+    }
+}
+
+static void camera_spi_debug_record_transfer_result(uint8 board_id,
+                                                     uint8 error)
+{
+    volatile camera_spi_debug_board_t *diag;
+    uint32 elapsed_cycles;
+
+    if((s_debug_transfer_recording == 0U) ||
+       (board_id >= CAMERA_SPI_BOARD_COUNT))
+    {
+        s_debug_transfer_recording = 0U;
+        return;
+    }
+    diag = &g_camera_spi_debug_board[board_id];
+    elapsed_cycles = DWT->CYCCNT - s_active_start_cycles;
+    s_debug_transfer_cycles_sum[board_id] += (uint64)elapsed_cycles;
+    if(elapsed_cycles > s_debug_transfer_cycles_max[board_id])
+    {
+        s_debug_transfer_cycles_max[board_id] = elapsed_cycles;
+    }
+    diag->last_error = error;
+    if(error == CAMERA_SPI_ERR_OK)
+    {
+        diag->control_success_count++;
+    }
+    else
+    {
+        diag->control_error_count++;
+        if(error == CAMERA_SPI_ERR_TIMEOUT)
+        {
+            diag->timeout_count++;
+        }
+        else if(error == CAMERA_SPI_ERR_CRC)
+        {
+            diag->crc_error_count++;
+        }
+        else if(error == CAMERA_SPI_ERR_HW)
+        {
+            diag->hw_error_count++;
+        }
+    }
+    s_debug_transfer_recording = 0U;
+}
+
+static void camera_spi_debug_record_cycle_complete(void)
+{
+    uint32 elapsed_cycles;
+
+    if(s_debug_cycle_recording == 0U)
+    {
+        return;
+    }
+    elapsed_cycles = DWT->CYCCNT - s_debug_cycle_start_cycles;
+    s_debug_cycle_cycles_sum += (uint64)elapsed_cycles;
+    if(elapsed_cycles > s_debug_cycle_cycles_max)
+    {
+        s_debug_cycle_cycles_max = elapsed_cycles;
+    }
+    g_camera_spi_debug_cycles_completed++;
+    s_debug_cycle_recording = 0U;
+}
+
+static void camera_spi_debug_finish_window(void)
+{
+    uint8 board_id;
+    uint32 elapsed_ms;
+
+    if((s_debug_window_active == 0U) ||
+       (s_debug_stop_requested == 0U) ||
+       (s_active != 0U) || (s_cycle_active != 0U))
+    {
+        return;
+    }
+    elapsed_ms = g_image_master_time_ms - s_debug_window_start_ms;
+    if(elapsed_ms == 0U)
+    {
+        elapsed_ms = 1U;
+    }
+    g_camera_spi_debug_elapsed_ms = elapsed_ms;
+    g_camera_spi_debug_scheduler_hz =
+        ((float)g_camera_spi_debug_scheduler_ticks * 1000.0f) /
+        (float)elapsed_ms;
+    if(g_camera_spi_debug_cycles_completed != 0U)
+    {
+        g_camera_spi_debug_average_cycle_us =
+            camera_spi_debug_cycles_to_us(s_debug_cycle_cycles_sum) /
+            (float)g_camera_spi_debug_cycles_completed;
+    }
+    g_camera_spi_debug_max_cycle_us =
+        camera_spi_debug_cycles_to_us((uint64)s_debug_cycle_cycles_max);
+
+    for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
+    {
+        volatile camera_spi_debug_board_t *diag =
+            &g_camera_spi_debug_board[board_id];
+
+        if(diag->control_start_count != 0U)
+        {
+            diag->average_transfer_us =
+                camera_spi_debug_cycles_to_us(
+                    s_debug_transfer_cycles_sum[board_id]) /
+                (float)diag->control_start_count;
+        }
+        diag->max_transfer_us = camera_spi_debug_cycles_to_us(
+            (uint64)s_debug_transfer_cycles_max[board_id]);
+        diag->new_frame_fps =
+            ((float)diag->new_frame_count * 1000.0f) /
+            (float)elapsed_ms;
+        diag->source_fps =
+            ((float)diag->source_frame_count * 1000.0f) /
+            (float)elapsed_ms;
+    }
+
+    s_debug_window_active = 0U;
+    s_debug_stop_requested = 0U;
+    g_camera_spi_debug_window_done = 1U;
+#if (CAMERA_SPI_DEBUG_AUTO_BREAK_ENABLE != 0U)
+    if((CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk) != 0U)
+    {
+        __BKPT(0);
+    }
+#endif
+}
 
 static void camera_spi_write_u16_be(uint8 *buffer, uint16 value)
 {
@@ -393,6 +749,28 @@ static uint8 camera_spi_sequence_is_newer(uint32 candidate, uint32 current)
             ((int32)(candidate - current) > 0)) ? 1U : 0U;
 }
 
+/* 仅在来源已静默且统一采集时间继续前进时接受回退帧号，避免把乱序包误判为重启。 */
+static uint8 camera_spi_history_can_rebase(
+    const camera_spi_history_entry_t *latest,
+    const image_frame_meta_t *candidate)
+{
+    if((latest == NULL) || (candidate == NULL) ||
+       (candidate->frame_sequence == latest->meta.frame_sequence) ||
+       (candidate->timestamp_valid == 0U) ||
+       ((uint32)(g_image_master_time_ms - latest->received_time_ms) <
+        CAMERA_SPI_FRAME_REBASE_MS))
+    {
+        return 0U;
+    }
+    if((latest->meta.timestamp_valid != 0U) &&
+       ((int32)(candidate->capture_time_ms -
+                latest->meta.capture_time_ms) <= 0))
+    {
+        return 0U;
+    }
+    return 1U;
+}
+
 /**
  * @brief 将来源帧写入该摄像头的最近两帧缓存。
  * @param source 摄像头来源编号。
@@ -418,7 +796,12 @@ static uint8 camera_spi_history_push(image_camera_e source,
        (camera_spi_sequence_is_newer(meta->frame_sequence,
                                      entries[0].meta.frame_sequence) == 0U))
     {
-        return 0U;
+        if(camera_spi_history_can_rebase(&entries[0], meta) == 0U)
+        {
+            return 0U;
+        }
+        memset(entries, 0, sizeof(s_history[source]));
+        s_history_count[source] = 0U;
     }
 
     if(s_history_count[source] != 0U)
@@ -671,6 +1054,7 @@ static uint8 camera_spi_ready_mask(void)
 static uint16 camera_spi_build_downlink_app(uint8 board_id, uint8 *app)
 {
     camera_spi_board_state_t *board = &s_boards[board_id];
+    car_lamp_track_snapshot_t track_snapshot;
     uint8 board_mask = (uint8)(1U << board_id);
     uint32 transaction;
     uint32 value_bits;
@@ -708,6 +1092,26 @@ static uint16 camera_spi_build_downlink_app(uint8 board_id, uint8 *app)
     }
     camera_spi_write_u32_le(&app[CAMERA_SPI_TIME_SYNC_SEQUENCE_OFFSET],
                             s_time_sync_sequence);
+    CarLampCrossCheck_GetSnapshot(&track_snapshot);
+    camera_spi_write_u32_le(&app[CAMERA_SPI_TRACK_SEQUENCE_OFFSET],
+                            track_snapshot.sequence);
+    camera_spi_write_u32_le(&app[CAMERA_SPI_TRACK_REFERENCE_MS_OFFSET],
+                            track_snapshot.reference_time_ms);
+    camera_spi_write_u32_le(&app[CAMERA_SPI_TRACK_LAST_SUPPORT_OFFSET],
+                            track_snapshot.last_support_time_ms);
+    camera_spi_write_float_le(&app[CAMERA_SPI_TRACK_CENTER_X_OFFSET],
+                              track_snapshot.center_x);
+    camera_spi_write_float_le(&app[CAMERA_SPI_TRACK_CENTER_Y_OFFSET],
+                              track_snapshot.center_y);
+    camera_spi_write_float_le(&app[CAMERA_SPI_TRACK_VELOCITY_X_OFFSET],
+                              track_snapshot.velocity_x);
+    camera_spi_write_float_le(&app[CAMERA_SPI_TRACK_VELOCITY_Y_OFFSET],
+                              track_snapshot.velocity_y);
+    app[CAMERA_SPI_TRACK_STATE_OFFSET] = track_snapshot.state;
+    app[CAMERA_SPI_TRACK_SUPPORT_OFFSET] =
+        track_snapshot.support_camera_mask;
+    app[CAMERA_SPI_TRACK_QUALITY_OFFSET] = track_snapshot.quality;
+    app[CAMERA_SPI_TRACK_ROI_MODE_OFFSET] = track_snapshot.roi_mode;
 
     if(((s_param_transaction.state == CAMERA_SPI_PARAM_PREFLIGHT) ||
         (s_param_transaction.state == CAMERA_SPI_PARAM_ACTIVE) ||
@@ -758,10 +1162,10 @@ static uint16 camera_spi_build_downlink_app(uint8 board_id, uint8 *app)
         {
             s_param_transaction.command_due_mask &= (uint8)(~board_mask);
         }
-        return CAMERA_SPI_PARAM_APP_LEN;
+        return CAMERA_SPI_CONTROL_APP_LEN;
     }
 
-    return CAMERA_SPI_TIME_SYNC_APP_LEN;
+    return CAMERA_SPI_CONTROL_APP_LEN;
 }
 
 static void camera_spi_refresh_flight_state(void)
@@ -891,6 +1295,8 @@ static void camera_spi_update_freshness(void)
         if(board->image_age_cycles == CAMERA_SPI_IMAGE_STALE_CYCLES)
         {
             camera_spi_invalidate_board_targets(board);
+            g_camera_spi_roi_diag[
+                (board_id == 0U) ? (uint8)Front : (uint8)Back] = 0U;
         }
         if(board->link_age_cycles == CAMERA_SPI_LINK_STALE_CYCLES)
         {
@@ -909,6 +1315,7 @@ static void camera_spi_update_freshness(void)
 static uint8 camera_spi_parse_image_payload(uint8 board_id, const uint8 *data)
 {
     uint8 i;
+    uint8 accepted;
     const uint8 *slot;
     image_camera_e expected_source;
     camera_spi_board_state_t *board = &s_boards[board_id];
@@ -981,8 +1388,12 @@ static uint8 camera_spi_parse_image_payload(uint8 board_id, const uint8 *data)
     }
 
     board->version = CAMERA_SPI_IMAGE_PROTOCOL_VERSION;
-    if(camera_spi_history_push(expected_source, &decoded, &meta) != 0U)
+    accepted = camera_spi_history_push(expected_source, &decoded, &meta);
+    camera_spi_debug_record_image(board_id, &meta, accepted);
+    if(accepted != 0U)
     {
+        g_camera_spi_roi_diag[expected_source] =
+            data[CAMERA_SPI_IMAGE_ROI_DIAG_OFFSET];
         board->beacon_count = data[CAMERA_SPI_IMAGE_BEACON_COUNT_OFFSET];
         if(board->beacon_count > CAMERA_SPI_IMAGE_BEACON_COUNT)
         {
@@ -1471,11 +1882,20 @@ static void camera_spi_start_transfer(uint8 board_id, uint8 relay)
 {
     cy_en_scb_spi_status_t status;
     uint8 board_mask;
+    uint8 debug_control;
 
     if((board_id >= CAMERA_SPI_BOARD_COUNT) || (s_active != 0U))
     {
         camera_spi_record_error(board_id, CAMERA_SPI_ERR_TRANSFER_BUSY);
         return;
+    }
+
+    debug_control = ((s_debug_window_active != 0U) &&
+                     (relay == 0U)) ? 1U : 0U;
+    s_debug_transfer_recording = 0U;
+    if(debug_control != 0U)
+    {
+        g_camera_spi_debug_board[board_id].control_attempt_count++;
     }
 
     s_active_relay = (relay != 0U) ? 1U : 0U;
@@ -1492,6 +1912,10 @@ static void camera_spi_start_transfer(uint8 board_id, uint8 relay)
         /* READY在CS建立期间撤销，取消空事务并保留latest-only透传帧。 */
         camera_spi_set_cs(board_id, 0U);
         s_active_relay = 0U;
+        if(debug_control != 0U)
+        {
+            g_camera_spi_debug_board[board_id].ready_race_count++;
+        }
         return;
     }
     status = Cy_SCB_SPI_Transfer(CAMERA_SPI_SCB,
@@ -1505,6 +1929,11 @@ static void camera_spi_start_transfer(uint8 board_id, uint8 relay)
         s_active_board = board_id;
         s_active_poll_count = 0U;
         s_active_start_cycles = DWT->CYCCNT;
+        if(debug_control != 0U)
+        {
+            g_camera_spi_debug_board[board_id].control_start_count++;
+            s_debug_transfer_recording = 1U;
+        }
         if(s_active_relay != 0U)
         {
             s_active_relay_mask = s_relay_pending[board_id];
@@ -1515,6 +1944,13 @@ static void camera_spi_start_transfer(uint8 board_id, uint8 relay)
     {
         camera_spi_set_cs(board_id, 0U);
         camera_spi_record_error(board_id, CAMERA_SPI_ERR_HW);
+        if(debug_control != 0U)
+        {
+            g_camera_spi_debug_board[board_id].control_error_count++;
+            g_camera_spi_debug_board[board_id].hw_error_count++;
+            g_camera_spi_debug_board[board_id].last_error =
+                CAMERA_SPI_ERR_HW;
+        }
         s_active_relay = 0U;
     }
 }
@@ -1533,6 +1969,7 @@ static void camera_spi_abort_active(uint8 error)
     Cy_SCB_SPI_Disable(CAMERA_SPI_SCB, &s_spi_context);
     Cy_SCB_SPI_Enable(CAMERA_SPI_SCB);
     camera_spi_record_error(s_active_board, error);
+    camera_spi_debug_record_transfer_result(s_active_board, error);
     if(s_active_relay != 0U)
     {
         s_relay_pending[s_active_board] |= s_active_relay_mask;
@@ -1594,6 +2031,7 @@ static void camera_spi_finish_active(void)
     s_boards[s_active_board].last_rx_head1 = s_rx_frame[1];
     error = camera_spi_parse_response(s_active_board);
     camera_spi_record_error(s_active_board, error);
+    camera_spi_debug_record_transfer_result(s_active_board, error);
     s_active_poll_count = 0U;
     s_active = 0U;
     s_active_relay = 0U;
@@ -1606,6 +2044,9 @@ static void camera_spi_finish_active(void)
  */
 static uint8 camera_spi_start_next_relay(void)
 {
+#if (CAMERA_SPI_TEST_DISABLE_RELAY != 0U)
+    return 0U;
+#else
     uint8 board_id;
     uint8 ready_mask = camera_spi_ready_mask();
 
@@ -1629,6 +2070,7 @@ static uint8 camera_spi_start_next_relay(void)
         }
     }
     return 0U;
+#endif
 }
 
 static void camera_spi_publish_log(void)
@@ -1669,9 +2111,11 @@ static void camera_spi_complete_cycle(void)
 {
     s_cycle_active = 0U;
     s_cycle_relay_sent_mask = 0U;
+    camera_spi_debug_record_cycle_complete();
     camera_spi_param_schedule_next();
     camera_spi_param_evaluate();
     camera_spi_publish_log();
+    camera_spi_debug_finish_window();
 }
 
 /*
@@ -1707,6 +2151,10 @@ uint8 CameraSpi_Service(void)
             s_cycle_pending_mask &= (uint8)(~board_mask);
             if((camera_spi_ready_mask() & board_mask) == 0U)
             {
+                if(s_debug_window_active != 0U)
+                {
+                    g_camera_spi_debug_board[board_id].ready_race_count++;
+                }
                 break;
             }
 
@@ -1738,6 +2186,8 @@ void CameraSpi_Init(void)
     uint8 board_id;
 
     memset(s_boards, 0, sizeof(s_boards));
+    memset((void *)g_camera_spi_roi_diag, 0,
+           sizeof(g_camera_spi_roi_diag));
     memset(s_relay_pending, 0, sizeof(s_relay_pending));
     memset(s_history, 0, sizeof(s_history));
     memset(s_history_count, 0, sizeof(s_history_count));
@@ -1772,6 +2222,9 @@ void CameraSpi_Init(void)
     s_ready_rearm_timeout_cycles = 0U;
     s_log_seq = 0U;
     s_time_sync_sequence = 0U;
+    s_debug_window_active = 0U;
+    s_debug_stop_requested = 0U;
+    s_debug_warmup_ticks = 0U;
 
     for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
     {
@@ -1780,6 +2233,7 @@ void CameraSpi_Init(void)
                                (board_id == 0U) ? Front : Back);
         s_boards[board_id].tx_sequence = 1U;
     }
+    camera_spi_debug_reset_window();
 
     camera_spi_init_pins();
     camera_spi_init_scb();
@@ -1807,12 +2261,16 @@ void CameraSpi_Init(void)
 
 void CameraSpi_Update(void)
 {
+    uint8 raw_ready_mask;
+
     if(s_initialized == 0U)
     {
         return;
     }
 
     (void)CameraSpi_Service();
+    (void)camera_spi_debug_scheduler_tick(
+        ((s_active != 0U) || (s_cycle_active != 0U)) ? 1U : 0U);
     if((s_active != 0U) || (s_cycle_active != 0U))
     {
         return;
@@ -1821,10 +2279,18 @@ void CameraSpi_Update(void)
     camera_spi_update_freshness();
     ipc_attitude_get(&s_attitude);
     camera_spi_refresh_flight_state();
+    raw_ready_mask = camera_spi_read_ready_pins();
     s_ready_mask = camera_spi_ready_mask();
+    camera_spi_debug_record_ready(raw_ready_mask, s_ready_mask);
     s_cycle_pending_mask = s_ready_mask & CAMERA_SPI_ALL_BOARD_MASK;
     s_cycle_relay_sent_mask = 0U;
     s_cycle_active = 1U;
+    if(s_debug_window_active != 0U)
+    {
+        s_debug_cycle_recording = 1U;
+        s_debug_cycle_start_cycles = DWT->CYCCNT;
+        g_camera_spi_debug_cycles_started++;
+    }
     (void)CameraSpi_Service();
 }
 

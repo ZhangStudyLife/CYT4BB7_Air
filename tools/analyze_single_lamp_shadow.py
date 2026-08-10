@@ -252,6 +252,7 @@ def _decode_status(value: float) -> dict[str, int]:
         "full_frame_fallback": (packed >> 16) & 0x07,
         "button_marker": (packed >> 19) & 0x01,
         "measured": (packed >> 20) & 0x07,
+        "actual_roi_mode": (packed >> 23) & 0x01,
     }
 
 
@@ -413,6 +414,11 @@ def _compact_v35(rows: list[dict[str, str]]) -> dict[str, object]:
                 camera: mask_rate("full_frame_fallback", index)
                 for index, camera in enumerate(CAMERAS)
             },
+            "actual_roi_mode_rate": (
+                sum(status["actual_roi_mode"] != 0 for status in statuses) / len(rows)
+                if rows
+                else 0.0
+            ),
             "geometry_valid_rate": (
                 sum(bool(geometry["valid"]) for geometry in geometries) / len(rows)
                 if rows

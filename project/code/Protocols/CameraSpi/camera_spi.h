@@ -26,49 +26,6 @@ typedef struct
     uint8 status;
 } camera_spi_remote_param_result_t;
 
-/* Air核心1本地Live Watch诊断，不进入IPC或Camera SPI协议。 */
-typedef struct
-{
-    uint32 ready_raw_high_ticks;
-    uint32 ready_eligible_ticks;
-    uint32 ready_low_ticks;
-    uint32 ready_rearm_block_ticks;
-    uint32 control_attempt_count;
-    uint32 control_start_count;
-    uint32 control_success_count;
-    uint32 control_error_count;
-    uint32 ready_race_count;
-    uint32 timeout_count;
-    uint32 crc_error_count;
-    uint32 hw_error_count;
-    uint32 image_response_count;
-    uint32 invalid_image_count;
-    uint32 new_frame_count;
-    uint32 duplicate_frame_count;
-    uint32 out_of_order_frame_count;
-    uint32 source_frame_count;
-    uint32 skipped_frame_count;
-    uint32 last_frame_sequence;
-    uint32 max_frame_delta;
-    uint8 last_error;
-    float average_transfer_us;
-    float max_transfer_us;
-    float new_frame_fps;
-    float source_fps;
-} camera_spi_debug_board_t;
-
-extern volatile uint8 g_camera_spi_debug_window_done;
-extern volatile uint32 g_camera_spi_debug_scheduler_ticks;
-extern volatile uint32 g_camera_spi_debug_cycles_started;
-extern volatile uint32 g_camera_spi_debug_cycles_completed;
-extern volatile uint32 g_camera_spi_debug_busy_ticks;
-extern volatile uint32 g_camera_spi_debug_elapsed_ms;
-extern volatile float g_camera_spi_debug_scheduler_hz;
-extern volatile float g_camera_spi_debug_average_cycle_us;
-extern volatile float g_camera_spi_debug_max_cycle_us;
-extern volatile camera_spi_debug_board_t
-    g_camera_spi_debug_board[CAMERA_SPI_BOARD_COUNT];
-
 /**
  * @brief 初始化核心1 Camera SPI主机、双板状态和三摄同步缓存。
  * @return 无。

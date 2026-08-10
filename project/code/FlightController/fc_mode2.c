@@ -11,7 +11,7 @@ static const float s_mode2_img_kd = 0.08f;
 static const float s_mode2_img_d_lpf_hz = 1.2f;
 static const float s_mode2_car_accel_ff = 5.0f;
 static const float s_mode2_car_accel_lpf_hz = 0.9f;
-static const float s_mode2_car_turn_accel_ff = 3.1f; /* 向心加速度前馈，单位 deg/(m/s^2) */
+static const float s_mode2_car_turn_accel_ff = 3.5f; /* 向心加速度前馈，单位 deg/(m/s^2) */
 static const float s_mode2_car_turn_accel_lpf_hz = 1.8f; /* 向心加速度低通截止频率，单位 Hz */
 static const float s_mode2_angle_limit_deg = 20.0f;
 

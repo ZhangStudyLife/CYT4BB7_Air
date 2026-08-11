@@ -756,7 +756,8 @@ void FC_Loop_500Hz(void)
                                               : 0.0f,                                   /* I42 M2 final pitch correction, deg */
                              (is_mode2 != 0U) ? g_mode2_img_error_rate_x_pxps : 0.0f,    /* I43 M2 error rate X, px/s */
                              (is_mode2 != 0U) ? g_mode2_img_error_rate_y_pxps : 0.0f,    /* I44 M2 error rate Y, px/s */
-                             (is_mode2 != 0U) ? g_mode2_car_dt_ms : 0.0f);               /* I45 M2 car dt, ms */
+                             (is_mode2 != 0U) ? g_mode2_car_dt_ms : 0.0f,                /* I45 M2 car dt, ms */
+                             g_car_sync_time_ms);                                        /* I46 car sync time, ms */
     }
 
     // wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw,roll_angle_target,pitch_angle_target,yaw_angle_target,

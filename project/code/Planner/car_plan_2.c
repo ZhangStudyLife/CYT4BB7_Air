@@ -32,7 +32,8 @@
 #define CAR_PLAN_2_MIN_TARGET_DIST_PX            (2.0f)  /* 车体中心与信标的最小有效距离，单位px。 */
 #define CAR_PLAN_2_FAST_CENTER_DIST_PX           (65.0f) /* 快速速度判定的投影中心距离，单位px。 */
 #define CAR_PLAN_2_ANGLE_TO_RAD                  (0.017453292519943295f) /* 角度转弧度系数。 */
-#define CAR_PLAN_2_DIRECTION_LPF_ALPHA           (0.2008f) /* 100Hz下4Hz方向低通系数。 */
+#define CAR_PLAN_2_DIRECTION_RADIAL_K             (1.10f) /* 速度方向的像素径向修正系数。 */
+#define CAR_PLAN_2_DIRECTION_BIAS_RAD             (5.0f * CAR_PLAN_2_ANGLE_TO_RAD) /* 速度方向固定补偿角，单位rad。 */
 
 typedef struct
 {
@@ -73,7 +74,6 @@ extern float g_car_sync_time_ms; /* 最近一次车端同步时间戳，单位ms
 
 static car_plan_2_result_t s_car_plan_2_result; /* 最近一次影子规划输出。 */
 static car_plan_2_lock_t s_car_plan_2_lock; /* 物理信标锁定位置、历史位置和计数状态。 */
-static float s_car_plan_2_direction_rad; /* 同一锁定信标的滤波速度方向，单位rad。 */
 
 /**
  * @brief 清零指定影子规划结果。
@@ -271,8 +271,9 @@ static uint8 CarPlan_2_MakeResult(const car_plan_2_cluster_t *cluster,
     float angle_rad;
     float line_x;
     float line_y;
-    float normal_x;
-    float normal_y;
+    float car_gain;
+    float target_gain;
+    float axis_dot;
     float strafe;
     float forward;
     float plan_speed = Car_Speed;
@@ -293,8 +294,6 @@ static uint8 CarPlan_2_MakeResult(const car_plan_2_cluster_t *cluster,
         return 0U;
     }
 
-    dx /= dist;
-    dy /= dist;
     angle_rad = g_car_lamp_fused.angle * CAR_PLAN_2_ANGLE_TO_RAD;
     line_x = cosf(angle_rad);
     line_y = sinf(angle_rad);
@@ -306,10 +305,28 @@ static uint8 CarPlan_2_MakeResult(const car_plan_2_cluster_t *cluster,
         line_x = -line_x;
         line_y = -line_y;
     }
-    normal_x = -line_y;
-    normal_y = line_x;
+
+    /* 同时修正目标、车体中心和车体右向切线，再计算真实地面方向。 */
+    car_gain = 1.0f + CAR_PLAN_2_DIRECTION_RADIAL_K *
+        (car_center_x * car_center_x + car_center_y * car_center_y) * 0.0001f;
+    target_gain = 1.0f + CAR_PLAN_2_DIRECTION_RADIAL_K *
+        (cluster->center_x * cluster->center_x + cluster->center_y * cluster->center_y) * 0.0001f;
+    dx = cluster->center_x * target_gain - car_center_x * car_gain;
+    dy = cluster->center_y * target_gain - car_center_y * car_gain;
+    axis_dot = 2.0f * CAR_PLAN_2_DIRECTION_RADIAL_K *
+        (car_center_x * line_x + car_center_y * line_y) * 0.0001f;
+    line_x = car_gain * line_x + axis_dot * car_center_x;
+    line_y = car_gain * line_y + axis_dot * car_center_y;
+    dist = sqrtf(line_x * line_x + line_y * line_y);
+    line_x /= dist;
+    line_y /= dist;
     strafe = dx * line_x + dy * line_y;
-    forward = -(dx * normal_x + dy * normal_y);
+    forward = dx * line_y - dy * line_x;
+    dx = strafe * cosf(CAR_PLAN_2_DIRECTION_BIAS_RAD) +
+         forward * sinf(CAR_PLAN_2_DIRECTION_BIAS_RAD);
+    forward = forward * cosf(CAR_PLAN_2_DIRECTION_BIAS_RAD) -
+              strafe * sinf(CAR_PLAN_2_DIRECTION_BIAS_RAD);
+    strafe = dx;
 
     if(g_projection_center.valid != 0U)
     {
@@ -380,8 +397,6 @@ static void CarPlan_2_LockCluster(const car_plan_2_cluster_t *cluster,
     s_car_plan_2_lock.lost_ticks = 0U;
     s_car_plan_2_lock.velocity_conflict_ticks = 0U;
     s_car_plan_2_lock.nearer_target_ticks = 0U;
-    s_car_plan_2_direction_rad = atan2f(result->target_strafe_mps,
-                                        result->target_forward_mps);
     s_car_plan_2_result = *result;
 }
 
@@ -657,18 +672,6 @@ uint8 CarPlan_2_Update(car_plan_2_result_t *result)
         s_car_plan_2_lock.center_y = clusters[selected_index].center_y;
         s_car_plan_2_lock.lost_ticks = 0U;
 
-        /* 同一信标仅平滑速度方向，并保持规划速度模长不变。 */
-        {
-            float direction_error = atan2f(candidate_result.target_strafe_mps,
-                                           candidate_result.target_forward_mps) -
-                                    s_car_plan_2_direction_rad;
-            float speed = sqrtf(candidate_result.target_strafe_mps * candidate_result.target_strafe_mps +
-                                candidate_result.target_forward_mps * candidate_result.target_forward_mps);
-            s_car_plan_2_direction_rad += CAR_PLAN_2_DIRECTION_LPF_ALPHA *
-                atan2f(sinf(direction_error), cosf(direction_error));
-            candidate_result.target_strafe_mps = speed * sinf(s_car_plan_2_direction_rad);
-            candidate_result.target_forward_mps = speed * cosf(s_car_plan_2_direction_rad);
-        }
         s_car_plan_2_result = candidate_result;
         CarPlan_2_CopyResult(result);
         return 1U;

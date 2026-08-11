@@ -32,8 +32,10 @@
 #define CAR_PLAN_2_MIN_TARGET_DIST_PX            (2.0f)  /* 车体中心与信标的最小有效距离，单位px。 */
 #define CAR_PLAN_2_FAST_CENTER_DIST_PX           (65.0f) /* 快速速度判定的投影中心距离，单位px。 */
 #define CAR_PLAN_2_ANGLE_TO_RAD                  (0.017453292519943295f) /* 角度转弧度系数。 */
-#define CAR_PLAN_2_DIRECTION_RADIAL_K             (1.10f) /* 速度方向的像素径向修正系数。 */
-#define CAR_PLAN_2_DIRECTION_BIAS_RAD             (5.0f * CAR_PLAN_2_ANGLE_TO_RAD) /* 速度方向固定补偿角，单位rad。 */
+#define CAR_PLAN_2_DIRECTION_RADIAL_K4            (2.40f) /* 四次径向修正系数。 */
+#define CAR_PLAN_2_DIRECTION_CENTER_SCALE        (0.3333333333f) /* 投影中心平移比例。 */
+#define CAR_PLAN_2_DIRECTION_BIAS_DEG             (2.0f) /* 全局方向补偿角，单位deg。 */
+#define CAR_PLAN_2_DIRECTION_BACK_BIAS_DEG      (-6.0f) /* Back相机方向补偿角，单位deg。 */
 
 typedef struct
 {
@@ -306,14 +308,26 @@ static uint8 CarPlan_2_MakeResult(const car_plan_2_cluster_t *cluster,
         line_y = -line_y;
     }
 
-    /* 同时修正目标、车体中心和车体右向切线，再计算真实地面方向。 */
-    car_gain = 1.0f + CAR_PLAN_2_DIRECTION_RADIAL_K *
-        (car_center_x * car_center_x + car_center_y * car_center_y) * 0.0001f;
-    target_gain = 1.0f + CAR_PLAN_2_DIRECTION_RADIAL_K *
-        (cluster->center_x * cluster->center_x + cluster->center_y * cluster->center_y) * 0.0001f;
-    dx = cluster->center_x * target_gain - car_center_x * car_gain;
-    dy = cluster->center_y * target_gain - car_center_y * car_gain;
-    axis_dot = 2.0f * CAR_PLAN_2_DIRECTION_RADIAL_K *
+    /* 平移到投影中心后，按四次径向模型及Jacobian修正两点和车灯长轴。 */
+    if(g_projection_center.valid != 0U)
+    {
+        car_center_x -= g_projection_center.cx * CAR_PLAN_2_DIRECTION_CENTER_SCALE;
+        car_center_y -= g_projection_center.cy * CAR_PLAN_2_DIRECTION_CENTER_SCALE;
+        dx = cluster->center_x - g_projection_center.cx * CAR_PLAN_2_DIRECTION_CENTER_SCALE;
+        dy = cluster->center_y - g_projection_center.cy * CAR_PLAN_2_DIRECTION_CENTER_SCALE;
+    }
+    else
+    {
+        dx = cluster->center_x;
+        dy = cluster->center_y;
+    }
+    axis_dot = (car_center_x * car_center_x + car_center_y * car_center_y) * 0.0001f;
+    car_gain = 1.0f + CAR_PLAN_2_DIRECTION_RADIAL_K4 * axis_dot * axis_dot;
+    target_gain = (dx * dx + dy * dy) * 0.0001f;
+    target_gain = 1.0f + CAR_PLAN_2_DIRECTION_RADIAL_K4 * target_gain * target_gain;
+    dx = dx * target_gain - car_center_x * car_gain;
+    dy = dy * target_gain - car_center_y * car_gain;
+    axis_dot = 4.0f * CAR_PLAN_2_DIRECTION_RADIAL_K4 * axis_dot *
         (car_center_x * line_x + car_center_y * line_y) * 0.0001f;
     line_x = car_gain * line_x + axis_dot * car_center_x;
     line_y = car_gain * line_y + axis_dot * car_center_y;
@@ -322,20 +336,24 @@ static uint8 CarPlan_2_MakeResult(const car_plan_2_cluster_t *cluster,
     line_y /= dist;
     strafe = dx * line_x + dy * line_y;
     forward = dx * line_y - dy * line_x;
-    dx = strafe * cosf(CAR_PLAN_2_DIRECTION_BIAS_RAD) +
-         forward * sinf(CAR_PLAN_2_DIRECTION_BIAS_RAD);
-    forward = forward * cosf(CAR_PLAN_2_DIRECTION_BIAS_RAD) -
-              strafe * sinf(CAR_PLAN_2_DIRECTION_BIAS_RAD);
+    angle_rad = (CAR_PLAN_2_DIRECTION_BIAS_DEG +
+                 ((cluster->camera_mask == 4U)
+                      ? CAR_PLAN_2_DIRECTION_BACK_BIAS_DEG
+                      : 0.0f)) * CAR_PLAN_2_ANGLE_TO_RAD;
+    dx = strafe * cosf(angle_rad) + forward * sinf(angle_rad);
+    forward = forward * cosf(angle_rad) - strafe * sinf(angle_rad);
     strafe = dx;
 
     if(g_projection_center.valid != 0U)
     {
         float beacon_projection_x = cluster->center_x - g_projection_center.cx;
         float beacon_projection_y = cluster->center_y - g_projection_center.cy;
-        float projection_car_x = g_projection_center.cx - car_center_x;
-        float projection_car_y = g_projection_center.cy - car_center_y;
-        float beacon_car_x = cluster->center_x - car_center_x;
-        float beacon_car_y = cluster->center_y - car_center_y;
+        float projection_car_x = g_projection_center.cx - g_car_lamp_fused.cx;
+        float projection_car_y = g_projection_center.cy -
+                                 (g_car_lamp_fused.cy + CAR_PLAN_2_CAR_CENTER_Y_OFFSET_PX);
+        float beacon_car_x = cluster->center_x - g_car_lamp_fused.cx;
+        float beacon_car_y = cluster->center_y -
+                             (g_car_lamp_fused.cy + CAR_PLAN_2_CAR_CENTER_Y_OFFSET_PX);
         float direction_dot = projection_car_x * beacon_car_x +
                               projection_car_y * beacon_car_y;
         if(((beacon_projection_x * beacon_projection_x +
@@ -351,8 +369,8 @@ static uint8 CarPlan_2_MakeResult(const car_plan_2_cluster_t *cluster,
         }
     }
 
-    speed_scale = plan_speed /
-                  ((fabsf(strafe) > fabsf(forward)) ? fabsf(strafe) : fabsf(forward));
+    /* 差速车按速度向量模长归一化，避免斜向指令被放大。 */
+    speed_scale = plan_speed / sqrtf(strafe * strafe + forward * forward);
     result->valid = 1U;
     result->camera_mask = cluster->camera_mask;
     result->target_strafe_mps = strafe * speed_scale;

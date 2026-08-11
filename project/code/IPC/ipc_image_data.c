@@ -6,10 +6,21 @@
 #include "Protocols/CameraSpi/camera_spi.h"
 #endif
 
+typedef char ipc_image_shared_data_size_must_be_336[
+    ((sizeof(struct image_data) * IMAGE_CAMERA_COUNT) == 336U) ? 1 : -1];
+
 #pragma location=".ipc_image_data"
-struct image_data image_data[IMAGE_CAMERA_COUNT];
+static volatile struct image_data s_ipc_image_data[IMAGE_CAMERA_COUNT];
+#pragma location=".ipc_image_camera_seq"
+volatile uint32 g_image_camera_seq[IMAGE_CAMERA_COUNT];
+#pragma location=".ipc_image_fresh_mask"
+volatile uint32 g_image_data_fresh_mask;
 #pragma location=".ipc_image_seq"
 volatile uint32 g_image_data_seq;
+#pragma location=".ipc_image_guard"
+volatile uint32 g_image_data_guard;
+#pragma location=".ipc_image_notify_busy"
+volatile uint32 g_image_ipc_notify_busy_count;
 #pragma location=".ipc_camera_spi_log"
 volatile ipc_camera_spi_log_t g_ipc_camera_spi_log;
 #pragma location=".ipc_remote_param_request"
@@ -22,6 +33,12 @@ volatile ipc_remote_param_mailbox_t g_ipc_remote_param_response;
 #pragma data_alignment=64
 volatile ipc_attitude_data_t g_ipc_attitude_data;
 
+struct image_data image_data[IMAGE_CAMERA_COUNT];                               /* 本核使用的三路一致性图像工作副本。 */
+volatile uint32 g_image_data_rx_seq;                                             /* CM7_0最近接收的一致性快照序号。 */
+volatile uint32 g_image_camera_rx_seq[IMAGE_CAMERA_COUNT];                      /* CM7_0最近接收的三路真实结果序号。 */
+volatile uint32 g_image_data_rx_fresh_mask;                                     /* CM7_0最近接收快照的新结果掩码。 */
+volatile uint32 g_image_snapshot_retry_count;                                   /* CM7_0因发布并发而重试快照的次数。 */
+
 #define IPC_FLIGHT_STATE_MAGIC   (0xA5000000UL)
 #define IPC_FLIGHT_STATE_MASK    (0xFFFF0000UL)
 #define IPC_FLIGHT_STATE_FLYING  (0x00000001UL)
@@ -30,6 +47,7 @@ volatile ipc_attitude_data_t g_ipc_attitude_data;
 #define IPC_IMAGE_SEND_SHIFT     (8U)
 /* 图传发送模式在 IPC 数据低 16 位中的掩码 */
 #define IPC_IMAGE_SEND_MASK      (0x0000FF00UL)
+#define IPC_IMAGE_SNAPSHOT_MAX_ATTEMPTS (4U) /* CM7_0单次轮询最多尝试的一致性快照次数。 */
 
 /* 远程参数邮箱校验盐值，避免全零内容被误判为合法事务。 */
 #define IPC_REMOTE_PARAM_CHECKSUM_SALT (0xA57C31E9UL)
@@ -93,13 +111,53 @@ typedef struct
 /* 最近一次已回复成功的核1 SET，用于处理响应与取消墓碑交叉时的补偿回滚。 */
 static ipc_remote_param_core1_set_cache_t s_remote_param_core1_set_cache;
 
-void ipc_image_publish(void)
+/*
+ * 函数功能: 将CM7_1本地图像结果一致性发布到共享内存并发送非阻塞通知。
+ * 输入参数: fresh_mask为本次真实新算法结果对应的摄像头位掩码。
+ * 返回值: 无。
+ */
+void ipc_image_publish(uint8 fresh_mask)
 {
+    uint8 camera_id;
+
+    g_image_data_guard++;
+    SCB_CleanDCache_by_Addr((volatile void *)&g_image_data_guard,
+                            sizeof(g_image_data_guard));
+    __DMB();
+
+    memcpy((void *)s_ipc_image_data, image_data, sizeof(image_data));
+    SCB_CleanDCache_by_Addr((volatile void *)s_ipc_image_data,
+                            sizeof(s_ipc_image_data));
+    for(camera_id = 0U; camera_id < IMAGE_CAMERA_COUNT; camera_id++)
+    {
+        if((fresh_mask & (uint8)(1U << camera_id)) != 0U)
+        {
+            g_image_camera_seq[camera_id]++;
+        }
+    }
+    g_image_data_fresh_mask = fresh_mask;
+    SCB_CleanDCache_by_Addr((volatile void *)g_image_camera_seq,
+                            sizeof(g_image_camera_seq));
+    SCB_CleanDCache_by_Addr((volatile void *)&g_image_data_fresh_mask,
+                            sizeof(g_image_data_fresh_mask));
+    __DMB();
+
     s_tx_seq++;
     g_image_data_seq = s_tx_seq;
-    SCB_CleanDCache_by_Addr((volatile void *)image_data, sizeof(image_data));
-    SCB_CleanDCache_by_Addr((volatile void *)&g_image_data_seq, sizeof(g_image_data_seq));
-    (void)ipc_send_data(s_tx_seq);
+    SCB_CleanDCache_by_Addr((volatile void *)&g_image_data_seq,
+                            sizeof(g_image_data_seq));
+    __DMB();
+    g_image_data_guard++;
+    SCB_CleanDCache_by_Addr((volatile void *)&g_image_data_guard,
+                            sizeof(g_image_data_guard));
+    __DSB();
+
+    if(ipc_try_send_data(s_tx_seq) != 0U)
+    {
+        g_image_ipc_notify_busy_count++;
+        SCB_CleanDCache_by_Addr((volatile void *)&g_image_ipc_notify_busy_count,
+                                sizeof(g_image_ipc_notify_busy_count));
+    }
 }
 
 #else
@@ -111,12 +169,61 @@ static uint32 s_remote_param_core0_counter = 0U;
 static volatile uint8 s_image_data_hint = 0U;
 static ipc_remote_param_mailbox_t s_remote_param_core0_request;
 static uint32 s_attitude_sequence = 0U;
+static uint32 s_image_data_last_seq = 0U;
+static struct image_data s_image_data_snapshot[IMAGE_CAMERA_COUNT];
 
-void ipc_image_publish(void)
+void ipc_image_publish(uint8 fresh_mask)
 {
+    (void)fresh_mask;
 }
 
 #endif
+
+/*
+ * 函数功能: 初始化本核图像工作副本及跨核发布或接收状态。
+ * 输入参数: 无。
+ * 返回值: 无。
+ */
+void ipc_image_init(void)
+{
+    uint8 camera_id;
+
+    for(camera_id = 0U; camera_id < IMAGE_CAMERA_COUNT; camera_id++)
+    {
+        image_data_clear(&image_data[camera_id]);
+    }
+    g_image_data_rx_seq = 0U;
+    g_image_data_rx_fresh_mask = 0U;
+    g_image_snapshot_retry_count = 0U;
+    memset((void *)g_image_camera_rx_seq, 0, sizeof(g_image_camera_rx_seq));
+
+#if defined(CY_CORE_CM7_1)
+    s_tx_seq = 0U;
+    g_image_data_seq = 0U;
+    g_image_data_fresh_mask = 0U;
+    g_image_data_guard = 0U;
+    g_image_ipc_notify_busy_count = 0U;
+    memset((void *)g_image_camera_seq, 0, sizeof(g_image_camera_seq));
+    memcpy((void *)s_ipc_image_data, image_data, sizeof(image_data));
+    SCB_CleanDCache_by_Addr((volatile void *)s_ipc_image_data,
+                            sizeof(s_ipc_image_data));
+    SCB_CleanDCache_by_Addr((volatile void *)g_image_camera_seq,
+                            sizeof(g_image_camera_seq));
+    SCB_CleanDCache_by_Addr((volatile void *)&g_image_data_fresh_mask,
+                            sizeof(g_image_data_fresh_mask));
+    SCB_CleanDCache_by_Addr((volatile void *)&g_image_data_seq,
+                            sizeof(g_image_data_seq));
+    SCB_CleanDCache_by_Addr((volatile void *)&g_image_data_guard,
+                            sizeof(g_image_data_guard));
+    SCB_CleanDCache_by_Addr((volatile void *)&g_image_ipc_notify_busy_count,
+                            sizeof(g_image_ipc_notify_busy_count));
+    __DSB();
+#else
+    s_image_data_last_seq = 0U;
+    s_image_data_hint = 0U;
+    memset(s_image_data_snapshot, 0, sizeof(s_image_data_snapshot));
+#endif
+}
 
 void ipc_attitude_publish(float roll_deg,
                           float pitch_deg,
@@ -239,8 +346,8 @@ static void ipc_remote_param_publish_response(const ipc_remote_param_mailbox_t *
     memcpy((void *)&g_ipc_remote_param_response, &response, sizeof(response));
     SCB_CleanDCache_by_Addr((volatile void *)&g_ipc_remote_param_response,
                             sizeof(g_ipc_remote_param_response));
-    (void)ipc_send_data(IPC_REMOTE_PARAM_NOTIFY_MAGIC |
-                        (request->transaction & 0x0000FFFFUL));
+    (void)ipc_try_send_data(IPC_REMOTE_PARAM_NOTIFY_MAGIC |
+                            (request->transaction & 0x0000FFFFUL));
 #else
     (void)request;
     (void)status;
@@ -738,14 +845,78 @@ void ipc_image_callback(uint32 ipc_data)
 #endif
 }
 
-void ipc_image_poll(void)
+/*
+ * 函数功能: CM7_0主动读取并提交一份跨核一致性图像快照。
+ * 输入参数: 无。
+ * 返回值: 接收到新发布快照返回1，否则返回0。
+ */
+uint8 ipc_image_poll(void)
 {
 #if defined(CY_CORE_CM7_0)
-    if(s_image_data_hint != 0U)
+    uint8 attempt;
+    uint8 snapshot_valid = 0U;
+    uint32 guard_before;
+    uint32 guard_after;
+    uint32 snapshot_seq = 0U;
+    uint32 snapshot_fresh_mask = 0U;
+    uint32 camera_seq_snapshot[IMAGE_CAMERA_COUNT];
+
+    for(attempt = 0U; attempt < IPC_IMAGE_SNAPSHOT_MAX_ATTEMPTS; attempt++)
     {
-        s_image_data_hint = 0U;
-        SCB_InvalidateDCache_by_Addr((volatile void *)image_data, sizeof(image_data));
-        SCB_InvalidateDCache_by_Addr((volatile void *)&g_image_data_seq, sizeof(g_image_data_seq));
+        SCB_InvalidateDCache_by_Addr((volatile void *)&g_image_data_guard,
+                                     sizeof(g_image_data_guard));
+        guard_before = g_image_data_guard;
+        if((guard_before & 1U) != 0U)
+        {
+            g_image_snapshot_retry_count++;
+            continue;
+        }
+
+        SCB_InvalidateDCache_by_Addr((volatile void *)s_ipc_image_data,
+                                     sizeof(s_ipc_image_data));
+        SCB_InvalidateDCache_by_Addr((volatile void *)g_image_camera_seq,
+                                     sizeof(g_image_camera_seq));
+        SCB_InvalidateDCache_by_Addr((volatile void *)&g_image_data_fresh_mask,
+                                     sizeof(g_image_data_fresh_mask));
+        SCB_InvalidateDCache_by_Addr((volatile void *)&g_image_data_seq,
+                                     sizeof(g_image_data_seq));
+        __DMB();
+        memcpy(s_image_data_snapshot,
+               (const void *)s_ipc_image_data,
+               sizeof(s_image_data_snapshot));
+        memcpy(camera_seq_snapshot,
+               (const void *)g_image_camera_seq,
+               sizeof(camera_seq_snapshot));
+        snapshot_fresh_mask = g_image_data_fresh_mask;
+        snapshot_seq = g_image_data_seq;
+        __DMB();
+        SCB_InvalidateDCache_by_Addr((volatile void *)&g_image_data_guard,
+                                     sizeof(g_image_data_guard));
+        guard_after = g_image_data_guard;
+        if((guard_before == guard_after) && ((guard_after & 1U) == 0U))
+        {
+            snapshot_valid = 1U;
+            break;
+        }
+        g_image_snapshot_retry_count++;
     }
+
+    s_image_data_hint = 0U;
+    if((snapshot_valid == 0U) || (snapshot_seq == s_image_data_last_seq))
+    {
+        return 0U;
+    }
+
+    memcpy(image_data, s_image_data_snapshot, sizeof(image_data));
+    memcpy((void *)g_image_camera_rx_seq,
+           camera_seq_snapshot,
+           sizeof(g_image_camera_rx_seq));
+    g_image_data_rx_fresh_mask = snapshot_fresh_mask;
+    g_image_data_rx_seq = snapshot_seq;
+    s_image_data_last_seq = snapshot_seq;
+    __DMB();
+    return 1U;
+#else
+    return 0U;
 #endif
 }

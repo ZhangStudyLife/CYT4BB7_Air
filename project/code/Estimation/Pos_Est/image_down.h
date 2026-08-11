@@ -49,7 +49,36 @@ extern int32 g_image_down_max_misses;
 extern float g_image_down_filter_pos_alpha;
 extern float g_image_down_filter_vel_alpha;
 
+extern volatile uint8 g_image_down_perf_window_done;               /* 5000帧统计窗口是否已经完成并冻结。 */
+extern volatile uint32 g_image_down_perf_processed_frames;          /* 统计窗口内算法实际处理的真实新帧数。 */
+extern volatile uint32 g_image_down_perf_source_frames;             /* 统计窗口覆盖的摄像头来源帧数。 */
+extern volatile uint32 g_image_down_perf_skipped_frames;            /* 统计窗口内处理前已被覆盖的来源帧数。 */
+extern volatile uint32 g_image_down_perf_elapsed_ms;                /* 首末处理帧之间的统计时间跨度，单位毫秒。 */
+extern volatile float g_image_down_perf_processed_fps;              /* 算法实际处理帧率，单位帧每秒。 */
+extern volatile float g_image_down_perf_source_fps;                 /* 摄像头实际来源帧率，单位帧每秒。 */
+extern volatile uint32 g_image_down_perf_average_latch_us;          /* 窗口平均图像锁存耗时，单位微秒。 */
+extern volatile uint32 g_image_down_perf_max_latch_us;              /* 窗口最大图像锁存耗时，单位微秒。 */
+extern volatile uint32 g_image_down_perf_average_algorithm_us;      /* 窗口平均纯算法耗时，单位微秒。 */
+extern volatile uint32 g_image_down_perf_max_algorithm_us;          /* 窗口最大纯算法耗时，单位微秒。 */
+extern volatile uint32 g_image_down_perf_average_total_us;          /* 窗口平均锁存到结果发布总耗时，单位微秒。 */
+extern volatile uint32 g_image_down_perf_max_total_us;              /* 窗口最大锁存到结果发布总耗时，单位微秒。 */
+extern volatile uint32 g_image_down_perf_over_10ms_count;           /* 总耗时超过10毫秒的处理帧数。 */
+extern volatile uint32 g_image_down_perf_over_period_count;         /* 总耗时超过摄像头目标帧周期的处理帧数。 */
+extern volatile uint32 g_image_down_perf_max_gap_us;                /* 相邻真实处理结果最大间隔，单位微秒。 */
+extern volatile uint32 g_image_down_perf_over_10ms_gap_count;       /* 相邻真实处理结果间隔超过10毫秒的次数。 */
+
+/*
+ * 函数功能: 初始化下摄图像算法、摄像头接口及5000帧性能统计窗口。
+ * 输入参数: 无。
+ * 返回值: 无。
+ */
 void image_down_init(void);
+
+/*
+ * 函数功能: 仅在摄像头发布真实新帧时锁存图像并执行下摄算法。
+ * 输入参数: 无。
+ * 返回值: 1表示本次完成了一帧处理；0表示没有可处理的新帧。
+ */
 uint8 image_down_update(void);
 uint8 *image_down_get_frame_buffer(void);
 const uint8 *image_down_get_binary_buffer(void);

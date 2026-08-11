@@ -16,6 +16,7 @@
 #define IMAGE_SCREEN_DATA_PERIOD_TICKS (1U)
 #define IMAGE_SCREEN_SPI_SPEED         (20U * 1000U * 1000U)
 #define IMAGE_SCREEN_AUX_REFRESH_FRAMES (5U)
+#define IMAGE_SCREEN_FORCE_DISABLE     (1U) /* Temporary performance baseline: disable screen refresh. */
 #define IMAGE_SCREEN_LCD_X_OFFSET       (40U)
 #define IMAGE_SCREEN_LCD_Y_OFFSET       (52U)
 #define IMAGE_SCREEN_AUX_X              (190U)
@@ -77,7 +78,11 @@ static uint32 ImageDebugScreen_Now(void)
 
 static uint8 ImageDebugScreen_RefreshAllowed(void)
 {
+#if (IMAGE_SCREEN_FORCE_DISABLE != 0U)
+    return 0U;
+#else
     return ipc_core0_screen_refresh_enable();
+#endif
 }
 
 static uint8 ImageDebugScreen_TaskBacklog(void)
@@ -293,18 +298,41 @@ static void ImageDebugScreen_ShowLampRow(uint16 y,
 
 static void ImageDebugScreen_UpdateData(void)
 {
-    ImageDebugScreen_ShowBeaconRow(
-        IMAGE_SCREEN_ROW_H, 'F', &image_data[Front].beacon_data[0]);
-    ImageDebugScreen_ShowBeaconRow(
-        2U * IMAGE_SCREEN_ROW_H, 'C', &image_data[Center].beacon_data[0]);
-    ImageDebugScreen_ShowBeaconRow(
-        3U * IMAGE_SCREEN_ROW_H, 'B', &image_data[Back].beacon_data[0]);
-    ImageDebugScreen_ShowLampRow(
-        5U * IMAGE_SCREEN_ROW_H, 'F', &image_data[Front].car_lamp_data[0]);
-    ImageDebugScreen_ShowLampRow(
-        6U * IMAGE_SCREEN_ROW_H, 'C', &image_data[Center].car_lamp_data[0]);
-    ImageDebugScreen_ShowLampRow(
-        7U * IMAGE_SCREEN_ROW_H, 'B', &image_data[Back].car_lamp_data[0]);
+    static uint8 row_index;
+
+    switch(row_index)
+    {
+        case 0U:
+            ImageDebugScreen_ShowBeaconRow(
+                IMAGE_SCREEN_ROW_H, 'F', &image_data[Front].beacon_data[0]);
+            break;
+        case 1U:
+            ImageDebugScreen_ShowBeaconRow(
+                2U * IMAGE_SCREEN_ROW_H, 'C', &image_data[Center].beacon_data[0]);
+            break;
+        case 2U:
+            ImageDebugScreen_ShowBeaconRow(
+                3U * IMAGE_SCREEN_ROW_H, 'B', &image_data[Back].beacon_data[0]);
+            break;
+        case 3U:
+            ImageDebugScreen_ShowLampRow(
+                5U * IMAGE_SCREEN_ROW_H, 'F', &image_data[Front].car_lamp_data[0]);
+            break;
+        case 4U:
+            ImageDebugScreen_ShowLampRow(
+                6U * IMAGE_SCREEN_ROW_H, 'C', &image_data[Center].car_lamp_data[0]);
+            break;
+        default:
+            ImageDebugScreen_ShowLampRow(
+                7U * IMAGE_SCREEN_ROW_H, 'B', &image_data[Back].car_lamp_data[0]);
+            break;
+    }
+
+    row_index++;
+    if(row_index >= 6U)
+    {
+        row_index = 0U;
+    }
 }
 
 static void ImageDebugScreen_SetSnapshotPixel(int x, int y, uint16 color)

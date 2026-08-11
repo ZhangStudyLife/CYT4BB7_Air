@@ -186,7 +186,7 @@ void FC_Mode2_50Hz(float dt)
              s_mode2_car_turn_accel_mps2);
 
         yaw_diff_rad = g_car_yaw - g_euler.yaw +
-                       g_car_yaw_rate_dps * s_mode2_deg_to_rad * 0.12f;
+                       g_car_yaw_rate_dps * 0.12f;
         while (yaw_diff_rad > 180.0f)
         {
             yaw_diff_rad -= 360.0f;

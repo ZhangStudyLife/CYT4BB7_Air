@@ -1,5 +1,7 @@
 #include "zf_common_headfile.h"
+#include "../code/FlightController/fc_mode.h"
 #include "../code/Planner/beacon_lost_detector.h"
+#include "../code/Planner/car_lamp_fused.h"
 #include "../code/Estimation/Pos_Est/FlowGyroDecoupler_LC302.h"
 
 volatile uint32 tick_1000us_cnt = 0U;
@@ -268,6 +270,42 @@ static void core0_plan_and_send_100hz(void)
 
     car_plan_send_valid = ((car_plan.valid != 0U) && (g_tof_fused_height_mm > 500.0f)) ? 1U : 0U;
     send_air_run_data_100hz(&car_plan, car_plan_send_valid);
+
+    (void)wifi_justfloat((float)FC_START_CRSF_Get_Flight_Mode(),             /* I1  flight mode */
+                             (float)FC_START_CRSF_Get_State(),                   /* I2  flight state */
+                             (float)g_image_data_seq,                            /* I3  image sequence */
+                             (float)g_car_lamp_fused.valid,                      /* I4  image valid */
+                             (float)g_tof_fused_valid,                           /* I5  height valid */
+                             g_tof_fused_height_mm,                              /* I6  height, mm */
+                             g_car_sync_time_ms,                                 /* I7  car time, ms */
+                             (g_car_sync_time_ms > 0.0f)
+                                 ? (float)(tick_1000us_cnt - g_car_last_update_time_ms)
+                                 : -1.0f,                                        /* I8  car data age, ms */
+                             roll_angle_target, pitch_angle_target, yaw_angle_target, /* I9-I11 target Euler, deg */
+                             g_euler.roll, g_euler.pitch, g_euler.yaw,           /* I12-I14 actual Euler, deg */
+                             g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, /* I15-I16 gyro, deg/s */
+                             g_car_lamp_fused.cx,                                /* I17 car center X, px */
+                             g_car_lamp_fused.cy,                                /* I18 car center Y, px */
+                             g_car_lamp_fused.angle,                             /* I19 car image angle, deg */
+                             (float)car_plan_2.valid,                             /* I20 CarPlan_2 valid */
+                             car_plan_2.target_center_x,                         /* I21 target center X, px */
+                             car_plan_2.target_center_y,                         /* I22 target center Y, px */
+                             (float)car_plan_2.camera_mask,                       /* I23 target camera mask */
+                             g_mode2_imgx_pid.error, g_mode2_imgy_pid.error,      /* I24-I25 image error, px */
+                             (float)car_plan_send_valid,                          /* I26 sent plan valid */
+                             (car_plan_send_valid != 0U) ? car_plan.target_strafe_mps : 0.0f, /* I27 sent strafe, m/s */
+                             (car_plan_send_valid != 0U) ? car_plan.target_forward_mps : 0.0f, /* I28 sent forward, m/s */
+                             g_car_yaw, g_car_yaw_rate_dps,                       /* I29-I30 car yaw/rate */
+                             g_car_vel_x, g_car_vel_y,                            /* I31-I32 car velocity, m/s */
+                             image_data[Front].beacon_data[0].x,                 /* I33 Front beacon0 X, px */
+                             image_data[Front].beacon_data[0].y,                 /* I34 Front beacon0 Y, px */
+                             image_data[Front].beacon_data[0].area,              /* I35 Front beacon0 area */
+                             image_data[Center].beacon_data[0].x,                /* I36 Center beacon0 X, px */
+                             image_data[Center].beacon_data[0].y,                /* I37 Center beacon0 Y, px */
+                             image_data[Center].beacon_data[0].area,             /* I38 Center beacon0 area */
+                             image_data[Back].beacon_data[0].x,                  /* I39 Back beacon0 X, px */
+                             image_data[Back].beacon_data[0].y,                  /* I40 Back beacon0 Y, px */
+                             image_data[Back].beacon_data[0].area);              /* I41 Back beacon0 area */
 }
 
 /**

@@ -6,8 +6,11 @@
 typedef struct
 {
     uint8 valid;
+    uint8 camera_mask;
     float target_strafe_mps;
     float target_forward_mps;
+    float target_center_x;
+    float target_center_y;
 } car_plan_2_result_t;
 
 /**

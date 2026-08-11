@@ -32,6 +32,7 @@
 #define CAR_PLAN_2_MIN_TARGET_DIST_PX            (2.0f)  /* 车体中心与信标的最小有效距离，单位px。 */
 #define CAR_PLAN_2_FAST_CENTER_DIST_PX           (65.0f) /* 快速速度判定的投影中心距离，单位px。 */
 #define CAR_PLAN_2_ANGLE_TO_RAD                  (0.017453292519943295f) /* 角度转弧度系数。 */
+#define CAR_PLAN_2_DIRECTION_LPF_ALPHA           (0.2008f) /* 100Hz下4Hz方向低通系数。 */
 
 typedef struct
 {
@@ -72,6 +73,7 @@ extern float g_car_sync_time_ms; /* 最近一次车端同步时间戳，单位ms
 
 static car_plan_2_result_t s_car_plan_2_result; /* 最近一次影子规划输出。 */
 static car_plan_2_lock_t s_car_plan_2_lock; /* 物理信标锁定位置、历史位置和计数状态。 */
+static float s_car_plan_2_direction_rad; /* 同一锁定信标的滤波速度方向，单位rad。 */
 
 /**
  * @brief 清零指定影子规划结果。
@@ -81,8 +83,11 @@ static car_plan_2_lock_t s_car_plan_2_lock; /* 物理信标锁定位置、历史
 static void CarPlan_2_ClearResult(car_plan_2_result_t *result)
 {
     result->valid = 0U;
+    result->camera_mask = 0U;
     result->target_strafe_mps = 0.0f;
     result->target_forward_mps = 0.0f;
+    result->target_center_x = 0.0f;
+    result->target_center_y = 0.0f;
 }
 
 /**
@@ -332,8 +337,11 @@ static uint8 CarPlan_2_MakeResult(const car_plan_2_cluster_t *cluster,
     speed_scale = plan_speed /
                   ((fabsf(strafe) > fabsf(forward)) ? fabsf(strafe) : fabsf(forward));
     result->valid = 1U;
+    result->camera_mask = cluster->camera_mask;
     result->target_strafe_mps = strafe * speed_scale;
     result->target_forward_mps = forward * speed_scale;
+    result->target_center_x = cluster->center_x;
+    result->target_center_y = cluster->center_y;
     return 1U;
 }
 
@@ -372,6 +380,8 @@ static void CarPlan_2_LockCluster(const car_plan_2_cluster_t *cluster,
     s_car_plan_2_lock.lost_ticks = 0U;
     s_car_plan_2_lock.velocity_conflict_ticks = 0U;
     s_car_plan_2_lock.nearer_target_ticks = 0U;
+    s_car_plan_2_direction_rad = atan2f(result->target_strafe_mps,
+                                        result->target_forward_mps);
     s_car_plan_2_result = *result;
 }
 
@@ -646,6 +656,19 @@ uint8 CarPlan_2_Update(car_plan_2_result_t *result)
         s_car_plan_2_lock.center_x = clusters[selected_index].center_x;
         s_car_plan_2_lock.center_y = clusters[selected_index].center_y;
         s_car_plan_2_lock.lost_ticks = 0U;
+
+        /* 同一信标仅平滑速度方向，并保持规划速度模长不变。 */
+        {
+            float direction_error = atan2f(candidate_result.target_strafe_mps,
+                                           candidate_result.target_forward_mps) -
+                                    s_car_plan_2_direction_rad;
+            float speed = sqrtf(candidate_result.target_strafe_mps * candidate_result.target_strafe_mps +
+                                candidate_result.target_forward_mps * candidate_result.target_forward_mps);
+            s_car_plan_2_direction_rad += CAR_PLAN_2_DIRECTION_LPF_ALPHA *
+                atan2f(sinf(direction_error), cosf(direction_error));
+            candidate_result.target_strafe_mps = speed * sinf(s_car_plan_2_direction_rad);
+            candidate_result.target_forward_mps = speed * cosf(s_car_plan_2_direction_rad);
+        }
         s_car_plan_2_result = candidate_result;
         CarPlan_2_CopyResult(result);
         return 1U;

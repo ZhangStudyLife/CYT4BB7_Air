@@ -3,6 +3,7 @@
 #include "ProjectionCenter.h"
 #include "car_lamp_fused.h"
 #include "../Image/image_data.h"
+#include "../Estimation/Attitude/IMU_TOP.h"
 #include <math.h>
 
 #define CAR_PLAN_2_CAMERA_COUNT                  (3U)    /* 参与影子规划的摄像头数量。 */
@@ -66,6 +67,8 @@ typedef struct
 
 extern float g_car_vel_x; /* 车体右向实际速度，单位m/s。 */
 extern float g_car_vel_y; /* 车体前向实际速度，单位m/s。 */
+extern float g_car_yaw; /* 车模yaw角，单位deg。 */
+extern float g_car_sync_time_ms; /* 最近一次车端同步时间戳，单位ms。 */
 
 static car_plan_2_result_t s_car_plan_2_result; /* 最近一次影子规划输出。 */
 static car_plan_2_lock_t s_car_plan_2_lock; /* 物理信标锁定位置、历史位置和计数状态。 */
@@ -290,6 +293,14 @@ static uint8 CarPlan_2_MakeResult(const car_plan_2_cluster_t *cluster,
     angle_rad = g_car_lamp_fused.angle * CAR_PLAN_2_ANGLE_TO_RAD;
     line_x = cosf(angle_rad);
     line_y = sinf(angle_rad);
+    /* 将180度无向长轴统一到真实车体右向。 */
+    if ((g_car_sync_time_ms > 0.0f) &&
+        (cosf((g_car_lamp_fused.angle - g_car_yaw + g_euler.yaw) *
+              CAR_PLAN_2_ANGLE_TO_RAD) < 0.0f))
+    {
+        line_x = -line_x;
+        line_y = -line_y;
+    }
     normal_x = -line_y;
     normal_y = line_x;
     strafe = dx * line_x + dy * line_y;

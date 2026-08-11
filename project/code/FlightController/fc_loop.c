@@ -612,7 +612,6 @@ void FC_Loop_500Hz(void)
         /* 控制量限幅 */
         limit = s_fc_angle_out_limit;
         mode0_angle_ff_enable = ((s_flight_mode == FC_START_CRSF_FLIGHT_MODE_0) ||
-                                 (s_flight_mode == FC_START_CRSF_FLIGHT_MODE_1) ||
                                  (s_flight_mode == FC_START_CRSF_FLIGHT_MODE_6)) ? 1U : 0U;
         if ((mode0_angle_ff_enable != 0U) && (s_mode0_angle_ff_active == 0U))
         {
@@ -641,8 +640,9 @@ void FC_Loop_500Hz(void)
             s_yaw_target_inited = 1U;
         }
 
-        /* Mode2/3/5/8 保留独立 yaw 目标，其余模式固定为 0 度。 */
-        if ((s_flight_mode != FC_START_CRSF_FLIGHT_MODE_2) &&
+        /* Mode1/2/3/5/8 保留独立 yaw 目标，其余模式固定为 0 度。 */
+        if ((s_flight_mode != FC_START_CRSF_FLIGHT_MODE_1) &&
+            (s_flight_mode != FC_START_CRSF_FLIGHT_MODE_2) &&
             (s_flight_mode != FC_START_CRSF_FLIGHT_MODE_3) &&
             (s_flight_mode != FC_START_CRSF_FLIGHT_MODE_5) &&
             (s_flight_mode != FC_START_CRSF_FLIGHT_MODE_8))

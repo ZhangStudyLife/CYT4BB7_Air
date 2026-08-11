@@ -1,6 +1,8 @@
 #include "car_plan.h"
 #include "ProjectionCenter.h"
+#include "car_lamp_fused.h"
 #include "../Image/image_data.h"
+#include "../Estimation/Attitude/IMU_TOP.h"
 #include <math.h>
 #include <string.h>
 
@@ -10,9 +12,11 @@
 #define CAR_PLAN_CENTER_MAX_DIST_PX        (65.0f)
 #define CAR_PLAN_CAR_CENTER_Y_OFFSET_PX    (10.0f) /* 车体中心相对车灯中心向图像 y 正方向偏移，单位 px。 */
 
-float Car_Speed = 1.2f; /* 车模规划速度，单位 m/s，可由车机通过 AirComm 修改 */
-float Car_Speed_Fast = 2.0f; /* 车模快速前进速度，单位 m/s，可由车机通过 AirComm 修改 */
+float Car_Speed = 2.2f; /* 车模规划速度，单位 m/s，可由车机通过 AirComm 修改 */
+float Car_Speed_Fast = 2.5f; /* 车模快速前进速度，单位 m/s，可由车机通过 AirComm 修改 */
 float Car_Plan_Mode = 2.0f; /* 车模规划算法选择：1=car_plan，2=car_plan_2，可由车机通过 AirComm 修改 */
+extern float g_car_yaw; /* 车模yaw角，单位deg。 */
+extern float g_car_sync_time_ms; /* 最近一次车端同步时间戳，单位ms。 */
 static car_plan_result_t s_car_plan_result;
 
 static void CarPlan_ClearResult(car_plan_result_t *result)
@@ -130,6 +134,29 @@ static uint8 CarPlan_MakeGeometryResult(uint8 camera, car_plan_result_t *out)
     angle_rad = lamp->angle * CAR_PLAN_ANGLE_TO_RAD;
     line_x = cosf(angle_rad);
     line_y = sinf(angle_rad);
+    if ((g_car_lamp_fused.valid != 0U) &&
+        (g_car_sync_time_ms > 0.0f))
+    {
+        /* 将各相机无向长轴统一到真实车体右向。 */
+        normal_x = cosf(g_car_lamp_fused.angle * CAR_PLAN_ANGLE_TO_RAD);
+        normal_y = sinf(g_car_lamp_fused.angle * CAR_PLAN_ANGLE_TO_RAD);
+        if (cosf((g_car_lamp_fused.angle - g_car_yaw + g_euler.yaw) *
+                 CAR_PLAN_ANGLE_TO_RAD) < 0.0f)
+        {
+            normal_x = -normal_x;
+            normal_y = -normal_y;
+        }
+        CarPlan_MapPointToCenter(camera, lamp->cx, lamp->cy,
+                                 &beacon_vector_x, &beacon_vector_y);
+        CarPlan_MapPointToCenter(camera, lamp->cx + line_x, lamp->cy + line_y,
+                                 &projection_vector_x, &projection_vector_y);
+        if ((projection_vector_x - beacon_vector_x) * normal_x +
+            (projection_vector_y - beacon_vector_y) * normal_y < 0.0f)
+        {
+            line_x = -line_x;
+            line_y = -line_y;
+        }
+    }
     normal_x = -line_y;
     normal_y = line_x;
     along = dx * line_x + dy * line_y;

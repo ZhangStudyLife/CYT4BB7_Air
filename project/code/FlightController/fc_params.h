@@ -265,6 +265,7 @@ typedef struct
     float mode7_vel_y_i_limit;
     float mode7_vel_y_d_lpf;
     /* ===== 各模式航向对准开关：0=关闭，1=开启 ===== */
+    float yaw_change_mode2;
     float yaw_change_mode3;
     float yaw_change_mode4;
     float yaw_change_mode5;

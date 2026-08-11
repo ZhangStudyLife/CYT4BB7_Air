@@ -257,7 +257,8 @@ static void core0_plan_and_send_100hz(void)
     {
         (void)CarPlan_Update(&car_plan);
         (void)CarPlan_2_Update(&car_plan_2);
-        if (Car_Plan_Mode >= 1.5f)
+        if ((FC_START_CRSF_Get_Flight_Mode() == FC_START_CRSF_FLIGHT_MODE_1) ||
+            (Car_Plan_Mode >= 1.5f))
         {
             car_plan.valid = car_plan_2.valid;
             car_plan.target_strafe_mps = car_plan_2.target_strafe_mps;

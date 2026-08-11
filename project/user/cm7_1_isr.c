@@ -38,7 +38,9 @@
 
 #include "zf_common_headfile.h"
 
-extern volatile uint8 g_image_tick_100hz;
+extern volatile uint8 g_image_tick_100hz;                 // 主循环待消费的100Hz节拍数
+extern volatile uint32 g_image_core1_tick_generated;      // PIT累计生成的100Hz节拍数
+extern volatile uint32 g_image_core1_tick_overflow_count; // 待处理节拍计数器饱和次数
 
 
 // **************************** PIT中断函数 ****************************
@@ -65,7 +67,15 @@ void pit0_ch2_isr()                     // 定时器通道 2 周期中断服务函数
 void pit0_ch10_isr()                    // 定时器通道 10 周期中断服务函数      
 {
     pit_isr_flag_clear(PIT_CH10);
-    g_image_tick_100hz = 1U;
+    g_image_core1_tick_generated++;
+    if(g_image_tick_100hz < 0xFFU)
+    {
+        g_image_tick_100hz++;
+    }
+    else
+    {
+        g_image_core1_tick_overflow_count++;
+    }
 
 }
 

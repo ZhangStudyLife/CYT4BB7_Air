@@ -58,6 +58,7 @@
 vuint8 mt9v03x_finish_flag = 0;                                                 // 一场图像采集完成标志位
 uint8 mt9v03x_image[MT9V03X_H][MT9V03X_W];     
 uint16 g_mt9v03x_exp_time = 400U;                                                // 运行时曝光时间
+volatile uint32 mt9v03x_frame_sequence = 0U;                                    // 最近完成采集的源帧序号
 
 static uint8 perfect_proportion = 0;
 static uint8 s_mt9v03x_trig_initialized = 0U;
@@ -76,7 +77,14 @@ void camera_finish_callback(void)
     SCB_InvalidateDCache_by_Addr(mt9v03x_image_temp[0], MT9V03X_IMAGE_SIZE);
 
     memcpy(mt9v03x_image[0], mt9v03x_image_temp[0], MT9V03X_IMAGE_SIZE);
-    
+
+    /* 图像复制完成后发布帧序号，零值保留为尚未收到有效帧。 */
+    __DMB();
+    mt9v03x_frame_sequence++;
+    if(0U == mt9v03x_frame_sequence)
+    {
+        mt9v03x_frame_sequence = 1U;
+    }
     mt9v03x_finish_flag = 1;
 }
 
@@ -87,13 +95,17 @@ static void mt9v03x_trig_stop(void)
     if(0U == s_mt9v03x_trig_initialized)
     {
         mt9v03x_finish_flag = 0U;
+        mt9v03x_frame_sequence = 0U;
         return;
     }
 
     lock = interrupt_global_disable();
+    /* 停止采集并清除残留中断与帧发布状态。 */
     Cy_Tcpwm_Counter_Disable(TCPWM0_GRP0_CNT59);
     Cy_Tcpwm_Counter_ClearTC_Intr(TCPWM0_GRP0_CNT59);
+    NVIC_ClearPendingIRQ(CPUIntIdx3_IRQn);
     mt9v03x_finish_flag = 0U;
+    mt9v03x_frame_sequence = 0U;
     interrupt_global_enable(lock);
 }
 

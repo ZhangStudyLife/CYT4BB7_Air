@@ -1,16 +1,35 @@
 # IPC image data
 
-CM7_1 writes the shared `image_data[IMAGE_CAMERA_COUNT]` array. CM7_0 reads the same symbol directly.
+CM7_1 publishes a complete snapshot of the three-camera `image_data` array. CM7_0
+copies a stable snapshot into its local `image_data` before the control loop reads it;
+the two cores do not access the working array concurrently.
 
 Fixed shared addresses are assigned in `linker_directives_tviibh.icf`:
 
 - `image_data`: `.ipc_image_data` at `0x28001000`
+- `g_image_camera_seq[3]`: `.ipc_image_camera_seq` at `0x28001150`
+- `g_image_data_fresh_mask`: `.ipc_image_fresh_mask` at `0x2800115C`
 - `g_image_data_seq`: `.ipc_image_seq` at `0x28001160`
+- `g_image_data_guard`: `.ipc_image_guard` at `0x28001164`
+- `g_image_ipc_notify_busy_count`: `.ipc_image_notify_busy` at `0x28001168`
 - `g_ipc_camera_spi_log`: `.ipc_camera_spi_log` at `0x28001180`
 
-CM7_1 calls `ipc_image_publish()` after updating all three camera slots. The function cleans D-cache for `image_data` and `g_image_data_seq`, then sends an IPC notification.
+CM7_1 calls `ipc_image_publish(fresh_mask)` only when at least one camera has a
+real new result or a stale-result state change. The publisher uses an odd/even guard
+around the copy, increments the per-camera result sequence only for `fresh_mask`,
+then sends a non-blocking IPC hint. A busy hint does not lose data because CM7_0
+also polls the shared sequence at 1 kHz and immediately before each 100 Hz control
+cycle.
 
-CM7_0 calls `ipc_image_poll()` before using image results. The function invalidates D-cache for `image_data` and `g_image_data_seq`.
+The front/rear Camera SPI payload carries an 8-bit algorithm-result sequence in
+header byte 3 (protocol version 4). Repeated SPI packets with the same result
+sequence are not counted as new image results. The Air CM7_1 image service period
+is 5 ms (200 Hz), while the flight-control loop remains 10 ms (100 Hz).
+
+CM7_0 calls `ipc_image_poll()` before using image results. The function validates
+the guard before and after copying, then updates local `image_data`,
+`g_image_camera_rx_seq[]`, and `g_image_data_rx_seq` atomically from the control
+loop's point of view.
 
 ## 2BL3 runtime parameters
 

@@ -6,6 +6,22 @@ volatile uint32 tick_1000us_cnt = 0U;
 volatile uint16 g_tick_1000HZ = 0U;
 volatile uint8 g_tick_100HZ = 0U;
 
+#define IMAGE_CONTROL_PERF_WINDOW_CYCLES (5000U) /* 控制端图像新鲜度统计窗口，单位100Hz控制周期。 */
+
+volatile uint8 g_image_control_perf_window_done;                               /* 5000个控制周期统计窗口完成标志。 */
+volatile uint32 g_image_control_perf_cycles;                                   /* 已统计的100Hz控制周期数。 */
+volatile uint32 g_image_control_perf_fresh_cycles;                             /* 控制周期看到任一路新结果的次数。 */
+volatile uint32 g_image_control_perf_duplicate_cycles;                         /* 控制周期继续使用上一整体快照的次数。 */
+volatile uint32 g_image_control_perf_camera_fresh_cycles[IMAGE_CAMERA_COUNT];  /* 三路摄像头在控制周期内更新的次数。 */
+volatile uint32 g_image_control_perf_camera_duplicate_cycles[IMAGE_CAMERA_COUNT]; /* 三路摄像头在控制周期内未更新的次数。 */
+volatile uint32 g_image_control_perf_all_camera_fresh_cycles;                  /* 同一控制周期三路均已更新的次数。 */
+volatile float g_image_control_perf_fresh_hz;                                  /* 控制端整体新快照有效频率，单位赫兹。 */
+volatile float g_image_control_perf_camera_hz[IMAGE_CAMERA_COUNT];             /* 控制端三路新结果有效频率，单位赫兹。 */
+volatile float g_image_control_perf_all_camera_fresh_hz;                       /* 控制端同周期三路均更新频率，单位赫兹。 */
+
+static uint32 s_image_control_previous_camera_seq[IMAGE_CAMERA_COUNT];         /* 上一控制周期使用的三路结果序号。 */
+static uint8 s_image_control_perf_started;                                     /* 三路均首次到达后才开始稳态统计。 */
+
 static uint8 div500 = 0U;
 static uint8 div50 = 0U;
 static uint8 slot50 = 0U;
@@ -16,6 +32,91 @@ static uint8 s_ipc_last_image_send_enable = 0xFFU;
 static uint8 s_ipc_last_screen_refresh_enable = 0xFFU;
 static uint8 s_ipc_flying_retry_div = 0U; /* 飞行状态 IPC 通知失败后的 100Hz 重试分频 */
 static uint8 s_ipc_state_periodic_div = 0U;
+
+/*
+ * 函数功能: 统计100Hz控制周期是否取得新的整体及分摄像头图像结果。
+ * 输入参数: 无。
+ * 返回值: 无。
+ */
+static void image_control_perf_record(void)
+{
+    uint8 camera_id;
+    uint8 any_camera_fresh = 0U;
+    uint8 all_camera_fresh = 1U;
+
+    if(g_image_control_perf_window_done != 0U)
+    {
+        return;
+    }
+
+    for(camera_id = 0U; camera_id < IMAGE_CAMERA_COUNT; camera_id++)
+    {
+        if(g_image_camera_rx_seq[camera_id] == 0U)
+        {
+            return;
+        }
+    }
+
+    if(s_image_control_perf_started == 0U)
+    {
+        memcpy(s_image_control_previous_camera_seq,
+               (const void *)g_image_camera_rx_seq,
+               sizeof(s_image_control_previous_camera_seq));
+        s_image_control_perf_started = 1U;
+        return;
+    }
+
+    g_image_control_perf_cycles++;
+    for(camera_id = 0U; camera_id < IMAGE_CAMERA_COUNT; camera_id++)
+    {
+        if((g_image_camera_rx_seq[camera_id] != 0U) &&
+           (g_image_camera_rx_seq[camera_id] !=
+            s_image_control_previous_camera_seq[camera_id]))
+        {
+            g_image_control_perf_camera_fresh_cycles[camera_id]++;
+            any_camera_fresh = 1U;
+        }
+        else
+        {
+            g_image_control_perf_camera_duplicate_cycles[camera_id]++;
+            all_camera_fresh = 0U;
+        }
+        s_image_control_previous_camera_seq[camera_id] =
+            g_image_camera_rx_seq[camera_id];
+    }
+    /* 整体fresh只由三路真实结果序号变化决定，排除超时清空等无新结果发布。 */
+    if(any_camera_fresh != 0U)
+    {
+        g_image_control_perf_fresh_cycles++;
+    }
+    else
+    {
+        g_image_control_perf_duplicate_cycles++;
+    }
+    if(all_camera_fresh != 0U)
+    {
+        g_image_control_perf_all_camera_fresh_cycles++;
+    }
+
+    if(g_image_control_perf_cycles >= IMAGE_CONTROL_PERF_WINDOW_CYCLES)
+    {
+        g_image_control_perf_fresh_hz =
+            ((float)g_image_control_perf_fresh_cycles * 100.0f) /
+            (float)g_image_control_perf_cycles;
+        for(camera_id = 0U; camera_id < IMAGE_CAMERA_COUNT; camera_id++)
+        {
+            g_image_control_perf_camera_hz[camera_id] =
+                ((float)g_image_control_perf_camera_fresh_cycles[camera_id] *
+                 100.0f) /
+                (float)g_image_control_perf_cycles;
+        }
+        g_image_control_perf_all_camera_fresh_hz =
+            ((float)g_image_control_perf_all_camera_fresh_cycles * 100.0f) /
+            (float)g_image_control_perf_cycles;
+        __DMB();
+        g_image_control_perf_window_done = 1U;
+    }
+}
 
 #define AIR_RUN_DATA_CRITICAL_COUNT       (15U) /* 飞行期间下发的关键数据数量 */
 #define AIR_RUN_DATA_DIAGNOSTIC_COUNT     (52U) /* 常态下发的完整诊断数据数量 */
@@ -193,6 +294,27 @@ int main(void)
     Motor_Init();
     ipc_communicate_init(IPC_PORT_1, ipc_image_callback);
     ipc_remote_param_core0_init();
+    ipc_image_init();
+    g_image_control_perf_window_done = 0U;
+    g_image_control_perf_cycles = 0U;
+    g_image_control_perf_fresh_cycles = 0U;
+    g_image_control_perf_duplicate_cycles = 0U;
+    g_image_control_perf_all_camera_fresh_cycles = 0U;
+    g_image_control_perf_fresh_hz = 0.0f;
+    g_image_control_perf_all_camera_fresh_hz = 0.0f;
+    memset((void *)g_image_control_perf_camera_fresh_cycles,
+           0,
+           sizeof(g_image_control_perf_camera_fresh_cycles));
+    memset((void *)g_image_control_perf_camera_duplicate_cycles,
+           0,
+           sizeof(g_image_control_perf_camera_duplicate_cycles));
+    memset((void *)g_image_control_perf_camera_hz,
+           0,
+           sizeof(g_image_control_perf_camera_hz));
+    s_image_control_perf_started = 0U;
+    memset(s_image_control_previous_camera_seq,
+           0,
+           sizeof(s_image_control_previous_camera_seq));
     FC_START_CRSF_Init();
     air_comm_air_init();
     wifi_justfloat_SetStandbyContext((0U == FC_START_CRSF_Get_State()) && (0U == FC_START_CRSF_Is_Armed()));
@@ -217,6 +339,7 @@ int main(void)
         while ((g_tick_1000HZ > 0U) && (guard < 100U))
         {
             g_tick_1000HZ--;
+            ipc_image_poll();
 
             IMU_Update_1000HZ();
             // ICM42688_Aux_Update_1000Hz(tick_1000us_cnt);         //对比用的陀螺仪关掉
@@ -291,13 +414,14 @@ int main(void)
             Height_Est_update_100HZ();
             CRSF_Update_100HZ();
             FC_START_CRSF_UpdateLandingButton100Hz();
+            (void)ipc_image_poll();
+            image_control_perf_record();
             FC_Loop_100Hz();
             air_comm_air_update_100HZ();
             ipc_attitude_publish(g_euler.roll,
                                  g_euler.pitch,
                                  g_tof_fused_height_mm,
                                  g_tof_fused_valid);
-            ipc_image_poll();
             {
                 ipc_camera_spi_log_t camera_spi_log;
 

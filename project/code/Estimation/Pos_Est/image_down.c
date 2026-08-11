@@ -50,7 +50,10 @@ int32 g_image_down_confirm_frames = 2;
 int32 g_image_down_max_misses = 3;
 float g_image_down_filter_pos_alpha = 0.65f;
 float g_image_down_filter_vel_alpha = 0.30f;
+
 static uint8 s_mt9v03x_initialized;
+static uint32 s_image_down_latched_frame_sequence;                 /* 最近成功锁存并处理的摄像头来源帧号。 */
+
 #define CAR_LAMP_EDGE_MAX_MISSES        3
 #define CAR_LAMP_CENTER_MAX_MISSES      24
 #define CAR_LAMP_TEMPORAL_EDGE_MARGIN   8
@@ -111,11 +114,29 @@ typedef struct
     float minor;
     float elongation;
     float angle;
+    float orientation_numerator;
+    float orientation_denominator;
     unsigned long gray_sum;
     unsigned long gray_sum_sq;
     unsigned char peak;
+    unsigned char angle_valid;
     unsigned char valid;
 } component_t;
+
+typedef struct
+{
+    float cx;
+    float cy;
+    float cos_angle;
+    float sin_angle;
+    float half_length;
+    float half_width;
+    int min_x;
+    int min_y;
+    int max_x;
+    int max_y;
+    unsigned char valid;
+} down_lamp_geometry_t;
 
 typedef struct
 {
@@ -197,29 +218,27 @@ uint8 g_image_frame[MT9V03X_H][MT9V03X_W];
 static unsigned char g_binary[BEACON_IMAGE_H][BEACON_IMAGE_W];
 static unsigned char g_beacon_binary_snapshot[BEACON_IMAGE_H][BEACON_IMAGE_W];
 static unsigned char g_car_lamp_binary_snapshot[BEACON_IMAGE_H][BEACON_IMAGE_W];
-static unsigned char g_visit_stamp[BEACON_IMAGE_H][BEACON_IMAGE_W];
+static unsigned char g_visit_stamp[IMAGE_QUEUE_SIZE];
 static unsigned char g_current_stamp = 0;
-static unsigned char g_queue_x[IMAGE_QUEUE_SIZE];
-static unsigned char g_queue_y[IMAGE_QUEUE_SIZE];
+/* 连通域队列：低8位为X，高8位为Y。 */
+static unsigned short g_queue[IMAGE_QUEUE_SIZE];
 static const unsigned char (*g_current_image)[BEACON_IMAGE_W] = 0;
 static temporal_track_t g_b0_track;
 static temporal_track_t g_car_track;
 static component_t g_current_lamp_masks[DOWN_CAR_MAX_MASKS];
+/* 当前帧车灯屏蔽区的几何缓存，避免候选扫描重复计算三角函数。 */
+static down_lamp_geometry_t g_current_lamp_geometries[DOWN_CAR_MAX_MASKS];
 static component_t g_weak_car_pending;
 static unsigned char g_current_lamp_mask_count;
 static unsigned char g_weak_car_pending_hits;
 static unsigned char g_weak_car_pending_misses;
-static unsigned short g_gray_box3_rows[3][BEACON_IMAGE_W];
-static unsigned short g_gray_box9_rows[9][BEACON_IMAGE_W];
-static unsigned short g_gray_box3_sum[BEACON_IMAGE_W];
-static unsigned short g_gray_box9_sum[BEACON_IMAGE_W];
+/* Box3列方向滑动和，前后预留镜像边界槽。 */
+static unsigned short g_gray_box3_storage[BEACON_IMAGE_W + 3];
+/* Box9列方向滑动和，前后预留镜像边界槽。 */
+static unsigned short g_gray_box9_storage[BEACON_IMAGE_W + 8];
 static signed short g_gray_response_rows[3][BEACON_IMAGE_W];
 
 static void beacon_image_reset_temporal(void);
-static float down_gray_ring_median(
-    const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
-    int center_x,
-    int center_y);
 static unsigned char down_local_shape_measure(
     const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
     int center_x,
@@ -237,6 +256,10 @@ static unsigned char down_gray_edge_support_valid(
     unsigned char peak,
     int left_margin,
     int right_margin);
+static void down_gray_lamp_geometry_init(
+    const component_t *lamp,
+    down_lamp_geometry_t *geometry);
+static void component_resolve_angle(component_t *comp);
 
 static void beacon_image_init(void)
 {
@@ -245,6 +268,7 @@ static void beacon_image_init(void)
     memset(g_car_lamp_binary_snapshot, 0, sizeof(g_car_lamp_binary_snapshot));
     memset(g_visit_stamp, 0, sizeof(g_visit_stamp));
     memset(g_current_lamp_masks, 0, sizeof(g_current_lamp_masks));
+    memset(g_current_lamp_geometries, 0, sizeof(g_current_lamp_geometries));
     memset(&g_weak_car_pending, 0, sizeof(g_weak_car_pending));
     g_current_image = 0;
     g_current_lamp_mask_count = 0U;
@@ -283,39 +307,98 @@ static void begin_visit_pass(void)
 
 static unsigned char is_visited(unsigned char x, unsigned char y)
 {
-    return (g_visit_stamp[y][x] == g_current_stamp) ? 1 : 0;
+    return (g_visit_stamp[(unsigned int)y * BEACON_IMAGE_W + x] ==
+            g_current_stamp) ? 1 : 0;
 }
 
-static void mark_visited(unsigned char x, unsigned char y)
-{
-    g_visit_stamp[y][x] = g_current_stamp;
-}
-
-static void threshold_image(
+#if defined(__ICCARM__)
+#pragma inline=never
+#endif
+static float threshold_image(
     const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
     unsigned char threshold)
 {
     const unsigned char *src = &image[0][0];
     unsigned char *dst = &g_binary[0][0];
-    int i;
+    unsigned long scene_sum = 0U;
+    unsigned int scene_count = 0U;
+    int x;
+    int y;
 
-    for (i = 0; i < BEACON_IMAGE_W * BEACON_IMAGE_H; i++)
+    for (y = 0; y < BEACON_IMAGE_H; y++)
     {
-        dst[i] = (src[i] >= threshold) ? 255 : 0;
+        const unsigned char *src_row = src + y * BEACON_IMAGE_W;
+        unsigned char *dst_row = dst + y * BEACON_IMAGE_W;
+
+#if defined(__ICCARM__)
+        const uint32 threshold_word = (uint32)threshold * 0x01010101UL;
+        for (x = 0; x < BEACON_IMAGE_W; x += 4)
+        {
+            uint32 gray_word = __UNALIGNED_UINT32_READ(&src_row[x]);
+            uint32 binary_word;
+
+            (void)__USUB8(gray_word, threshold_word);
+            binary_word = __SEL(0xFFFFFFFFUL, 0U);
+            __UNALIGNED_UINT32_WRITE(&dst_row[x], binary_word);
+            if ((y & 3) == 0)
+            {
+                scene_sum += gray_word & 0xFFU;
+                scene_count++;
+            }
+        }
+#else
+        for (x = 0; x < BEACON_IMAGE_W; x++)
+        {
+            dst_row[x] = (src_row[x] >= threshold) ? 255U : 0U;
+            if (((y & 3) == 0) && ((x & 3) == 0))
+            {
+                scene_sum += src_row[x];
+                scene_count++;
+            }
+        }
+#endif
     }
+    return (scene_count > 0U) ?
+               (float)scene_sum / (float)scene_count : 0.0f;
 }
 
+static unsigned short *grow_component_enqueue(
+    const unsigned char *binary,
+    unsigned char *visit,
+    unsigned int index,
+    unsigned short coordinate,
+    unsigned char stamp,
+    unsigned short *tail,
+    unsigned short *end)
+{
+    if (tail >= end || binary[index] == 0U || visit[index] == stamp)
+    {
+        return tail;
+    }
+    visit[index] = stamp;
+    *tail++ = coordinate;
+    return tail;
+}
+
+static void finish_component(
+    component_t *comp,
+    int sum_x,
+    int sum_y,
+    unsigned short coordinate_count);
+
+#if defined(__ICCARM__)
+#pragma inline=never
+#endif
 static component_t grow_component(unsigned char start_x, unsigned char start_y)
 {
-    static const signed char dx[8] = { 1, -1, 0, 0, 1, 1, -1, -1 };
-    static const signed char dy[8] = { 0, 0, 1, -1, 1, -1, 1, -1 };
-    unsigned short head = 0;
-    unsigned short tail = 0;
+    const unsigned char *binary = &g_binary[0][0];
+    unsigned char *visit = g_visit_stamp;
+    unsigned short *head = g_queue;
+    unsigned short *tail = g_queue;
+    unsigned short *end = g_queue + IMAGE_QUEUE_SIZE;
+    unsigned char stamp = g_current_stamp;
     int sum_x = 0;
     int sum_y = 0;
-    float sum_xx = 0.0f;
-    float sum_yy = 0.0f;
-    float sum_xy = 0.0f;
     component_t comp;
 
     memset(&comp, 0, sizeof(comp));
@@ -324,18 +407,16 @@ static component_t grow_component(unsigned char start_x, unsigned char start_y)
     comp.min_y = start_y;
     comp.max_y = start_y;
 
-    g_queue_x[tail] = start_x;
-    g_queue_y[tail] = start_y;
-    tail++;
-    mark_visited(start_x, start_y);
+    *tail++ = (unsigned short)start_x | ((unsigned short)start_y << 8U);
+    visit[(unsigned int)start_y * BEACON_IMAGE_W + start_x] = stamp;
 
     while (head < tail)
     {
-        unsigned char i;
-        unsigned char x = g_queue_x[head];
-        unsigned char y = g_queue_y[head];
+        unsigned short coordinate = *head++;
+        unsigned char x = (unsigned char)coordinate;
+        unsigned char y = (unsigned char)(coordinate >> 8U);
+        unsigned int pixel_index = (unsigned int)y * BEACON_IMAGE_W + x;
         unsigned int gray = (g_current_image != 0) ? g_current_image[y][x] : 0U;
-        head++;
 
         comp.area++;
         comp.gray_sum += gray;
@@ -346,94 +427,75 @@ static component_t grow_component(unsigned char start_x, unsigned char start_y)
         }
         sum_x += x;
         sum_y += y;
-        sum_xx += (float)x * (float)x;
-        sum_yy += (float)y * (float)y;
-        sum_xy += (float)x * (float)y;
 
         if ((int)x < comp.min_x) comp.min_x = x;
         if ((int)x > comp.max_x) comp.max_x = x;
         if ((int)y < comp.min_y) comp.min_y = y;
         if ((int)y > comp.max_y) comp.max_y = y;
 
-        for (i = 0; i < 8; i++)
+        if (x > 0U && x < BEACON_IMAGE_W - 1 &&
+            y > 0U && y < BEACON_IMAGE_H - 1)
         {
-            int nx = (int)x + dx[i];
-            int ny = (int)y + dy[i];
-
-            if (nx < 0 || nx >= BEACON_IMAGE_W ||
-                ny < 0 || ny >= BEACON_IMAGE_H)
-            {
-                continue;
-            }
-            if (g_binary[ny][nx] == 0 || is_visited((unsigned char)nx, (unsigned char)ny))
-            {
-                continue;
-            }
-            if (tail >= IMAGE_QUEUE_SIZE)
-            {
-                continue;
-            }
-
-            mark_visited((unsigned char)nx, (unsigned char)ny);
-            g_queue_x[tail] = (unsigned char)nx;
-            g_queue_y[tail] = (unsigned char)ny;
-            tail++;
+            tail = grow_component_enqueue(
+                binary, visit, pixel_index + 1U,
+                (unsigned short)(coordinate + 1U), stamp, tail, end);
+            tail = grow_component_enqueue(
+                binary, visit, pixel_index - 1U,
+                (unsigned short)(coordinate - 1U), stamp, tail, end);
+            tail = grow_component_enqueue(
+                binary, visit, pixel_index + BEACON_IMAGE_W,
+                (unsigned short)(coordinate + 0x0100U), stamp, tail, end);
+            tail = grow_component_enqueue(
+                binary, visit, pixel_index - BEACON_IMAGE_W,
+                (unsigned short)(coordinate - 0x0100U), stamp, tail, end);
+            tail = grow_component_enqueue(
+                binary, visit, pixel_index + BEACON_IMAGE_W + 1U,
+                (unsigned short)(coordinate + 0x0101U), stamp, tail, end);
+            tail = grow_component_enqueue(
+                binary, visit, pixel_index - BEACON_IMAGE_W + 1U,
+                (unsigned short)(coordinate - 0x00FFU), stamp, tail, end);
+            tail = grow_component_enqueue(
+                binary, visit, pixel_index + BEACON_IMAGE_W - 1U,
+                (unsigned short)(coordinate + 0x00FFU), stamp, tail, end);
+            tail = grow_component_enqueue(
+                binary, visit, pixel_index - BEACON_IMAGE_W - 1U,
+                (unsigned short)(coordinate - 0x0101U), stamp, tail, end);
+        }
+        else
+        {
+#define ENQUEUE_COMPONENT_IF(valid_, index_, coordinate_) \
+            do { if (valid_) { tail = grow_component_enqueue( \
+                binary, visit, (index_), (coordinate_), stamp, tail, end); } } while (0)
+            ENQUEUE_COMPONENT_IF(x + 1U < BEACON_IMAGE_W,
+                pixel_index + 1U, (unsigned short)(coordinate + 1U));
+            ENQUEUE_COMPONENT_IF(x > 0U,
+                pixel_index - 1U, (unsigned short)(coordinate - 1U));
+            ENQUEUE_COMPONENT_IF(y + 1U < BEACON_IMAGE_H,
+                pixel_index + BEACON_IMAGE_W,
+                (unsigned short)(coordinate + 0x0100U));
+            ENQUEUE_COMPONENT_IF(y > 0U,
+                pixel_index - BEACON_IMAGE_W,
+                (unsigned short)(coordinate - 0x0100U));
+            ENQUEUE_COMPONENT_IF(x + 1U < BEACON_IMAGE_W && y + 1U < BEACON_IMAGE_H,
+                pixel_index + BEACON_IMAGE_W + 1U,
+                (unsigned short)(coordinate + 0x0101U));
+            ENQUEUE_COMPONENT_IF(x + 1U < BEACON_IMAGE_W && y > 0U,
+                pixel_index - BEACON_IMAGE_W + 1U,
+                (unsigned short)(coordinate - 0x00FFU));
+            ENQUEUE_COMPONENT_IF(x > 0U && y + 1U < BEACON_IMAGE_H,
+                pixel_index + BEACON_IMAGE_W - 1U,
+                (unsigned short)(coordinate + 0x00FFU));
+            ENQUEUE_COMPONENT_IF(x > 0U && y > 0U,
+                pixel_index - BEACON_IMAGE_W - 1U,
+                (unsigned short)(coordinate - 0x0101U));
+#undef ENQUEUE_COMPONENT_IF
         }
     }
 
-    if (comp.area > 0)
-    {
-        float inv_area = 1.0f / (float)comp.area;
-        float var_x;
-        float var_y;
-        float cov_xy;
-        float trace;
-        float det;
-        float disc;
-        float eig_major;
-        float eig_minor;
-
-        comp.cx = (float)sum_x * inv_area;
-        comp.cy = (float)sum_y * inv_area;
-        var_x = sum_xx * inv_area - comp.cx * comp.cx;
-        var_y = sum_yy * inv_area - comp.cy * comp.cy;
-        cov_xy = sum_xy * inv_area - comp.cx * comp.cy;
-        trace = var_x + var_y;
-        det = var_x * var_y - cov_xy * cov_xy;
-        disc = trace * trace * 0.25f - det;
-        if (disc < 0.0f)
-        {
-            disc = 0.0f;
-        }
-
-        eig_major = trace * 0.5f + sqrtf(disc);
-        eig_minor = trace * 0.5f - sqrtf(disc);
-        if (eig_minor < 0.0f)
-        {
-            eig_minor = 0.0f;
-        }
-
-        comp.major = 4.0f * sqrtf(eig_major + 0.0001f);
-        comp.minor = 4.0f * sqrtf(eig_minor + 0.0001f);
-        if (comp.minor < 1.0f)
-        {
-            comp.minor = 1.0f;
-        }
-        comp.elongation = comp.major / comp.minor;
-        comp.angle = 0.5f * atan2f(2.0f * cov_xy, var_x - var_y) * 180.0f / PI_F;
-        comp.valid = 1;
-    }
-
+    finish_component(
+        &comp, sum_x, sum_y, (unsigned short)(tail - g_queue));
     return comp;
 }
-
-static void finish_component(
-    component_t *comp,
-    int sum_x,
-    int sum_y,
-    float sum_xx,
-    float sum_yy,
-    float sum_xy);
 
 static float car_score_term(float value, float base, float range)
 {
@@ -538,26 +600,44 @@ static unsigned char car_find_core_seed(const component_t *comp,
     return (best_distance < 1.0e9f) ? 1U : 0U;
 }
 
+static unsigned short *grow_car_envelope_enqueue(
+    const unsigned char *image,
+    unsigned char *visit,
+    unsigned int index,
+    unsigned short coordinate,
+    unsigned char threshold,
+    unsigned char stamp,
+    unsigned short *tail,
+    unsigned short *end)
+{
+    if (tail >= end || image[index] < threshold || visit[index] == stamp)
+    {
+        return tail;
+    }
+    visit[index] = stamp;
+    *tail++ = coordinate;
+    return tail;
+}
+
 static component_t grow_car_envelope(const component_t *core,
                                      int threshold,
                                      int pad)
 {
-    static const signed char dx[8] = { 1, -1, 0, 0, 1, 1, -1, -1 };
-    static const signed char dy[8] = { 0, 0, 1, -1, 1, -1, 1, -1 };
+    const unsigned char *image = &g_current_image[0][0];
+    unsigned char *visit = g_visit_stamp;
+    unsigned short *head = g_queue;
+    unsigned short *tail = g_queue;
+    unsigned short *end = g_queue + IMAGE_QUEUE_SIZE;
+    unsigned char stamp;
     component_t envelope;
     unsigned char seed_x = 0U;
     unsigned char seed_y = 0U;
-    unsigned short head = 0U;
-    unsigned short tail = 0U;
     int min_x = core->min_x - pad;
     int max_x = core->max_x + pad;
     int min_y = core->min_y - pad;
     int max_y = core->max_y + pad;
     int sum_x = 0;
     int sum_y = 0;
-    float sum_xx = 0.0f;
-    float sum_yy = 0.0f;
-    float sum_xy = 0.0f;
 
     memset(&envelope, 0, sizeof(envelope));
     if (min_x < 0) min_x = 0;
@@ -570,21 +650,20 @@ static component_t grow_car_envelope(const component_t *core,
     }
 
     begin_visit_pass();
+    stamp = g_current_stamp;
     envelope.min_x = seed_x;
     envelope.max_x = seed_x;
     envelope.min_y = seed_y;
     envelope.max_y = seed_y;
-    g_queue_x[tail] = seed_x;
-    g_queue_y[tail] = seed_y;
-    tail++;
-    mark_visited(seed_x, seed_y);
+    *tail++ = (unsigned short)seed_x | ((unsigned short)seed_y << 8U);
+    visit[(unsigned int)seed_y * BEACON_IMAGE_W + seed_x] = stamp;
     while (head < tail)
     {
-        unsigned char index;
-        unsigned char x = g_queue_x[head];
-        unsigned char y = g_queue_y[head];
+        unsigned short coordinate = *head++;
+        unsigned char x = (unsigned char)coordinate;
+        unsigned char y = (unsigned char)(coordinate >> 8U);
+        unsigned int pixel_index = (unsigned int)y * BEACON_IMAGE_W + x;
         unsigned int gray = g_current_image[y][x];
-        head++;
         envelope.area++;
         envelope.gray_sum += gray;
         envelope.gray_sum_sq += gray * gray;
@@ -594,35 +673,85 @@ static component_t grow_car_envelope(const component_t *core,
         }
         sum_x += x;
         sum_y += y;
-        sum_xx += (float)x * (float)x;
-        sum_yy += (float)y * (float)y;
-        sum_xy += (float)x * (float)y;
         if ((int)x < envelope.min_x) envelope.min_x = x;
         if ((int)x > envelope.max_x) envelope.max_x = x;
         if ((int)y < envelope.min_y) envelope.min_y = y;
         if ((int)y > envelope.max_y) envelope.max_y = y;
-        for (index = 0U; index < 8U; index++)
+        if ((int)x > min_x && (int)x < max_x &&
+            (int)y > min_y && (int)y < max_y)
         {
-            int next_x = (int)x + dx[index];
-            int next_y = (int)y + dy[index];
-            if (next_x < min_x || next_x > max_x ||
-                next_y < min_y || next_y > max_y ||
-                g_current_image[next_y][next_x] < threshold ||
-                is_visited((unsigned char)next_x, (unsigned char)next_y) != 0U ||
-                tail >= IMAGE_QUEUE_SIZE)
-            {
-                continue;
-            }
-            mark_visited((unsigned char)next_x, (unsigned char)next_y);
-            g_queue_x[tail] = (unsigned char)next_x;
-            g_queue_y[tail] = (unsigned char)next_y;
-            tail++;
+            tail = grow_car_envelope_enqueue(
+                image, visit, pixel_index + 1U,
+                (unsigned short)(coordinate + 1U),
+                (unsigned char)threshold, stamp, tail, end);
+            tail = grow_car_envelope_enqueue(
+                image, visit, pixel_index - 1U,
+                (unsigned short)(coordinate - 1U),
+                (unsigned char)threshold, stamp, tail, end);
+            tail = grow_car_envelope_enqueue(
+                image, visit, pixel_index + BEACON_IMAGE_W,
+                (unsigned short)(coordinate + 0x0100U),
+                (unsigned char)threshold, stamp, tail, end);
+            tail = grow_car_envelope_enqueue(
+                image, visit, pixel_index - BEACON_IMAGE_W,
+                (unsigned short)(coordinate - 0x0100U),
+                (unsigned char)threshold, stamp, tail, end);
+            tail = grow_car_envelope_enqueue(
+                image, visit, pixel_index + BEACON_IMAGE_W + 1U,
+                (unsigned short)(coordinate + 0x0101U),
+                (unsigned char)threshold, stamp, tail, end);
+            tail = grow_car_envelope_enqueue(
+                image, visit, pixel_index - BEACON_IMAGE_W + 1U,
+                (unsigned short)(coordinate - 0x00FFU),
+                (unsigned char)threshold, stamp, tail, end);
+            tail = grow_car_envelope_enqueue(
+                image, visit, pixel_index + BEACON_IMAGE_W - 1U,
+                (unsigned short)(coordinate + 0x00FFU),
+                (unsigned char)threshold, stamp, tail, end);
+            tail = grow_car_envelope_enqueue(
+                image, visit, pixel_index - BEACON_IMAGE_W - 1U,
+                (unsigned short)(coordinate - 0x0101U),
+                (unsigned char)threshold, stamp, tail, end);
+        }
+        else
+        {
+#define ENQUEUE_ENVELOPE_IF(valid_, index_, coordinate_) \
+            do { if (valid_) { tail = grow_car_envelope_enqueue( \
+                image, visit, (index_), (coordinate_), \
+                (unsigned char)threshold, stamp, tail, end); } } while (0)
+            ENQUEUE_ENVELOPE_IF((int)x < max_x,
+                pixel_index + 1U, (unsigned short)(coordinate + 1U));
+            ENQUEUE_ENVELOPE_IF((int)x > min_x,
+                pixel_index - 1U, (unsigned short)(coordinate - 1U));
+            ENQUEUE_ENVELOPE_IF((int)y < max_y,
+                pixel_index + BEACON_IMAGE_W,
+                (unsigned short)(coordinate + 0x0100U));
+            ENQUEUE_ENVELOPE_IF((int)y > min_y,
+                pixel_index - BEACON_IMAGE_W,
+                (unsigned short)(coordinate - 0x0100U));
+            ENQUEUE_ENVELOPE_IF((int)x < max_x && (int)y < max_y,
+                pixel_index + BEACON_IMAGE_W + 1U,
+                (unsigned short)(coordinate + 0x0101U));
+            ENQUEUE_ENVELOPE_IF((int)x < max_x && (int)y > min_y,
+                pixel_index - BEACON_IMAGE_W + 1U,
+                (unsigned short)(coordinate - 0x00FFU));
+            ENQUEUE_ENVELOPE_IF((int)x > min_x && (int)y < max_y,
+                pixel_index + BEACON_IMAGE_W - 1U,
+                (unsigned short)(coordinate + 0x00FFU));
+            ENQUEUE_ENVELOPE_IF((int)x > min_x && (int)y > min_y,
+                pixel_index - BEACON_IMAGE_W - 1U,
+                (unsigned short)(coordinate - 0x0101U));
+#undef ENQUEUE_ENVELOPE_IF
         }
     }
-    finish_component(&envelope, sum_x, sum_y, sum_xx, sum_yy, sum_xy);
+    finish_component(
+        &envelope, sum_x, sum_y, (unsigned short)(tail - g_queue));
     return envelope;
 }
 
+#if defined(__ICCARM__)
+#pragma inline=never
+#endif
 static unsigned char car_component_features(
     const component_t *comp,
     down_car_features_t *features)
@@ -724,7 +853,13 @@ static void add_car_mask(const component_t *comp)
     if (comp != 0 && comp->valid != 0 &&
         g_current_lamp_mask_count < DOWN_CAR_MAX_MASKS)
     {
-        g_current_lamp_masks[g_current_lamp_mask_count++] = *comp;
+        unsigned char index = g_current_lamp_mask_count;
+        g_current_lamp_masks[index] = *comp;
+        component_resolve_angle(&g_current_lamp_masks[index]);
+        down_gray_lamp_geometry_init(
+            &g_current_lamp_masks[index],
+            &g_current_lamp_geometries[index]);
+        g_current_lamp_mask_count++;
     }
 }
 
@@ -732,19 +867,23 @@ static void finish_component(
     component_t *comp,
     int sum_x,
     int sum_y,
-    float sum_xx,
-    float sum_yy,
-    float sum_xy)
+    unsigned short coordinate_count)
 {
     float inv_area;
+    float sum_xx = 0.0f;
+    float sum_yy = 0.0f;
+    float sum_xy = 0.0f;
     float var_x;
     float var_y;
     float cov_xy;
     float trace;
     float det;
     float disc;
+    float eig_delta;
     float eig_major;
     float eig_minor;
+    unsigned short *head;
+    unsigned short *end;
 
     if (comp == 0 || comp->area <= 0)
     {
@@ -753,6 +892,51 @@ static void finish_component(
     inv_area = 1.0f / (float)comp->area;
     comp->cx = (float)sum_x * inv_area;
     comp->cy = (float)sum_y * inv_area;
+    head = g_queue;
+    end = g_queue + coordinate_count;
+    if (coordinate_count <= 479U)
+    {
+        unsigned int int_sum_xx = 0U;
+        unsigned int int_sum_yy = 0U;
+        unsigned int int_sum_xy = 0U;
+#if defined(__ICCARM__)
+        unsigned short *pair_end = g_queue + (coordinate_count & ~1U);
+        while (head < pair_end)
+        {
+            uint32 coordinates = __UNALIGNED_UINT32_READ(head);
+            uint32 x_pair = __UXTB16(coordinates);
+            uint32 y_pair = __UXTB16(__ROR(coordinates, 8U));
+            head += 2;
+            int_sum_xx = (unsigned int)__SMLAD(x_pair, x_pair, int_sum_xx);
+            int_sum_yy = (unsigned int)__SMLAD(y_pair, y_pair, int_sum_yy);
+            int_sum_xy = (unsigned int)__SMLAD(x_pair, y_pair, int_sum_xy);
+        }
+#endif
+        while (head < end)
+        {
+            unsigned short coordinate = *head++;
+            unsigned int x = (unsigned char)coordinate;
+            unsigned int y = (unsigned char)(coordinate >> 8U);
+            int_sum_xx += x * x;
+            int_sum_yy += y * y;
+            int_sum_xy += x * y;
+        }
+        sum_xx = (float)int_sum_xx;
+        sum_yy = (float)int_sum_yy;
+        sum_xy = (float)int_sum_xy;
+    }
+    else
+    {
+        while (head < end)
+        {
+            unsigned short coordinate = *head++;
+            unsigned char x = (unsigned char)coordinate;
+            unsigned char y = (unsigned char)(coordinate >> 8U);
+            sum_xx += (float)x * (float)x;
+            sum_yy += (float)y * (float)y;
+            sum_xy += (float)x * (float)y;
+        }
+    }
     var_x = sum_xx * inv_area - comp->cx * comp->cx;
     var_y = sum_yy * inv_area - comp->cy * comp->cy;
     cov_xy = sum_xy * inv_area - comp->cx * comp->cy;
@@ -763,8 +947,9 @@ static void finish_component(
     {
         disc = 0.0f;
     }
-    eig_major = trace * 0.5f + sqrtf(disc);
-    eig_minor = trace * 0.5f - sqrtf(disc);
+    eig_delta = sqrtf(disc);
+    eig_major = trace * 0.5f + eig_delta;
+    eig_minor = trace * 0.5f - eig_delta;
     if (eig_minor < 0.0f)
     {
         eig_minor = 0.0f;
@@ -776,9 +961,21 @@ static void finish_component(
         comp->minor = 1.0f;
     }
     comp->elongation = comp->major / comp->minor;
-    comp->angle = 0.5f * atan2f(2.0f * cov_xy, var_x - var_y) *
-                  180.0f / PI_F;
+    comp->orientation_numerator = 2.0f * cov_xy;
+    comp->orientation_denominator = var_x - var_y;
+    comp->angle_valid = 0U;
     comp->valid = 1U;
+}
+
+static void component_resolve_angle(component_t *comp)
+{
+    if (comp != 0 && comp->valid != 0U && comp->angle_valid == 0U)
+    {
+        comp->angle = 0.5f * atan2f(
+            comp->orientation_numerator,
+            comp->orientation_denominator) * 180.0f / PI_F;
+        comp->angle_valid = 1U;
+    }
 }
 
 
@@ -1007,6 +1204,9 @@ static unsigned char select_car_candidate(
     return best;
 }
 
+#if defined(__ICCARM__)
+#pragma inline=never
+#endif
 static unsigned char find_car_lamp(component_t *best_lamp)
 {
     component_t cores[DOWN_CAR_MAX_COMPONENTS];
@@ -1026,11 +1226,21 @@ static unsigned char find_car_lamp(component_t *best_lamp)
     begin_visit_pass();
     for (y = 0U; y < BEACON_IMAGE_H; y++)
     {
-        for (x = 0U; x < BEACON_IMAGE_W; x++)
+        x = 0U;
+        while (x < BEACON_IMAGE_W)
         {
             component_t component;
+#if defined(__ICCARM__)
+            if ((x <= BEACON_IMAGE_W - 4U) &&
+                (__UNALIGNED_UINT32_READ(&g_binary[y][x]) == 0U))
+            {
+                x = (unsigned char)(x + 4U);
+                continue;
+            }
+#endif
             if (g_binary[y][x] == 0U || is_visited(x, y) != 0U)
             {
+                x++;
                 continue;
             }
             component = grow_component(x, y);
@@ -1038,6 +1248,7 @@ static unsigned char find_car_lamp(component_t *best_lamp)
             {
                 store_car_core(cores, &core_count, &component);
             }
+            x++;
         }
     }
 
@@ -1063,6 +1274,7 @@ static unsigned char find_car_lamp(component_t *best_lamp)
     if (best < candidate_count)
     {
         *best_lamp = candidates[best].component;
+        component_resolve_angle(best_lamp);
         reset_weak_car_pending();
         return 1U;
     }
@@ -1073,6 +1285,7 @@ static unsigned char find_car_lamp(component_t *best_lamp)
         weak_car_confirmed(&candidates[weak_best].component, 1U) != 0U)
     {
         *best_lamp = candidates[weak_best].component;
+        component_resolve_angle(best_lamp);
         return 1U;
     }
     best = select_car_candidate(candidates, candidate_count,
@@ -1089,6 +1302,7 @@ static unsigned char find_car_lamp(component_t *best_lamp)
             g_image_down_gate_distance * g_image_down_gate_distance)
         {
             *best_lamp = candidates[best].component;
+            component_resolve_angle(best_lamp);
             add_car_mask(&candidates[best].mask);
             reset_weak_car_pending();
             return 1U;
@@ -1210,58 +1424,56 @@ static unsigned char down_gray_in_bounds(int x, int y)
             y >= 0 && y < BEACON_IMAGE_H) ? 1U : 0U;
 }
 
-static float down_gray_scene_mean(
-    const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W])
-{
-    unsigned long sum = 0U;
-    unsigned int count = 0U;
-    int x;
-    int y;
-
-    for (y = 0; y < BEACON_IMAGE_H; y += 4)
-    {
-        for (x = 0; x < BEACON_IMAGE_W; x += 4)
-        {
-            sum += image[y][x];
-            count++;
-        }
-    }
-    return (count > 0U) ? (float)sum / (float)count : 0.0f;
-}
-
-static unsigned char down_gray_point_in_lamp(
-    int x,
-    int y,
-    const component_t *lamp)
+static void down_gray_lamp_geometry_init(
+    const component_t *lamp,
+    down_lamp_geometry_t *geometry)
 {
     float angle;
-    float cos_a;
-    float sin_a;
+
+    memset(geometry, 0, sizeof(*geometry));
+    if (lamp == 0 || lamp->valid == 0U)
+    {
+        return;
+    }
+    angle = lamp->angle * (PI_F / 180.0f);
+    geometry->cx = lamp->cx;
+    geometry->cy = lamp->cy;
+    geometry->cos_angle = cosf(angle);
+    geometry->sin_angle = sinf(angle);
+    geometry->half_length = lamp->major * 0.5f + (float)LAMP_MASK_PAD;
+    geometry->half_width = lamp->minor * 0.5f + (float)LAMP_MASK_PAD;
+    geometry->min_x = lamp->min_x - LAMP_MASK_PAD;
+    geometry->max_x = lamp->max_x + LAMP_MASK_PAD;
+    geometry->min_y = lamp->min_y - LAMP_MASK_PAD;
+    geometry->max_y = lamp->max_y + LAMP_MASK_PAD;
+    geometry->valid = 1U;
+}
+
+static unsigned char down_gray_point_in_lamp_geometry(
+    int x,
+    int y,
+    const down_lamp_geometry_t *geometry)
+{
     float dx;
     float dy;
     float major;
     float minor;
 
-    if (lamp == 0 || lamp->valid == 0)
+    if (geometry == 0 || geometry->valid == 0U)
     {
         return 0U;
     }
-    if (x < lamp->min_x - LAMP_MASK_PAD ||
-        x > lamp->max_x + LAMP_MASK_PAD ||
-        y < lamp->min_y - LAMP_MASK_PAD ||
-        y > lamp->max_y + LAMP_MASK_PAD)
+    if (x < geometry->min_x || x > geometry->max_x ||
+        y < geometry->min_y || y > geometry->max_y)
     {
         return 0U;
     }
-    angle = lamp->angle * (PI_F / 180.0f);
-    cos_a = cosf(angle);
-    sin_a = sinf(angle);
-    dx = (float)x - lamp->cx;
-    dy = (float)y - lamp->cy;
-    major = dx * cos_a + dy * sin_a;
-    minor = -dx * sin_a + dy * cos_a;
-    return (fabsf(major) <= lamp->major * 0.5f + (float)LAMP_MASK_PAD &&
-            fabsf(minor) <= lamp->minor * 0.5f + (float)LAMP_MASK_PAD) ? 1U : 0U;
+    dx = (float)x - geometry->cx;
+    dy = (float)y - geometry->cy;
+    major = dx * geometry->cos_angle + dy * geometry->sin_angle;
+    minor = -dx * geometry->sin_angle + dy * geometry->cos_angle;
+    return (fabsf(major) <= geometry->half_length &&
+            fabsf(minor) <= geometry->half_width) ? 1U : 0U;
 }
 
 static unsigned char down_gray_point_in_current_lamps(int x, int y)
@@ -1270,8 +1482,8 @@ static unsigned char down_gray_point_in_current_lamps(int x, int y)
 
     for (index = 0U; index < g_current_lamp_mask_count; index++)
     {
-        if (down_gray_point_in_lamp(
-                x, y, &g_current_lamp_masks[index]) != 0U)
+        if (down_gray_point_in_lamp_geometry(
+                x, y, &g_current_lamp_geometries[index]) != 0U)
         {
             return 1U;
         }
@@ -1311,25 +1523,233 @@ static unsigned char down_gray_point_in_range(int x, int y)
     return 1U;
 }
 
-static void down_gray_horizontal_box_sum(
-    const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
-    int y,
-    int radius,
-    unsigned short output[BEACON_IMAGE_W])
+/* 刷新列滑动和的镜像边界槽。输入和输出均为当前行的Box列和缓存。 */
+static void down_gray_vertical_box_sum_reflect_edges(void)
 {
-    unsigned int sum = 0U;
+    unsigned short *box3_sum = &g_gray_box3_storage[2];
+    unsigned short *box9_sum = &g_gray_box9_storage[4];
+    int offset;
+
+    box3_sum[-1] = box3_sum[1];
+    box3_sum[BEACON_IMAGE_W] = box3_sum[BEACON_IMAGE_W - 2];
+    for (offset = 1; offset <= 4; offset++)
+    {
+        box9_sum[-offset] = box9_sum[offset];
+        box9_sum[BEACON_IMAGE_W - 1 + offset] =
+            box9_sum[BEACON_IMAGE_W - 1 - offset];
+    }
+}
+
+/* 初始化指定中心行的Box3和Box9列方向滑动和。 */
+static void down_gray_vertical_box_sum_init_at(
+    const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
+    int center_y)
+{
+    unsigned short *box3_sum = &g_gray_box3_storage[2];
+    unsigned short *box9_sum = &g_gray_box9_storage[4];
     int x;
 
-    for (x = -radius; x <= radius; x++)
+#if defined(__ICCARM__)
+    if (center_y >= 4 && center_y <= BEACON_IMAGE_H - 5)
     {
-        sum += image[y][down_gray_reflect_index(x, BEACON_IMAGE_W)];
+        const unsigned char *row_m4 = &image[center_y - 4][0];
+
+        for (x = 0; x < BEACON_IMAGE_W; x += 4)
+        {
+            uint32 word = __UNALIGNED_UINT32_READ(&row_m4[x]);
+            uint32 box9_even = __UXTB16(word);
+            uint32 box9_odd = __UXTB16(__ROR(word, 8U));
+            uint32 box3_even;
+            uint32 box3_odd;
+            uint32 even;
+            uint32 odd;
+
+            word = __UNALIGNED_UINT32_READ(&row_m4[BEACON_IMAGE_W + x]);
+            box9_even = __UADD16(box9_even, __UXTB16(word));
+            box9_odd = __UADD16(box9_odd, __UXTB16(__ROR(word, 8U)));
+            word = __UNALIGNED_UINT32_READ(&row_m4[2 * BEACON_IMAGE_W + x]);
+            box9_even = __UADD16(box9_even, __UXTB16(word));
+            box9_odd = __UADD16(box9_odd, __UXTB16(__ROR(word, 8U)));
+            word = __UNALIGNED_UINT32_READ(&row_m4[3 * BEACON_IMAGE_W + x]);
+            box3_even = __UXTB16(word);
+            box3_odd = __UXTB16(__ROR(word, 8U));
+            box9_even = __UADD16(box9_even, box3_even);
+            box9_odd = __UADD16(box9_odd, box3_odd);
+            word = __UNALIGNED_UINT32_READ(&row_m4[4 * BEACON_IMAGE_W + x]);
+            even = __UXTB16(word);
+            odd = __UXTB16(__ROR(word, 8U));
+            box3_even = __UADD16(box3_even, even);
+            box3_odd = __UADD16(box3_odd, odd);
+            box9_even = __UADD16(box9_even, even);
+            box9_odd = __UADD16(box9_odd, odd);
+            word = __UNALIGNED_UINT32_READ(&row_m4[5 * BEACON_IMAGE_W + x]);
+            even = __UXTB16(word);
+            odd = __UXTB16(__ROR(word, 8U));
+            box3_even = __UADD16(box3_even, even);
+            box3_odd = __UADD16(box3_odd, odd);
+            box9_even = __UADD16(box9_even, even);
+            box9_odd = __UADD16(box9_odd, odd);
+            __UNALIGNED_UINT32_WRITE(
+                &box3_sum[x], __PKHBT(box3_even, box3_odd, 16));
+            __UNALIGNED_UINT32_WRITE(
+                &box3_sum[x + 2], __PKHTB(box3_odd, box3_even, 16));
+            word = __UNALIGNED_UINT32_READ(&row_m4[6 * BEACON_IMAGE_W + x]);
+            box9_even = __UADD16(box9_even, __UXTB16(word));
+            box9_odd = __UADD16(box9_odd, __UXTB16(__ROR(word, 8U)));
+            word = __UNALIGNED_UINT32_READ(&row_m4[7 * BEACON_IMAGE_W + x]);
+            box9_even = __UADD16(box9_even, __UXTB16(word));
+            box9_odd = __UADD16(box9_odd, __UXTB16(__ROR(word, 8U)));
+            word = __UNALIGNED_UINT32_READ(&row_m4[8 * BEACON_IMAGE_W + x]);
+            box9_even = __UADD16(box9_even, __UXTB16(word));
+            box9_odd = __UADD16(box9_odd, __UXTB16(__ROR(word, 8U)));
+            __UNALIGNED_UINT32_WRITE(
+                &box9_sum[x], __PKHBT(box9_even, box9_odd, 16));
+            __UNALIGNED_UINT32_WRITE(
+                &box9_sum[x + 2], __PKHTB(box9_odd, box9_even, 16));
+        }
     }
-    output[0] = (unsigned short)sum;
-    for (x = 1; x < BEACON_IMAGE_W; x++)
+    else
+#endif
     {
-        sum += image[y][down_gray_reflect_index(x + radius, BEACON_IMAGE_W)];
-        sum -= image[y][down_gray_reflect_index(x - radius - 1, BEACON_IMAGE_W)];
-        output[x] = (unsigned short)sum;
+        const unsigned char *row_m4 =
+            image[down_gray_reflect_index(center_y - 4, BEACON_IMAGE_H)];
+        const unsigned char *row_m3 =
+            image[down_gray_reflect_index(center_y - 3, BEACON_IMAGE_H)];
+        const unsigned char *row_m2 =
+            image[down_gray_reflect_index(center_y - 2, BEACON_IMAGE_H)];
+        const unsigned char *row_m1 =
+            image[down_gray_reflect_index(center_y - 1, BEACON_IMAGE_H)];
+        const unsigned char *row_0 = image[center_y];
+        const unsigned char *row_p1 =
+            image[down_gray_reflect_index(center_y + 1, BEACON_IMAGE_H)];
+        const unsigned char *row_p2 =
+            image[down_gray_reflect_index(center_y + 2, BEACON_IMAGE_H)];
+        const unsigned char *row_p3 =
+            image[down_gray_reflect_index(center_y + 3, BEACON_IMAGE_H)];
+        const unsigned char *row_p4 =
+            image[down_gray_reflect_index(center_y + 4, BEACON_IMAGE_H)];
+
+        for (x = 0; x < BEACON_IMAGE_W; x++)
+        {
+            box3_sum[x] = (unsigned short)(
+                (unsigned int)row_m1[x] + (unsigned int)row_0[x] +
+                (unsigned int)row_p1[x]);
+            box9_sum[x] = (unsigned short)(
+                (unsigned int)row_m4[x] + (unsigned int)row_m3[x] +
+                (unsigned int)row_m2[x] + (unsigned int)row_m1[x] +
+                (unsigned int)row_0[x] + (unsigned int)row_p1[x] +
+                (unsigned int)row_p2[x] + (unsigned int)row_p3[x] +
+                (unsigned int)row_p4[x]);
+        }
+    }
+    down_gray_vertical_box_sum_reflect_edges();
+}
+
+/* 将四列Box列和推进一行；M7路径使用双半字并行加减。 */
+static void down_gray_vertical_box_sum_update4(
+    unsigned short *sum,
+    const unsigned char *sub_row,
+    const unsigned char *add_row,
+    int x)
+{
+#if defined(__ICCARM__)
+    uint32 current01 = __UNALIGNED_UINT32_READ(&sum[x]);
+    uint32 current23 = __UNALIGNED_UINT32_READ(&sum[x + 2]);
+    uint32 sub_word = __UNALIGNED_UINT32_READ(&sub_row[x]);
+    uint32 add_word = __UNALIGNED_UINT32_READ(&add_row[x]);
+    uint32 even = __PKHBT(current01, current23, 16);
+    uint32 odd = __PKHTB(current23, current01, 16);
+
+    even = __USUB16(even, __UXTB16(sub_word));
+    even = __UADD16(even, __UXTB16(add_word));
+    odd = __USUB16(odd, __UXTB16(__ROR(sub_word, 8U)));
+    odd = __UADD16(odd, __UXTB16(__ROR(add_word, 8U)));
+    current01 = __PKHBT(even, odd, 16);
+    current23 = __PKHTB(odd, even, 16);
+    __UNALIGNED_UINT32_WRITE(&sum[x], current01);
+    __UNALIGNED_UINT32_WRITE(&sum[x + 2], current23);
+#else
+    int offset;
+    for (offset = 0; offset < 4; offset++)
+    {
+        sum[x + offset] = (unsigned short)(
+            sum[x + offset] - sub_row[x + offset] + add_row[x + offset]);
+    }
+#endif
+}
+
+/* 缓存闭合边界内每列的整数行区间，并生成各行的候选扫描跨度。 */
+static void down_gray_build_range_cache(
+    unsigned char minimum_y[BEACON_IMAGE_W],
+    unsigned char maximum_y[BEACON_IMAGE_W],
+    unsigned char row_minimum_x[BEACON_IMAGE_H],
+    unsigned char row_maximum_x[BEACON_IMAGE_H],
+    unsigned char row_valid[BEACON_IMAGE_H])
+{
+    int x;
+    int y;
+
+    memset(row_minimum_x, BEACON_IMAGE_W, BEACON_IMAGE_H);
+    memset(row_maximum_x, 0, BEACON_IMAGE_H);
+    memset(row_valid, 0, BEACON_IMAGE_H);
+    for (x = 0; x < BEACON_IMAGE_W; x++)
+    {
+        int min_y = 0;
+        int max_y = BEACON_IMAGE_H - 1;
+
+        if (g_image_down_horizon_valid != 0U &&
+            g_image_down_horizon_extrapolated == 0U)
+        {
+            float top_y;
+            float bottom_y;
+            if (image_down_horizon_get_column(
+                    (uint16)x, &top_y, &bottom_y) != 0U)
+            {
+                float lower = top_y;
+                float upper = bottom_y;
+                if (top_y >= 0.0f && top_y <= (float)(BEACON_IMAGE_H - 1))
+                {
+                    lower = top_y + DOWN_BEACON_BOUNDARY_CLEARANCE;
+                }
+                if (bottom_y >= 0.0f &&
+                    bottom_y <= (float)(BEACON_IMAGE_H - 1))
+                {
+                    upper = bottom_y - DOWN_BEACON_BOUNDARY_CLEARANCE;
+                }
+                min_y = (int)lower;
+                if ((float)min_y < lower)
+                {
+                    min_y++;
+                }
+                max_y = (int)upper;
+                if ((float)max_y > upper)
+                {
+                    max_y--;
+                }
+                if (min_y < 0) min_y = 0;
+                if (max_y >= BEACON_IMAGE_H) max_y = BEACON_IMAGE_H - 1;
+            }
+            else if (image_down_horizon_contains((float)x, 0.0f, 0.0f) == 0U)
+            {
+                min_y = BEACON_IMAGE_H;
+                max_y = -1;
+            }
+        }
+        minimum_y[x] = (unsigned char)min_y;
+        maximum_y[x] = (max_y >= 0) ? (unsigned char)max_y : 0U;
+        if (min_y > max_y)
+        {
+            continue;
+        }
+        for (y = min_y; y <= max_y; y++)
+        {
+            if (row_valid[y] == 0U)
+            {
+                row_minimum_x[y] = (unsigned char)x;
+                row_valid[y] = 1U;
+            }
+            row_maximum_x[y] = (unsigned char)x;
+        }
     }
 }
 
@@ -1373,13 +1793,18 @@ static void down_gray_insert_peak(
 
 static void down_gray_collect_response_row(
     const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
-    const component_t *lamp,
-    const component_t *temporal_lamp,
+    const down_lamp_geometry_t *lamp_geometry,
+    const down_lamp_geometry_t *temporal_lamp_geometry,
     float scene_mean,
     int center_y,
     int top_slot,
     int center_slot,
     int bottom_slot,
+    const unsigned char minimum_y[BEACON_IMAGE_W],
+    const unsigned char maximum_y[BEACON_IMAGE_W],
+    const unsigned char row_minimum_x[BEACON_IMAGE_H],
+    const unsigned char row_maximum_x[BEACON_IMAGE_H],
+    const unsigned char row_valid[BEACON_IMAGE_H],
     down_gray_peak_t peaks[DOWN_GRAY_MAX_PEAKS],
     unsigned char *count)
 {
@@ -1390,17 +1815,39 @@ static void down_gray_collect_response_row(
     {
         minimum_peak = 90;
     }
-    for (x = 0; x < BEACON_IMAGE_W; x++)
+    if (row_valid[center_y] == 0U)
+    {
+        return;
+    }
+    for (x = row_minimum_x[center_y]; x <= row_maximum_x[center_y]; x++)
     {
         signed short response = g_gray_response_rows[center_slot][x];
         int dx;
         unsigned char local_maximum = 1U;
 
+#if defined(__ICCARM__)
+        if (((x & 3) == 0) && x + 3 <= row_maximum_x[center_y])
+        {
+            uint32 gray_word = __UNALIGNED_UINT32_READ(&image[center_y][x]);
+            uint32 threshold_word = (uint32)minimum_peak * 0x01010101UL;
+            (void)__USUB8(gray_word, threshold_word);
+            if (__SEL(0xFFFFFFFFUL, 0U) == 0U)
+            {
+                x += 3;
+                continue;
+            }
+        }
+#endif
+
         if (response <= 0 || image[center_y][x] < minimum_peak ||
-            down_gray_point_in_range(x, center_y) == 0U ||
-            down_gray_point_in_current_lamps(x, center_y) != 0U ||
-            down_gray_point_in_lamp(x, center_y, lamp) != 0U ||
-            down_gray_point_in_lamp(x, center_y, temporal_lamp) != 0U)
+            center_y < minimum_y[x] || center_y > maximum_y[x])
+        {
+            continue;
+        }
+        if (response < g_gray_response_rows[center_slot]
+                         [down_gray_reflect_index(x - 1, BEACON_IMAGE_W)] ||
+            response < g_gray_response_rows[center_slot]
+                         [down_gray_reflect_index(x + 1, BEACON_IMAGE_W)])
         {
             continue;
         }
@@ -1408,7 +1855,6 @@ static void down_gray_collect_response_row(
         {
             int xx = down_gray_reflect_index(x + dx, BEACON_IMAGE_W);
             if (response < g_gray_response_rows[top_slot][xx] ||
-                response < g_gray_response_rows[center_slot][xx] ||
                 response < g_gray_response_rows[bottom_slot][xx])
             {
                 local_maximum = 0U;
@@ -1417,154 +1863,133 @@ static void down_gray_collect_response_row(
         }
         if (local_maximum != 0U)
         {
-            down_gray_insert_peak(peaks, count, response, x, center_y);
+            if ((*count < DOWN_GRAY_MAX_PEAKS ||
+                 response > peaks[DOWN_GRAY_MAX_PEAKS - 1U].response) &&
+                down_gray_point_in_current_lamps(x, center_y) == 0U &&
+                down_gray_point_in_lamp_geometry(
+                    x, center_y, lamp_geometry) == 0U &&
+                down_gray_point_in_lamp_geometry(
+                    x, center_y, temporal_lamp_geometry) == 0U)
+            {
+                down_gray_insert_peak(peaks, count, response, x, center_y);
+            }
         }
     }
 }
 
+#if defined(__ICCARM__)
+#pragma inline=never
+#endif
 static unsigned char down_gray_find_peaks(
     const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
-    const component_t *lamp,
-    const component_t *temporal_lamp,
+    const down_lamp_geometry_t *lamp_geometry,
+    const down_lamp_geometry_t *temporal_lamp_geometry,
     float scene_mean,
     down_gray_peak_t peaks[DOWN_GRAY_MAX_PEAKS])
 {
     unsigned char count = 0U;
-    int index;
+    unsigned char minimum_y[BEACON_IMAGE_W];
+    unsigned char maximum_y[BEACON_IMAGE_W];
+    unsigned char row_minimum_x[BEACON_IMAGE_H];
+    unsigned char row_maximum_x[BEACON_IMAGE_H];
+    unsigned char row_valid[BEACON_IMAGE_H];
+    unsigned short *box3_vertical = &g_gray_box3_storage[2];
+    unsigned short *box9_vertical = &g_gray_box9_storage[4];
     int x;
     int y;
 
     memset(peaks, 0, sizeof(down_gray_peak_t) * DOWN_GRAY_MAX_PEAKS);
-    memset(g_gray_box3_sum, 0, sizeof(g_gray_box3_sum));
-    memset(g_gray_box9_sum, 0, sizeof(g_gray_box9_sum));
-    for (index = 0; index < 3; index++)
-    {
-        int row = down_gray_reflect_index(index - 1, BEACON_IMAGE_H);
-        down_gray_horizontal_box_sum(image, row, 1, g_gray_box3_rows[index]);
-        for (x = 0; x < BEACON_IMAGE_W; x++)
-        {
-            g_gray_box3_sum[x] += g_gray_box3_rows[index][x];
-        }
-    }
-    for (index = 0; index < 9; index++)
-    {
-        int row = down_gray_reflect_index(index - 4, BEACON_IMAGE_H);
-        down_gray_horizontal_box_sum(image, row, 4, g_gray_box9_rows[index]);
-        for (x = 0; x < BEACON_IMAGE_W; x++)
-        {
-            g_gray_box9_sum[x] += g_gray_box9_rows[index][x];
-        }
-    }
+    down_gray_build_range_cache(
+        minimum_y, maximum_y,
+        row_minimum_x, row_maximum_x, row_valid);
+    down_gray_vertical_box_sum_init_at(image, 0);
     for (y = 0; y < BEACON_IMAGE_H; y++)
     {
         int response_slot = y % 3;
-        for (x = 0; x < BEACON_IMAGE_W; x++)
+        int box_response =
+            9 * ((int)box3_vertical[0] + 2 * (int)box3_vertical[1]) -
+            ((int)box9_vertical[0] +
+             2 * ((int)box9_vertical[1] + (int)box9_vertical[2] +
+                  (int)box9_vertical[3] + (int)box9_vertical[4]));
+
+        g_gray_response_rows[response_slot][0] = (signed short)box_response;
+        for (x = 1; x < BEACON_IMAGE_W; x++)
         {
-            int response = 9 * (int)g_gray_box3_sum[x] - (int)g_gray_box9_sum[x];
-            g_gray_response_rows[response_slot][x] = (signed short)response;
+#if defined(__ICCARM__)
+            uint32 entering = __PKHBT(
+                (uint32)box3_vertical[x + 1],
+                (uint32)box9_vertical[x + 4], 16);
+            uint32 leaving = __PKHBT(
+                (uint32)box3_vertical[x - 2],
+                (uint32)box9_vertical[x - 5], 16);
+            uint32 delta = __SSUB16(entering, leaving);
+            box_response = (int)__SMLAD(
+                delta, 0xFFFF0009UL, (uint32)box_response);
+#else
+            box_response +=
+                9 * ((int)box3_vertical[x + 1] -
+                     (int)box3_vertical[x - 2]) -
+                ((int)box9_vertical[x + 4] -
+                 (int)box9_vertical[x - 5]);
+#endif
+            g_gray_response_rows[response_slot][x] = (signed short)box_response;
         }
         if (y == 1)
         {
             down_gray_collect_response_row(
-                image, lamp, temporal_lamp, scene_mean,
-                0, 1, 0, 1, peaks, &count);
+                image, lamp_geometry, temporal_lamp_geometry, scene_mean,
+                0, 1, 0, 1,
+                minimum_y, maximum_y,
+                row_minimum_x, row_maximum_x, row_valid,
+                peaks, &count);
         }
         else if (y >= 2)
         {
             down_gray_collect_response_row(
-                image, lamp, temporal_lamp, scene_mean,
+                image, lamp_geometry, temporal_lamp_geometry, scene_mean,
                 y - 1, (y - 2) % 3, (y - 1) % 3, y % 3,
+                minimum_y, maximum_y,
+                row_minimum_x, row_maximum_x, row_valid,
                 peaks, &count);
         }
-        index = y % 3;
-        for (x = 0; x < BEACON_IMAGE_W; x++)
+        if (y == BEACON_IMAGE_H - 1)
         {
-            g_gray_box3_sum[x] -= g_gray_box3_rows[index][x];
+            break;
         }
-        down_gray_horizontal_box_sum(
-            image, down_gray_reflect_index(y + 2, BEACON_IMAGE_H),
-            1, g_gray_box3_rows[index]);
-        for (x = 0; x < BEACON_IMAGE_W; x++)
         {
-            g_gray_box3_sum[x] += g_gray_box3_rows[index][x];
+            const unsigned char *box3_sub_row =
+                image[down_gray_reflect_index(y - 1, BEACON_IMAGE_H)];
+            const unsigned char *box3_add_row =
+                image[down_gray_reflect_index(y + 2, BEACON_IMAGE_H)];
+            const unsigned char *box9_sub_row =
+                image[down_gray_reflect_index(y - 4, BEACON_IMAGE_H)];
+            const unsigned char *box9_add_row =
+                image[down_gray_reflect_index(y + 5, BEACON_IMAGE_H)];
+            for (x = 0; x < BEACON_IMAGE_W; x += 4)
+            {
+                down_gray_vertical_box_sum_update4(
+                    box3_vertical, box3_sub_row, box3_add_row, x);
+                down_gray_vertical_box_sum_update4(
+                    box9_vertical, box9_sub_row, box9_add_row, x);
+            }
         }
-        index = y % 9;
-        for (x = 0; x < BEACON_IMAGE_W; x++)
-        {
-            g_gray_box9_sum[x] -= g_gray_box9_rows[index][x];
-        }
-        down_gray_horizontal_box_sum(
-            image, down_gray_reflect_index(y + 5, BEACON_IMAGE_H),
-            4, g_gray_box9_rows[index]);
-        for (x = 0; x < BEACON_IMAGE_W; x++)
-        {
-            g_gray_box9_sum[x] += g_gray_box9_rows[index][x];
-        }
+        down_gray_vertical_box_sum_reflect_edges();
     }
     down_gray_collect_response_row(
-        image, lamp, temporal_lamp, scene_mean,
+        image, lamp_geometry, temporal_lamp_geometry, scene_mean,
         BEACON_IMAGE_H - 1,
         (BEACON_IMAGE_H - 2) % 3,
         (BEACON_IMAGE_H - 1) % 3,
         (BEACON_IMAGE_H - 2) % 3,
+        minimum_y, maximum_y,
+        row_minimum_x, row_maximum_x, row_valid,
         peaks, &count);
     return count;
 }
 
-static float down_gray_ring_median(
-    const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
-    int center_x,
-    int center_y)
-{
-    unsigned short histogram[256];
-    unsigned short count = 0U;
-    unsigned short cumulative = 0U;
-    int min_dx;
-    int max_dx;
-    int min_dy;
-    int max_dy;
-    int dx;
-    int dy;
-    int value;
-
-    memset(histogram, 0, sizeof(histogram));
-    min_dx = (center_x < 10) ? -center_x : -10;
-    max_dx = (center_x + 10 >= BEACON_IMAGE_W) ?
-                 BEACON_IMAGE_W - 1 - center_x : 10;
-    min_dy = (center_y < 10) ? -center_y : -10;
-    max_dy = (center_y + 10 >= BEACON_IMAGE_H) ?
-                 BEACON_IMAGE_H - 1 - center_y : 10;
-    for (dy = min_dy; dy <= max_dy; dy++)
-    {
-        for (dx = min_dx; dx <= max_dx; dx++)
-        {
-            int radius2 = dx * dx + dy * dy;
-            int x = center_x + dx;
-            int y = center_y + dy;
-            if (radius2 < DOWN_GRAY_BACKGROUND_INNER_SQ ||
-                radius2 > DOWN_GRAY_BACKGROUND_OUTER_SQ)
-            {
-                continue;
-            }
-            histogram[image[y][x]]++;
-            count++;
-        }
-    }
-    if (count == 0U)
-    {
-        return 0.0f;
-    }
-    for (value = 0; value < 256; value++)
-    {
-        cumulative += histogram[value];
-        if (cumulative * 2U >= count)
-        {
-            return (float)value;
-        }
-    }
-    return 0.0f;
-}
-
+#if defined(__ICCARM__)
+#pragma inline=never
+#endif
 static unsigned char down_local_shape_measure(
     const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
     int center_x,
@@ -1764,6 +2189,9 @@ static unsigned char down_gray_edge_support_valid(
         DOWN_EDGE_SUPPORT_MAX_AREA, 1U, &support);
 }
 
+#if defined(__ICCARM__)
+#pragma inline=never
+#endif
 static unsigned char down_gray_local_features(
     const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
     int center_x,
@@ -1789,6 +2217,9 @@ static unsigned char down_gray_local_features(
     float eigen_major;
     float eigen_minor;
     float background;
+    unsigned short background_histogram[256];
+    unsigned short background_count = 0U;
+    unsigned short background_cumulative = 0U;
     int inner_count = 0;
     int middle_count = 0;
     int outer_count = 0;
@@ -1797,12 +2228,9 @@ static unsigned char down_gray_local_features(
     int max_dx;
     int min_dy;
     int max_dy;
-    int half_min_dx;
-    int half_max_dx;
-    int half_min_dy;
-    int half_max_dy;
     int dx;
     int dy;
+    int value;
     unsigned char peak = 0U;
     unsigned char half_area = 0U;
 
@@ -1811,7 +2239,7 @@ static unsigned char down_gray_local_features(
         return 0U;
     }
     memset(features, 0, sizeof(*features));
-    background = down_gray_ring_median(image, center_x, center_y);
+    memset(background_histogram, 0, sizeof(background_histogram));
     min_dx = (center_x < 10) ? -center_x : -10;
     max_dx = (center_x + 10 >= BEACON_IMAGE_W) ?
                  BEACON_IMAGE_W - 1 - center_x : 10;
@@ -1829,11 +2257,9 @@ static unsigned char down_gray_local_features(
             if (radius2 >= DOWN_GRAY_BACKGROUND_INNER_SQ &&
                 radius2 <= DOWN_GRAY_BACKGROUND_OUTER_SQ)
             {
+                background_histogram[pixel]++;
+                background_count++;
                 outer_count++;
-                if ((float)pixel >= background + 20.0f)
-                {
-                    outer_bright++;
-                }
             }
             if (radius2 > DOWN_GRAY_PATCH_RADIUS * DOWN_GRAY_PATCH_RADIUS)
             {
@@ -1853,6 +2279,39 @@ static unsigned char down_gray_local_features(
                 middle_sum += pixel;
                 middle_count++;
             }
+        }
+    }
+    background = 0.0f;
+    if (background_count != 0U)
+    {
+        for (value = 0; value < 256; value++)
+        {
+            background_cumulative += background_histogram[value];
+            if (background_cumulative * 2U >= background_count)
+            {
+                background = (float)value;
+                break;
+            }
+        }
+    }
+    for (dy = min_dy; dy <= max_dy; dy++)
+    {
+        for (dx = min_dx; dx <= max_dx; dx++)
+        {
+            int radius2 = dx * dx + dy * dy;
+            int x = center_x + dx;
+            int y = center_y + dy;
+            unsigned char pixel = image[y][x];
+            if (radius2 >= DOWN_GRAY_BACKGROUND_INNER_SQ &&
+                radius2 <= DOWN_GRAY_BACKGROUND_OUTER_SQ &&
+                (float)pixel >= background + 20.0f)
+            {
+                outer_bright++;
+            }
+            if (radius2 > DOWN_GRAY_PATCH_RADIUS * DOWN_GRAY_PATCH_RADIUS)
+            {
+                continue;
+            }
             {
                 float weight = (float)pixel - background;
                 if (weight < 0.0f)
@@ -1870,32 +2329,15 @@ static unsigned char down_gray_local_features(
                     inner_weight += weight;
                 }
             }
+            if ((unsigned int)pixel * 2U >= peak)
+            {
+                half_area++;
+            }
         }
     }
     if (weight_sum <= 0.0001f || inner_count == 0 || middle_count == 0)
     {
         return 0U;
-    }
-    half_min_dx = (center_x < DOWN_GRAY_PATCH_RADIUS) ?
-                      -center_x : -DOWN_GRAY_PATCH_RADIUS;
-    half_max_dx = (center_x + DOWN_GRAY_PATCH_RADIUS >= BEACON_IMAGE_W) ?
-                      BEACON_IMAGE_W - 1 - center_x : DOWN_GRAY_PATCH_RADIUS;
-    half_min_dy = (center_y < DOWN_GRAY_PATCH_RADIUS) ?
-                      -center_y : -DOWN_GRAY_PATCH_RADIUS;
-    half_max_dy = (center_y + DOWN_GRAY_PATCH_RADIUS >= BEACON_IMAGE_H) ?
-                      BEACON_IMAGE_H - 1 - center_y : DOWN_GRAY_PATCH_RADIUS;
-    for (dy = half_min_dy; dy <= half_max_dy; dy++)
-    {
-        for (dx = half_min_dx; dx <= half_max_dx; dx++)
-        {
-            int x = center_x + dx;
-            int y = center_y + dy;
-            if (dx * dx + dy * dy <= DOWN_GRAY_PATCH_RADIUS * DOWN_GRAY_PATCH_RADIUS &&
-                (unsigned int)image[y][x] * 2U >= peak)
-            {
-                half_area++;
-            }
-        }
     }
     centroid_x = weight_x / weight_sum;
     centroid_y = weight_y / weight_sum;
@@ -1933,6 +2375,9 @@ static unsigned char down_gray_local_features(
     return 1U;
 }
 
+#if defined(__ICCARM__)
+#pragma inline=never
+#endif
 static unsigned char down_gray_large_shape_valid(
     const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
     int center_x,
@@ -2283,20 +2728,23 @@ static void find_beacons(
     const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
     const component_t *lamp,
     const component_t *temporal_lamp,
+    float scene_mean,
     beacon_result_t *result)
 {
     down_gray_peak_t peaks[DOWN_GRAY_MAX_PEAKS];
     down_gray_candidate_t candidates[DOWN_GRAY_MAX_CANDIDATES];
-    float scene_mean;
+    down_lamp_geometry_t lamp_geometry;
+    down_lamp_geometry_t temporal_lamp_geometry;
     unsigned char peak_count;
     unsigned char candidate_count = 0U;
     unsigned char index;
 
     result->beacon_count = 0U;
     memset(candidates, 0, sizeof(candidates));
-    scene_mean = down_gray_scene_mean(image);
+    down_gray_lamp_geometry_init(lamp, &lamp_geometry);
+    down_gray_lamp_geometry_init(temporal_lamp, &temporal_lamp_geometry);
     peak_count = down_gray_find_peaks(
-        image, lamp, temporal_lamp, scene_mean, peaks);
+        image, &lamp_geometry, &temporal_lamp_geometry, scene_mean, peaks);
     for (index = 0U; index < peak_count; index++)
     {
         down_gray_features_t features;
@@ -2318,9 +2766,9 @@ static void find_beacons(
             down_gray_point_in_current_lamps(
                 (int)(candidate.x + 0.5f),
                 (int)(candidate.y + 0.5f)) != 0U ||
-            down_gray_point_in_lamp(
+            down_gray_point_in_lamp_geometry(
                 (int)(candidate.x + 0.5f),
-                (int)(candidate.y + 0.5f), lamp) != 0U ||
+                (int)(candidate.y + 0.5f), &lamp_geometry) != 0U ||
             down_gray_candidate_valid(
                 image, (int)(candidate.x + 0.5f),
                 (int)(candidate.y + 0.5f), scene_mean, &features,
@@ -2653,6 +3101,7 @@ static void beacon_image_process(
     beacon_result_t *result)
 {
     component_t lamp;
+    float scene_mean;
     unsigned char has_lamp;
     unsigned char i;
 
@@ -2668,7 +3117,8 @@ static void beacon_image_process(
     }
 
     g_current_image = image;
-    threshold_image(image, (unsigned char)g_image_down_car_lamp_binary_threshold);
+    scene_mean = threshold_image(
+        image, (unsigned char)g_image_down_car_lamp_binary_threshold);
     memcpy(g_car_lamp_binary_snapshot, g_binary,
            sizeof(g_car_lamp_binary_snapshot));
     has_lamp = find_car_lamp(&lamp);
@@ -2678,7 +3128,7 @@ static void beacon_image_process(
     }
 
     write_car_lamp(&lamp, result);
-    find_beacons(image, &lamp, 0, result);
+    find_beacons(image, &lamp, 0, scene_mean, result);
     update_temporal_result(result);
 
     for (i = result->car_lamp_count; i < BEACON_MAX_CAR_LAMP_COUNT; i++)
@@ -2687,15 +3137,32 @@ static void beacon_image_process(
     }
 }
 
+/*
+ * 函数功能: 基于摄像头来源帧号锁存一帧稳定图像，并跳过已处理的旧帧。
+ * 输入参数: 无。
+ * 返回值: 1表示锁存到真实新帧；0表示当前没有尚未处理的新帧。
+ */
 static uint8 image_down_latch_frame(void)
 {
-    if(0U == mt9v03x_finish_flag)
-    {
-        return 0U;
-    }
+    uint32 frame_sequence;
 
-    memcpy(g_image_frame[0], mt9v03x_image[0], MT9V03X_IMAGE_SIZE);
-    mt9v03x_finish_flag = 0U;
+    /* 复制期间若中断发布了新帧，则重新锁存，避免算法读取撕裂图像。 */
+    do
+    {
+        frame_sequence = mt9v03x_frame_sequence;
+        if((frame_sequence == 0U) ||
+           (frame_sequence == s_image_down_latched_frame_sequence))
+        {
+            return 0U;
+        }
+
+        mt9v03x_finish_flag = 0U;
+        __DMB();
+        memcpy(g_image_frame[0], mt9v03x_image[0], MT9V03X_IMAGE_SIZE);
+        __DMB();
+    } while(frame_sequence != mt9v03x_frame_sequence);
+
+    s_image_down_latched_frame_sequence = frame_sequence;
     return 1U;
 }
 
@@ -2738,15 +3205,23 @@ static void image_down_store_result(const beacon_result_t *result)
     }
 }
 
+/* 初始化下摄图像算法和摄像头接口。 */
 void image_down_init(void)
 {
     memset(g_image_frame, 0, MT9V03X_IMAGE_SIZE);
     image_down_clear_results();
     beacon_image_init();
+    s_image_down_latched_frame_sequence = 0U;
+
     mt9v03x_finish_flag = 0U;
     s_mt9v03x_initialized = (mt9v03x_init() == 0U) ? 1U : 0U;
 }
 
+/*
+ * 函数功能: 仅在摄像头发布真实新帧时锁存图像并执行算法。
+ * 输入参数: 无。
+ * 返回值: 1表示本次完成了一帧处理；0表示没有可处理的新帧。
+ */
 uint8 image_down_update(void)
 {
     beacon_result_t result;

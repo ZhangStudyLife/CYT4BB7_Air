@@ -169,6 +169,7 @@ static void core0_run_fast_loop_step(void)
 {
     static uint8 div500 = 0U;
 
+    (void)ipc_image_poll();
     IMU_Update_1000HZ();
     Pos_Est_Update_1000HZ();
     Pos_Est_Update_1000HZ_2();
@@ -324,6 +325,7 @@ static void core0_run_slow_slot(uint8 slot)
         Height_Est_update_100HZ();
         CRSF_Update_100HZ();
         FC_START_CRSF_UpdateLandingButton100Hz();
+        (void)ipc_image_poll();
         FC_Loop_100Hz();
         break;
 
@@ -359,7 +361,6 @@ static void core0_run_slow_slot(uint8 slot)
                              g_euler.pitch,
                              g_tof_fused_height_mm,
                              g_tof_fused_valid);
-        ipc_image_poll();
         break;
 
     case 5U:
@@ -435,6 +436,7 @@ int main(void)
     Motor_Init();
     ipc_communicate_init(IPC_PORT_1, ipc_image_callback);
     ipc_remote_param_core0_init();
+    ipc_image_init();
     FC_START_CRSF_Init();
     air_comm_air_init();
     wifi_justfloat_SetStandbyContext((0U == FC_START_CRSF_Get_State()) &&

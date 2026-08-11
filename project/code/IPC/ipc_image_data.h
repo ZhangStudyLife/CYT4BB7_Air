@@ -185,14 +185,39 @@ typedef char ipc_attitude_data_size_must_be_20[
     (sizeof(ipc_attitude_data_t) == 20U) ? 1 : -1];
 
 extern volatile uint32 g_image_data_seq;
+extern volatile uint32 g_image_camera_seq[IMAGE_CAMERA_COUNT];                  /* CM7_1已发布的三路真实结果序号。 */
+extern volatile uint32 g_image_data_fresh_mask;                                 /* 最近一次发布包含的真实新结果掩码。 */
+extern volatile uint32 g_image_data_guard;                                      /* 跨核图像快照奇偶一致性保护序号。 */
+extern volatile uint32 g_image_data_rx_seq;                                     /* CM7_0最近接收的一致性快照序号。 */
+extern volatile uint32 g_image_camera_rx_seq[IMAGE_CAMERA_COUNT];               /* CM7_0最近接收的三路真实结果序号。 */
+extern volatile uint32 g_image_data_rx_fresh_mask;                              /* CM7_0最近接收快照的新结果掩码。 */
 extern volatile ipc_camera_spi_log_t g_ipc_camera_spi_log;
 extern volatile ipc_remote_param_mailbox_t g_ipc_remote_param_request;
 extern volatile ipc_remote_param_mailbox_t g_ipc_remote_param_response;
 extern volatile ipc_attitude_data_t g_ipc_attitude_data;
 
 void ipc_image_callback(uint32 ipc_data);
-void ipc_image_publish(void);
-void ipc_image_poll(void);
+
+/*
+ * 函数功能: 初始化本核图像工作副本及跨核发布或接收状态。
+ * 输入参数: 无。
+ * 返回值: 无。
+ */
+void ipc_image_init(void);
+
+/*
+ * 函数功能: 将CM7_1本地图像结果一致性发布到共享内存并发送非阻塞通知。
+ * 输入参数: fresh_mask为本次真实新算法结果对应的摄像头位掩码。
+ * 返回值: 无。
+ */
+void ipc_image_publish(uint8 fresh_mask);
+
+/*
+ * 函数功能: CM7_0主动读取并提交一份跨核一致性图像快照。
+ * 输入参数: 无。
+ * 返回值: 接收到新发布快照返回1，否则返回0。
+ */
+uint8 ipc_image_poll(void);
 void ipc_attitude_publish(float roll_deg,
                           float pitch_deg,
                           float height_mm,

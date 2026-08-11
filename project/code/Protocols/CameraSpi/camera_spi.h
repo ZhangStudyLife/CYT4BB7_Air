@@ -4,8 +4,9 @@
 #include "zf_common_headfile.h"
 #include "Image/image_data.h"
 
-#define CAMERA_SPI_BOARD_COUNT    (2U)
-#define CAMERA_SPI_MAX_CAR_LAMPS  (1U)
+#define CAMERA_SPI_BOARD_COUNT       (2U)
+#define CAMERA_SPI_MAX_CAR_LAMPS     (1U)
+#define CAMERA_SPI_UPDATE_PERIOD_US  (5000U) /* Air图像核调用CameraSpi_Update的固定周期。 */
 
 typedef struct
 {
@@ -26,7 +27,14 @@ void CameraSpi_Init(void);
 uint8 CameraSpi_Service(void);
 
 void CameraSpi_Update(void);
-void CameraSpi_GetSnapshot(struct image_data camera[IMAGE_CAMERA_COUNT]);
+
+/*
+ * 函数功能: 将两块图像板的最新结果复制到三摄数组，并消费本轮结果变化标志。
+ * 输入参数: camera为三摄结果数组；fresh_mask输出真实新算法结果对应的摄像头位掩码。
+ * 返回值: 本轮结果内容发生变化的摄像头位掩码，包含新结果和超时清空。
+ */
+uint8 CameraSpi_GetSnapshot(struct image_data camera[IMAGE_CAMERA_COUNT],
+                            uint8 *fresh_mask);
 
 /* 启动一笔同时发往两颗2BL3的参数事务；持久化命令SET跳过预读，返回1表示已启动。 */
 uint8 CameraSpi_RemoteParamStart(uint8 op,

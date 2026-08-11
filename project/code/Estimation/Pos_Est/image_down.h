@@ -49,7 +49,18 @@ extern int32 g_image_down_max_misses;
 extern float g_image_down_filter_pos_alpha;
 extern float g_image_down_filter_vel_alpha;
 
+/*
+ * 函数功能: 初始化下摄图像算法、摄像头接口及5000帧性能统计窗口。
+ * 输入参数: 无。
+ * 返回值: 无。
+ */
 void image_down_init(void);
+
+/*
+ * 函数功能: 仅在摄像头发布真实新帧时锁存图像并执行下摄算法。
+ * 输入参数: 无。
+ * 返回值: 1表示本次完成了一帧处理；0表示没有可处理的新帧。
+ */
 uint8 image_down_update(void);
 uint8 *image_down_get_frame_buffer(void);
 const uint8 *image_down_get_binary_buffer(void);

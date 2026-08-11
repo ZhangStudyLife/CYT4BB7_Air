@@ -188,16 +188,9 @@ extern volatile uint32 g_image_data_seq;
 extern volatile uint32 g_image_camera_seq[IMAGE_CAMERA_COUNT];                  /* CM7_1已发布的三路真实结果序号。 */
 extern volatile uint32 g_image_data_fresh_mask;                                 /* 最近一次发布包含的真实新结果掩码。 */
 extern volatile uint32 g_image_data_guard;                                      /* 跨核图像快照奇偶一致性保护序号。 */
-extern volatile uint32 g_image_ipc_notify_busy_count;                           /* 非阻塞图像通知忙碌次数。 */
 extern volatile uint32 g_image_data_rx_seq;                                     /* CM7_0最近接收的一致性快照序号。 */
 extern volatile uint32 g_image_camera_rx_seq[IMAGE_CAMERA_COUNT];               /* CM7_0最近接收的三路真实结果序号。 */
 extern volatile uint32 g_image_data_rx_fresh_mask;                              /* CM7_0最近接收快照的新结果掩码。 */
-extern volatile uint32 g_image_snapshot_retry_count;                            /* CM7_0因发布并发而重试快照的次数。 */
-/* CM7_1最终IPC发布性能统计；数组下标为Front、Center、Back。 */
-extern volatile uint32 g_image_core1_perf_camera_publish_updates[IMAGE_CAMERA_COUNT];
-extern volatile float g_image_core1_perf_camera_publish_hz[IMAGE_CAMERA_COUNT];
-extern volatile uint32 g_image_core1_perf_camera_publish_max_gap_us[IMAGE_CAMERA_COUNT];
-extern volatile uint32 g_image_core1_perf_camera_publish_over_10ms_gap_count[IMAGE_CAMERA_COUNT];
 extern volatile ipc_camera_spi_log_t g_ipc_camera_spi_log;
 extern volatile ipc_remote_param_mailbox_t g_ipc_remote_param_request;
 extern volatile ipc_remote_param_mailbox_t g_ipc_remote_param_response;

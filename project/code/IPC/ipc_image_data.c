@@ -19,8 +19,6 @@ volatile uint32 g_image_data_fresh_mask;
 volatile uint32 g_image_data_seq;
 #pragma location=".ipc_image_guard"
 volatile uint32 g_image_data_guard;
-#pragma location=".ipc_image_notify_busy"
-volatile uint32 g_image_ipc_notify_busy_count;
 #pragma location=".ipc_camera_spi_log"
 volatile ipc_camera_spi_log_t g_ipc_camera_spi_log;
 #pragma location=".ipc_remote_param_request"
@@ -37,7 +35,6 @@ struct image_data image_data[IMAGE_CAMERA_COUNT];                               
 volatile uint32 g_image_data_rx_seq;                                             /* CM7_0最近接收的一致性快照序号。 */
 volatile uint32 g_image_camera_rx_seq[IMAGE_CAMERA_COUNT];                      /* CM7_0最近接收的三路真实结果序号。 */
 volatile uint32 g_image_data_rx_fresh_mask;                                     /* CM7_0最近接收快照的新结果掩码。 */
-volatile uint32 g_image_snapshot_retry_count;                                   /* CM7_0因发布并发而重试快照的次数。 */
 
 #define IPC_FLIGHT_STATE_MAGIC   (0xA5000000UL)
 #define IPC_FLIGHT_STATE_MASK    (0xFFFF0000UL)
@@ -152,12 +149,7 @@ void ipc_image_publish(uint8 fresh_mask)
                             sizeof(g_image_data_guard));
     __DSB();
 
-    if(ipc_try_send_data(s_tx_seq) != 0U)
-    {
-        g_image_ipc_notify_busy_count++;
-        SCB_CleanDCache_by_Addr((volatile void *)&g_image_ipc_notify_busy_count,
-                                sizeof(g_image_ipc_notify_busy_count));
-    }
+    (void)ipc_try_send_data(s_tx_seq);
 }
 
 #else
@@ -194,7 +186,6 @@ void ipc_image_init(void)
     }
     g_image_data_rx_seq = 0U;
     g_image_data_rx_fresh_mask = 0U;
-    g_image_snapshot_retry_count = 0U;
     memset((void *)g_image_camera_rx_seq, 0, sizeof(g_image_camera_rx_seq));
 
 #if defined(CY_CORE_CM7_1)
@@ -202,7 +193,6 @@ void ipc_image_init(void)
     g_image_data_seq = 0U;
     g_image_data_fresh_mask = 0U;
     g_image_data_guard = 0U;
-    g_image_ipc_notify_busy_count = 0U;
     memset((void *)g_image_camera_seq, 0, sizeof(g_image_camera_seq));
     memcpy((void *)s_ipc_image_data, image_data, sizeof(image_data));
     SCB_CleanDCache_by_Addr((volatile void *)s_ipc_image_data,
@@ -215,8 +205,6 @@ void ipc_image_init(void)
                             sizeof(g_image_data_seq));
     SCB_CleanDCache_by_Addr((volatile void *)&g_image_data_guard,
                             sizeof(g_image_data_guard));
-    SCB_CleanDCache_by_Addr((volatile void *)&g_image_ipc_notify_busy_count,
-                            sizeof(g_image_ipc_notify_busy_count));
     __DSB();
 #else
     s_image_data_last_seq = 0U;
@@ -868,7 +856,6 @@ uint8 ipc_image_poll(void)
         guard_before = g_image_data_guard;
         if((guard_before & 1U) != 0U)
         {
-            g_image_snapshot_retry_count++;
             continue;
         }
 
@@ -898,7 +885,6 @@ uint8 ipc_image_poll(void)
             snapshot_valid = 1U;
             break;
         }
-        g_image_snapshot_retry_count++;
     }
 
     s_image_data_hint = 0U;

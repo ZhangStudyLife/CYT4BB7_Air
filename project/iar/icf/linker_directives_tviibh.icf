@@ -363,7 +363,6 @@ place at address mem:0x28001150 { section .ipc_image_camera_seq };
 place at address mem:0x2800115C { section .ipc_image_fresh_mask };
 place at address mem:0x28001160 { section .ipc_image_seq };
 place at address mem:0x28001164 { section .ipc_image_guard };
-place at address mem:0x28001168 { section .ipc_image_notify_busy };
 place at address mem:0x28001180 { section .ipc_camera_spi_log };
 place at address mem:0x28001200 { section .ipc_remote_param_request };
 place at address mem:0x28001240 { section .ipc_remote_param_response };

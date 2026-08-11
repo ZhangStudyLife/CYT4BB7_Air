@@ -35,8 +35,6 @@
 #define CAMERA_SPI_LINK_STALE_CYCLES \
     ((CAMERA_SPI_LINK_STALE_TIME_US + CAMERA_SPI_UPDATE_PERIOD_US - 1U) / \
      CAMERA_SPI_UPDATE_PERIOD_US)
-#define CAMERA_SPI_PERF_WINDOW_TRANSFERS    (5000U) /* 每块图像板的性能统计事务数。 */
-#define CAMERA_SPI_RESULT_PERF_WINDOW_UPDATES (5000U) /* 每块图像板真实新结果的统计窗口。 */
 #define CAMERA_SPI_ALL_BOARD_MASK           ((1U << CAMERA_SPI_BOARD_COUNT) - 1U)
 #define CAMERA_SPI_DWT_UNLOCK_KEY           (0xC5ACCE55UL)
 #define CAMERA_SPI_READY0_PIN               P01_0
@@ -178,21 +176,6 @@ typedef struct
     uint8 board_status[CAMERA_SPI_BOARD_COUNT];
 } camera_spi_param_transaction_t;
 
-volatile uint8 g_camera_spi_perf_window_done[CAMERA_SPI_BOARD_COUNT];           /* 两块图像板的事务统计窗口完成标志。 */
-volatile uint32 g_camera_spi_perf_transfer_count[CAMERA_SPI_BOARD_COUNT];       /* 两块图像板已统计的完整事务数。 */
-volatile uint32 g_camera_spi_perf_last_transfer_us[CAMERA_SPI_BOARD_COUNT];     /* 两块图像板最近事务耗时，单位微秒。 */
-volatile uint32 g_camera_spi_perf_average_transfer_us[CAMERA_SPI_BOARD_COUNT];  /* 两块图像板平均事务耗时，单位微秒。 */
-volatile uint32 g_camera_spi_perf_max_transfer_us[CAMERA_SPI_BOARD_COUNT];      /* 两块图像板最大事务耗时，单位微秒。 */
-volatile uint8 g_camera_spi_result_perf_window_done[CAMERA_SPI_BOARD_COUNT];    /* 两块图像板真实结果统计窗口完成标志。 */
-volatile uint32 g_camera_spi_result_perf_received_updates[CAMERA_SPI_BOARD_COUNT]; /* Air实际接收的唯一新结果数。 */
-volatile uint32 g_camera_spi_result_perf_source_updates[CAMERA_SPI_BOARD_COUNT]; /* 根据结果序号推算的图像板结果数。 */
-volatile uint32 g_camera_spi_result_perf_duplicate_packets[CAMERA_SPI_BOARD_COUNT]; /* 重复图像结果包数量。 */
-volatile uint32 g_camera_spi_result_perf_skipped_updates[CAMERA_SPI_BOARD_COUNT]; /* Air轮询期间跨过的图像板结果数。 */
-volatile float g_camera_spi_result_perf_received_fps[CAMERA_SPI_BOARD_COUNT];   /* Air实际接收唯一结果频率，单位赫兹。 */
-volatile float g_camera_spi_result_perf_source_fps[CAMERA_SPI_BOARD_COUNT];     /* 图像板真实结果频率，单位赫兹。 */
-volatile uint32 g_camera_spi_result_perf_max_gap_us[CAMERA_SPI_BOARD_COUNT];    /* 相邻唯一结果最大到达间隔，单位微秒。 */
-volatile uint32 g_camera_spi_result_perf_over_10ms_gap_count[CAMERA_SPI_BOARD_COUNT]; /* 唯一结果到达间隔超过10毫秒的次数。 */
-
 typedef struct
 {
     uint8 valid;
@@ -220,11 +203,6 @@ static uint8 s_cycle_pending_mask;
 static uint32 s_active_poll_count;
 static uint32 s_active_start_cycles;
 static uint32 s_transfer_timeout_cycles;
-static uint64 s_perf_transfer_cycles_sum[CAMERA_SPI_BOARD_COUNT];               /* 两块图像板事务周期累计值。 */
-static uint32 s_perf_max_transfer_cycles[CAMERA_SPI_BOARD_COUNT];               /* 两块图像板事务最大周期值。 */
-static uint64 s_result_perf_elapsed_cycles[CAMERA_SPI_BOARD_COUNT];             /* 唯一结果首末到达间隔累计周期。 */
-static uint32 s_result_perf_previous_cycles[CAMERA_SPI_BOARD_COUNT];            /* 上一唯一结果到达时的DWT周期值。 */
-static uint32 s_result_perf_max_gap_cycles[CAMERA_SPI_BOARD_COUNT];             /* 唯一结果最大到达间隔周期值。 */
 static uint8 s_snapshot_fresh_mask;                                              /* 尚未被快照消费的真实新结果掩码。 */
 static uint8 s_snapshot_changed_mask;                                            /* 尚未被快照消费的结果状态变化掩码。 */
 static uint32 s_log_seq;
@@ -513,76 +491,6 @@ static void camera_spi_invalidate_board_targets(camera_spi_board_state_t *board)
     camera_spi_clear_board_targets(board);
 }
 
-/*
- * 函数功能: 记录一块图像板真实新算法结果的到达频率、跳过数量和最大间隔。
- * 输入参数: board_id为图像板编号；sequence_delta为相邻结果序号差；sample_cycles为本次到达的DWT周期值。
- * 返回值: 无。
- */
-static void camera_spi_result_perf_record(uint8 board_id,
-                                          uint8 sequence_delta,
-                                          uint32 sample_cycles)
-{
-    uint32 gap_cycles;
-    uint32 cycles_per_us;
-
-    if((board_id >= CAMERA_SPI_BOARD_COUNT) ||
-       (g_camera_spi_result_perf_window_done[board_id] != 0U))
-    {
-        return;
-    }
-
-    if(g_camera_spi_result_perf_received_updates[board_id] == 0U)
-    {
-        g_camera_spi_result_perf_source_updates[board_id] = 1U;
-    }
-    else
-    {
-        gap_cycles = sample_cycles - s_result_perf_previous_cycles[board_id];
-        s_result_perf_elapsed_cycles[board_id] += (uint64)gap_cycles;
-        g_camera_spi_result_perf_source_updates[board_id] += sequence_delta;
-        g_camera_spi_result_perf_skipped_updates[board_id] +=
-            (uint32)sequence_delta - 1U;
-        if(gap_cycles > s_result_perf_max_gap_cycles[board_id])
-        {
-            s_result_perf_max_gap_cycles[board_id] = gap_cycles;
-        }
-        if(gap_cycles > (SystemCoreClock / 100U))
-        {
-            g_camera_spi_result_perf_over_10ms_gap_count[board_id]++;
-        }
-    }
-
-    s_result_perf_previous_cycles[board_id] = sample_cycles;
-    g_camera_spi_result_perf_received_updates[board_id]++;
-
-    if(g_camera_spi_result_perf_received_updates[board_id] >=
-       CAMERA_SPI_RESULT_PERF_WINDOW_UPDATES)
-    {
-        if(s_result_perf_elapsed_cycles[board_id] == 0U)
-        {
-            s_result_perf_elapsed_cycles[board_id] = 1U;
-        }
-        cycles_per_us = SystemCoreClock / 1000000U;
-        if(cycles_per_us == 0U)
-        {
-            cycles_per_us = 1U;
-        }
-        g_camera_spi_result_perf_received_fps[board_id] =
-            ((float)(g_camera_spi_result_perf_received_updates[board_id] - 1U) *
-             (float)SystemCoreClock) /
-            (float)s_result_perf_elapsed_cycles[board_id];
-        g_camera_spi_result_perf_source_fps[board_id] =
-            ((float)(g_camera_spi_result_perf_source_updates[board_id] - 1U) *
-             (float)SystemCoreClock) /
-            (float)s_result_perf_elapsed_cycles[board_id];
-        g_camera_spi_result_perf_max_gap_us[board_id] =
-            (s_result_perf_max_gap_cycles[board_id] + cycles_per_us / 2U) /
-            cycles_per_us;
-        __DMB();
-        g_camera_spi_result_perf_window_done[board_id] = 1U;
-    }
-}
-
 /* 每个固定采集周期更新链路和图像新鲜度，超时后只隔离对应图像板。 */
 static void camera_spi_update_freshness(void)
 {
@@ -625,7 +533,6 @@ static void camera_spi_parse_image_payload(uint8 board_id, const uint8 *data)
     uint8 i;
     uint8 count;
     uint8 result_sequence;
-    uint8 sequence_delta;
     uint8 camera_mask;
     const uint8 *slot;
     camera_spi_board_state_t *board = &s_boards[board_id];
@@ -639,29 +546,18 @@ static void camera_spi_parse_image_payload(uint8 board_id, const uint8 *data)
     }
     if(board->result_sequence_initialized != 0U)
     {
-        sequence_delta = (uint8)(result_sequence - board->result_sequence);
-        if(sequence_delta == 0U)
+        if(result_sequence == board->result_sequence)
         {
-            if(g_camera_spi_result_perf_window_done[board_id] == 0U)
-            {
-                g_camera_spi_result_perf_duplicate_packets[board_id]++;
-            }
             return;
-        }
-        if(sequence_delta >= 0x80U)
-        {
-            sequence_delta = 1U;
         }
     }
     else
     {
-        sequence_delta = 1U;
         board->result_sequence_initialized = 1U;
     }
 
     board->result_sequence = result_sequence;
     board->image_age_cycles = 0U;
-    camera_spi_result_perf_record(board_id, sequence_delta, DWT->CYCCNT);
     camera_mask = (board_id == 0U) ? (uint8)(1U << Front) :
                                      (uint8)(1U << Back);
     s_snapshot_fresh_mask |= camera_mask;
@@ -1231,56 +1127,10 @@ static uint8 camera_spi_active_timed_out(void)
     return 0U;
 }
 
-/*
- * 函数功能: 记录一块图像板从片选有效到传输完成的真实事务耗时。
- * 输入参数: board_id图像板编号，范围0..CAMERA_SPI_BOARD_COUNT-1；elapsed_cycles事务周期数。
- * 返回值: 无。
- */
-static void camera_spi_perf_record(uint8 board_id, uint32 elapsed_cycles)
-{
-    uint32 cycles_per_us;
-
-    if((board_id >= CAMERA_SPI_BOARD_COUNT) ||
-       (g_camera_spi_perf_window_done[board_id] != 0U))
-    {
-        return;
-    }
-
-    cycles_per_us = SystemCoreClock / 1000000U;
-    if(cycles_per_us == 0U)
-    {
-        cycles_per_us = 1U;
-    }
-    g_camera_spi_perf_last_transfer_us[board_id] =
-        (elapsed_cycles + cycles_per_us / 2U) / cycles_per_us;
-    g_camera_spi_perf_transfer_count[board_id]++;
-    s_perf_transfer_cycles_sum[board_id] += (uint64)elapsed_cycles;
-    if(elapsed_cycles > s_perf_max_transfer_cycles[board_id])
-    {
-        s_perf_max_transfer_cycles[board_id] = elapsed_cycles;
-    }
-
-    if(g_camera_spi_perf_transfer_count[board_id] >=
-       CAMERA_SPI_PERF_WINDOW_TRANSFERS)
-    {
-        g_camera_spi_perf_average_transfer_us[board_id] = (uint32)(
-            ((s_perf_transfer_cycles_sum[board_id] /
-              (uint64)g_camera_spi_perf_transfer_count[board_id]) +
-             (uint64)(cycles_per_us / 2U)) /
-            (uint64)cycles_per_us);
-        g_camera_spi_perf_max_transfer_us[board_id] =
-            (s_perf_max_transfer_cycles[board_id] + cycles_per_us / 2U) /
-            cycles_per_us;
-        __DMB();
-        g_camera_spi_perf_window_done[board_id] = 1U;
-    }
-}
-
 /* 推进当前异步传输；未完成时立即返回，不在100Hz任务内忙等。 */
 static void camera_spi_finish_active(void)
 {
     uint32 status;
-    uint32 elapsed_cycles;
     uint8 error;
 
     if(s_active == 0U)
@@ -1308,8 +1158,6 @@ static void camera_spi_finish_active(void)
     }
 
     camera_spi_set_cs(s_active_board, 0U);
-    elapsed_cycles = DWT->CYCCNT - s_active_start_cycles;
-    camera_spi_perf_record(s_active_board, elapsed_cycles);
     s_boards[s_active_board].last_rx_head0 = s_rx_frame[0];
     s_boards[s_active_board].last_rx_head1 = s_rx_frame[1];
     error = camera_spi_parse_response(s_active_board);
@@ -1442,53 +1290,6 @@ void CameraSpi_Init(void)
     s_active_poll_count = 0U;
     s_active_start_cycles = 0U;
     s_transfer_timeout_cycles = 0U;
-    memset((void *)g_camera_spi_perf_window_done,
-           0,
-           sizeof(g_camera_spi_perf_window_done));
-    memset((void *)g_camera_spi_perf_transfer_count,
-           0,
-           sizeof(g_camera_spi_perf_transfer_count));
-    memset((void *)g_camera_spi_perf_last_transfer_us,
-           0,
-           sizeof(g_camera_spi_perf_last_transfer_us));
-    memset((void *)g_camera_spi_perf_average_transfer_us,
-           0,
-           sizeof(g_camera_spi_perf_average_transfer_us));
-    memset((void *)g_camera_spi_perf_max_transfer_us,
-           0,
-           sizeof(g_camera_spi_perf_max_transfer_us));
-    memset((void *)g_camera_spi_result_perf_window_done,
-           0,
-           sizeof(g_camera_spi_result_perf_window_done));
-    memset((void *)g_camera_spi_result_perf_received_updates,
-           0,
-           sizeof(g_camera_spi_result_perf_received_updates));
-    memset((void *)g_camera_spi_result_perf_source_updates,
-           0,
-           sizeof(g_camera_spi_result_perf_source_updates));
-    memset((void *)g_camera_spi_result_perf_duplicate_packets,
-           0,
-           sizeof(g_camera_spi_result_perf_duplicate_packets));
-    memset((void *)g_camera_spi_result_perf_skipped_updates,
-           0,
-           sizeof(g_camera_spi_result_perf_skipped_updates));
-    memset((void *)g_camera_spi_result_perf_received_fps,
-           0,
-           sizeof(g_camera_spi_result_perf_received_fps));
-    memset((void *)g_camera_spi_result_perf_source_fps,
-           0,
-           sizeof(g_camera_spi_result_perf_source_fps));
-    memset((void *)g_camera_spi_result_perf_max_gap_us,
-           0,
-           sizeof(g_camera_spi_result_perf_max_gap_us));
-    memset((void *)g_camera_spi_result_perf_over_10ms_gap_count,
-           0,
-           sizeof(g_camera_spi_result_perf_over_10ms_gap_count));
-    memset(s_perf_transfer_cycles_sum, 0, sizeof(s_perf_transfer_cycles_sum));
-    memset(s_perf_max_transfer_cycles, 0, sizeof(s_perf_max_transfer_cycles));
-    memset(s_result_perf_elapsed_cycles, 0, sizeof(s_result_perf_elapsed_cycles));
-    memset(s_result_perf_previous_cycles, 0, sizeof(s_result_perf_previous_cycles));
-    memset(s_result_perf_max_gap_cycles, 0, sizeof(s_result_perf_max_gap_cycles));
     s_snapshot_fresh_mask = 0U;
     s_snapshot_changed_mask = 0U;
     s_log_seq = 0U;

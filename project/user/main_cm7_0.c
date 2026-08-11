@@ -26,6 +26,8 @@ static uint16 s_air_comm_beep_tick = 200U; /* 空地串口断联蜂鸣器的100H
 
 float g_car_vel_x = 0.0f; // 这个是车的速度 这个变量大于0 , 车往右
 float g_car_vel_y = 0.0f; // 这个是车的速度 这个变量大于0 , 车往前
+float g_car_vel_target_x = 0.0f;
+float g_car_vel_target_y = 0.0f;
 float g_car_yaw = 0.0f; /* Car yaw angle, unit: deg */
 float g_car_yaw_rate_dps = 0.0f; /* 10Hz low-pass car yaw rate, unit: deg/s */
 float g_car_sync_time_ms = 0.0f; /* Last car-side sync timestamp, unit: ms */
@@ -45,6 +47,8 @@ static void on_car_data(const float *data, uint8 count)
         g_car_vel_y = data[1];
         g_car_yaw = data[3];
         g_car_yaw_rate_dps = data[4];
+        g_car_vel_target_x = data[5];
+        g_car_vel_target_y = data[6];
         /* 仅在车端时间戳推进时刷新数据新鲜时刻。 */
         if (data[10] != g_car_sync_time_ms)
         {

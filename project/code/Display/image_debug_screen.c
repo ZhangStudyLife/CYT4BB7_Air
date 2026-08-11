@@ -16,7 +16,7 @@
 #define IMAGE_SCREEN_DATA_PERIOD_TICKS (1U)
 #define IMAGE_SCREEN_SPI_SPEED         (20U * 1000U * 1000U)
 #define IMAGE_SCREEN_AUX_REFRESH_FRAMES (5U)
-#define IMAGE_SCREEN_FORCE_DISABLE     (1U) /* Temporary performance baseline: disable screen refresh. */
+#define IMAGE_SCREEN_FORCE_DISABLE     (1U) /* 三摄高帧率版本不初始化或刷新屏幕。 */
 #define IMAGE_SCREEN_LCD_X_OFFSET       (40U)
 #define IMAGE_SCREEN_LCD_Y_OFFSET       (52U)
 #define IMAGE_SCREEN_AUX_X              (190U)
@@ -865,6 +865,10 @@ void ImageDebugScreen_Init(void)
     s_layout_dirty = 0U;
     s_image_frame_pending = 0U;
     s_aux_refresh_counter = 0U;
+
+#if (IMAGE_SCREEN_FORCE_DISABLE != 0U)
+    return;
+#endif
 
     ips114_set_dir(IPS114_PORTAIT);
     ips114_init();

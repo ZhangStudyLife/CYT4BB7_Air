@@ -11,7 +11,6 @@ Fixed shared addresses are assigned in `linker_directives_tviibh.icf`:
 - `g_image_data_fresh_mask`: `.ipc_image_fresh_mask` at `0x2800115C`
 - `g_image_data_seq`: `.ipc_image_seq` at `0x28001160`
 - `g_image_data_guard`: `.ipc_image_guard` at `0x28001164`
-- `g_image_ipc_notify_busy_count`: `.ipc_image_notify_busy` at `0x28001168`
 - `g_ipc_camera_spi_log`: `.ipc_camera_spi_log` at `0x28001180`
 
 CM7_1 calls `ipc_image_publish(fresh_mask)` only when at least one camera has a

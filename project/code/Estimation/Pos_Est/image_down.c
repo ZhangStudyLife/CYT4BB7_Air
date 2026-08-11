@@ -12,9 +12,6 @@
 #define BEACON_MAX_CIRCLE_COUNT 8
 #define BEACON_MAX_BEACON_COUNT 8
 #define BEACON_MAX_CAR_LAMP_COUNT IMAGE_MAX_CAR_LAMP_COUNT
-#define IMAGE_DOWN_PERF_WINDOW_FRAMES       (5000U)       /* Live Watch性能统计窗口的真实处理帧数。 */
-#define IMAGE_DOWN_PERF_PERIOD_US            ((1000000U + (MT9V03X_FPS_DEF / 2U)) / MT9V03X_FPS_DEF) /* 摄像头目标帧周期，单位微秒。 */
-#define IMAGE_DOWN_DWT_UNLOCK_KEY            (0xC5ACCE55UL) /* DWT锁访问寄存器解锁键。 */
 
 typedef struct
 {
@@ -54,36 +51,8 @@ int32 g_image_down_max_misses = 3;
 float g_image_down_filter_pos_alpha = 0.65f;
 float g_image_down_filter_vel_alpha = 0.30f;
 
-volatile uint8 g_image_down_perf_window_done;                     /* 5000帧统计窗口是否已经完成并冻结。 */
-volatile uint32 g_image_down_perf_processed_frames;                /* 统计窗口内算法实际处理的真实新帧数。 */
-volatile uint32 g_image_down_perf_source_frames;                   /* 统计窗口覆盖的摄像头来源帧数。 */
-volatile uint32 g_image_down_perf_skipped_frames;                  /* 统计窗口内处理前已被覆盖的来源帧数。 */
-volatile uint32 g_image_down_perf_elapsed_ms;                      /* 首末处理帧之间的统计时间跨度，单位毫秒。 */
-volatile float g_image_down_perf_processed_fps;                    /* 算法实际处理帧率，单位帧每秒。 */
-volatile float g_image_down_perf_source_fps;                       /* 摄像头实际来源帧率，单位帧每秒。 */
-volatile uint32 g_image_down_perf_average_latch_us;                /* 窗口平均图像锁存耗时，单位微秒。 */
-volatile uint32 g_image_down_perf_max_latch_us;                    /* 窗口最大图像锁存耗时，单位微秒。 */
-volatile uint32 g_image_down_perf_average_algorithm_us;            /* 窗口平均纯算法耗时，单位微秒。 */
-volatile uint32 g_image_down_perf_max_algorithm_us;                /* 窗口最大纯算法耗时，单位微秒。 */
-volatile uint32 g_image_down_perf_average_total_us;                /* 窗口平均锁存到结果发布总耗时，单位微秒。 */
-volatile uint32 g_image_down_perf_max_total_us;                    /* 窗口最大锁存到结果发布总耗时，单位微秒。 */
-volatile uint32 g_image_down_perf_over_10ms_count;                 /* 总耗时超过10毫秒的处理帧数。 */
-volatile uint32 g_image_down_perf_over_period_count;               /* 总耗时超过摄像头目标帧周期的处理帧数。 */
-volatile uint32 g_image_down_perf_max_gap_us;                      /* 相邻真实处理结果最大间隔，单位微秒。 */
-volatile uint32 g_image_down_perf_over_10ms_gap_count;             /* 相邻真实处理结果间隔超过10毫秒的次数。 */
-
 static uint8 s_mt9v03x_initialized;
 static uint32 s_image_down_latched_frame_sequence;                 /* 最近成功锁存并处理的摄像头来源帧号。 */
-static uint32 s_image_down_perf_previous_sequence;                 /* 统计窗口上一处理帧的摄像头来源帧号。 */
-static uint32 s_image_down_perf_previous_sample_cycles;            /* 统计窗口上一处理帧的DWT采样周期值。 */
-static uint64 s_image_down_perf_elapsed_cycles;                    /* 首末处理帧之间累计经过的DWT周期数。 */
-static uint32 s_image_down_perf_max_gap_cycles;                    /* 相邻真实处理结果最大间隔周期值。 */
-static uint64 s_image_down_perf_latch_cycles_sum;                  /* 图像锁存耗时的DWT周期累计值。 */
-static uint64 s_image_down_perf_algorithm_cycles_sum;              /* 纯算法耗时的DWT周期累计值。 */
-static uint64 s_image_down_perf_total_cycles_sum;                  /* 锁存到结果发布总耗时的DWT周期累计值。 */
-static uint32 s_image_down_perf_max_latch_cycles;                  /* 图像锁存最大耗时的DWT周期数。 */
-static uint32 s_image_down_perf_max_algorithm_cycles;              /* 纯算法最大耗时的DWT周期数。 */
-static uint32 s_image_down_perf_max_total_cycles;                  /* 锁存到结果发布最大耗时的DWT周期数。 */
 
 #define CAR_LAMP_EDGE_MAX_MISSES        3
 #define CAR_LAMP_CENTER_MAX_MISSES      24
@@ -3197,139 +3166,6 @@ static uint8 image_down_latch_frame(void)
     return 1U;
 }
 
-/*
- * 函数功能: 记录一帧下摄处理性能，并在5000帧后计算和冻结Live Watch结果。
- * 输入参数: sample_cycles为本帧开始时DWT周期值；latch_cycles为锁存耗时周期数；algorithm_cycles为纯算法耗时周期数；total_cycles为锁存到结果发布总耗时周期数。
- * 返回值: 无。
- */
-static void image_down_perf_record(uint32 sample_cycles,
-                                   uint32 latch_cycles,
-                                   uint32 algorithm_cycles,
-                                   uint32 total_cycles)
-{
-    uint32 cycles_per_us;
-    uint32 sequence_delta;
-    uint32 gap_cycles;
-
-    if(g_image_down_perf_window_done != 0U)
-    {
-        return;
-    }
-
-    cycles_per_us = SystemCoreClock / 1000000U;
-    if(cycles_per_us == 0U)
-    {
-        cycles_per_us = 1U;
-    }
-
-    /* 用帧号差统计来源帧及覆盖帧，用逐帧周期差累计跨回绕的墙钟时间。 */
-    if(g_image_down_perf_processed_frames == 0U)
-    {
-        g_image_down_perf_source_frames = 1U;
-    }
-    else
-    {
-        sequence_delta = s_image_down_latched_frame_sequence -
-                         s_image_down_perf_previous_sequence;
-        if((sequence_delta == 0U) || (sequence_delta >= 0x80000000UL))
-        {
-            sequence_delta = 1U;
-        }
-        g_image_down_perf_source_frames += sequence_delta;
-        g_image_down_perf_skipped_frames += sequence_delta - 1U;
-        gap_cycles = sample_cycles - s_image_down_perf_previous_sample_cycles;
-        s_image_down_perf_elapsed_cycles += (uint64)gap_cycles;
-        if(gap_cycles > s_image_down_perf_max_gap_cycles)
-        {
-            s_image_down_perf_max_gap_cycles = gap_cycles;
-        }
-        if(gap_cycles > (SystemCoreClock / 100U))
-        {
-            g_image_down_perf_over_10ms_gap_count++;
-        }
-    }
-    s_image_down_perf_previous_sequence =
-        s_image_down_latched_frame_sequence;
-    s_image_down_perf_previous_sample_cycles = sample_cycles;
-    g_image_down_perf_processed_frames++;
-
-    /* 累计分段耗时并保留窗口内各阶段最坏值。 */
-    s_image_down_perf_latch_cycles_sum += (uint64)latch_cycles;
-    s_image_down_perf_algorithm_cycles_sum += (uint64)algorithm_cycles;
-    s_image_down_perf_total_cycles_sum += (uint64)total_cycles;
-    if(latch_cycles > s_image_down_perf_max_latch_cycles)
-    {
-        s_image_down_perf_max_latch_cycles = latch_cycles;
-    }
-    if(algorithm_cycles > s_image_down_perf_max_algorithm_cycles)
-    {
-        s_image_down_perf_max_algorithm_cycles = algorithm_cycles;
-    }
-    if(total_cycles > s_image_down_perf_max_total_cycles)
-    {
-        s_image_down_perf_max_total_cycles = total_cycles;
-    }
-    if(total_cycles > (cycles_per_us * IMAGE_DOWN_PERF_PERIOD_US))
-    {
-        g_image_down_perf_over_period_count++;
-    }
-    if(total_cycles > (cycles_per_us * 10000U))
-    {
-        g_image_down_perf_over_10ms_count++;
-    }
-
-    if(g_image_down_perf_processed_frames >= IMAGE_DOWN_PERF_WINDOW_FRAMES)
-    {
-        /* 使用首末帧间隔计算真实帧率，避免把首帧误当成一个完整周期。 */
-        if(s_image_down_perf_elapsed_cycles == 0U)
-        {
-            s_image_down_perf_elapsed_cycles = 1U;
-        }
-        g_image_down_perf_elapsed_ms = (uint32)(
-            (s_image_down_perf_elapsed_cycles * 1000ULL +
-             (uint64)(SystemCoreClock / 2U)) /
-            (uint64)SystemCoreClock);
-        g_image_down_perf_processed_fps =
-            ((float)(g_image_down_perf_processed_frames - 1U) *
-             (float)SystemCoreClock) /
-            (float)s_image_down_perf_elapsed_cycles;
-        g_image_down_perf_source_fps =
-            ((float)(g_image_down_perf_source_frames - 1U) *
-             (float)SystemCoreClock) /
-            (float)s_image_down_perf_elapsed_cycles;
-
-        g_image_down_perf_average_latch_us = (uint32)(
-            ((s_image_down_perf_latch_cycles_sum /
-              (uint64)g_image_down_perf_processed_frames) +
-             (uint64)(cycles_per_us / 2U)) /
-            (uint64)cycles_per_us);
-        g_image_down_perf_average_algorithm_us = (uint32)(
-            ((s_image_down_perf_algorithm_cycles_sum /
-              (uint64)g_image_down_perf_processed_frames) +
-             (uint64)(cycles_per_us / 2U)) /
-            (uint64)cycles_per_us);
-        g_image_down_perf_average_total_us = (uint32)(
-            ((s_image_down_perf_total_cycles_sum /
-              (uint64)g_image_down_perf_processed_frames) +
-             (uint64)(cycles_per_us / 2U)) /
-            (uint64)cycles_per_us);
-        g_image_down_perf_max_latch_us =
-            (s_image_down_perf_max_latch_cycles + cycles_per_us / 2U) /
-            cycles_per_us;
-        g_image_down_perf_max_algorithm_us =
-            (s_image_down_perf_max_algorithm_cycles + cycles_per_us / 2U) /
-            cycles_per_us;
-        g_image_down_perf_max_total_us =
-            (s_image_down_perf_max_total_cycles + cycles_per_us / 2U) /
-            cycles_per_us;
-        g_image_down_perf_max_gap_us =
-            (s_image_down_perf_max_gap_cycles + cycles_per_us / 2U) /
-            cycles_per_us;
-        __DMB();
-        g_image_down_perf_window_done = 1U;
-    }
-}
-
 static void image_down_clear_results(void)
 {
     image_data_clear(&image_data[Center]);
@@ -3369,86 +3205,34 @@ static void image_down_store_result(const beacon_result_t *result)
     }
 }
 
-/*
- * 函数功能: 初始化下摄图像算法、摄像头接口及5000帧性能统计窗口。
- * 输入参数: 无。
- * 返回值: 无。
- */
+/* 初始化下摄图像算法和摄像头接口。 */
 void image_down_init(void)
 {
-    /* 启用DWT周期计数器，为锁存和算法分段计时。 */
-    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
-    DWT->LAR = IMAGE_DOWN_DWT_UNLOCK_KEY;
-    DWT->CYCCNT = 0U;
-    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
-
     memset(g_image_frame, 0, MT9V03X_IMAGE_SIZE);
     image_down_clear_results();
     beacon_image_init();
-
-    /* 清空Live Watch窗口，确保每次初始化都重新统计5000个真实新帧。 */
-    g_image_down_perf_window_done = 0U;
-    g_image_down_perf_processed_frames = 0U;
-    g_image_down_perf_source_frames = 0U;
-    g_image_down_perf_skipped_frames = 0U;
-    g_image_down_perf_elapsed_ms = 0U;
-    g_image_down_perf_processed_fps = 0.0f;
-    g_image_down_perf_source_fps = 0.0f;
-    g_image_down_perf_average_latch_us = 0U;
-    g_image_down_perf_max_latch_us = 0U;
-    g_image_down_perf_average_algorithm_us = 0U;
-    g_image_down_perf_max_algorithm_us = 0U;
-    g_image_down_perf_average_total_us = 0U;
-    g_image_down_perf_max_total_us = 0U;
-    g_image_down_perf_over_10ms_count = 0U;
-    g_image_down_perf_over_period_count = 0U;
-    g_image_down_perf_max_gap_us = 0U;
-    g_image_down_perf_over_10ms_gap_count = 0U;
     s_image_down_latched_frame_sequence = 0U;
-    s_image_down_perf_previous_sequence = 0U;
-    s_image_down_perf_previous_sample_cycles = 0U;
-    s_image_down_perf_elapsed_cycles = 0U;
-    s_image_down_perf_max_gap_cycles = 0U;
-    s_image_down_perf_latch_cycles_sum = 0U;
-    s_image_down_perf_algorithm_cycles_sum = 0U;
-    s_image_down_perf_total_cycles_sum = 0U;
-    s_image_down_perf_max_latch_cycles = 0U;
-    s_image_down_perf_max_algorithm_cycles = 0U;
-    s_image_down_perf_max_total_cycles = 0U;
 
     mt9v03x_finish_flag = 0U;
     s_mt9v03x_initialized = (mt9v03x_init() == 0U) ? 1U : 0U;
 }
 
 /*
- * 函数功能: 仅在摄像头发布真实新帧时锁存图像、执行算法并更新性能统计。
+ * 函数功能: 仅在摄像头发布真实新帧时锁存图像并执行算法。
  * 输入参数: 无。
  * 返回值: 1表示本次完成了一帧处理；0表示没有可处理的新帧。
  */
 uint8 image_down_update(void)
 {
     beacon_result_t result;
-    uint32 frame_start_cycles = DWT->CYCCNT;
-    uint32 algorithm_start_cycles;
-    uint32 latch_cycles;
-    uint32 algorithm_cycles;
-    uint32 total_cycles;
 
     if(0U == image_down_latch_frame())
     {
         return 0U;
     }
 
-    latch_cycles = DWT->CYCCNT - frame_start_cycles;
-    algorithm_start_cycles = DWT->CYCCNT;
     beacon_image_process(g_image_frame, &result);
-    algorithm_cycles = DWT->CYCCNT - algorithm_start_cycles;
     image_down_store_result(&result);
-    total_cycles = DWT->CYCCNT - frame_start_cycles;
-    image_down_perf_record(frame_start_cycles,
-                           latch_cycles,
-                           algorithm_cycles,
-                           total_cycles);
     return 1U;
 }
 

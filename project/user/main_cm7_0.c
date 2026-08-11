@@ -347,8 +347,8 @@ static void core0_run_slow_slot(uint8 slot)
             div10 = 0U;
             FC_START_CRSF_Update();
 
-            if (g_euler.roll > 45.0f || g_euler.roll < -45.0f ||
-                g_euler.pitch > 45.0f || g_euler.pitch < -45.0f)
+            if (g_euler.roll > 75.0f || g_euler.roll < -75.0f ||
+                g_euler.pitch > 75.0f || g_euler.pitch < -75.0f)
             {
                 FC_START_CRSF_Trigger_Emergency_Stop();
             }

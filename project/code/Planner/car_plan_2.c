@@ -22,15 +22,15 @@
 #define CAR_PLAN_2_NEAR_VELOCITY_COS_MIN         (0.8f)  /* 允许近灯抢占时目标与车速方向的余弦下限。 */
 #define CAR_PLAN_2_NEAR_SAME_RATIO               (0.75f) /* 同摄近灯相对当前目标的最大距离比例。 */
 #define CAR_PLAN_2_NEAR_CROSS_RATIO              (0.60f) /* 跨摄近灯相对当前目标的最大距离比例。 */
-#define CAR_PLAN_2_NEAR_SAME_DIST_PX             (8.0f)  /* 同摄近灯相对当前目标的最小距离优势，单位px。 */
-#define CAR_PLAN_2_NEAR_CROSS_DIST_PX            (15.0f) /* 跨摄近灯相对当前目标的最小距离优势，单位px。 */
+#define CAR_PLAN_2_NEAR_SAME_DIST_MODEL_SQ      (244.6f) /* 同摄近灯最小模型距离优势平方。 */
+#define CAR_PLAN_2_NEAR_CROSS_DIST_MODEL_SQ     (861.4f) /* 跨摄近灯最小模型距离优势平方。 */
 #define CAR_PLAN_2_NEAR_SAME_TICKS               (5U)    /* 100Hz下同摄近灯持续约50ms后抢占。 */
 #define CAR_PLAN_2_NEAR_CROSS_TICKS              (8U)    /* 100Hz下跨摄近灯持续约80ms后抢占。 */
-#define CAR_PLAN_2_ACQUIRE_DIST_TIE_PX           (1.0f)  /* 初次选灯的距离近似相等阈值，单位px。 */
+#define CAR_PLAN_2_ACQUIRE_DIST_TIE_MODEL_SQ    (3.82f)  /* 初次选灯模型距离平局阈值平方。 */
 #define CAR_PLAN_2_ACQUIRE_COS_TIE               (0.02f) /* 初次选灯的方向余弦近似相等阈值。 */
-#define CAR_PLAN_2_CONFLICT_TARGET_DIST_PX       (20.0f) /* 车速纠错时两个物理目标的最小距离，单位px。 */
+#define CAR_PLAN_2_CONFLICT_TARGET_DIST_MODEL_SQ (1536.2f) /* 车速纠错目标间最小模型距离平方。 */
 #define CAR_PLAN_2_CAR_CENTER_Y_OFFSET_PX        (10.0f) /* 车体中心相对车灯中心的Y轴偏移，单位px。 */
-#define CAR_PLAN_2_MIN_TARGET_DIST_PX            (2.0f)  /* 车体中心与信标的最小有效距离，单位px。 */
+#define CAR_PLAN_2_MIN_TARGET_DIST_MODEL_SQ      (15.29f) /* 车体中心与信标的最小模型距离平方。 */
 #define CAR_PLAN_2_FAST_CENTER_DIST_PX           (65.0f) /* 快速速度判定的投影中心距离，单位px。 */
 #define CAR_PLAN_2_ANGLE_TO_RAD                  (0.017453292519943295f) /* 角度转弧度系数。 */
 #define CAR_PLAN_2_DIRECTION_BIAS_DEG             (2.0f) /* 全局方向补偿角，单位deg。 */
@@ -54,6 +54,20 @@ typedef struct
     float max_area;
     float area_sum;
 } car_plan_2_cluster_t;
+
+static float CarPlan_2_ModelDistanceSq(float x1, float y1, float x2, float y2)
+{
+    float dx = x2 - x1;
+    float dy = y2 - y1;
+    if(g_projection_center.valid != 0U)
+    {
+        CameraModel_MapPoint(x1, y1, g_euler.roll, g_euler.pitch, &x1, &y1);
+        CameraModel_MapPoint(x2, y2, g_euler.roll, g_euler.pitch, &x2, &y2);
+        dx = x2 - x1;
+        dy = y2 - y1;
+    }
+    return dx * dx + dy * dy;
+}
 
 typedef struct
 {
@@ -268,6 +282,7 @@ static uint8 CarPlan_2_MakeResult(const car_plan_2_cluster_t *cluster,
     float car_center_y;
     float dx;
     float dy;
+    float distance_sq;
     float dist;
     float angle_rad;
     float line_x;
@@ -284,10 +299,9 @@ static uint8 CarPlan_2_MakeResult(const car_plan_2_cluster_t *cluster,
 
     car_center_x = g_car_lamp_fused.cx;
     car_center_y = g_car_lamp_fused.cy + CAR_PLAN_2_CAR_CENTER_Y_OFFSET_PX;
-    dx = cluster->center_x - car_center_x;
-    dy = cluster->center_y - car_center_y;
-    dist = sqrtf(dx * dx + dy * dy);
-    if(dist <= CAR_PLAN_2_MIN_TARGET_DIST_PX)
+    distance_sq = CarPlan_2_ModelDistanceSq(car_center_x, car_center_y,
+                                            cluster->center_x, cluster->center_y);
+    if(distance_sq <= CAR_PLAN_2_MIN_TARGET_DIST_MODEL_SQ)
     {
         return 0U;
     }
@@ -425,15 +439,13 @@ static uint8 CarPlan_2_Acquire(const car_plan_2_cluster_t *clusters,
     float car_speed = sqrtf(g_car_vel_x * g_car_vel_x + g_car_vel_y * g_car_vel_y);
     float car_center_x = g_car_lamp_fused.cx;
     float car_center_y = g_car_lamp_fused.cy + CAR_PLAN_2_CAR_CENTER_Y_OFFSET_PX;
-    float selected_dist = 0.0f;
+    float selected_dist_sq = 0.0f;
     float selected_cos = -2.0f;
 
     /* 方向合格时距离优先；全部方向不合格时选择最顺车速的目标。 */
     for(i = 0U; i < cluster_count; i++)
     {
-        float dx;
-        float dy;
-        float dist;
+        float dist_sq;
         float velocity_cos;
         uint8 compatible;
         uint8 better = 0U;
@@ -444,9 +456,8 @@ static uint8 CarPlan_2_Acquire(const car_plan_2_cluster_t *clusters,
         velocity_cos = CarPlan_2_VelocityCos(&result);
         compatible = ((car_speed <= CAR_PLAN_2_VELOCITY_MIN_MPS) ||
                       (velocity_cos >= CAR_PLAN_2_NEAR_VELOCITY_COS_MIN)) ? 1U : 0U;
-        dx = clusters[i].center_x - car_center_x;
-        dy = clusters[i].center_y - car_center_y;
-        dist = sqrtf(dx * dx + dy * dy);
+        dist_sq = CarPlan_2_ModelDistanceSq(car_center_x, car_center_y,
+                                            clusters[i].center_x, clusters[i].center_y);
         if(selected_index == 0xFFU)
         {
             better = 1U;
@@ -457,8 +468,8 @@ static uint8 CarPlan_2_Acquire(const car_plan_2_cluster_t *clusters,
         }
         else if(compatible != 0U)
         {
-            if((dist < selected_dist) ||
-               ((fabsf(dist - selected_dist) <= CAR_PLAN_2_ACQUIRE_DIST_TIE_PX) &&
+            if((dist_sq < selected_dist_sq) ||
+               ((fabsf(dist_sq - selected_dist_sq) <= CAR_PLAN_2_ACQUIRE_DIST_TIE_MODEL_SQ) &&
                 (fabsf(velocity_cos - selected_cos) <= CAR_PLAN_2_ACQUIRE_COS_TIE) &&
                 (clusters[i].max_area > clusters[selected_index].max_area)))
             {
@@ -467,8 +478,8 @@ static uint8 CarPlan_2_Acquire(const car_plan_2_cluster_t *clusters,
         }
         else if((velocity_cos > (selected_cos + CAR_PLAN_2_ACQUIRE_COS_TIE)) ||
                 ((fabsf(velocity_cos - selected_cos) <= CAR_PLAN_2_ACQUIRE_COS_TIE) &&
-                 ((dist < (selected_dist - CAR_PLAN_2_ACQUIRE_DIST_TIE_PX)) ||
-                  ((fabsf(dist - selected_dist) <= CAR_PLAN_2_ACQUIRE_DIST_TIE_PX) &&
+                 ((dist_sq < (selected_dist_sq - CAR_PLAN_2_ACQUIRE_DIST_TIE_MODEL_SQ)) ||
+                  ((fabsf(dist_sq - selected_dist_sq) <= CAR_PLAN_2_ACQUIRE_DIST_TIE_MODEL_SQ) &&
                    (clusters[i].max_area > clusters[selected_index].max_area)))))
         {
             better = 1U;
@@ -477,7 +488,7 @@ static uint8 CarPlan_2_Acquire(const car_plan_2_cluster_t *clusters,
         {
             selected_index = i;
             selected_compatible = compatible;
-            selected_dist = dist;
+            selected_dist_sq = dist_sq;
             selected_cos = velocity_cos;
         }
     }
@@ -569,20 +580,18 @@ uint8 CarPlan_2_Update(car_plan_2_result_t *result)
         uint8 nearer_index = 0xFFU;
         uint8 nearer_ticks_required = 0U;
         float challenger_velocity_cos = CAR_PLAN_2_CHALLENGER_VELOCITY_COS_MIN;
-        float nearer_dist = 0.0f;
+        float nearer_dist_sq = 0.0f;
         float car_center_x = g_car_lamp_fused.cx;
         float car_center_y = g_car_lamp_fused.cy + CAR_PLAN_2_CAR_CENTER_Y_OFFSET_PX;
-        float locked_dx = clusters[selected_index].center_x - car_center_x;
-        float locked_dy = clusters[selected_index].center_y - car_center_y;
-        float locked_dist = sqrtf(locked_dx * locked_dx + locked_dy * locked_dy);
+        float locked_dist_sq = CarPlan_2_ModelDistanceSq(car_center_x, car_center_y,
+                                                         clusters[selected_index].center_x,
+                                                         clusters[selected_index].center_y);
 
         /* 每个替代目标同时检查严重逆速纠错和明显近灯抢占。 */
         for(i = 0U; i < cluster_count; i++)
         {
             car_plan_2_result_t challenger_result;
-            float dx;
-            float dy;
-            float dist;
+            float dist_sq;
             float velocity_cos;
             uint8 same_camera;
             if(i == selected_index)
@@ -598,10 +607,10 @@ uint8 CarPlan_2_Update(car_plan_2_result_t *result)
                (locked_velocity_cos < CAR_PLAN_2_LOCKED_VELOCITY_COS_MAX) &&
                (velocity_cos > challenger_velocity_cos))
             {
-                dx = clusters[i].center_x - clusters[selected_index].center_x;
-                dy = clusters[i].center_y - clusters[selected_index].center_y;
-                if((dx * dx + dy * dy) >=
-                   (CAR_PLAN_2_CONFLICT_TARGET_DIST_PX * CAR_PLAN_2_CONFLICT_TARGET_DIST_PX))
+                if(CarPlan_2_ModelDistanceSq(clusters[i].center_x, clusters[i].center_y,
+                                              clusters[selected_index].center_x,
+                                              clusters[selected_index].center_y) >=
+                   CAR_PLAN_2_CONFLICT_TARGET_DIST_MODEL_SQ)
                 {
                     challenger_velocity_cos = velocity_cos;
                     challenger_index = i;
@@ -612,22 +621,23 @@ uint8 CarPlan_2_Update(car_plan_2_result_t *result)
                 ((locked_velocity_cos >= CAR_PLAN_2_NEAR_VELOCITY_COS_MIN) &&
                  (velocity_cos >= CAR_PLAN_2_NEAR_VELOCITY_COS_MIN))))
             {
-                dx = clusters[i].center_x - car_center_x;
-                dy = clusters[i].center_y - car_center_y;
-                dist = sqrtf(dx * dx + dy * dy);
+                dist_sq = CarPlan_2_ModelDistanceSq(car_center_x, car_center_y,
+                                                    clusters[i].center_x, clusters[i].center_y);
                 same_camera = ((clusters[i].camera_mask & clusters[selected_index].camera_mask) != 0U)
                                   ? 1U : 0U;
                 if(((same_camera != 0U) &&
-                    (dist <= (locked_dist * CAR_PLAN_2_NEAR_SAME_RATIO)) &&
-                    ((locked_dist - dist) >= CAR_PLAN_2_NEAR_SAME_DIST_PX)) ||
+                    (dist_sq <= (locked_dist_sq * CAR_PLAN_2_NEAR_SAME_RATIO *
+                                 CAR_PLAN_2_NEAR_SAME_RATIO)) &&
+                    ((locked_dist_sq - dist_sq) >= CAR_PLAN_2_NEAR_SAME_DIST_MODEL_SQ)) ||
                    ((same_camera == 0U) &&
-                    (dist <= (locked_dist * CAR_PLAN_2_NEAR_CROSS_RATIO)) &&
-                    ((locked_dist - dist) >= CAR_PLAN_2_NEAR_CROSS_DIST_PX)))
+                    (dist_sq <= (locked_dist_sq * CAR_PLAN_2_NEAR_CROSS_RATIO *
+                                 CAR_PLAN_2_NEAR_CROSS_RATIO)) &&
+                    ((locked_dist_sq - dist_sq) >= CAR_PLAN_2_NEAR_CROSS_DIST_MODEL_SQ)))
                 {
-                    if((nearer_index == 0xFFU) || (dist < nearer_dist))
+                    if((nearer_index == 0xFFU) || (dist_sq < nearer_dist_sq))
                     {
                         nearer_index = i;
-                        nearer_dist = dist;
+                        nearer_dist_sq = dist_sq;
                         nearer_ticks_required = (same_camera != 0U)
                                                   ? CAR_PLAN_2_NEAR_SAME_TICKS
                                                   : CAR_PLAN_2_NEAR_CROSS_TICKS;

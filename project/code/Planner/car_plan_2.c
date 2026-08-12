@@ -1,5 +1,6 @@
 #include "car_plan_2.h"
 #include "car_plan.h"
+#include "CameraModel.h"
 #include "ProjectionCenter.h"
 #include "car_lamp_fused.h"
 #include "../Image/image_data.h"
@@ -32,8 +33,6 @@
 #define CAR_PLAN_2_MIN_TARGET_DIST_PX            (2.0f)  /* 车体中心与信标的最小有效距离，单位px。 */
 #define CAR_PLAN_2_FAST_CENTER_DIST_PX           (65.0f) /* 快速速度判定的投影中心距离，单位px。 */
 #define CAR_PLAN_2_ANGLE_TO_RAD                  (0.017453292519943295f) /* 角度转弧度系数。 */
-#define CAR_PLAN_2_DIRECTION_RADIAL_K4            (2.40f) /* 四次径向修正系数。 */
-#define CAR_PLAN_2_DIRECTION_CENTER_SCALE        (0.3333333333f) /* 投影中心平移比例。 */
 #define CAR_PLAN_2_DIRECTION_BIAS_DEG             (2.0f) /* 全局方向补偿角，单位deg。 */
 #define CAR_PLAN_2_DIRECTION_BACK_BIAS_DEG      (-6.0f) /* Back相机方向补偿角，单位deg。 */
 
@@ -273,9 +272,6 @@ static uint8 CarPlan_2_MakeResult(const car_plan_2_cluster_t *cluster,
     float angle_rad;
     float line_x;
     float line_y;
-    float car_gain;
-    float target_gain;
-    float axis_dot;
     float strafe;
     float forward;
     float plan_speed = Car_Speed;
@@ -308,29 +304,24 @@ static uint8 CarPlan_2_MakeResult(const car_plan_2_cluster_t *cluster,
         line_y = -line_y;
     }
 
-    /* 平移到投影中心后，按四次径向模型及Jacobian修正两点和车灯长轴。 */
+    /* 统一修正车灯、信标坐标和车灯长轴。 */
     if(g_projection_center.valid != 0U)
     {
-        car_center_x -= g_projection_center.cx * CAR_PLAN_2_DIRECTION_CENTER_SCALE;
-        car_center_y -= g_projection_center.cy * CAR_PLAN_2_DIRECTION_CENTER_SCALE;
-        dx = cluster->center_x - g_projection_center.cx * CAR_PLAN_2_DIRECTION_CENTER_SCALE;
-        dy = cluster->center_y - g_projection_center.cy * CAR_PLAN_2_DIRECTION_CENTER_SCALE;
+        CameraModel_MapVector(car_center_x, car_center_y, line_x, line_y,
+                              g_euler.roll, g_euler.pitch, &line_x, &line_y);
+        CameraModel_MapPoint(car_center_x, car_center_y,
+                             g_euler.roll, g_euler.pitch,
+                             &car_center_x, &car_center_y);
+        CameraModel_MapPoint(cluster->center_x, cluster->center_y,
+                             g_euler.roll, g_euler.pitch, &dx, &dy);
+        dx -= car_center_x;
+        dy -= car_center_y;
     }
     else
     {
         dx = cluster->center_x;
         dy = cluster->center_y;
     }
-    axis_dot = (car_center_x * car_center_x + car_center_y * car_center_y) * 0.0001f;
-    car_gain = 1.0f + CAR_PLAN_2_DIRECTION_RADIAL_K4 * axis_dot * axis_dot;
-    target_gain = (dx * dx + dy * dy) * 0.0001f;
-    target_gain = 1.0f + CAR_PLAN_2_DIRECTION_RADIAL_K4 * target_gain * target_gain;
-    dx = dx * target_gain - car_center_x * car_gain;
-    dy = dy * target_gain - car_center_y * car_gain;
-    axis_dot = 4.0f * CAR_PLAN_2_DIRECTION_RADIAL_K4 * axis_dot *
-        (car_center_x * line_x + car_center_y * line_y) * 0.0001f;
-    line_x = car_gain * line_x + axis_dot * car_center_x;
-    line_y = car_gain * line_y + axis_dot * car_center_y;
     dist = sqrtf(line_x * line_x + line_y * line_y);
     line_x /= dist;
     line_y /= dist;

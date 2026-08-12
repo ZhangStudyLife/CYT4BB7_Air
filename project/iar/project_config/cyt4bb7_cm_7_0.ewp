@@ -1767,6 +1767,12 @@
                 <name>$PROJ_DIR$\..\..\code\Planner\car_plan_2.h</name>
             </file>
             <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\CameraModel.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\CameraModel.h</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\..\..\code\Planner\pix_to_distance.c</name>
             </file>
             <file>

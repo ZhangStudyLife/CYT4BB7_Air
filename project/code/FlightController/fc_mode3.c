@@ -168,7 +168,7 @@ void FC_Mode3_100Hz(void)
     //     g_motor_cmd.throttle, g_motor_cmd.roll, g_motor_cmd.pitch, g_motor_cmd.yaw);
 }
 
-void FC_Mode3_50Hz(float dt)
+void FC_Mode3_Control100Hz(float dt)
 {
     float velx_sp = 0.0f;
     float vely_sp = 0.0f;
@@ -298,8 +298,8 @@ void FC_Mode3_50Hz(float dt)
                                 -angle_target_max, angle_target_max);
         vely_ff = FC_Mode_Clamp(g_fc_params.mode3_vel_y_kff * vely_target_rate + turn_ff_y,
                                 -angle_target_max, angle_target_max);
-        s_mode3_velx_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA * (velx_ff - s_mode3_velx_ff_lpf);
-        s_mode3_vely_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA * (vely_ff - s_mode3_vely_ff_lpf);
+        s_mode3_velx_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA_100HZ * (velx_ff - s_mode3_velx_ff_lpf);
+        s_mode3_vely_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA_100HZ * (vely_ff - s_mode3_vely_ff_lpf);
         velx_ff = s_mode3_velx_ff_lpf;
         vely_ff = s_mode3_vely_ff_lpf;
     }

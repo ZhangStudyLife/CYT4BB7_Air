@@ -2,7 +2,7 @@
 #include "../Image/image_data.h"
 #include <math.h>
 
-static const uint8 s_lamp_hold_max_ticks = 20U;
+static const uint8 s_lamp_hold_max_ticks = 40U; /* 100Hz下保持约400ms */
 
 car_lamp_fused_result_t g_car_lamp_fused;
 uint8 only_front_see_car_lamp;
@@ -22,7 +22,7 @@ void CarLampFused_Init(void)
     s_lamp_hold_ticks = 0U;
 }
 
-uint8 CarLampFused_Update50Hz(void)
+uint8 CarLampFused_Update100Hz(void)
 {
     const car_lamp_data *front_lamp = &image_data[Front].car_lamp_data[0];
     const car_lamp_data *center_lamp = &image_data[Center].car_lamp_data[0];

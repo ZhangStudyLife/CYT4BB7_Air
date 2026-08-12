@@ -88,7 +88,7 @@ void FC_Mode2_100Hz(void)
     }
 }
 
-void FC_Mode2_50Hz(float dt)
+void FC_Mode2_Control100Hz(float dt)
 {
     float img_err_x = 0.0f;
     float img_err_y = 0.0f;

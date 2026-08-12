@@ -81,6 +81,8 @@ typedef struct
     uint32 crc_error_count;        /* CRC 校验失败次数 */
     uint32 rx_oversize_count;      /* 接收帧 payload 超长次数 */
     uint32 rx_queue_overflow_count; /* 接收环形队列溢出次数 */
+    uint32 tx_run_data_replace_count; /* RUN_DATA被新数据替换次数 */
+    uint32 tx_run_data_drop_count;  /* RUN_DATA无可替换槽时丢弃次数 */
     uint32 heartbeat_tx_count;     /* 心跳发送次数 */
     uint32 heartbeat_rx_count;     /* 心跳接收次数 */
     uint32 set_param_ok_count;     /* 参数设置成功次数 */
@@ -199,9 +201,9 @@ void air_comm_air_poll(void);
 uint8 air_comm_air_remote_param_busy(void);
 
 /*
- * 100Hz 周期更新，负责定时发送心跳（每 200ms 一次）和检查在线超时。
+ * 200Hz 周期更新，负责定时发送心跳（每 200ms 一次）和检查在线超时。
  */
-void air_comm_air_update_100HZ(void);
+void air_comm_air_update_200HZ(void);
 
 /*
  * UART 中断回调入口。收到一个字节就调这个函数，字节会存入环形队列。
@@ -240,14 +242,14 @@ uint8 air_comm_air_register_param(const char *name, void *var, uint8 type, float
 /*
  * 注册轮询型 Air 远程命令。
  * name: 远程命令名，0x03 payload 中传输的字符串。
- * run:  100Hz 周期调用，只写命令需要持续运行的内容。
+ * run:  200Hz 周期调用，只写命令需要持续运行的内容。
  */
 uint8 air_comm_air_register_polling_command(const char *name, air_comm_air_command_fn run);
 
 /*
  * 注册立即退出型 Air 远程命令。
  * name: 远程命令名，0x03 payload 中传输的字符串。
- * run:  ACK_OK 之后在 100Hz 调度中执行一次，完成后框架自动发送 ACK_EXIT_OK。
+ * run:  ACK_OK 之后在 200Hz 调度中执行一次，完成后框架自动发送 ACK_EXIT_OK。
  */
 uint8 air_comm_air_register_instant_command(const char *name, air_comm_air_command_fn run);
 uint8 air_comm_air_send_command_ack_text(uint8 seq, const char *text);

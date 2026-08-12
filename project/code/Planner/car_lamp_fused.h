@@ -18,6 +18,6 @@ extern uint8 only_front_see_car_lamp;
 extern uint8 only_back_see_car_lamp;
 
 void CarLampFused_Init(void);
-uint8 CarLampFused_Update50Hz(void);
+uint8 CarLampFused_Update100Hz(void);
 
 #endif /* CAR_LAMP_FUSED_H */

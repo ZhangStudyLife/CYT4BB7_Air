@@ -329,7 +329,7 @@ void FC_Loop_Reset(void)
 
 /*
  * 函数名: FC_Loop_50Hz
- * 功能: 执行50Hz高度位置环，并分发对应模式的50Hz控制
+ * 功能: 执行50Hz高度位置环，并分发非图像模式的50Hz控制
  * 输入参数: 无
  * 返回值: 无
  */
@@ -369,20 +369,6 @@ void FC_Loop_50Hz(void)
         height_pos_out = 0.0f;
     }
 
-    CarLampFused_Update50Hz();
-    ProjectionCenter_Update();
-    PixToDistance_Update_ProjectionCenter_2();
-    if ((fc_state == FC_START_CRSF_STATE_FLYING) || (fc_state == FC_START_CRSF_STATE_LANDING))
-    {
-        PullDetect_Update(g_car_lamp_fused_distance_projectioncenter_2.valid,
-                          g_car_lamp_fused_distance_projectioncenter_2.x_cm,
-                          g_car_lamp_fused_distance_projectioncenter_2.y_cm);
-    }
-    else
-    {
-        PullDetect_Init();
-    }
-
     switch (s_flight_mode)
     {
     case FC_START_CRSF_FLIGHT_MODE_0:
@@ -390,23 +376,11 @@ void FC_Loop_50Hz(void)
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_1:
-        FC_Mode1_50Hz(dt);
-        break;
-
     case FC_START_CRSF_FLIGHT_MODE_2:
-        FC_Mode2_50Hz(dt);
-        break;
-
     case FC_START_CRSF_FLIGHT_MODE_3:
-        FC_Mode3_50Hz(dt);
-        break;
-
     case FC_START_CRSF_FLIGHT_MODE_4:
-        FC_Mode4_50Hz(dt);
-        break;
-
     case FC_START_CRSF_FLIGHT_MODE_5:
-        FC_Mode5_50Hz(dt);
+    case FC_START_CRSF_FLIGHT_MODE_8:
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_6:
@@ -415,10 +389,6 @@ void FC_Loop_50Hz(void)
 
     case FC_START_CRSF_FLIGHT_MODE_7:
         FC_Mode7_50Hz(dt);
-        break;
-
-    case FC_START_CRSF_FLIGHT_MODE_8:
-        FC_Mode8_50Hz(dt);
         break;
 
     default:
@@ -436,7 +406,7 @@ void FC_Loop_50Hz(void)
 
 /*
  * 函数名: FC_Loop_100Hz
- * 功能: 执行100Hz高度测速、高度速度环与模式分发
+ * 功能: 执行100Hz高度测速、高度速度环、图像链与模式分发
  * 输入参数: 无
  * 返回值: 无
  */
@@ -461,6 +431,20 @@ void FC_Loop_100Hz(void)
     fc_state = FC_START_CRSF_Get_State();
     s_flight_mode = FC_START_CRSF_Get_Flight_Mode(); /* 检测遥控器的模式 */
     FC_Handle_Mode_Transition_100Hz(s_flight_mode, fc_state);
+
+    CarLampFused_Update100Hz();
+    ProjectionCenter_Update100Hz();
+    PixToDistance_UpdateProjectionCenter2_100Hz();
+    if ((fc_state == FC_START_CRSF_STATE_FLYING) || (fc_state == FC_START_CRSF_STATE_LANDING))
+    {
+        PullDetect_Update100Hz(g_car_lamp_fused_distance_projectioncenter_2.valid,
+                               g_car_lamp_fused_distance_projectioncenter_2.x_cm,
+                               g_car_lamp_fused_distance_projectioncenter_2.y_cm);
+    }
+    else
+    {
+        PullDetect_Init();
+    }
 
     if ((fc_state == FC_START_CRSF_STATE_FLYING) || (fc_state == FC_START_CRSF_STATE_LANDING))
     {
@@ -523,22 +507,27 @@ void FC_Loop_100Hz(void)
 
     case FC_START_CRSF_FLIGHT_MODE_1:
         FC_Mode1_100Hz();
+        FC_Mode1_Control100Hz(dt);
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_2:
         FC_Mode2_100Hz();
+        FC_Mode2_Control100Hz(dt);
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_3:
         FC_Mode3_100Hz();
+        FC_Mode3_Control100Hz(dt);
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_4:
         FC_Mode4_100Hz();
+        FC_Mode4_Control100Hz(dt);
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_5:
         FC_Mode5_100Hz();
+        FC_Mode5_Control100Hz(dt);
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_6:
@@ -551,6 +540,7 @@ void FC_Loop_100Hz(void)
 
     case FC_START_CRSF_FLIGHT_MODE_8:
         FC_Mode8_100Hz();
+        FC_Mode8_Control100Hz(dt);
         break;
 
     default:

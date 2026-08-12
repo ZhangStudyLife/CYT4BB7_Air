@@ -33,7 +33,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->angle_dt = 0.002f;  /* 500Hz */
     params->pos_xy_dt = 0.02f;  /* 50Hz */
     params->pos_z_dt = 0.02f;   /* 50Hz */
-    params->vel_xy_dt = 0.02f;  /* 50Hz */
+    params->vel_xy_dt = 0.01f;  /* 100Hz */
     params->vel_z_dt = 0.01f;   /* 100Hz */
 
     /* ===== 油门与机械配平参数 ===== */

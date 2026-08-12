@@ -35,15 +35,15 @@ void FC_Mode1_100Hz(void)
 }
 
 /*
- * 函数名: FC_Mode1_50Hz
+ * 函数名: FC_Mode1_Control100Hz
  * 功能: 复用模式2跟车控制，并使用信标居中结果更新航向目标
  * 输入参数:
  *   dt - 本次调用周期，单位s
  * 返回值: 无
  */
-void FC_Mode1_50Hz(float dt)
+void FC_Mode1_Control100Hz(float dt)
 {
-    FC_Mode2_50Hz(dt);
+    FC_Mode2_Control100Hz(dt);
     if (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING)
     {
         YawAlign_Reset();

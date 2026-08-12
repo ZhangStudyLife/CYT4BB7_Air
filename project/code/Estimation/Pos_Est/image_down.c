@@ -46,22 +46,22 @@ int32 g_image_down_near_lamp_background_max = 40;
 float g_image_down_match_distance = 18.0f;
 float g_image_down_gate_distance = 24.0f;
 float g_image_down_new_target_distance = 36.0f;
-int32 g_image_down_confirm_frames = 2;
-int32 g_image_down_max_misses = 3;
-float g_image_down_filter_pos_alpha = 0.65f;
-float g_image_down_filter_vel_alpha = 0.30f;
+int32 g_image_down_confirm_frames = 4;
+int32 g_image_down_max_misses = 6;
+float g_image_down_filter_pos_alpha = 0.408392f;
+float g_image_down_filter_vel_alpha = 0.163340f;
 
 static uint8 s_mt9v03x_initialized;
 static uint32 s_image_down_latched_frame_sequence;                 /* 最近成功锁存并处理的摄像头来源帧号。 */
 
-#define CAR_LAMP_EDGE_MAX_MISSES        3
-#define CAR_LAMP_CENTER_MAX_MISSES      24
+#define CAR_LAMP_EDGE_MAX_MISSES        6
+#define CAR_LAMP_CENTER_MAX_MISSES      48
 #define CAR_LAMP_TEMPORAL_EDGE_MARGIN   8
 #define CAR_LAMP_TEMPORAL_MASK_PAD      5
 
 #define IMAGE_QUEUE_SIZE                (BEACON_IMAGE_W * BEACON_IMAGE_H)
 #define PI_F                            3.1415926f
-#define DOWN_BEACON_COAST_FRAMES        2U
+#define DOWN_BEACON_COAST_FRAMES        4U
 #define DOWN_GRAY_MAX_PEAKS             20U
 #define DOWN_GRAY_MAX_CANDIDATES        12U
 #define DOWN_OBJECT_BOUNDARY_MARGIN     3.0f
@@ -992,7 +992,7 @@ static void age_weak_car_pending(void)
     {
         return;
     }
-    if (g_weak_car_pending_misses >= 1U)
+    if (g_weak_car_pending_misses >= 2U)
     {
         reset_weak_car_pending();
         return;
@@ -1053,7 +1053,7 @@ static unsigned char weak_car_confirmed(
         return 0U;
     }
     if (g_weak_car_pending_hits != 0U &&
-        g_weak_car_pending_misses <= 1U &&
+        g_weak_car_pending_misses <= 2U &&
         weak_car_matches(candidate, &g_weak_car_pending) != 0U)
     {
         if (g_weak_car_pending_hits < 255U)

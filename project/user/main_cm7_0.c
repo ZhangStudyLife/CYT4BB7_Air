@@ -34,6 +34,8 @@ float g_car_yaw = 0.0f; /* Car yaw angle, unit: deg */
 float g_car_yaw_rate_dps = 0.0f; /* 10Hz low-pass car yaw rate, unit: deg/s */
 float g_car_sync_time_ms = 0.0f; /* Last car-side sync timestamp, unit: ms */
 uint32 g_car_last_update_time_ms = 0U; /* 最近一次收到新车端时间戳的飞机本机时刻，单位ms */
+static car_plan_result_t s_air_run_car_plan;
+static uint8 s_air_run_car_plan_valid = 0U;
 
 /**
  * @brief 接收并保存小车实时运行数据。
@@ -61,15 +63,15 @@ static void on_car_data(const float *data, uint8 count)
 }
 
 /**
- * @brief 按飞机状态向车端发送关键运行数据或完整诊断数据。
- * @param car_plan 当前车模规划结果。
- * @param car_plan_send_valid 允许下发规划结果时为1，否则为0。
+ * @brief 按飞机状态以200Hz发送缓存的规划结果或完整诊断数据。
+ * @param 无。
  * @return 无。
  */
-static void send_air_run_data_100hz(const car_plan_result_t *car_plan,
-                                    uint8 car_plan_send_valid)
+static void send_air_run_data_200hz(void)
 {
     FC_START_CRSF_state_e state = FC_START_CRSF_Get_State();
+    const car_plan_result_t *car_plan = &s_air_run_car_plan;
+    uint8 car_plan_send_valid = s_air_run_car_plan_valid;
     float plan_strafe_mps = (car_plan_send_valid != 0U) ? car_plan->target_strafe_mps : 0.0f;
     float plan_forward_mps = (car_plan_send_valid != 0U) ? car_plan->target_forward_mps : 0.0f;
     float beacon_lost = (float)BeaconLostDetector_GetFlag();
@@ -245,11 +247,11 @@ static void core0_update_ipc_state_100hz(void)
 }
 
 /**
- * @brief 更新信标与车模规划，并按高度条件发送本周期空地数据。
+ * @brief 以100Hz更新信标与车模规划，并缓存供200Hz发送任务使用。
  * @param 无。
  * @return 无。
  */
-static void core0_plan_and_send_100hz(void)
+static void core0_plan_update_100hz(void)
 {
     car_plan_result_t car_plan = {0};
     car_plan_2_result_t car_plan_2 = {0};
@@ -270,7 +272,8 @@ static void core0_plan_and_send_100hz(void)
     }
 
     car_plan_send_valid = ((car_plan.valid != 0U) && (g_tof_fused_height_mm > 500.0f)) ? 1U : 0U;
-    send_air_run_data_100hz(&car_plan, car_plan_send_valid);
+    s_air_run_car_plan = car_plan;
+    s_air_run_car_plan_valid = car_plan_send_valid;
 
     (void)wifi_justfloat((float)FC_START_CRSF_Get_Flight_Mode(),             /* I1  flight mode */
                              (float)FC_START_CRSF_Get_State(),                   /* I2  flight state */
@@ -337,8 +340,12 @@ static void core0_run_slow_slot(uint8 slot)
         VL53L1X_TaskStep();
         break;
 
+    case 0U:
+        air_comm_air_update_200HZ();
+        send_air_run_data_200hz();
+        break;
+
     case 3U:
-        air_comm_air_update_100HZ();
         if (air_comm_air_is_car_online() == 0U)
         {
             if (s_air_comm_beep_tick >= 200U)
@@ -364,7 +371,9 @@ static void core0_run_slow_slot(uint8 slot)
         break;
 
     case 5U:
-        core0_plan_and_send_100hz();
+        core0_plan_update_100hz();
+        air_comm_air_update_200HZ();
+        send_air_run_data_200hz();
         break;
 
     case 7U:

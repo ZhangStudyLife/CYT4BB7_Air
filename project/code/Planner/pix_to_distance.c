@@ -216,7 +216,7 @@ uint8 PixToDistance_Update_ProjectionCenter(void)
     return 1U;
 }
 
-uint8 PixToDistance_Update_ProjectionCenter_2(void)
+uint8 PixToDistance_UpdateProjectionCenter2_100Hz(void)
 {
     float delta_cx;
     float delta_cy;

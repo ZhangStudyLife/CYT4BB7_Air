@@ -13,6 +13,6 @@ typedef struct
 extern projection_center_result_t g_projection_center;
 
 void ProjectionCenter_Init(void);
-uint8 ProjectionCenter_Update(void);
+uint8 ProjectionCenter_Update100Hz(void);
 
 #endif /* PROJECTION_CENTER_H */

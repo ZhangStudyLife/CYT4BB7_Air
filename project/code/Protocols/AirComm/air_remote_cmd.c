@@ -17,5 +17,5 @@ uint8 air_remote_cmd_register_instant(const char *name, air_remote_cmd_fn run)
 
 void air_remote_cmd_update_100HZ(void)
 {
-    /* 当前远程命令由 air_comm_air_update_100HZ() 统一调度。 */
+    /* 当前远程命令由 air_comm_air_update_200HZ() 统一调度。 */
 }

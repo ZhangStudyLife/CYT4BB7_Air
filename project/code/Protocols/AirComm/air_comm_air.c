@@ -201,6 +201,7 @@ typedef struct
 {
     uint8 data[AIR_COMM_TX_QUEUE_SIZE][AIR_COMM_MAX_FRAME];
     uint16 len[AIR_COMM_TX_QUEUE_SIZE];
+    uint8 type[AIR_COMM_TX_QUEUE_SIZE];
     volatile uint8 head;           /* UART2中断读取的帧索引 */
     volatile uint8 tail;           /* 主循环写入的帧索引 */
     volatile uint8 count;          /* 尚未完全写入硬件FIFO的帧数 */
@@ -543,6 +544,10 @@ static uint8 air_comm_name_equal(const char *name, const uint8 *bytes, uint8 len
  */
 static uint8 air_comm_send_uart(const uint8 *data, uint16 len, uint8 type)
 {
+    uint8 index;
+    uint8 run_data_count = 0U;
+    uint8 scan_count = 0U;
+    uint8 replace_index = AIR_COMM_TX_QUEUE_SIZE;
     uint8 tail;
     uint8 pending;
     uint32 interrupt_state;
@@ -554,8 +559,42 @@ static uint8 air_comm_send_uart(const uint8 *data, uint16 len, uint8 type)
 
     interrupt_state = Cy_SysLib_EnterCriticalSection();
     pending = s_air_comm_tx_queue.count;
-    if ((pending >= AIR_COMM_TX_QUEUE_SIZE) ||
-        ((AIR_COMM_MSG_RUN_DATA == type) && (pending >= AIR_COMM_TX_RUN_DATA_LIMIT)))
+    if (AIR_COMM_MSG_RUN_DATA == type)
+    {
+        index = s_air_comm_tx_queue.head;
+        while (scan_count < pending)
+        {
+            if (AIR_COMM_MSG_RUN_DATA == s_air_comm_tx_queue.type[index])
+            {
+                run_data_count++;
+                if (!((index == s_air_comm_tx_queue.head) &&
+                      (s_air_comm_tx_queue.offset > 0U)) &&
+                    (replace_index >= AIR_COMM_TX_QUEUE_SIZE))
+                {
+                    replace_index = index;
+                }
+            }
+            index = (uint8)((index + 1U) % AIR_COMM_TX_QUEUE_SIZE);
+            scan_count++;
+        }
+
+        if ((pending >= AIR_COMM_TX_QUEUE_SIZE) ||
+            (run_data_count >= AIR_COMM_TX_RUN_DATA_LIMIT))
+        {
+            if (replace_index < AIR_COMM_TX_QUEUE_SIZE)
+            {
+                memcpy(s_air_comm_tx_queue.data[replace_index], data, len);
+                s_air_comm_tx_queue.len[replace_index] = len;
+                s_air_comm_stats.tx_run_data_replace_count++;
+                Cy_SysLib_ExitCriticalSection(interrupt_state);
+                return 1U;
+            }
+            s_air_comm_stats.tx_run_data_drop_count++;
+            Cy_SysLib_ExitCriticalSection(interrupt_state);
+            return 0U;
+        }
+    }
+    else if (pending >= AIR_COMM_TX_QUEUE_SIZE)
     {
         Cy_SysLib_ExitCriticalSection(interrupt_state);
         return 0U;
@@ -564,6 +603,7 @@ static uint8 air_comm_send_uart(const uint8 *data, uint16 len, uint8 type)
     tail = s_air_comm_tx_queue.tail;
     memcpy(s_air_comm_tx_queue.data[tail], data, len);
     s_air_comm_tx_queue.len[tail] = len;
+    s_air_comm_tx_queue.type[tail] = type;
     s_air_comm_tx_queue.tail = (uint8)((tail + 1U) % AIR_COMM_TX_QUEUE_SIZE);
     pending++;
     s_air_comm_tx_queue.count = pending;
@@ -2305,7 +2345,7 @@ void air_comm_air_poll(void)
     air_comm_task_online();
 }
 
-void air_comm_air_update_100HZ(void)
+void air_comm_air_update_200HZ(void)
 {
     if(s_air_comm_initialized == 0U)
     {

@@ -97,8 +97,8 @@ void FC_Mode7_50Hz(float dt)
                             -angle_target_max, angle_target_max);
     vely_ff = FC_Mode_Clamp(g_fc_params.mode7_vel_y_kff * vely_target_rate,
                             -angle_target_max, angle_target_max);
-    s_mode7_velx_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA * (velx_ff - s_mode7_velx_ff_lpf);
-    s_mode7_vely_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA * (vely_ff - s_mode7_vely_ff_lpf);
+    s_mode7_velx_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA_50HZ * (velx_ff - s_mode7_velx_ff_lpf);
+    s_mode7_vely_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA_50HZ * (vely_ff - s_mode7_vely_ff_lpf);
     velx_ff = s_mode7_velx_ff_lpf;
     vely_ff = s_mode7_vely_ff_lpf;
 

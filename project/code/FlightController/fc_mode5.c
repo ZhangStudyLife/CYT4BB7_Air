@@ -95,7 +95,7 @@ void FC_Mode5_100Hz(void)
                    // Pos_Est_vel_x, Pos_Est_vel_y);
 }
 
-void FC_Mode5_50Hz(float dt)
+void FC_Mode5_Control100Hz(float dt)
 {
     float velx_sp = 0.0f;
     float vely_sp = 0.0f;
@@ -218,8 +218,8 @@ void FC_Mode5_50Hz(float dt)
                                 -angle_target_max, angle_target_max);
         vely_ff = FC_Mode_Clamp(g_fc_params.mode5_vel_y_kff * vely_target_rate + turn_ff_y,
                                 -angle_target_max, angle_target_max);
-        s_mode5_velx_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA * (velx_ff - s_mode5_velx_ff_lpf);
-        s_mode5_vely_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA * (vely_ff - s_mode5_vely_ff_lpf);
+        s_mode5_velx_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA_100HZ * (velx_ff - s_mode5_velx_ff_lpf);
+        s_mode5_vely_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA_100HZ * (vely_ff - s_mode5_vely_ff_lpf);
         velx_ff = s_mode5_velx_ff_lpf;
         vely_ff = s_mode5_vely_ff_lpf;
     }

@@ -36,8 +36,9 @@
 #define FC_MODE_IMAGE_VEL_LIMIT_CMPS (400.0f)
 /* 图像控制允许工作的最低融合高度，单位 mm。 */
 #define FC_MODE_IMAGE_MIN_HEIGHT_MM (400.0f)
-/* 水平速度前馈一阶低通系数：50 Hz 更新、10 Hz 截止。 */
-#define FC_MODE_VEL_KFF_LPF_ALPHA (0.672624f)
+/* 水平速度前馈一阶低通系数：按调用频率保持截止频率不变。 */
+#define FC_MODE_VEL_KFF_LPF_ALPHA_50HZ (0.672624f) /* 50Hz */
+#define FC_MODE_VEL_KFF_LPF_ALPHA_100HZ (0.427832f) /* 100Hz */
 /* 小车运行数据用于 yaw 坐标转换的最大未更新时间，单位 ms。 */
 #define FC_MODE_CAR_RUN_DATA_TIMEOUT_MS (200U)
 /* 模式7摇杆满量程对应的最大水平目标速度，单位 cm/s。 */
@@ -157,13 +158,13 @@ void FC_Mode1_Reset(void);
 void FC_Mode1_100Hz(void);
 
 /*
- * 函数名: FC_Mode1_50Hz
- * 功能: 执行模式1的50Hz控制
+ * 函数名: FC_Mode1_Control100Hz
+ * 功能: 执行模式1的100Hz图像控制
  * 输入参数:
- *   dt - 本次50Hz调用周期，单位 s
+ *   dt - 本次100Hz调用周期，单位 s
  * 返回值: 无
  */
-void FC_Mode1_50Hz(float dt);
+void FC_Mode1_Control100Hz(float dt);
 
 /*
  * 函数名: FC_Mode2_Init
@@ -190,13 +191,13 @@ void FC_Mode2_Reset(void);
 void FC_Mode2_100Hz(void);
 
 /*
- * 函数名: FC_Mode2_50Hz
- * 功能: 执行模式2的50Hz控制
+ * 函数名: FC_Mode2_Control100Hz
+ * 功能: 执行模式2的100Hz图像控制
  * 输入参数:
- *   dt - 本次50Hz调用周期，单位 s
+ *   dt - 本次100Hz调用周期，单位 s
  * 返回值: 无
  */
-void FC_Mode2_50Hz(float dt);
+void FC_Mode2_Control100Hz(float dt);
 
 /*
  * 函数名: FC_Mode2_Get_Fixed_Height_M
@@ -300,13 +301,13 @@ void FC_Mode3_Reset(void);
 void FC_Mode3_100Hz(void);
 
 /*
- * 函数名: FC_Mode3_50Hz
- * 功能: 执行模式3的50Hz控制
+ * 函数名: FC_Mode3_Control100Hz
+ * 功能: 执行模式3的100Hz图像控制
  * 输入参数:
- *   dt - 本次50Hz调用周期，单位s
+ *   dt - 本次100Hz调用周期，单位s
  * 返回值: 无
  */
-void FC_Mode3_50Hz(float dt);
+void FC_Mode3_Control100Hz(float dt);
 
 /*
  * 函数名: FC_Mode4_Init
@@ -333,13 +334,13 @@ void FC_Mode4_Reset(void);
 void FC_Mode4_100Hz(void);
 
 /*
- * 函数名: FC_Mode4_50Hz
- * 功能: 执行模式4的50Hz控制
+ * 函数名: FC_Mode4_Control100Hz
+ * 功能: 执行模式4的100Hz图像控制
  * 输入参数:
- *   dt - 本次50Hz调用周期，单位s
+ *   dt - 本次100Hz调用周期，单位s
  * 返回值: 无
  */
-void FC_Mode4_50Hz(float dt);
+void FC_Mode4_Control100Hz(float dt);
 
 /*
  * 函数名: FC_Mode5_Init
@@ -366,13 +367,13 @@ void FC_Mode5_Reset(void);
 void FC_Mode5_100Hz(void);
 
 /*
- * 函数名: FC_Mode5_50Hz
- * 功能: 执行模式5的50Hz控制
+ * 函数名: FC_Mode5_Control100Hz
+ * 功能: 执行模式5的100Hz图像控制
  * 输入参数:
- *   dt - 本次50Hz调用周期，单位s
+ *   dt - 本次100Hz调用周期，单位s
  * 返回值: 无
  */
-void FC_Mode5_50Hz(float dt);
+void FC_Mode5_Control100Hz(float dt);
 
 /*
  * 函数名: FC_Mode5_Get_Fixed_Height_M
@@ -474,13 +475,13 @@ void FC_Mode8_Reset(void);
 void FC_Mode8_100Hz(void);
 
 /*
- * 函数名: FC_Mode8_50Hz
- * 功能: 执行模式8的50Hz控制
+ * 函数名: FC_Mode8_Control100Hz
+ * 功能: 执行模式8的100Hz图像控制
  * 输入参数:
- *   dt - 本次50Hz调用周期，单位s
+ *   dt - 本次100Hz调用周期，单位s
  * 返回值: 无
  */
-void FC_Mode8_50Hz(float dt);
+void FC_Mode8_Control100Hz(float dt);
 
 #ifdef __cplusplus
 }

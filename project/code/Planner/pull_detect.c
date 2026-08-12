@@ -3,15 +3,15 @@
 #include <math.h>
 #include <string.h>
 
-#define PULL_DETECT_DISTANCE_LPF_ALPHA       (0.2f)
-#define PULL_DETECT_SPEED_LPF_ALPHA          (0.2f)
-#define PULL_DETECT_HISTORY_COUNT             (10U)
+#define PULL_DETECT_DISTANCE_LPF_ALPHA       (0.105573f)
+#define PULL_DETECT_SPEED_LPF_ALPHA          (0.105573f)
+#define PULL_DETECT_HISTORY_COUNT             (20U)
 #define PULL_DETECT_HISTORY_DT_S              (0.2f)
 #define PULL_DETECT_PREDICT_TIME_S            (0.3f)
 #define PULL_DETECT_WARN_SCORE_CM            (66.0f)
 #define PULL_DETECT_HYSTERESIS_CM             (5.0f)
-#define PULL_DETECT_ON_TICKS                   (2U)
-#define PULL_DETECT_OFF_TICKS                  (5U)
+#define PULL_DETECT_ON_TICKS                   (4U)
+#define PULL_DETECT_OFF_TICKS                  (10U)
 
 typedef struct
 {
@@ -34,7 +34,7 @@ void PullDetect_Init(void)
     g_pull_detect_result.danger = 0U;
 }
 
-void PullDetect_Update(uint8 image_valid, float x_cm, float y_cm)
+void PullDetect_Update100Hz(uint8 image_valid, float x_cm, float y_cm)
 {
     float distance_cm;
     float delayed_distance_cm;

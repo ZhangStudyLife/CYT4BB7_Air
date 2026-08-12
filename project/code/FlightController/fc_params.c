@@ -121,31 +121,15 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pos_est_k_flow = 0.5f;
 
     /* ===== 模式 2 直接图像 PD 与角度前馈参数 ===== */
-    params->mode2_img_x_kp = 0.09f;
-    params->mode2_img_x_kp2 = 0.08f;
-    params->mode2_img_x_kd = 0.18f;
-    params->mode2_img_x_kd_slope = 0.00255f;
-    params->mode2_img_x_d_lpf = 2.5f;
-    params->mode2_img_y_kp = 0.10f;
-    params->mode2_img_y_kp2 = 0.12f;
-    params->mode2_img_y_kd = 0.18f;
-    params->mode2_img_y_kd_slope = 0.00350f;
-    params->mode2_img_y_d_lpf = 2.5f;
-    params->mode2_img_d_limit_deg = 2.5f;
-    params->mode2_car_vel_ff_x_deg_per_mps = 0.35f;
-    params->mode2_car_vel_ff_y_deg_per_mps = 0.35f;
-    params->mode2_car_accel_ff_x_deg_per_mps2 = 5.2f;
-    params->mode2_car_accel_ff_y_deg_per_mps2 = 5.2f;
-    params->mode2_car_accel_lpf_hz = 3.0f;
-    params->mode2_car_accel_lead_s = 0.08f;
-    params->mode2_car_accel_raw_limit_mps2 = 4.0f;
-    params->mode2_car_accel_ff_limit_deg = 8.0f;
-    params->mode2_attitude_fb_gain = 0.0f;
-    params->mode2_turn_accel_ff_gain_x = 0.60f;
-    params->mode2_turn_accel_ff_gain_y = 0.60f;
-    params->mode2_angle_limit_deg = 14.0f;
-    params->mode2_angle_slew_dps = 70.0f;
-    params->mode2_angle_brake_slew_dps = 120.0f;
+    params->mode2_img_kp = 0.17f;
+    params->mode2_img_kd = 0.10f;
+    params->mode2_img_d_lpf_hz = 1.2f;
+    params->mode2_car_vel_error_lpf_hz = 1.2f;
+    params->mode2_car_accel_gain_pos = 4.5f;
+    params->mode2_car_accel_gain_neg = 4.5f;
+    params->mode2_car_accel_ff = 4.5f;
+    params->mode2_car_turn_accel_ff = 3.5f;
+    params->mode2_car_turn_accel_lpf_hz = 1.8f;
 
     /* ===== 模式 3 图像、速度与转弯前馈参数 ===== */
     params->mode3_img_x_kp = 2.0f;

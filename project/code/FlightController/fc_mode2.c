@@ -7,15 +7,6 @@
 
 static const float s_mode2_two_pi = 6.283185307179586f;
 static const float s_mode2_deg_to_rad = 0.017453292519943295f;
-static const float s_mode2_img_kp = 0.17f;
-static const float s_mode2_img_kd = 0.10f;
-static const float s_mode2_img_d_lpf_hz = 1.2f;
-static const float s_mode2_car_vel_error_lpf_hz = 1.2f;
-static const float s_mode2_car_accel_gain_pos = 4.5f;
-static const float s_mode2_car_accel_gain_neg = 4.5f;
-static const float s_mode2_car_accel_ff = 4.5f;
-static const float s_mode2_car_turn_accel_ff = 3.5f; /* 向心加速度前馈，单位 deg/(m/s^2) */
-static const float s_mode2_car_turn_accel_lpf_hz = 1.8f; /* 向心加速度低通截止频率，单位 Hz */
 static const float s_mode2_angle_limit_deg = 30.0f;
 
 extern float g_car_vel_x;
@@ -39,21 +30,27 @@ float g_mode2_raw_pitch_correction_deg = 0.0f;
 float g_mode2_img_error_rate_x_pxps = 0.0f;
 float g_mode2_img_error_rate_y_pxps = 0.0f;
 float g_mode2_car_dt_ms = 0.0f;
+float g_mode2_car_vel_error_x_mps = 0.0f;
+float g_mode2_car_vel_error_y_mps = 0.0f;
+float g_mode2_car_body_accel_x_mps2 = 0.0f;
+float g_mode2_car_body_accel_y_mps2 = 0.0f;
+float g_mode2_car_turn_accel_mps2 = 0.0f;
+float g_mode2_yaw_diff_deg = 0.0f;
+uint32 g_mode2_control_seq = 0U;
 
 static float s_mode2_prev_img_error_x = 0.0f;
 static float s_mode2_prev_img_error_y = 0.0f;
 static float s_mode2_prev_car_sync_time_ms = 0.0f;
-static float s_mode2_car_vel_error_x_mps = 0.0f;
-static float s_mode2_car_vel_error_y_mps = 0.0f;
-static float s_mode2_car_turn_accel_mps2 = 0.0f; /* 滤波后的车模向心加速度，单位 m/s^2 */
 static uint8 s_mode2_image_initialized = 0U;
 
 void FC_Mode2_Init(void)
 {
-    PID_Init(&g_mode2_imgx_pid, s_mode2_img_kp, 0.0f, s_mode2_img_kd,
-             0.0f, g_fc_params.vel_xy_dt, 0.0f, s_mode2_img_d_lpf_hz);
-    PID_Init(&g_mode2_imgy_pid, s_mode2_img_kp, 0.0f, s_mode2_img_kd,
-             0.0f, g_fc_params.vel_xy_dt, 0.0f, s_mode2_img_d_lpf_hz);
+    PID_Init(&g_mode2_imgx_pid, g_fc_params.mode2_img_kp, 0.0f,
+             g_fc_params.mode2_img_kd, 0.0f, g_fc_params.vel_xy_dt,
+             0.0f, g_fc_params.mode2_img_d_lpf_hz);
+    PID_Init(&g_mode2_imgy_pid, g_fc_params.mode2_img_kp, 0.0f,
+             g_fc_params.mode2_img_kd, 0.0f, g_fc_params.vel_xy_dt,
+             0.0f, g_fc_params.mode2_img_d_lpf_hz);
     FC_Mode2_Reset();
 }
 
@@ -69,8 +66,10 @@ void FC_Mode2_Reset(void)
     g_mode2_car_dt_ms = 0.0f;
     s_mode2_prev_img_error_x = s_mode2_prev_img_error_y = 0.0f;
     s_mode2_prev_car_sync_time_ms = 0.0f;
-    s_mode2_car_vel_error_x_mps = s_mode2_car_vel_error_y_mps = 0.0f;
-    s_mode2_car_turn_accel_mps2 = 0.0f;
+    g_mode2_car_vel_error_x_mps = g_mode2_car_vel_error_y_mps = 0.0f;
+    g_mode2_car_body_accel_x_mps2 = g_mode2_car_body_accel_y_mps2 = 0.0f;
+    g_mode2_car_turn_accel_mps2 = 0.0f;
+    g_mode2_yaw_diff_deg = 0.0f;
     s_mode2_image_initialized = 0U;
     YawAlign_Reset();
     roll_angle_target = FC_Mode_Get_Roll_Mech_Trim_Deg();
@@ -134,7 +133,7 @@ void FC_Mode2_Control100Hz(float dt)
         img_err_y = g_car_lamp_fused.cy - g_projection_center.cy;
         if (s_mode2_image_initialized != 0U)
         {
-            alpha = s_mode2_two_pi * s_mode2_img_d_lpf_hz * dt;
+            alpha = s_mode2_two_pi * g_fc_params.mode2_img_d_lpf_hz * dt;
             alpha /= 1.0f + alpha;
             g_mode2_img_error_rate_x_pxps += alpha *
                 ((img_err_x - s_mode2_prev_img_error_x) / dt -
@@ -151,10 +150,10 @@ void FC_Mode2_Control100Hz(float dt)
         s_mode2_prev_img_error_y = img_err_y;
         g_mode2_imgx_pid.error = img_err_x;
         g_mode2_imgy_pid.error = img_err_y;
-        g_mode2_imgx_pid.p_term = s_mode2_img_kp * img_err_x;
-        g_mode2_imgy_pid.p_term = s_mode2_img_kp * img_err_y;
-        g_mode2_imgx_pid.d_term = s_mode2_img_kd * g_mode2_img_error_rate_x_pxps;
-        g_mode2_imgy_pid.d_term = s_mode2_img_kd * g_mode2_img_error_rate_y_pxps;
+        g_mode2_imgx_pid.p_term = g_fc_params.mode2_img_kp * img_err_x;
+        g_mode2_imgy_pid.p_term = g_fc_params.mode2_img_kp * img_err_y;
+        g_mode2_imgx_pid.d_term = g_fc_params.mode2_img_kd * g_mode2_img_error_rate_x_pxps;
+        g_mode2_imgy_pid.d_term = g_fc_params.mode2_img_kd * g_mode2_img_error_rate_y_pxps;
         g_mode2_imgx_pid.output = g_mode2_imgx_pid.p_term + g_mode2_imgx_pid.d_term;
         g_mode2_imgy_pid.output = g_mode2_imgy_pid.p_term + g_mode2_imgy_pid.d_term;
     }
@@ -182,39 +181,41 @@ void FC_Mode2_Control100Hz(float dt)
             s_mode2_prev_car_sync_time_ms = g_car_sync_time_ms;
         }
 
-        alpha = s_mode2_two_pi * s_mode2_car_vel_error_lpf_hz * dt;
+        alpha = s_mode2_two_pi * g_fc_params.mode2_car_vel_error_lpf_hz * dt;
         alpha /= 1.0f + alpha;
-        s_mode2_car_vel_error_x_mps += alpha *
-            (g_car_vel_target_x - g_car_vel_x - s_mode2_car_vel_error_x_mps);
-        s_mode2_car_vel_error_y_mps += alpha *
-            (g_car_vel_target_y - g_car_vel_y - s_mode2_car_vel_error_y_mps);
+        g_mode2_car_vel_error_x_mps += alpha *
+            (g_car_vel_target_x - g_car_vel_x - g_mode2_car_vel_error_x_mps);
+        g_mode2_car_vel_error_y_mps += alpha *
+            (g_car_vel_target_y - g_car_vel_y - g_mode2_car_vel_error_y_mps);
         car_accel_x_mps2 =
-            ((s_mode2_car_vel_error_x_mps >= 0.0f)
-                 ? s_mode2_car_accel_gain_pos
-                 : s_mode2_car_accel_gain_neg) * s_mode2_car_vel_error_x_mps;
+            ((g_mode2_car_vel_error_x_mps >= 0.0f)
+                 ? g_fc_params.mode2_car_accel_gain_pos
+                 : g_fc_params.mode2_car_accel_gain_neg) * g_mode2_car_vel_error_x_mps;
         car_accel_y_mps2 =
-            ((s_mode2_car_vel_error_y_mps >= 0.0f)
-                 ? s_mode2_car_accel_gain_pos
-                 : s_mode2_car_accel_gain_neg) * s_mode2_car_vel_error_y_mps;
+            ((g_mode2_car_vel_error_y_mps >= 0.0f)
+                 ? g_fc_params.mode2_car_accel_gain_pos
+                 : g_fc_params.mode2_car_accel_gain_neg) * g_mode2_car_vel_error_y_mps;
+        g_mode2_car_body_accel_x_mps2 = car_accel_x_mps2;
+        g_mode2_car_body_accel_y_mps2 = car_accel_y_mps2;
 
         /* 滤波车模向心加速度，再按实时车机航向差投影到 Roll/Pitch。 */
-        alpha = s_mode2_two_pi * s_mode2_car_turn_accel_lpf_hz * dt;
+        alpha = s_mode2_two_pi * g_fc_params.mode2_car_turn_accel_lpf_hz * dt;
         alpha /= 1.0f + alpha;
-        s_mode2_car_turn_accel_mps2 += alpha *
+        g_mode2_car_turn_accel_mps2 += alpha *
             (g_car_vel_y * g_car_yaw_rate_dps * s_mode2_deg_to_rad -
-             s_mode2_car_turn_accel_mps2);
+             g_mode2_car_turn_accel_mps2);
 
-        yaw_diff_rad = g_car_yaw - g_euler.yaw +
-                       g_car_yaw_rate_dps * 0.12f;
-        while (yaw_diff_rad > 180.0f)
+        g_mode2_yaw_diff_deg = g_car_yaw - g_euler.yaw +
+                               g_car_yaw_rate_dps * 0.12f;
+        while (g_mode2_yaw_diff_deg > 180.0f)
         {
-            yaw_diff_rad -= 360.0f;
+            g_mode2_yaw_diff_deg -= 360.0f;
         }
-        while (yaw_diff_rad < -180.0f)
+        while (g_mode2_yaw_diff_deg < -180.0f)
         {
-            yaw_diff_rad += 360.0f;
+            g_mode2_yaw_diff_deg += 360.0f;
         }
-        yaw_diff_rad *= s_mode2_deg_to_rad;
+        yaw_diff_rad = g_mode2_yaw_diff_deg * s_mode2_deg_to_rad;
         yaw_cos = cosf(yaw_diff_rad);
         yaw_sin = sinf(yaw_diff_rad);
         g_mode2_car_accel_x_mps2 =
@@ -222,11 +223,11 @@ void FC_Mode2_Control100Hz(float dt)
         g_mode2_car_accel_y_mps2 =
             car_accel_x_mps2 * yaw_sin - car_accel_y_mps2 * yaw_cos;
         g_mode2_car_accel_angle_ff_x_deg =
-            s_mode2_car_accel_ff * g_mode2_car_accel_x_mps2 +
-            s_mode2_car_turn_accel_ff * s_mode2_car_turn_accel_mps2 * yaw_cos;
+            g_fc_params.mode2_car_accel_ff * g_mode2_car_accel_x_mps2 +
+            g_fc_params.mode2_car_turn_accel_ff * g_mode2_car_turn_accel_mps2 * yaw_cos;
         g_mode2_car_accel_angle_ff_y_deg =
-            s_mode2_car_accel_ff * g_mode2_car_accel_y_mps2 +
-            s_mode2_car_turn_accel_ff * s_mode2_car_turn_accel_mps2 * yaw_sin;
+            g_fc_params.mode2_car_accel_ff * g_mode2_car_accel_y_mps2 +
+            g_fc_params.mode2_car_turn_accel_ff * g_mode2_car_turn_accel_mps2 * yaw_sin;
     }
     else
     {
@@ -234,8 +235,10 @@ void FC_Mode2_Control100Hz(float dt)
         g_mode2_car_accel_x_mps2 = g_mode2_car_accel_y_mps2 = 0.0f;
         g_mode2_car_dt_ms = 0.0f;
         s_mode2_prev_car_sync_time_ms = 0.0f;
-        s_mode2_car_vel_error_x_mps = s_mode2_car_vel_error_y_mps = 0.0f;
-        s_mode2_car_turn_accel_mps2 = 0.0f;
+        g_mode2_car_vel_error_x_mps = g_mode2_car_vel_error_y_mps = 0.0f;
+        g_mode2_car_body_accel_x_mps2 = g_mode2_car_body_accel_y_mps2 = 0.0f;
+        g_mode2_car_turn_accel_mps2 = 0.0f;
+        g_mode2_yaw_diff_deg = 0.0f;
     }
 
     g_mode2_raw_roll_correction_deg = g_mode2_imgx_pid.output +
@@ -248,6 +251,7 @@ void FC_Mode2_Control100Hz(float dt)
     pitch_angle_target = FC_Mode_Clamp(
         FC_Mode_Get_Pitch_Mech_Trim_Deg() + g_mode2_raw_pitch_correction_deg,
         -s_mode2_angle_limit_deg, s_mode2_angle_limit_deg);
+    g_mode2_control_seq++;
 }
 
 float FC_Mode2_Get_Fixed_Height_M(void)

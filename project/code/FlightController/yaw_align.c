@@ -38,6 +38,9 @@ static uint8 s_locked = 0U;
 static uint8 s_lost_frames = 0U;
 static uint8 s_center_turn_active = 0U;
 static float s_center_turn_target_yaw = 0.0f;
+static yaw_align_beacon_t s_active_beacon;
+static float s_yaw_delta_deg = 0.0f;
+static uint8 s_action = YAW_ALIGN_ACTION_IDLE;
 
 static float YawAlign_Clamp(float value, float min_value, float max_value)
 {
@@ -282,6 +285,9 @@ void YawAlign_Reset(void)
     s_lost_frames = 0U;
     s_center_turn_active = 0U;
     s_center_turn_target_yaw = 0.0f;
+    s_active_beacon.valid = 0U;
+    s_yaw_delta_deg = 0.0f;
+    s_action = YAW_ALIGN_ACTION_IDLE;
 }
 
 static void YawAlign_FillDebugBeacon(const yaw_align_beacon_t *src,
@@ -304,6 +310,9 @@ void YawAlign_GetDebug(yaw_align_debug_t *out)
     out->locked = s_locked;
     out->candidate_frames = s_candidate_frames;
     out->lost_frames = s_lost_frames;
+    out->action = s_action;
+    out->yaw_delta_deg = s_yaw_delta_deg;
+    YawAlign_FillDebugBeacon(&s_active_beacon, &out->active_beacon);
     YawAlign_FillDebugBeacon(&s_locked_beacon, &out->locked_beacon);
     YawAlign_FillDebugBeacon(&s_candidate_beacon, &out->candidate_beacon);
 }
@@ -330,11 +339,16 @@ uint8 YawAlign_Update(void)
     float yaw_delta;
 
     beacon.valid = 0U;
+    s_active_beacon.valid = 0U;
+    s_yaw_delta_deg = 0.0f;
+    s_action = YAW_ALIGN_ACTION_IDLE;
 
     if(s_locked == 0U)
     {
         if(YawAlign_FindLargestBeacon(&beacon) != 0U)
         {
+            s_active_beacon = beacon;
+            s_action = YAW_ALIGN_ACTION_CANDIDATE;
             s_center_turn_active = 0U;
             s_center_turn_target_yaw = 0.0f;
             YawAlign_UpdateCandidate(&beacon);
@@ -356,14 +370,19 @@ uint8 YawAlign_Update(void)
             s_center_turn_target_yaw = g_euler.yaw +
                                        ((beacon.x > 0.0f) ? 90.0f : -90.0f);
             s_center_turn_active = 1U;
+            s_active_beacon = beacon;
         }
 
+        s_action = YAW_ALIGN_ACTION_CENTER_TURN;
+        s_yaw_delta_deg = s_center_turn_target_yaw - g_euler.yaw;
         yaw_angle_target = s_center_turn_target_yaw;
         return 0U;
     }
 
     if(YawAlign_FindNearestLockedBeacon(&beacon) == 0U)
     {
+        s_active_beacon.valid = 0U;
+        s_action = YAW_ALIGN_ACTION_LOST_HOLD;
         if(s_lost_frames < s_yaw_align_lost_reset_frames)
         {
             s_lost_frames++;
@@ -378,16 +397,20 @@ uint8 YawAlign_Update(void)
     }
 
     s_locked_beacon = beacon;
+    s_active_beacon = beacon;
     s_locked_yaw = g_euler.yaw;
     s_lost_frames = 0U;
 
     if(fabsf(beacon.x) <= s_yaw_align_deadband_px)
     {
+        s_action = YAW_ALIGN_ACTION_DEADBAND_HOLD;
         YawAlign_HoldCurrentYaw();
         return 1U;
     }
 
     yaw_delta = YawAlign_GetYawDelta(&beacon);
+    s_action = YAW_ALIGN_ACTION_TRACK;
+    s_yaw_delta_deg = yaw_delta;
     yaw_angle_target = g_euler.yaw + yaw_delta;
     return 1U;
 }

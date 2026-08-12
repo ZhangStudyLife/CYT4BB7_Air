@@ -120,31 +120,15 @@ typedef struct
     float mode8_img_y_i_limit;         /* 模式8图像Y位置环积分限幅 */
     float mode8_img_y_d_lpf;           /* 模式8图像Y位置环D项低通截止频率，单位Hz */
     /* ===== 模式 2 直接图像 PD 与角度前馈参数 ===== */
-    float mode2_img_x_kp;                       /* X轴图像P增益，单位 deg/px */
-    float mode2_img_x_kp2;                      /* X轴图像非线性P增益 */
-    float mode2_img_x_kd;                       /* X轴图像D增益，单位 deg/(px/s) */
-    float mode2_img_x_kd_slope;                 /* X轴D增益随误差增加的斜率 */
-    float mode2_img_x_d_lpf;                    /* X轴D项低通截止频率，单位 Hz */
-    float mode2_img_y_kp;                       /* Y轴图像P增益，单位 deg/px */
-    float mode2_img_y_kp2;                      /* Y轴图像非线性P增益 */
-    float mode2_img_y_kd;                       /* Y轴图像D增益，单位 deg/(px/s) */
-    float mode2_img_y_kd_slope;                 /* Y轴D增益随误差增加的斜率 */
-    float mode2_img_y_d_lpf;                    /* Y轴D项低通截止频率，单位 Hz */
-    float mode2_img_d_limit_deg;                /* 图像D项单轴限幅，单位 deg */
-    float mode2_car_vel_ff_x_deg_per_mps;       /* X轴车速角度前馈，单位 deg/(m/s) */
-    float mode2_car_vel_ff_y_deg_per_mps;       /* Y轴车速角度前馈，单位 deg/(m/s) */
-    float mode2_car_accel_ff_x_deg_per_mps2;    /* X轴车加速度角度前馈，单位 deg/(m/s^2) */
-    float mode2_car_accel_ff_y_deg_per_mps2;    /* Y轴车加速度角度前馈，单位 deg/(m/s^2) */
-    float mode2_car_accel_lpf_hz;               /* 车加速度低通截止频率，单位 Hz */
-    float mode2_car_accel_lead_s;               /* 车加速度前馈超前时间，单位 s */
-    float mode2_car_accel_raw_limit_mps2;       /* 原始车加速度限幅，单位 m/s^2 */
-    float mode2_car_accel_ff_limit_deg;         /* 车加速度角度前馈限幅，单位 deg */
-    float mode2_attitude_fb_gain;               /* 实际姿态状态反馈增益 */
-    float mode2_turn_accel_ff_gain_x;           /* X轴转向加速度角度前馈增益 */
-    float mode2_turn_accel_ff_gain_y;           /* Y轴转向加速度角度前馈增益 */
-    float mode2_angle_limit_deg;                /* 图像与前馈合成修正限幅，单位 deg */
-    float mode2_angle_slew_dps;                 /* 姿态修正变化率限幅，单位 deg/s */
-    float mode2_angle_brake_slew_dps;            /* 刹车或反向时姿态修正变化率，单位 deg/s */
+    float mode2_img_kp;                     /* 模式1/2图像P增益，单位 deg/px */
+    float mode2_img_kd;                     /* 模式1/2图像D增益，单位 deg/(px/s) */
+    float mode2_img_d_lpf_hz;               /* 模式1/2图像D项低通截止频率，单位 Hz */
+    float mode2_car_vel_error_lpf_hz;       /* 模式1/2车速误差低通截止频率，单位 Hz */
+    float mode2_car_accel_gain_pos;         /* 模式1/2正向车速误差加速度增益 */
+    float mode2_car_accel_gain_neg;         /* 模式1/2负向车速误差加速度增益 */
+    float mode2_car_accel_ff;               /* 模式1/2车加速度前馈，单位 deg/(m/s^2) */
+    float mode2_car_turn_accel_ff;          /* 模式1/2向心加速度前馈，单位 deg/(m/s^2) */
+    float mode2_car_turn_accel_lpf_hz;      /* 模式1/2向心加速度低通截止频率，单位 Hz */
     /* ===== Mode 5 image and velocity params ===== */
     float mode5_img_x_kp;
     float mode5_img_x_ki;

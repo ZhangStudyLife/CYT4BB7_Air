@@ -228,6 +228,15 @@ extern float g_mode2_car_accel_y_mps2;
 /* 模式2限幅前的Roll/Pitch修正，单位deg。 */
 extern float g_mode2_raw_roll_correction_deg;
 extern float g_mode2_raw_pitch_correction_deg;
+extern float g_mode2_img_error_rate_x_pxps;
+extern float g_mode2_img_error_rate_y_pxps;
+extern float g_mode2_car_vel_error_x_mps;
+extern float g_mode2_car_vel_error_y_mps;
+extern float g_mode2_car_body_accel_x_mps2;
+extern float g_mode2_car_body_accel_y_mps2;
+extern float g_mode2_car_turn_accel_mps2;
+extern float g_mode2_yaw_diff_deg;
+extern uint32 g_mode2_control_seq;
 extern pid_t g_mode5_velx_pid;
 extern pid_t g_mode5_vely_pid;
 extern pid_t g_mode5_imgx_pid;

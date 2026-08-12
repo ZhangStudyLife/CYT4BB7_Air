@@ -1,5 +1,6 @@
 #include "zf_common_headfile.h"
 #include "../code/FlightController/fc_mode.h"
+#include "../code/FlightController/yaw_align.h"
 #include "../code/Planner/beacon_lost_detector.h"
 #include "../code/Planner/car_lamp_fused.h"
 #include "../code/Estimation/Pos_Est/FlowGyroDecoupler_LC302.h"
@@ -36,6 +37,113 @@ float g_car_sync_time_ms = 0.0f; /* Last car-side sync timestamp, unit: ms */
 uint32 g_car_last_update_time_ms = 0U; /* 最近一次收到新车端时间戳的飞机本机时刻，单位ms */
 static car_plan_result_t s_air_run_car_plan;
 static uint8 s_air_run_car_plan_valid = 0U;
+
+#define MODE12_WIFI_RECORD_DYNAMIC       (0U)
+#define MODE12_WIFI_DEBUG_PERIOD_MS      (5U)
+
+static uint32 mode12_debug_state_pack(void)
+{
+    uint32 state = (uint32)FC_START_CRSF_Get_Flight_Mode() |
+                   ((uint32)FC_START_CRSF_Get_State() << 4U);
+    uint32 lamp_mask = 0U;
+
+    if (image_data_car_lamp_valid(&image_data[Front].car_lamp_data[0]) != 0U)
+    {
+        lamp_mask |= 1U;
+    }
+    if (image_data_car_lamp_valid(&image_data[Center].car_lamp_data[0]) != 0U)
+    {
+        lamp_mask |= 2U;
+    }
+    if (image_data_car_lamp_valid(&image_data[Back].car_lamp_data[0]) != 0U)
+    {
+        lamp_mask |= 4U;
+    }
+    if (g_car_lamp_fused.valid != 0U)
+    {
+        state |= 1UL << 7U;
+    }
+    if (g_tof_fused_valid != 0U)
+    {
+        state |= 1UL << 8U;
+    }
+    if ((g_car_sync_time_ms > 0.0f) &&
+        ((tick_1000us_cnt - g_car_last_update_time_ms) < FC_MODE_CAR_RUN_DATA_TIMEOUT_MS))
+    {
+        state |= 1UL << 9U;
+    }
+
+    return state | (lamp_mask << 10U);
+}
+
+static uint32 mode12_debug_yaw_pack(const yaw_align_debug_t *debug)
+{
+    uint32 camera = (debug->active_beacon.valid != 0U)
+                        ? (uint32)debug->active_beacon.camera
+                        : 3U;
+
+    return ((uint32)debug->action & 0x7U) |
+           ((camera & 0x3U) << 3U) |
+           (((uint32)debug->locked & 0x1U) << 5U) |
+           (((uint32)debug->candidate_frames & 0x1FU) << 6U) |
+           (((uint32)debug->lost_frames & 0x1FU) << 11U);
+}
+
+static void mode12_wifi_debug_200hz(void)
+{
+    static uint32 last_tick_ms = 0U;
+    FC_START_CRSF_flight_mode_e mode = FC_START_CRSF_Get_Flight_Mode();
+    yaw_align_debug_t yaw_debug;
+    uint32 tick_now = tick_1000us_cnt;
+
+    if ((FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING) ||
+        ((mode != FC_START_CRSF_FLIGHT_MODE_1) &&
+         (mode != FC_START_CRSF_FLIGHT_MODE_2)))
+    {
+        last_tick_ms = tick_now;
+        return;
+    }
+    if ((tick_now - last_tick_ms) < MODE12_WIFI_DEBUG_PERIOD_MS)
+    {
+        return;
+    }
+    last_tick_ms = tick_now;
+    YawAlign_GetDebug(&yaw_debug);
+
+    (void)wifi_justfloat(
+        (float)MODE12_WIFI_RECORD_DYNAMIC,                  /* I1 记录类型 */
+        (float)mode12_debug_state_pack(),                   /* I2 状态位 */
+        (float)g_mode2_control_seq,                         /* I3 100Hz控制序号 */
+        (float)g_image_data_seq,                            /* I4 图像序号 */
+        g_car_sync_time_ms,                                 /* I5 车端时间戳 */
+        g_euler.roll, g_euler.pitch, g_euler.yaw,           /* I6-I8 实际欧拉角 */
+        roll_angle_target, pitch_angle_target, yaw_angle_target, /* I9-I11 目标欧拉角 */
+        g_tof_fused_height_mm,                              /* I12 融合高度 */
+        g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy,
+        g_imufilter_1000hz.gyroz,                           /* I13-I15 实际角速度 */
+        roll_gyro_target, pitch_gyro_target, yaw_gyro_target, /* I16-I18 目标角速度 */
+        (float)g_motor_cmd.roll, (float)g_motor_cmd.pitch,
+        (float)g_motor_cmd.yaw,                             /* I19-I21 电机控制量 */
+        g_car_lamp_fused.cx, g_car_lamp_fused.cy,           /* I22-I23 融合车灯坐标 */
+        g_mode2_imgx_pid.error, g_mode2_imgy_pid.error,     /* I24-I25 图像误差 */
+        g_mode2_img_error_rate_x_pxps,
+        g_mode2_img_error_rate_y_pxps,                      /* I26-I27 滤波误差变化率 */
+        g_car_vel_x, g_car_vel_y,                           /* I28-I29 实际车速 */
+        g_car_vel_target_x, g_car_vel_target_y,             /* I30-I31 目标车速 */
+        g_mode2_car_vel_error_x_mps,
+        g_mode2_car_vel_error_y_mps,                        /* I32-I33 滤波车速误差 */
+        g_mode2_car_body_accel_x_mps2,
+        g_mode2_car_body_accel_y_mps2,                      /* I34-I35 旋转前车体加速度 */
+        g_mode2_car_turn_accel_mps2,                        /* I36 滤波向心加速度 */
+        g_car_yaw, g_car_yaw_rate_dps,                      /* I37-I38 车Yaw及角速度 */
+        g_mode2_yaw_diff_deg,                               /* I39 控制航向差 */
+        g_mode2_raw_roll_correction_deg,
+        g_mode2_raw_pitch_correction_deg,                   /* I40-I41 限幅前修正角 */
+        yaw_debug.active_beacon.x, yaw_debug.active_beacon.y,
+        yaw_debug.active_beacon.area,                       /* I42-I44 Yaw使用信标 */
+        yaw_debug.yaw_delta_deg,                            /* I45 Yaw目标增量 */
+        (float)mode12_debug_yaw_pack(&yaw_debug));          /* I46 Yaw状态 */
+}
 
 /**
  * @brief 接收并保存小车实时运行数据。
@@ -185,6 +293,7 @@ static void core0_run_fast_loop_step(void)
 
     FC_Loop_1000Hz();
     air_comm_air_poll();
+    mode12_wifi_debug_200hz();
 }
 
 /**
@@ -275,41 +384,6 @@ static void core0_plan_update_100hz(void)
     s_air_run_car_plan = car_plan;
     s_air_run_car_plan_valid = car_plan_send_valid;
 
-    (void)wifi_justfloat((float)FC_START_CRSF_Get_Flight_Mode(),             /* I1  flight mode */
-                             (float)FC_START_CRSF_Get_State(),                   /* I2  flight state */
-                             (float)g_image_data_seq,                            /* I3  image sequence */
-                             (float)g_car_lamp_fused.valid,                      /* I4  image valid */
-                             (float)g_tof_fused_valid,                           /* I5  height valid */
-                             g_tof_fused_height_mm,                              /* I6  height, mm */
-                             g_car_sync_time_ms,                                 /* I7  car time, ms */
-                             (g_car_sync_time_ms > 0.0f)
-                                 ? (float)(tick_1000us_cnt - g_car_last_update_time_ms)
-                                 : -1.0f,                                        /* I8  car data age, ms */
-                             roll_angle_target, pitch_angle_target, yaw_angle_target, /* I9-I11 target Euler, deg */
-                             g_euler.roll, g_euler.pitch, g_euler.yaw,           /* I12-I14 actual Euler, deg */
-                             g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, /* I15-I16 gyro, deg/s */
-                             g_car_lamp_fused.cx,                                /* I17 car center X, px */
-                             g_car_lamp_fused.cy,                                /* I18 car center Y, px */
-                             g_car_lamp_fused.angle,                             /* I19 car image angle, deg */
-                             (float)car_plan_2.valid,                             /* I20 CarPlan_2 valid */
-                             car_plan_2.target_center_x,                         /* I21 target center X, px */
-                             car_plan_2.target_center_y,                         /* I22 target center Y, px */
-                             (float)car_plan_2.camera_mask,                       /* I23 target camera mask */
-                             g_mode2_imgx_pid.error, g_mode2_imgy_pid.error,      /* I24-I25 image error, px */
-                             (float)car_plan_send_valid,                          /* I26 sent plan valid */
-                             (car_plan_send_valid != 0U) ? car_plan.target_strafe_mps : 0.0f, /* I27 sent strafe, m/s */
-                             (car_plan_send_valid != 0U) ? car_plan.target_forward_mps : 0.0f, /* I28 sent forward, m/s */
-                             g_car_yaw, g_car_yaw_rate_dps,                       /* I29-I30 car yaw/rate */
-                             g_car_vel_x, g_car_vel_y,                            /* I31-I32 car velocity, m/s */
-                             image_data[Front].beacon_data[0].x,                 /* I33 Front beacon0 X, px */
-                             image_data[Front].beacon_data[0].y,                 /* I34 Front beacon0 Y, px */
-                             image_data[Front].beacon_data[0].area,              /* I35 Front beacon0 area */
-                             image_data[Center].beacon_data[0].x,                /* I36 Center beacon0 X, px */
-                             image_data[Center].beacon_data[0].y,                /* I37 Center beacon0 Y, px */
-                             image_data[Center].beacon_data[0].area,             /* I38 Center beacon0 area */
-                             image_data[Back].beacon_data[0].x,                  /* I39 Back beacon0 X, px */
-                             image_data[Back].beacon_data[0].y,                  /* I40 Back beacon0 Y, px */
-                             image_data[Back].beacon_data[0].area);              /* I41 Back beacon0 area */
 }
 
 /**

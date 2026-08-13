@@ -121,15 +121,15 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pos_est_k_flow = 0.5f;
 
     /* ===== 模式 2 直接图像 PD 与角度前馈参数 ===== */
-    params->mode2_img_kp = 0.17f;
-    params->mode2_img_kd = 0.10f;
-    params->mode2_img_d_lpf_hz = 1.2f;
-    params->mode2_car_vel_error_lpf_hz = 1.2f;
-    params->mode2_car_accel_gain_pos = 4.5f;
-    params->mode2_car_accel_gain_neg = 4.5f;
-    params->mode2_car_accel_ff = 4.5f;
-    params->mode2_car_turn_accel_ff = 3.5f;
-    params->mode2_car_turn_accel_lpf_hz = 1.8f;
+    params->mode2_img_kp = 0.28f;
+    params->mode2_img_kd = 0.18f;
+    params->mode2_img_d_lpf_hz = 1.0f;
+    params->mode2_car_vel_error_lpf_hz = 1.3f;
+    params->mode2_car_accel_gain_pos = 5.8f;
+    params->mode2_car_accel_gain_neg = 5.8f;
+    params->mode2_car_accel_ff = 4.0f;
+    params->mode2_car_turn_accel_ff = 3.4f;
+    params->mode2_car_turn_accel_lpf_hz = 2.9f;
 
     /* ===== 模式 3 图像、速度与转弯前馈参数 ===== */
     params->mode3_img_x_kp = 2.0f;

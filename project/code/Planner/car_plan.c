@@ -12,8 +12,8 @@
 #define CAR_PLAN_CENTER_MAX_DIST_PX        (65.0f)
 #define CAR_PLAN_CAR_CENTER_Y_OFFSET_PX    (10.0f) /* 车体中心相对车灯中心向图像 y 正方向偏移，单位 px。 */
 
-float Car_Speed = 2.2f; /* 车模规划速度，单位 m/s，可由车机通过 AirComm 修改 */
-float Car_Speed_Fast = 2.2f; /* 车模快速前进速度，单位 m/s，可由车机通过 AirComm 修改 */
+float Car_Speed = 2.1f; /* 车模规划速度，单位 m/s，可由车机通过 AirComm 修改 */
+float Car_Speed_Fast = 2.1f; /* 车模快速前进速度，单位 m/s，可由车机通过 AirComm 修改 */
 float Car_Plan_Mode = 2.0f; /* 车模规划算法选择：1=car_plan，2=car_plan_2，可由车机通过 AirComm 修改 */
 extern float g_car_yaw; /* 车模yaw角，单位deg。 */
 extern float g_car_sync_time_ms; /* 最近一次车端同步时间戳，单位ms。 */

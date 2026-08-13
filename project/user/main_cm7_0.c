@@ -3,6 +3,7 @@
 #include "../code/FlightController/yaw_align.h"
 #include "../code/Planner/beacon_lost_detector.h"
 #include "../code/Planner/car_lamp_fused.h"
+#include "../code/Planner/car_plan_2.h"
 #include "../code/Estimation/Pos_Est/FlowGyroDecoupler_LC302.h"
 
 volatile uint32 tick_1000us_cnt = 0U;
@@ -35,6 +36,8 @@ float g_car_yaw = 0.0f; /* Car yaw angle, unit: deg */
 float g_car_yaw_rate_dps = 0.0f; /* 10Hz low-pass car yaw rate, unit: deg/s */
 float g_car_sync_time_ms = 0.0f; /* Last car-side sync timestamp, unit: ms */
 uint32 g_car_last_update_time_ms = 0U; /* 最近一次收到新车端时间戳的飞机本机时刻，单位ms */
+float g_car_yaw_target_deg = 0.0f; /* 车端yaw控制目标角(经SPI data[2])，单位deg */
+float g_car_large_turn_state = 0.0f; /* 车端大角度状态机(经SPI data[7]): 0正常 1刹车 2原地转 3退出 */
 static car_plan_result_t s_air_run_car_plan;
 static uint8 s_air_run_car_plan_valid = 0U;
 
@@ -94,6 +97,9 @@ static void mode12_wifi_debug_200hz(void)
     static uint32 last_tick_ms = 0U;
     FC_START_CRSF_flight_mode_e mode = FC_START_CRSF_Get_Flight_Mode();
     yaw_align_debug_t yaw_debug;
+    car_plan_2_result_t plan2_dbg;
+    float cmd_ang_deg = 0.0f;
+    float dir_cmd_deg = 0.0f;
     uint32 tick_now = tick_1000us_cnt;
 
     if ((FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING) ||
@@ -109,6 +115,24 @@ static void mode12_wifi_debug_200hz(void)
     }
     last_tick_ms = tick_now;
     YawAlign_GetDebug(&yaw_debug);
+    CarPlan_2_GetResult(&plan2_dbg);
+    if ((s_air_run_car_plan_valid != 0U) &&
+        ((fabsf(s_air_run_car_plan.target_strafe_mps) > 0.01f) ||
+         (fabsf(s_air_run_car_plan.target_forward_mps) > 0.01f)))
+    {
+        /* 车端控制律: yaw目标 = 车yaw + atan2(strafe, forward)，飞机可据此预判车旋转方向 */
+        cmd_ang_deg = atan2f(s_air_run_car_plan.target_strafe_mps,
+                             s_air_run_car_plan.target_forward_mps) * 57.29577951f;
+        dir_cmd_deg = g_car_yaw + cmd_ang_deg;
+        while (dir_cmd_deg > 180.0f)
+        {
+            dir_cmd_deg -= 360.0f;
+        }
+        while (dir_cmd_deg < -180.0f)
+        {
+            dir_cmd_deg += 360.0f;
+        }
+    }
 
     (void)wifi_justfloat(
         (float)MODE12_WIFI_RECORD_DYNAMIC,                  /* I1 记录类型 */
@@ -124,25 +148,37 @@ static void mode12_wifi_debug_200hz(void)
         roll_gyro_target, pitch_gyro_target, yaw_gyro_target, /* I16-I18 目标角速度 */
         (float)g_motor_cmd.roll, (float)g_motor_cmd.pitch,
         (float)g_motor_cmd.yaw,                             /* I19-I21 电机控制量 */
-        g_car_lamp_fused.cx, g_car_lamp_fused.cy,           /* I22-I23 融合车灯坐标 */
-        g_mode2_imgx_pid.error, g_mode2_imgy_pid.error,     /* I24-I25 图像误差 */
+        g_car_lamp_fused.cx, g_car_lamp_fused.cy,
+        g_car_lamp_fused.angle,                             /* I22-I24 融合车灯坐标及角度 */
+        g_mode2_imgx_pid.error, g_mode2_imgy_pid.error,     /* I25-I26 图像误差 */
         g_mode2_img_error_rate_x_pxps,
-        g_mode2_img_error_rate_y_pxps,                      /* I26-I27 滤波误差变化率 */
-        g_car_vel_x, g_car_vel_y,                           /* I28-I29 实际车速 */
-        g_car_vel_target_x, g_car_vel_target_y,             /* I30-I31 目标车速 */
+        g_mode2_img_error_rate_y_pxps,                      /* I27-I28 滤波误差变化率 */
+        g_car_vel_x, g_car_vel_y,                           /* I29-I30 实际车速 */
+        g_car_vel_target_x, g_car_vel_target_y,             /* I31-I32 目标车速 */
         g_mode2_car_vel_error_x_mps,
-        g_mode2_car_vel_error_y_mps,                        /* I32-I33 滤波车速误差 */
+        g_mode2_car_vel_error_y_mps,                        /* I33-I34 滤波车速误差 */
         g_mode2_car_body_accel_x_mps2,
-        g_mode2_car_body_accel_y_mps2,                      /* I34-I35 旋转前车体加速度 */
-        g_mode2_car_turn_accel_mps2,                        /* I36 滤波向心加速度 */
-        g_car_yaw, g_car_yaw_rate_dps,                      /* I37-I38 车Yaw及角速度 */
-        g_mode2_yaw_diff_deg,                               /* I39 控制航向差 */
+        g_mode2_car_body_accel_y_mps2,                      /* I35-I36 旋转前车体加速度 */
+        g_mode2_car_turn_accel_mps2,                        /* I37 滤波向心加速度 */
+        g_car_yaw, g_car_yaw_rate_dps,                      /* I38-I39 车Yaw及角速度 */
+        g_mode2_yaw_diff_deg,                               /* I40 控制航向差 */
         g_mode2_raw_roll_correction_deg,
-        g_mode2_raw_pitch_correction_deg,                   /* I40-I41 限幅前修正角 */
+        g_mode2_raw_pitch_correction_deg,                   /* I41-I42 限幅前修正角 */
         yaw_debug.active_beacon.x, yaw_debug.active_beacon.y,
-        yaw_debug.active_beacon.area,                       /* I42-I44 Yaw使用信标 */
-        yaw_debug.yaw_delta_deg,                            /* I45 Yaw目标增量 */
-        (float)mode12_debug_yaw_pack(&yaw_debug));          /* I46 Yaw状态 */
+        yaw_debug.active_beacon.area,                       /* I43-I45 Yaw使用信标 */
+        yaw_debug.yaw_delta_deg,                            /* I46 Yaw目标增量 */
+        (float)mode12_debug_yaw_pack(&yaw_debug),           /* I47 Yaw状态 */
+        (float)s_air_run_car_plan_valid,                    /* I48 实际下发plan有效 */
+        s_air_run_car_plan.target_strafe_mps,               /* I49 实际下发横移速度m/s */
+        s_air_run_car_plan.target_forward_mps,              /* I50 实际下发前进速度m/s */
+        (float)plan2_dbg.camera_mask,                       /* I51 plan2目标相机mask 1前2中4后 */
+        plan2_dbg.target_center_x,                          /* I52 plan2目标信标x px */
+        plan2_dbg.target_center_y,                          /* I53 plan2目标信标y px */
+        (float)plan2_dbg.valid,                             /* I54 plan2结果有效 */
+        cmd_ang_deg,                                        /* I55 指令方向角(车身系)deg */
+        dir_cmd_deg,                                        /* I56 预测车航向(世界系)deg */
+        g_car_yaw_target_deg,                               /* I57 车端yaw目标(经SPI)deg */
+        g_car_large_turn_state);                            /* I58 车端大角度状态 0正常1刹车2原地转3退出 */
 }
 
 /**
@@ -157,10 +193,12 @@ static void on_car_data(const float *data, uint8 count)
     {
         g_car_vel_x = data[0];
         g_car_vel_y = data[1];
+        g_car_yaw_target_deg = data[2];
         g_car_yaw = data[3];
         g_car_yaw_rate_dps = data[4];
         g_car_vel_target_x = data[5];
         g_car_vel_target_y = data[6];
+        g_car_large_turn_state = data[7];
         /* 仅在车端时间戳推进时刷新数据新鲜时刻。 */
         if (data[10] != g_car_sync_time_ms)
         {

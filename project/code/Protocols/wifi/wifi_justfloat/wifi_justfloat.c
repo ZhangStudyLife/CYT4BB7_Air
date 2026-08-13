@@ -6,7 +6,6 @@
 
 #include "wifi_justfloat.h"
 
-#include <stdarg.h>
 #include <string.h>
 
 #include "../wifi_cmd/wifi_cmd.h"
@@ -280,48 +279,4 @@ uint8_t wifi_justfloat_Array(const float *data, uint8_t num)
     }
 
     return wifi_justfloat_enqueue_frame(data, num);
-}
-
-uint8_t wifi_justfloat_Impl(uint8_t declared_num, uint8_t actual_num, ...)
-{
-    uint8_t i;
-    uint8_t ret;
-    float values[WIFI_JUSTFLOAT_USER_MAX_NUM];
-    va_list ap;
-
-#if (1U == WIFI_IMAGE_ENABLE)
-    (void)declared_num;
-    (void)actual_num;
-    return 0U;
-#endif
-
-    if (actual_num > WIFI_JUSTFLOAT_USER_MAX_NUM)
-    {
-        return 1U;
-    }
-
-    if (declared_num != actual_num)
-    {
-        return 1U;
-    }
-
-    if (0U == wifi_cmd_IsReady())
-    {
-        return 1U;
-    }
-
-    if (0U == wifi_justfloat_should_send())
-    {
-        return 0U;
-    }
-
-    va_start(ap, actual_num);
-    for (i = 0U; i < actual_num; i++)
-    {
-        values[i] = (float)va_arg(ap, double);
-    }
-    va_end(ap);
-
-    ret = wifi_justfloat_enqueue_frame(values, actual_num);
-    return ret;
 }

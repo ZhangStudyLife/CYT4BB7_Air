@@ -30,7 +30,7 @@
 #endif
 
 #ifndef UDP_REMOTE_IP
-#define UDP_REMOTE_IP       "192.168.110.22"    /* 上位机 IP 地址 */
+#define UDP_REMOTE_IP       "192.168.110.183"    /* 上位机 IP 地址 */
 #endif
 
 #ifndef UDP_REMOTE_PORT

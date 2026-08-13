@@ -89,6 +89,8 @@ extern float g_car_sync_time_ms; /* 最近一次车端同步时间戳，单位ms
 
 static car_plan_2_result_t s_car_plan_2_result; /* 最近一次影子规划输出。 */
 static car_plan_2_lock_t s_car_plan_2_lock; /* 物理信标锁定位置、历史位置和计数状态。 */
+static car_plan_2_cluster_t s_car_plan_2_debug_clusters[CAR_PLAN_2_MAX_CANDIDATE_COUNT]; /* 最近一次融合信标簇快照。 */
+static uint8 s_car_plan_2_debug_cluster_count; /* 最近一次融合信标簇数量。 */
 
 /**
  * @brief 清零指定影子规划结果。
@@ -511,6 +513,7 @@ static uint8 CarPlan_2_Acquire(const car_plan_2_cluster_t *clusters,
 void CarPlan_2_Reset(void)
 {
     CarPlan_2_ClearResult(&s_car_plan_2_result);
+    s_car_plan_2_debug_cluster_count = 0U;
     s_car_plan_2_lock.valid = 0U;
     s_car_plan_2_lock.previous_valid = 0U;
     s_car_plan_2_lock.lost_ticks = 0U;
@@ -534,6 +537,12 @@ uint8 CarPlan_2_Update(car_plan_2_result_t *result)
     uint8 cluster_count = CarPlan_2_BuildClusters(clusters);
     uint8 selected_index = 0xFFU;
     uint8 i;
+
+    s_car_plan_2_debug_cluster_count = cluster_count;
+    for(i = 0U; i < cluster_count; i++)
+    {
+        s_car_plan_2_debug_clusters[i] = clusters[i];
+    }
 
     if(s_car_plan_2_lock.valid == 0U)
     {
@@ -723,4 +732,78 @@ uint8 CarPlan_2_Update(car_plan_2_result_t *result)
 void CarPlan_2_GetResult(car_plan_2_result_t *result)
 {
     CarPlan_2_CopyResult(result);
+}
+
+/**
+ * @brief 获取最近一次三摄融合信标和当前选定目标的调试快照。
+ * @param debug 输出调试快照；允许传入空指针。
+ * @return 无。
+ */
+void CarPlan_2_GetDebug(car_plan_2_debug_t *debug)
+{
+    uint8 output_count;
+    uint8 selected_index = 0xFFU;
+    uint8 i;
+
+    if(debug == 0)
+    {
+        return;
+    }
+
+    for(i = 0U; i < CAR_PLAN_2_DEBUG_BEACON_COUNT; i++)
+    {
+        debug->beacon[i].valid = 0U;
+        debug->beacon[i].camera_mask = 0U;
+        debug->beacon[i].center_x = IMAGE_DATA_INVALID_VALUE;
+        debug->beacon[i].center_y = IMAGE_DATA_INVALID_VALUE;
+        debug->beacon[i].area = 0.0f;
+    }
+    debug->selected_target_id = -1;
+
+    if(s_car_plan_2_result.valid != 0U)
+    {
+        float best_dist_sq = 0.000001f;
+        for(i = 0U; i < s_car_plan_2_debug_cluster_count; i++)
+        {
+            float dx = s_car_plan_2_debug_clusters[i].center_x -
+                       s_car_plan_2_result.target_center_x;
+            float dy = s_car_plan_2_debug_clusters[i].center_y -
+                       s_car_plan_2_result.target_center_y;
+            float dist_sq = dx * dx + dy * dy;
+            if(dist_sq < best_dist_sq)
+            {
+                best_dist_sq = dist_sq;
+                selected_index = i;
+            }
+        }
+    }
+
+    output_count = s_car_plan_2_debug_cluster_count;
+    if(output_count > CAR_PLAN_2_DEBUG_BEACON_COUNT)
+    {
+        output_count = CAR_PLAN_2_DEBUG_BEACON_COUNT;
+    }
+    for(i = 0U; i < output_count; i++)
+    {
+        debug->beacon[i].valid = 1U;
+        debug->beacon[i].camera_mask = s_car_plan_2_debug_clusters[i].camera_mask;
+        debug->beacon[i].center_x = s_car_plan_2_debug_clusters[i].center_x;
+        debug->beacon[i].center_y = s_car_plan_2_debug_clusters[i].center_y;
+        debug->beacon[i].area = s_car_plan_2_debug_clusters[i].max_area;
+    }
+
+    if(selected_index < CAR_PLAN_2_DEBUG_BEACON_COUNT)
+    {
+        debug->selected_target_id = (int8)selected_index;
+    }
+    else if(selected_index != 0xFFU)
+    {
+        i = CAR_PLAN_2_DEBUG_BEACON_COUNT - 1U;
+        debug->beacon[i].valid = 1U;
+        debug->beacon[i].camera_mask = s_car_plan_2_debug_clusters[selected_index].camera_mask;
+        debug->beacon[i].center_x = s_car_plan_2_debug_clusters[selected_index].center_x;
+        debug->beacon[i].center_y = s_car_plan_2_debug_clusters[selected_index].center_y;
+        debug->beacon[i].area = s_car_plan_2_debug_clusters[selected_index].max_area;
+        debug->selected_target_id = (int8)i;
+    }
 }

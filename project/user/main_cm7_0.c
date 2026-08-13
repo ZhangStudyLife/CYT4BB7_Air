@@ -2,6 +2,7 @@
 #include "../code/FlightController/fc_mode.h"
 #include "../code/Image/image_data.h"
 #include "../code/Planner/beacon_lost_detector.h"
+#include "../code/Planner/CameraModel.h"
 #include "../code/Planner/car_lamp_fused.h"
 #include "../code/Planner/car_plan_2.h"
 #include "../code/Estimation/Pos_Est/FlowGyroDecoupler_LC302.h"
@@ -41,247 +42,164 @@ float g_car_large_turn_state = 0.0f; /* 车端大角度状态机(经SPI data[7])
 static car_plan_result_t s_air_run_car_plan;
 static uint8 s_air_run_car_plan_valid = 0U;
 
-#define MODE12_WIFI_DEBUG_PERIOD_MS      (5U)
+#define CAR_PLAN_DEBUG_PERIOD_MS          (5U)  /* 规划调试JustFloat发送周期，单位ms。 */
+#define CAR_PLAN_DEBUG_FLOAT_COUNT        (69U) /* 规划调试JustFloat用户float数量。 */
 
 typedef struct
 {
-    float data[42];
+    float data[CAR_PLAN_DEBUG_FLOAT_COUNT];
 } CarPlanWifiJustFloatPacket;
 
 _Static_assert(sizeof(CarPlanWifiJustFloatPacket) ==
-                   (42U * sizeof(float)),
+                   (CAR_PLAN_DEBUG_FLOAT_COUNT * sizeof(float)),
                "JustFloat packet layout error");
 
-#if 0
-static uint32 mode12_debug_state_pack(void)
-{
-    uint32 state = (uint32)FC_START_CRSF_Get_Flight_Mode() |
-                   ((uint32)FC_START_CRSF_Get_State() << 4U);
-    uint32 lamp_mask = 0U;
-
-    if (image_data_car_lamp_valid(&image_data[Front].car_lamp_data[0]) != 0U)
-    {
-        lamp_mask |= 1U;
-    }
-    if (image_data_car_lamp_valid(&image_data[Center].car_lamp_data[0]) != 0U)
-    {
-        lamp_mask |= 2U;
-    }
-    if (image_data_car_lamp_valid(&image_data[Back].car_lamp_data[0]) != 0U)
-    {
-        lamp_mask |= 4U;
-    }
-    if (g_car_lamp_fused.valid != 0U)
-    {
-        state |= 1UL << 7U;
-    }
-    if (g_tof_fused_valid != 0U)
-    {
-        state |= 1UL << 8U;
-    }
-    if ((g_car_sync_time_ms > 0.0f) &&
-        ((tick_1000us_cnt - g_car_last_update_time_ms) < FC_MODE_CAR_RUN_DATA_TIMEOUT_MS))
-    {
-        state |= 1UL << 9U;
-    }
-
-    return state | (lamp_mask << 10U);
-}
-
-static uint32 mode12_debug_yaw_pack(const yaw_align_debug_t *debug)
-{
-    uint32 camera = (debug->active_beacon.valid != 0U)
-                        ? (uint32)debug->active_beacon.camera
-                        : 3U;
-
-    return ((uint32)debug->action & 0x7U) |
-           ((camera & 0x3U) << 3U) |
-           (((uint32)debug->locked & 0x1U) << 5U) |
-           (((uint32)debug->candidate_frames & 0x1FU) << 6U) |
-           (((uint32)debug->lost_frames & 0x1FU) << 11U);
-}
-
-static void mode12_wifi_debug_legacy_200hz(void)
+/**
+ * @brief 以200Hz组装并发送车模规划调试JustFloat数据。
+ * @param 无。
+ * @return 无。
+ */
+static void car_plan_debug_200hz(void)
 {
     static uint32 last_tick_ms = 0U;
-    FC_START_CRSF_flight_mode_e mode = FC_START_CRSF_Get_Flight_Mode();
-    yaw_align_debug_t yaw_debug;
-    car_plan_2_result_t plan2_dbg;
-    float cmd_ang_deg = 0.0f;
-    float dir_cmd_deg = 0.0f;
     uint32 tick_now = tick_1000us_cnt;
+    CarPlanWifiJustFloatPacket packet;
+    car_plan_2_debug_t plan_debug;
+    float *data = packet.data;
+    uint8 camera;
+    uint8 beacon;
+    uint8 index = 0U;
 
-    if ((FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING) ||
-        ((mode != FC_START_CRSF_FLIGHT_MODE_1) &&
-         (mode != FC_START_CRSF_FLIGHT_MODE_2)))
-    {
-        last_tick_ms = tick_now;
-        return;
-    }
-    if ((tick_now - last_tick_ms) < MODE12_WIFI_DEBUG_PERIOD_MS)
+    if ((tick_now - last_tick_ms) < CAR_PLAN_DEBUG_PERIOD_MS)
     {
         return;
     }
     last_tick_ms = tick_now;
-    YawAlign_GetDebug(&yaw_debug);
-    CarPlan_2_GetResult(&plan2_dbg);
-    if ((s_air_run_car_plan_valid != 0U) &&
-        ((fabsf(s_air_run_car_plan.target_strafe_mps) > 0.01f) ||
-         (fabsf(s_air_run_car_plan.target_forward_mps) > 0.01f)))
+    CarPlan_2_GetDebug(&plan_debug);
+
+    /* I1-I30: Front/Center/Back，各两个信标(x,y,area)和一个车灯(x,y,angle,length)。 */
+    for (camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
     {
-        /* 车端控制律: yaw目标 = 车yaw + atan2(strafe, forward)，飞机可据此预判车旋转方向 */
-        cmd_ang_deg = atan2f(s_air_run_car_plan.target_strafe_mps,
-                             s_air_run_car_plan.target_forward_mps) * 57.29577951f;
-        dir_cmd_deg = g_car_yaw + cmd_ang_deg;
-        while (dir_cmd_deg > 180.0f)
+        for (beacon = 0U; beacon < 2U; beacon++)
         {
-            dir_cmd_deg -= 360.0f;
-        }
-        while (dir_cmd_deg < -180.0f)
-        {
-            dir_cmd_deg += 360.0f;
-        }
-    }
-
-    (void)wifi_justfloat(
-        (float)MODE12_WIFI_RECORD_DYNAMIC,                  /* I1 记录类型 */
-        (float)mode12_debug_state_pack(),                   /* I2 状态位 */
-        (float)g_mode2_control_seq,                         /* I3 100Hz控制序号 */
-        (float)g_image_data_seq,                            /* I4 图像序号 */
-        g_car_sync_time_ms,                                 /* I5 车端时间戳 */
-        g_euler.roll, g_euler.pitch, g_euler.yaw,           /* I6-I8 实际欧拉角 */
-        roll_angle_target, pitch_angle_target, yaw_angle_target, /* I9-I11 目标欧拉角 */
-        g_tof_fused_height_mm,                              /* I12 融合高度 */
-        g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy,
-        g_imufilter_1000hz.gyroz,                           /* I13-I15 实际角速度 */
-        roll_gyro_target, pitch_gyro_target, yaw_gyro_target, /* I16-I18 目标角速度 */
-        (float)g_motor_cmd.roll, (float)g_motor_cmd.pitch,
-        (float)g_motor_cmd.yaw,                             /* I19-I21 电机控制量 */
-        g_car_lamp_fused.cx, g_car_lamp_fused.cy,
-        g_car_lamp_fused.angle,                             /* I22-I24 融合车灯坐标及角度 */
-        g_mode2_imgx_pid.error, g_mode2_imgy_pid.error,     /* I25-I26 图像误差 */
-        g_mode2_img_error_rate_x_pxps,
-        g_mode2_img_error_rate_y_pxps,                      /* I27-I28 滤波误差变化率 */
-        g_car_vel_x, g_car_vel_y,                           /* I29-I30 实际车速 */
-        g_car_vel_target_x, g_car_vel_target_y,             /* I31-I32 目标车速 */
-        g_mode2_car_vel_error_x_mps,
-        g_mode2_car_vel_error_y_mps,                        /* I33-I34 滤波车速误差 */
-        g_mode2_car_body_accel_x_mps2,
-        g_mode2_car_body_accel_y_mps2,                      /* I35-I36 旋转前车体加速度 */
-        g_mode2_car_turn_accel_mps2,                        /* I37 滤波向心加速度 */
-        g_car_yaw, g_car_yaw_rate_dps,                      /* I38-I39 车Yaw及角速度 */
-        g_mode2_yaw_diff_deg,                               /* I40 控制航向差 */
-        g_mode2_raw_roll_correction_deg,
-        g_mode2_raw_pitch_correction_deg,                   /* I41-I42 限幅前修正角 */
-        yaw_debug.active_beacon.x, yaw_debug.active_beacon.y,
-        yaw_debug.active_beacon.area,                       /* I43-I45 Yaw使用信标 */
-        yaw_debug.yaw_delta_deg,                            /* I46 Yaw目标增量 */
-        (float)mode12_debug_yaw_pack(&yaw_debug),           /* I47 Yaw状态 */
-        (float)s_air_run_car_plan_valid,                    /* I48 实际下发plan有效 */
-        s_air_run_car_plan.target_strafe_mps,               /* I49 实际下发横移速度m/s */
-        s_air_run_car_plan.target_forward_mps,              /* I50 实际下发前进速度m/s */
-        (float)plan2_dbg.camera_mask,                       /* I51 plan2目标相机mask 1前2中4后 */
-        plan2_dbg.target_center_x,                          /* I52 plan2目标信标x px */
-        plan2_dbg.target_center_y,                          /* I53 plan2目标信标y px */
-        (float)plan2_dbg.valid,                             /* I54 plan2结果有效 */
-        cmd_ang_deg,                                        /* I55 指令方向角(车身系)deg */
-        dir_cmd_deg,                                        /* I56 预测车航向(世界系)deg */
-        g_car_yaw_target_deg,                               /* I57 车端yaw目标(经SPI)deg */
-        g_car_large_turn_state);                            /* I58 车端大角度状态 0正常1刹车2原地转3退出 */
-}
-#endif
-
-static void mode12_wifi_debug_200hz(void)
-{
-    static uint32 last_tick_ms = 0U;
-    FC_START_CRSF_flight_mode_e mode = FC_START_CRSF_Get_Flight_Mode();
-    uint32 tick_now = tick_1000us_cnt;
-
-    if ((FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING) ||
-        ((mode != FC_START_CRSF_FLIGHT_MODE_1) &&
-         (mode != FC_START_CRSF_FLIGHT_MODE_2)))
-    {
-        last_tick_ms = tick_now;
-        return;
-    }
-    if ((tick_now - last_tick_ms) < MODE12_WIFI_DEBUG_PERIOD_MS)
-    {
-        return;
-    }
-    last_tick_ms = tick_now;
-
-    {
-        CarPlanWifiJustFloatPacket packet;
-        float *data = packet.data;
-        uint8 camera;
-        uint8 beacon;
-        uint8 index = 0U;
-
-        for (camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
-        {
-            for (beacon = 0U; beacon < 2U; beacon++)
+            const beacon_data *item = &image_data[camera].beacon_data[beacon];
+            if (image_data_beacon_valid(item) != 0U)
             {
-                const beacon_data *item = &image_data[camera].beacon_data[beacon];
-                if ((item->valid != 0U) && (item->x > -900.0f) &&
-                    (item->y > -900.0f) && (item->area > 0.0f))
-                {
-                    data[index++] = item->x;
-                    data[index++] = item->y;
-                    data[index++] = item->area;
-                }
-                else
-                {
-                    data[index++] = -999.0f;
-                    data[index++] = -999.0f;
-                    data[index++] = 0.0f;
-                }
+                data[index++] = item->x;
+                data[index++] = item->y;
+                data[index++] = item->area;
+            }
+            else
+            {
+                data[index++] = IMAGE_DATA_INVALID_VALUE;
+                data[index++] = IMAGE_DATA_INVALID_VALUE;
+                data[index++] = 0.0f;
             }
         }
 
-        for (camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
         {
             const car_lamp_data *item = &image_data[camera].car_lamp_data[0];
-            if ((item->valid != 0U) && (item->cx > -900.0f) &&
-                (item->cy > -900.0f) && (item->angle > -900.0f) &&
-                (item->width > 0.0f) && (item->length > 0.0f))
+            if ((image_data_car_lamp_valid(item) != 0U) && (item->length > 0.0f))
             {
                 data[index++] = item->cx;
                 data[index++] = item->cy;
                 data[index++] = item->angle;
-                data[index++] = item->width;
                 data[index++] = item->length;
             }
             else
             {
-                data[index++] = -999.0f;
-                data[index++] = -999.0f;
-                data[index++] = -999.0f;
-                data[index++] = 0.0f;
+                data[index++] = IMAGE_DATA_INVALID_VALUE;
+                data[index++] = IMAGE_DATA_INVALID_VALUE;
+                data[index++] = IMAGE_DATA_INVALID_VALUE;
                 data[index++] = 0.0f;
             }
         }
-
-        data[index++] = g_euler.pitch;
-        data[index++] = g_euler.roll;
-        data[index++] = g_euler.yaw;
-        data[index++] = (float)tick_now;
-        data[index++] = 0.0f;
-        data[index++] = g_car_vel_y;
-        data[index++] = g_car_yaw;
-        data[index++] = (s_air_run_car_plan_valid != 0U) ?
-                            s_air_run_car_plan.target_forward_mps : 0.0f;
-        data[index++] = (s_air_run_car_plan_valid != 0U) ?
-                            s_air_run_car_plan.target_strafe_mps : 0.0f;
-
-        (void)wifi_justfloat(
-            data[0], data[1], data[2], data[3], data[4], data[5],
-            data[6], data[7], data[8], data[9], data[10], data[11],
-            data[12], data[13], data[14], data[15], data[16], data[17],
-            data[18], data[19], data[20], data[21], data[22], data[23],
-            data[24], data[25], data[26], data[27], data[28], data[29],
-            data[30], data[31], data[32], data[33], data[34], data[35],
-            data[36], data[37], data[38], data[39], data[40], data[41]);
     }
+
+    /* I31-I42: 三个Center融合信标(x,y,area,camera_mask)。 */
+    for (beacon = 0U; beacon < CAR_PLAN_2_DEBUG_BEACON_COUNT; beacon++)
+    {
+        const car_plan_2_debug_beacon_t *item = &plan_debug.beacon[beacon];
+        data[index++] = item->center_x;
+        data[index++] = item->center_y;
+        data[index++] = item->area;
+        data[index++] = (float)item->camera_mask;
+    }
+    /* I43-I46: Center融合车灯(x,y,angle,length)。 */
+    if (g_car_lamp_fused.valid != 0U)
+    {
+        data[index++] = g_car_lamp_fused.cx;
+        data[index++] = g_car_lamp_fused.cy;
+        data[index++] = g_car_lamp_fused.angle;
+        data[index++] = g_car_lamp_fused.length;
+    }
+    else
+    {
+        data[index++] = IMAGE_DATA_INVALID_VALUE;
+        data[index++] = IMAGE_DATA_INVALID_VALUE;
+        data[index++] = IMAGE_DATA_INVALID_VALUE;
+        data[index++] = 0.0f;
+    }
+
+    /* I47-I55: 三个CameraModel信标(x,y,area)。 */
+    for (beacon = 0U; beacon < CAR_PLAN_2_DEBUG_BEACON_COUNT; beacon++)
+    {
+        const car_plan_2_debug_beacon_t *item = &plan_debug.beacon[beacon];
+        if (item->valid != 0U)
+        {
+            CameraModel_MapPoint(item->center_x, item->center_y,
+                                 g_euler.roll, g_euler.pitch,
+                                 &data[index], &data[index + 1U]);
+            index += 2U;
+            data[index++] = item->area;
+        }
+        else
+        {
+            data[index++] = IMAGE_DATA_INVALID_VALUE;
+            data[index++] = IMAGE_DATA_INVALID_VALUE;
+            data[index++] = 0.0f;
+        }
+    }
+
+    /* I56-I59: CameraModel车灯(x,y,angle,length)。 */
+    if (g_car_lamp_fused.valid != 0U)
+    {
+        float angle_rad = g_car_lamp_fused.angle * 0.017453292519943295f;
+        float model_vx;
+        float model_vy;
+        CameraModel_MapPoint(g_car_lamp_fused.cx, g_car_lamp_fused.cy,
+                             g_euler.roll, g_euler.pitch,
+                             &data[index], &data[index + 1U]);
+        index += 2U;
+        CameraModel_MapVector(g_car_lamp_fused.cx, g_car_lamp_fused.cy,
+                              cosf(angle_rad), sinf(angle_rad),
+                              g_euler.roll, g_euler.pitch,
+                              &model_vx, &model_vy);
+        data[index++] = atan2f(model_vy, model_vx) * 57.29577951308232f;
+        data[index++] = g_car_lamp_fused.length *
+                        sqrtf(model_vx * model_vx + model_vy * model_vy);
+    }
+    else
+    {
+        data[index++] = IMAGE_DATA_INVALID_VALUE;
+        data[index++] = IMAGE_DATA_INVALID_VALUE;
+        data[index++] = IMAGE_DATA_INVALID_VALUE;
+        data[index++] = 0.0f;
+    }
+
+    /* I60-I69: 车状态、飞机状态和当前融合信标槽位。 */
+    data[index++] = g_car_yaw;
+    data[index++] = g_car_vel_x;
+    data[index++] = g_car_vel_y;
+    data[index++] = g_car_vel_target_x;
+    data[index++] = g_car_vel_target_y;
+    data[index++] = g_tof_fused_height_mm;
+    data[index++] = g_euler.roll;
+    data[index++] = g_euler.pitch;
+    data[index++] = g_euler.yaw;
+    data[index++] = (float)plan_debug.selected_target_id;
+
+    (void)wifi_justfloat_Array(data, CAR_PLAN_DEBUG_FLOAT_COUNT);
 }
 
 /**
@@ -434,7 +352,7 @@ static void core0_run_fast_loop_step(void)
 
     FC_Loop_1000Hz();
     air_comm_air_poll();
-    mode12_wifi_debug_200hz();
+    car_plan_debug_200hz();
 }
 
 /**

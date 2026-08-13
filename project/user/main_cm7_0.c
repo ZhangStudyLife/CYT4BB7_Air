@@ -1,6 +1,6 @@
 #include "zf_common_headfile.h"
 #include "../code/FlightController/fc_mode.h"
-#include "../code/FlightController/yaw_align.h"
+#include "../code/Image/image_data.h"
 #include "../code/Planner/beacon_lost_detector.h"
 #include "../code/Planner/car_lamp_fused.h"
 #include "../code/Planner/car_plan_2.h"
@@ -41,9 +41,18 @@ float g_car_large_turn_state = 0.0f; /* 车端大角度状态机(经SPI data[7])
 static car_plan_result_t s_air_run_car_plan;
 static uint8 s_air_run_car_plan_valid = 0U;
 
-#define MODE12_WIFI_RECORD_DYNAMIC       (0U)
 #define MODE12_WIFI_DEBUG_PERIOD_MS      (5U)
 
+typedef struct
+{
+    float data[42];
+} CarPlanWifiJustFloatPacket;
+
+_Static_assert(sizeof(CarPlanWifiJustFloatPacket) ==
+                   (42U * sizeof(float)),
+               "JustFloat packet layout error");
+
+#if 0
 static uint32 mode12_debug_state_pack(void)
 {
     uint32 state = (uint32)FC_START_CRSF_Get_Flight_Mode() |
@@ -92,7 +101,7 @@ static uint32 mode12_debug_yaw_pack(const yaw_align_debug_t *debug)
            (((uint32)debug->lost_frames & 0x1FU) << 11U);
 }
 
-static void mode12_wifi_debug_200hz(void)
+static void mode12_wifi_debug_legacy_200hz(void)
 {
     static uint32 last_tick_ms = 0U;
     FC_START_CRSF_flight_mode_e mode = FC_START_CRSF_Get_Flight_Mode();
@@ -179,6 +188,100 @@ static void mode12_wifi_debug_200hz(void)
         dir_cmd_deg,                                        /* I56 预测车航向(世界系)deg */
         g_car_yaw_target_deg,                               /* I57 车端yaw目标(经SPI)deg */
         g_car_large_turn_state);                            /* I58 车端大角度状态 0正常1刹车2原地转3退出 */
+}
+#endif
+
+static void mode12_wifi_debug_200hz(void)
+{
+    static uint32 last_tick_ms = 0U;
+    FC_START_CRSF_flight_mode_e mode = FC_START_CRSF_Get_Flight_Mode();
+    uint32 tick_now = tick_1000us_cnt;
+
+    if ((FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING) ||
+        ((mode != FC_START_CRSF_FLIGHT_MODE_1) &&
+         (mode != FC_START_CRSF_FLIGHT_MODE_2)))
+    {
+        last_tick_ms = tick_now;
+        return;
+    }
+    if ((tick_now - last_tick_ms) < MODE12_WIFI_DEBUG_PERIOD_MS)
+    {
+        return;
+    }
+    last_tick_ms = tick_now;
+
+    {
+        CarPlanWifiJustFloatPacket packet;
+        float *data = packet.data;
+        uint8 camera;
+        uint8 beacon;
+        uint8 index = 0U;
+
+        for (camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
+        {
+            for (beacon = 0U; beacon < 2U; beacon++)
+            {
+                const beacon_data *item = &image_data[camera].beacon_data[beacon];
+                if ((item->valid != 0U) && (item->x > -900.0f) &&
+                    (item->y > -900.0f) && (item->area > 0.0f))
+                {
+                    data[index++] = item->x;
+                    data[index++] = item->y;
+                    data[index++] = item->area;
+                }
+                else
+                {
+                    data[index++] = -999.0f;
+                    data[index++] = -999.0f;
+                    data[index++] = 0.0f;
+                }
+            }
+        }
+
+        for (camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
+        {
+            const car_lamp_data *item = &image_data[camera].car_lamp_data[0];
+            if ((item->valid != 0U) && (item->cx > -900.0f) &&
+                (item->cy > -900.0f) && (item->angle > -900.0f) &&
+                (item->width > 0.0f) && (item->length > 0.0f))
+            {
+                data[index++] = item->cx;
+                data[index++] = item->cy;
+                data[index++] = item->angle;
+                data[index++] = item->width;
+                data[index++] = item->length;
+            }
+            else
+            {
+                data[index++] = -999.0f;
+                data[index++] = -999.0f;
+                data[index++] = -999.0f;
+                data[index++] = 0.0f;
+                data[index++] = 0.0f;
+            }
+        }
+
+        data[index++] = g_euler.pitch;
+        data[index++] = g_euler.roll;
+        data[index++] = g_euler.yaw;
+        data[index++] = (float)tick_now;
+        data[index++] = 0.0f;
+        data[index++] = g_car_vel_y;
+        data[index++] = g_car_yaw;
+        data[index++] = (s_air_run_car_plan_valid != 0U) ?
+                            s_air_run_car_plan.target_forward_mps : 0.0f;
+        data[index++] = (s_air_run_car_plan_valid != 0U) ?
+                            s_air_run_car_plan.target_strafe_mps : 0.0f;
+
+        (void)wifi_justfloat(
+            data[0], data[1], data[2], data[3], data[4], data[5],
+            data[6], data[7], data[8], data[9], data[10], data[11],
+            data[12], data[13], data[14], data[15], data[16], data[17],
+            data[18], data[19], data[20], data[21], data[22], data[23],
+            data[24], data[25], data[26], data[27], data[28], data[29],
+            data[30], data[31], data[32], data[33], data[34], data[35],
+            data[36], data[37], data[38], data[39], data[40], data[41]);
+    }
 }
 
 /**

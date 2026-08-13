@@ -15,6 +15,230 @@
     ((IMAGE_SCREEN_TICK_PERIOD_US + IMAGE_CORE1_TASK_PERIOD_US - 1U) / \
      IMAGE_CORE1_TASK_PERIOD_US)
 
+/* Air侧仅负责候选关联和输出槽位重排，不参与图像检测。 */
+#define AIR_BEACON0_MATCH_DISTANCE_SQ       (18.0f * 18.0f)
+#define AIR_BEACON0_NEW_TARGET_DISTANCE_SQ  (36.0f * 36.0f)
+#define AIR_BEACON0_SWITCH_AREA_RATIO       1.45f
+#define AIR_BEACON0_CONFIRM_FRAMES          2U
+#define AIR_BEACON0_MAX_MISSES              3U
+
+typedef struct
+{
+    uint8 active;
+    uint8 confirmed;
+    uint8 hits;
+    uint8 misses;
+    float x;
+    float y;
+    float vx;
+    float vy;
+    float area;
+} air_beacon0_track_t;
+
+static air_beacon0_track_t s_air_beacon0_track[IMAGE_CAMERA_COUNT];
+
+static float air_beacon0_distance_sq(float ax, float ay, float bx, float by)
+{
+    float dx = ax - bx;
+    float dy = ay - by;
+    return dx * dx + dy * dy;
+}
+
+static void air_beacon0_reset_track(air_beacon0_track_t *track)
+{
+    memset(track, 0, sizeof(*track));
+}
+
+static void air_beacon0_start_track(air_beacon0_track_t *track,
+                                    const beacon_data *beacon)
+{
+    air_beacon0_reset_track(track);
+    track->active = 1U;
+    track->hits = 1U;
+    track->x = beacon->x;
+    track->y = beacon->y;
+    track->area = beacon->area;
+}
+
+static int air_beacon0_nearest(const struct image_data *data,
+                               float x,
+                               float y)
+{
+    uint8 i;
+    int best = -1;
+    float best_distance = AIR_BEACON0_MATCH_DISTANCE_SQ;
+
+    for(i = 0U; i < IMAGE_MAX_BEACON_COUNT; i++)
+    {
+        const beacon_data *beacon = &data->beacon_data[i];
+        float distance;
+
+        if(image_data_beacon_valid(beacon) == 0U)
+        {
+            continue;
+        }
+        distance = air_beacon0_distance_sq(beacon->x, beacon->y, x, y);
+        if(distance <= best_distance)
+        {
+            best_distance = distance;
+            best = (int)i;
+        }
+    }
+    return best;
+}
+
+static void air_beacon0_output_track(struct image_data *data,
+                                     air_beacon0_track_t *track,
+                                     int matched)
+{
+    beacon_data output;
+    uint8 i;
+
+    output.valid = 1U;
+    output.x = track->x;
+    output.y = track->y;
+    output.area = track->area;
+
+    if(matched > 0)
+    {
+        /* 先移除关联候选，再把历史轨迹插入0号槽，保持其余候选相对顺序。 */
+        for(i = (uint8)matched; i + 1U < IMAGE_MAX_BEACON_COUNT; i++)
+        {
+            data->beacon_data[i] = data->beacon_data[i + 1U];
+        }
+        for(i = IMAGE_MAX_BEACON_COUNT - 1U; i > 0U; i--)
+        {
+            data->beacon_data[i] = data->beacon_data[i - 1U];
+        }
+        data->beacon_data[0] = output;
+    }
+    else
+    {
+        data->beacon_data[0] = output;
+    }
+}
+
+static void air_beacon0_stabilize_camera(struct image_data *data,
+                                         air_beacon0_track_t *track)
+{
+    int selected = -1;
+    uint8 i;
+
+    if(data == NULL || track == NULL)
+    {
+        return;
+    }
+
+    if(track->confirmed != 0U)
+    {
+        float predict_x = track->x + track->vx;
+        float predict_y = track->y + track->vy;
+        selected = air_beacon0_nearest(data, predict_x, predict_y);
+        if(selected > 0 &&
+           data->beacon_data[0].area >
+               data->beacon_data[selected].area * AIR_BEACON0_SWITCH_AREA_RATIO)
+        {
+            selected = 0;
+        }
+        if(selected < 0)
+        {
+            if(image_data_beacon_valid(&data->beacon_data[0]) != 0U &&
+               air_beacon0_distance_sq(predict_x, predict_y,
+                                       data->beacon_data[0].x,
+                                       data->beacon_data[0].y) >
+                   AIR_BEACON0_NEW_TARGET_DISTANCE_SQ)
+            {
+                air_beacon0_start_track(track, &data->beacon_data[0]);
+                return;
+            }
+        }
+    }
+    else
+    {
+        for(i = 0U; i < IMAGE_MAX_BEACON_COUNT; i++)
+        {
+            if(image_data_beacon_valid(&data->beacon_data[i]) != 0U)
+            {
+                selected = (int)i;
+                break;
+            }
+        }
+    }
+
+    if(selected < 0)
+    {
+        if(track->confirmed != 0U && track->misses < AIR_BEACON0_MAX_MISSES)
+        {
+            track->x += track->vx;
+            track->y += track->vy;
+            track->misses++;
+            air_beacon0_output_track(data, track, -1);
+        }
+        else
+        {
+            air_beacon0_reset_track(track);
+        }
+        return;
+    }
+
+    {
+        beacon_data *measurement = &data->beacon_data[selected];
+        float old_x = track->x;
+        float old_y = track->y;
+
+        if(track->active == 0U)
+        {
+            air_beacon0_start_track(track, measurement);
+            return;
+        }
+        if(air_beacon0_distance_sq(track->x + track->vx,
+                                   track->y + track->vy,
+                                   measurement->x,
+                                   measurement->y) >
+           AIR_BEACON0_NEW_TARGET_DISTANCE_SQ)
+        {
+            air_beacon0_start_track(track, measurement);
+            return;
+        }
+
+        track->vx = 0.70f * track->vx + 0.30f * (measurement->x - old_x);
+        track->vy = 0.70f * track->vy + 0.30f * (measurement->y - old_y);
+        track->x = 0.65f * measurement->x + 0.35f * (track->x + track->vx);
+        track->y = 0.65f * measurement->y + 0.35f * (track->y + track->vy);
+        track->area = measurement->area;
+        track->misses = 0U;
+        if(track->confirmed == 0U)
+        {
+            if(track->hits < 255U)
+            {
+                track->hits++;
+            }
+            if(track->hits >= AIR_BEACON0_CONFIRM_FRAMES)
+            {
+                track->confirmed = 1U;
+            }
+        }
+        if(track->confirmed != 0U)
+        {
+            air_beacon0_output_track(data, track, selected);
+        }
+    }
+}
+
+static void air_beacon0_stabilize(uint8 fresh_mask)
+{
+    uint8 camera;
+
+    for(camera = Front; camera < IMAGE_CAMERA_COUNT; camera++)
+    {
+        if((fresh_mask & (uint8)(1U << camera)) != 0U)
+        {
+            air_beacon0_stabilize_camera(&image_data[camera],
+                                         &s_air_beacon0_track[camera]);
+        }
+    }
+}
+
 volatile uint8 g_image_tick_100hz = 0U;
 volatile uint32 g_image_core1_tick_generated;
 volatile uint32 g_image_core1_tick_overflow_count;
@@ -95,6 +319,7 @@ static uint8 Get_Image_data(uint8 *fresh_mask)
         camera_spi_fresh_mask |= (uint8)(1U << Center);
         changed_mask |= (uint8)(1U << Center);
     }
+    air_beacon0_stabilize((uint8)(camera_spi_fresh_mask | changed_mask));
     if(fresh_mask != NULL)
     {
         *fresh_mask = camera_spi_fresh_mask;

@@ -1,5 +1,6 @@
 #include "zf_common_headfile.h"
 #include "../code/FlightController/fc_mode.h"
+#include "../code/FlightController/yaw_align.h"
 #include "../code/Image/image_data.h"
 #include "../code/Planner/beacon_lost_detector.h"
 #include "../code/Planner/car_lamp_fused.h"
@@ -45,12 +46,76 @@ static uint8 s_air_run_car_plan_valid = 0U;
 
 typedef struct
 {
-    float data[42];
-} CarPlanWifiJustFloatPacket;
+    car_plan_2_debug_t plan;
+    float lamp_xy[IMAGE_CAMERA_COUNT][2];
+    float beacon_xy[IMAGE_CAMERA_COUNT][2][2];
+    uint8 lamp_valid_mask;
+    uint8 beacon_valid_mask;
+} mode12_plan_debug_snapshot_t;
 
-_Static_assert(sizeof(CarPlanWifiJustFloatPacket) ==
-                   (42U * sizeof(float)),
-               "JustFloat packet layout error");
+static mode12_plan_debug_snapshot_t s_mode12_plan_debug;
+
+static void mode12_plan_debug_capture_100hz(void)
+{
+    uint8 camera;
+    uint8 beacon;
+
+    CarPlan_2_GetDebug(&s_mode12_plan_debug.plan);
+    s_mode12_plan_debug.lamp_valid_mask = 0U;
+    s_mode12_plan_debug.beacon_valid_mask = 0U;
+    for(camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
+    {
+        s_mode12_plan_debug.lamp_xy[camera][0] = image_data[camera].car_lamp_data[0].cx;
+        s_mode12_plan_debug.lamp_xy[camera][1] = image_data[camera].car_lamp_data[0].cy;
+        if(image_data_car_lamp_valid(&image_data[camera].car_lamp_data[0]) != 0U)
+        {
+            s_mode12_plan_debug.lamp_valid_mask |= (uint8)(1U << camera);
+        }
+        for(beacon = 0U; beacon < 2U; beacon++)
+        {
+            s_mode12_plan_debug.beacon_xy[camera][beacon][0] =
+                image_data[camera].beacon_data[beacon].x;
+            s_mode12_plan_debug.beacon_xy[camera][beacon][1] =
+                image_data[camera].beacon_data[beacon].y;
+            if(image_data_beacon_valid(&image_data[camera].beacon_data[beacon]) != 0U)
+            {
+                s_mode12_plan_debug.beacon_valid_mask |=
+                    (uint8)(1U << (camera * 2U + beacon));
+            }
+        }
+    }
+}
+
+static uint32 mode12_plan_state_pack(void)
+{
+    uint32 state = (uint32)FC_START_CRSF_Get_Flight_Mode() |
+                   ((uint32)FC_START_CRSF_Get_State() << 4U);
+    uint32 lamp_mask = 0U;
+
+    if(image_data_car_lamp_valid(&image_data[Front].car_lamp_data[0]) != 0U) lamp_mask |= 1U;
+    if(image_data_car_lamp_valid(&image_data[Center].car_lamp_data[0]) != 0U) lamp_mask |= 2U;
+    if(image_data_car_lamp_valid(&image_data[Back].car_lamp_data[0]) != 0U) lamp_mask |= 4U;
+    if(g_car_lamp_fused.valid != 0U) state |= 1UL << 7U;
+    if(g_tof_fused_valid != 0U) state |= 1UL << 8U;
+    if((g_car_sync_time_ms > 0.0f) &&
+       ((tick_1000us_cnt - g_car_last_update_time_ms) < FC_MODE_CAR_RUN_DATA_TIMEOUT_MS))
+    {
+        state |= 1UL << 9U;
+    }
+    return state | (lamp_mask << 10U);
+}
+
+static uint32 mode12_plan_yaw_pack(const yaw_align_debug_t *debug)
+{
+    uint32 camera = (debug->active_beacon.valid != 0U)
+                        ? (uint32)debug->active_beacon.camera
+                        : 3U;
+    return ((uint32)debug->action & 0x7U) |
+           ((camera & 0x3U) << 3U) |
+           (((uint32)debug->locked & 0x1U) << 5U) |
+           (((uint32)debug->candidate_frames & 0x1FU) << 6U) |
+           (((uint32)debug->lost_frames & 0x1FU) << 11U);
+}
 
 #if 0
 static uint32 mode12_debug_state_pack(void)
@@ -195,6 +260,8 @@ static void mode12_wifi_debug_200hz(void)
 {
     static uint32 last_tick_ms = 0U;
     FC_START_CRSF_flight_mode_e mode = FC_START_CRSF_Get_Flight_Mode();
+    yaw_align_debug_t yaw_debug;
+    const car_plan_2_debug_t *plan_debug = &s_mode12_plan_debug.plan;
     uint32 tick_now = tick_1000us_cnt;
 
     if ((FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING) ||
@@ -209,79 +276,38 @@ static void mode12_wifi_debug_200hz(void)
         return;
     }
     last_tick_ms = tick_now;
+    YawAlign_GetDebug(&yaw_debug);
 
-    {
-        CarPlanWifiJustFloatPacket packet;
-        float *data = packet.data;
-        uint8 camera;
-        uint8 beacon;
-        uint8 index = 0U;
-
-        for (camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
-        {
-            for (beacon = 0U; beacon < 2U; beacon++)
-            {
-                const beacon_data *item = &image_data[camera].beacon_data[beacon];
-                if ((item->valid != 0U) && (item->x > -900.0f) &&
-                    (item->y > -900.0f) && (item->area > 0.0f))
-                {
-                    data[index++] = item->x;
-                    data[index++] = item->y;
-                    data[index++] = item->area;
-                }
-                else
-                {
-                    data[index++] = -999.0f;
-                    data[index++] = -999.0f;
-                    data[index++] = 0.0f;
-                }
-            }
-        }
-
-        for (camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
-        {
-            const car_lamp_data *item = &image_data[camera].car_lamp_data[0];
-            if ((item->valid != 0U) && (item->cx > -900.0f) &&
-                (item->cy > -900.0f) && (item->angle > -900.0f) &&
-                (item->width > 0.0f) && (item->length > 0.0f))
-            {
-                data[index++] = item->cx;
-                data[index++] = item->cy;
-                data[index++] = item->angle;
-                data[index++] = item->width;
-                data[index++] = item->length;
-            }
-            else
-            {
-                data[index++] = -999.0f;
-                data[index++] = -999.0f;
-                data[index++] = -999.0f;
-                data[index++] = 0.0f;
-                data[index++] = 0.0f;
-            }
-        }
-
-        data[index++] = g_euler.pitch;
-        data[index++] = g_euler.roll;
-        data[index++] = g_euler.yaw;
-        data[index++] = (float)tick_now;
-        data[index++] = 0.0f;
-        data[index++] = g_car_vel_y;
-        data[index++] = g_car_yaw;
-        data[index++] = (s_air_run_car_plan_valid != 0U) ?
-                            s_air_run_car_plan.target_forward_mps : 0.0f;
-        data[index++] = (s_air_run_car_plan_valid != 0U) ?
-                            s_air_run_car_plan.target_strafe_mps : 0.0f;
-
-        (void)wifi_justfloat(
-            data[0], data[1], data[2], data[3], data[4], data[5],
-            data[6], data[7], data[8], data[9], data[10], data[11],
-            data[12], data[13], data[14], data[15], data[16], data[17],
-            data[18], data[19], data[20], data[21], data[22], data[23],
-            data[24], data[25], data[26], data[27], data[28], data[29],
-            data[30], data[31], data[32], data[33], data[34], data[35],
-            data[36], data[37], data[38], data[39], data[40], data[41]);
-    }
+    (void)wifi_justfloat(
+        0.0f, (float)tick_now, (float)mode12_plan_state_pack(),
+        (float)mode12_plan_yaw_pack(&yaw_debug),
+        (float)plan_debug->reason, (float)plan_debug->lock_valid,
+        (float)plan_debug->lock_camera_mask, (float)plan_debug->lock_source_mask,
+        (float)plan_debug->previous_lock_source_mask,
+        (float)plan_debug->matched_source_mask,
+        (float)plan_debug->velocity_challenger_source_mask,
+        (float)plan_debug->nearer_source_mask, (float)plan_debug->lock_changed,
+        (float)plan_debug->lock_change_count, (float)plan_debug->lost_ticks,
+        (float)plan_debug->velocity_conflict_ticks,
+        (float)plan_debug->nearer_target_ticks, (float)plan_debug->cluster_count,
+        plan_debug->lock_center_x, plan_debug->lock_center_y,
+        plan_debug->predicted_x, plan_debug->predicted_y,
+        plan_debug->locked_velocity_cos, plan_debug->target_strafe_mps,
+        plan_debug->target_forward_mps, g_car_vel_x, g_car_vel_y,
+        (float)g_car_lamp_fused.valid, g_car_lamp_fused.cx, g_car_lamp_fused.cy,
+        s_mode12_plan_debug.lamp_xy[Front][0], s_mode12_plan_debug.lamp_xy[Front][1],
+        s_mode12_plan_debug.lamp_xy[Center][0], s_mode12_plan_debug.lamp_xy[Center][1],
+        s_mode12_plan_debug.lamp_xy[Back][0], s_mode12_plan_debug.lamp_xy[Back][1],
+        s_mode12_plan_debug.beacon_xy[Front][0][0], s_mode12_plan_debug.beacon_xy[Front][0][1],
+        s_mode12_plan_debug.beacon_xy[Front][1][0], s_mode12_plan_debug.beacon_xy[Front][1][1],
+        s_mode12_plan_debug.beacon_xy[Center][0][0], s_mode12_plan_debug.beacon_xy[Center][0][1],
+        s_mode12_plan_debug.beacon_xy[Center][1][0], s_mode12_plan_debug.beacon_xy[Center][1][1],
+        s_mode12_plan_debug.beacon_xy[Back][0][0], s_mode12_plan_debug.beacon_xy[Back][0][1],
+        s_mode12_plan_debug.beacon_xy[Back][1][0], s_mode12_plan_debug.beacon_xy[Back][1][1],
+        (float)s_mode12_plan_debug.lamp_valid_mask,
+        (float)s_mode12_plan_debug.beacon_valid_mask,
+        (float)plan_debug->failure_reason, (float)plan_debug->lock_change_reason,
+        (float)CRSF_STD[8]);
 }
 
 /**
@@ -512,6 +538,7 @@ static void core0_plan_update_100hz(void)
     {
         (void)CarPlan_Update(&car_plan);
         (void)CarPlan_2_Update(&car_plan_2);
+        mode12_plan_debug_capture_100hz();
         if ((FC_START_CRSF_Get_Flight_Mode() == FC_START_CRSF_FLIGHT_MODE_1) ||
             (Car_Plan_Mode >= 1.5f))
         {

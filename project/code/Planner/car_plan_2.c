@@ -6,6 +6,7 @@
 #include "../Image/image_data.h"
 #include "../Estimation/Attitude/IMU_TOP.h"
 #include <math.h>
+#include <string.h>
 
 #define CAR_PLAN_2_CAMERA_COUNT                  (3U)    /* 参与影子规划的摄像头数量。 */
 #define CAR_PLAN_2_BEACON_COUNT_PER_CAMERA       (2U)    /* 每个摄像头参与规划的信标候选数量。 */
@@ -40,6 +41,7 @@ typedef struct
 {
     uint8 camera;
     uint8 group;
+    uint8 source_bit;
     float center_x;
     float center_y;
     float area;
@@ -49,6 +51,7 @@ typedef struct
 {
     uint8 group;
     uint8 camera_mask;
+    uint8 source_mask;
     float center_x;
     float center_y;
     float max_area;
@@ -72,6 +75,8 @@ static float CarPlan_2_ModelDistanceSq(float x1, float y1, float x2, float y2)
 typedef struct
 {
     uint8 valid;
+    uint8 camera_mask;
+    uint8 source_mask;
     uint8 previous_valid;
     uint8 lost_ticks;
     uint8 velocity_conflict_ticks;
@@ -89,6 +94,7 @@ extern float g_car_sync_time_ms; /* 最近一次车端同步时间戳，单位ms
 
 static car_plan_2_result_t s_car_plan_2_result; /* 最近一次影子规划输出。 */
 static car_plan_2_lock_t s_car_plan_2_lock; /* 物理信标锁定位置、历史位置和计数状态。 */
+static car_plan_2_debug_t s_car_plan_2_debug; /* 最新规划状态和切换原因快照。 */
 
 /**
  * @brief 清零指定影子规划结果。
@@ -189,6 +195,8 @@ static uint8 CarPlan_2_BuildClusters(car_plan_2_cluster_t clusters[CAR_PLAN_2_MA
 
             candidates[candidate_count].camera = camera;
             candidates[candidate_count].group = candidate_count;
+            candidates[candidate_count].source_bit =
+                (uint8)(1U << (camera * CAR_PLAN_2_BEACON_COUNT_PER_CAMERA + beacon_index));
             candidates[candidate_count].area = beacon->area;
             CarPlan_2_MapPointToCenter(camera,
                                        beacon->x,
@@ -243,6 +251,7 @@ static uint8 CarPlan_2_BuildClusters(car_plan_2_cluster_t clusters[CAR_PLAN_2_MA
             cluster_index = cluster_count;
             clusters[cluster_index].group = candidates[i].group;
             clusters[cluster_index].camera_mask = 0U;
+            clusters[cluster_index].source_mask = 0U;
             clusters[cluster_index].center_x = 0.0f;
             clusters[cluster_index].center_y = 0.0f;
             clusters[cluster_index].max_area = 0.0f;
@@ -251,6 +260,7 @@ static uint8 CarPlan_2_BuildClusters(car_plan_2_cluster_t clusters[CAR_PLAN_2_MA
         }
 
         clusters[cluster_index].camera_mask |= (uint8)(1U << candidates[i].camera);
+        clusters[cluster_index].source_mask |= candidates[i].source_bit;
         clusters[cluster_index].center_x += candidates[i].center_x * candidates[i].area;
         clusters[cluster_index].center_y += candidates[i].center_y * candidates[i].area;
         clusters[cluster_index].area_sum += candidates[i].area;
@@ -294,6 +304,7 @@ static uint8 CarPlan_2_MakeResult(const car_plan_2_cluster_t *cluster,
 
     if(g_car_lamp_fused.valid == 0U)
     {
+        s_car_plan_2_debug.failure_reason = CAR_PLAN_2_DEBUG_REASON_INVALID_LAMP;
         return 0U;
     }
 
@@ -303,6 +314,7 @@ static uint8 CarPlan_2_MakeResult(const car_plan_2_cluster_t *cluster,
                                             cluster->center_x, cluster->center_y);
     if(distance_sq <= CAR_PLAN_2_MIN_TARGET_DIST_MODEL_SQ)
     {
+        s_car_plan_2_debug.failure_reason = CAR_PLAN_2_DEBUG_REASON_TARGET_TOO_CLOSE;
         return 0U;
     }
 
@@ -382,6 +394,7 @@ static uint8 CarPlan_2_MakeResult(const car_plan_2_cluster_t *cluster,
     result->target_forward_mps = forward * speed_scale;
     result->target_center_x = cluster->center_x;
     result->target_center_y = cluster->center_y;
+    s_car_plan_2_debug.failure_reason = 0U;
     return 1U;
 }
 
@@ -413,7 +426,15 @@ static float CarPlan_2_VelocityCos(const car_plan_2_result_t *result)
 static void CarPlan_2_LockCluster(const car_plan_2_cluster_t *cluster,
                                   const car_plan_2_result_t *result)
 {
+    uint8 changed = (s_car_plan_2_lock.valid == 0U) ||
+                    (s_car_plan_2_lock.source_mask != cluster->source_mask);
+    if(changed != 0U)
+    {
+        s_car_plan_2_debug.previous_lock_source_mask = s_car_plan_2_lock.source_mask;
+    }
     s_car_plan_2_lock.valid = 1U;
+    s_car_plan_2_lock.camera_mask = cluster->camera_mask;
+    s_car_plan_2_lock.source_mask = cluster->source_mask;
     s_car_plan_2_lock.center_x = cluster->center_x;
     s_car_plan_2_lock.center_y = cluster->center_y;
     s_car_plan_2_lock.previous_valid = 0U;
@@ -421,6 +442,18 @@ static void CarPlan_2_LockCluster(const car_plan_2_cluster_t *cluster,
     s_car_plan_2_lock.velocity_conflict_ticks = 0U;
     s_car_plan_2_lock.nearer_target_ticks = 0U;
     s_car_plan_2_result = *result;
+    s_car_plan_2_debug.lock_valid = 1U;
+    s_car_plan_2_debug.lock_camera_mask = cluster->camera_mask;
+    s_car_plan_2_debug.lock_source_mask = cluster->source_mask;
+    s_car_plan_2_debug.lock_changed = changed;
+    if(changed != 0U)
+    {
+        s_car_plan_2_debug.lock_change_count++;
+    }
+    s_car_plan_2_debug.lock_center_x = cluster->center_x;
+    s_car_plan_2_debug.lock_center_y = cluster->center_y;
+    s_car_plan_2_debug.target_strafe_mps = result->target_strafe_mps;
+    s_car_plan_2_debug.target_forward_mps = result->target_forward_mps;
 }
 
 /**
@@ -496,10 +529,21 @@ static uint8 CarPlan_2_Acquire(const car_plan_2_cluster_t *clusters,
        (CarPlan_2_MakeResult(&clusters[selected_index], &result) == 0U))
     {
         CarPlan_2_ClearResult(&s_car_plan_2_result);
+        s_car_plan_2_debug.lock_valid = 0U;
+        s_car_plan_2_debug.reason = (g_car_lamp_fused.valid == 0U)
+                                      ? CAR_PLAN_2_DEBUG_REASON_INVALID_LAMP
+                                      : CAR_PLAN_2_DEBUG_REASON_NO_TARGET;
+        if(g_car_lamp_fused.valid == 0U)
+        {
+            s_car_plan_2_debug.failure_reason = CAR_PLAN_2_DEBUG_REASON_INVALID_LAMP;
+        }
+        s_car_plan_2_debug.target_strafe_mps = 0.0f;
+        s_car_plan_2_debug.target_forward_mps = 0.0f;
         return 0U;
     }
 
     CarPlan_2_LockCluster(&clusters[selected_index], &result);
+    s_car_plan_2_debug.reason = CAR_PLAN_2_DEBUG_REASON_ACQUIRE;
     return 1U;
 }
 
@@ -520,6 +564,10 @@ void CarPlan_2_Reset(void)
     s_car_plan_2_lock.center_y = 0.0f;
     s_car_plan_2_lock.previous_x = 0.0f;
     s_car_plan_2_lock.previous_y = 0.0f;
+    s_car_plan_2_lock.camera_mask = 0U;
+    s_car_plan_2_lock.source_mask = 0U;
+    memset(&s_car_plan_2_debug, 0, sizeof(s_car_plan_2_debug));
+    s_car_plan_2_debug.reason = CAR_PLAN_2_DEBUG_REASON_IDLE;
 }
 
 /**
@@ -533,11 +581,33 @@ uint8 CarPlan_2_Update(car_plan_2_result_t *result)
     car_plan_2_result_t candidate_result;
     uint8 cluster_count = CarPlan_2_BuildClusters(clusters);
     uint8 selected_index = 0xFFU;
+    uint8 expired_source_mask = 0U;
     uint8 i;
+
+    s_car_plan_2_debug.lock_changed = 0U;
+    s_car_plan_2_debug.lock_change_reason = 0U;
+    s_car_plan_2_debug.matched_source_mask = 0U;
+    s_car_plan_2_debug.velocity_challenger_source_mask = 0U;
+    s_car_plan_2_debug.nearer_source_mask = 0U;
+    s_car_plan_2_debug.lock_valid = s_car_plan_2_lock.valid;
+    s_car_plan_2_debug.lock_camera_mask = s_car_plan_2_lock.camera_mask;
+    s_car_plan_2_debug.lock_source_mask = s_car_plan_2_lock.source_mask;
+    s_car_plan_2_debug.lost_ticks = s_car_plan_2_lock.lost_ticks;
+    s_car_plan_2_debug.velocity_conflict_ticks = s_car_plan_2_lock.velocity_conflict_ticks;
+    s_car_plan_2_debug.nearer_target_ticks = s_car_plan_2_lock.nearer_target_ticks;
+    s_car_plan_2_debug.cluster_count = cluster_count;
+    s_car_plan_2_debug.failure_reason = 0U;
+    s_car_plan_2_debug.locked_velocity_cos = -2.0f;
+    s_car_plan_2_debug.target_strafe_mps = s_car_plan_2_result.target_strafe_mps;
+    s_car_plan_2_debug.target_forward_mps = s_car_plan_2_result.target_forward_mps;
 
     if(s_car_plan_2_lock.valid == 0U)
     {
-        (void)CarPlan_2_Acquire(clusters, cluster_count);
+        s_car_plan_2_debug.reason = CAR_PLAN_2_DEBUG_REASON_ACQUIRE;
+        if(CarPlan_2_Acquire(clusters, cluster_count) != 0U)
+        {
+            s_car_plan_2_debug.lock_change_reason = CAR_PLAN_2_DEBUG_REASON_ACQUIRE;
+        }
         CarPlan_2_CopyResult(result);
         return s_car_plan_2_result.valid;
     }
@@ -557,6 +627,8 @@ uint8 CarPlan_2_Update(car_plan_2_result_t *result)
             predict_x += step_x;
             predict_y += step_y;
         }
+        s_car_plan_2_debug.predicted_x = predict_x;
+        s_car_plan_2_debug.predicted_y = predict_y;
 
         for(i = 0U; i < cluster_count; i++)
         {
@@ -586,6 +658,9 @@ uint8 CarPlan_2_Update(car_plan_2_result_t *result)
         float locked_dist_sq = CarPlan_2_ModelDistanceSq(car_center_x, car_center_y,
                                                          clusters[selected_index].center_x,
                                                          clusters[selected_index].center_y);
+
+        s_car_plan_2_debug.matched_source_mask = clusters[selected_index].source_mask;
+        s_car_plan_2_debug.locked_velocity_cos = locked_velocity_cos;
 
         /* 每个替代目标同时检查严重逆速纠错和明显近灯抢占。 */
         for(i = 0U; i < cluster_count; i++)
@@ -648,12 +723,16 @@ uint8 CarPlan_2_Update(car_plan_2_result_t *result)
 
         if(challenger_index != 0xFFU)
         {
+            s_car_plan_2_debug.velocity_challenger_source_mask =
+                clusters[challenger_index].source_mask;
             if(s_car_plan_2_lock.velocity_conflict_ticks < CAR_PLAN_2_VELOCITY_CONFLICT_TICKS)
             {
                 s_car_plan_2_lock.velocity_conflict_ticks++;
             }
             if(s_car_plan_2_lock.velocity_conflict_ticks >= CAR_PLAN_2_VELOCITY_CONFLICT_TICKS)
             {
+                s_car_plan_2_debug.reason = CAR_PLAN_2_DEBUG_REASON_SWITCH_VELOCITY;
+                s_car_plan_2_debug.lock_change_reason = CAR_PLAN_2_DEBUG_REASON_SWITCH_VELOCITY;
                 CarPlan_2_MakeResult(&clusters[challenger_index], &candidate_result);
                 CarPlan_2_LockCluster(&clusters[challenger_index], &candidate_result);
                 CarPlan_2_CopyResult(result);
@@ -667,12 +746,15 @@ uint8 CarPlan_2_Update(car_plan_2_result_t *result)
 
         if(nearer_index != 0xFFU)
         {
+            s_car_plan_2_debug.nearer_source_mask = clusters[nearer_index].source_mask;
             if(s_car_plan_2_lock.nearer_target_ticks < nearer_ticks_required)
             {
                 s_car_plan_2_lock.nearer_target_ticks++;
             }
             if(s_car_plan_2_lock.nearer_target_ticks >= nearer_ticks_required)
             {
+                s_car_plan_2_debug.reason = CAR_PLAN_2_DEBUG_REASON_SWITCH_NEARER;
+                s_car_plan_2_debug.lock_change_reason = CAR_PLAN_2_DEBUG_REASON_SWITCH_NEARER;
                 CarPlan_2_MakeResult(&clusters[nearer_index], &candidate_result);
                 CarPlan_2_LockCluster(&clusters[nearer_index], &candidate_result);
                 CarPlan_2_CopyResult(result);
@@ -687,29 +769,70 @@ uint8 CarPlan_2_Update(car_plan_2_result_t *result)
         s_car_plan_2_lock.previous_x = s_car_plan_2_lock.center_x;
         s_car_plan_2_lock.previous_y = s_car_plan_2_lock.center_y;
         s_car_plan_2_lock.previous_valid = 1U;
+        if(s_car_plan_2_lock.source_mask != clusters[selected_index].source_mask)
+        {
+            s_car_plan_2_debug.previous_lock_source_mask = s_car_plan_2_lock.source_mask;
+            s_car_plan_2_debug.lock_changed = 1U;
+            s_car_plan_2_debug.lock_change_reason = CAR_PLAN_2_DEBUG_REASON_TRACK;
+            s_car_plan_2_debug.lock_change_count++;
+        }
+        s_car_plan_2_lock.camera_mask = clusters[selected_index].camera_mask;
+        s_car_plan_2_lock.source_mask = clusters[selected_index].source_mask;
         s_car_plan_2_lock.center_x = clusters[selected_index].center_x;
         s_car_plan_2_lock.center_y = clusters[selected_index].center_y;
         s_car_plan_2_lock.lost_ticks = 0U;
 
         s_car_plan_2_result = candidate_result;
+        s_car_plan_2_debug.lock_camera_mask = clusters[selected_index].camera_mask;
+        s_car_plan_2_debug.lock_source_mask = clusters[selected_index].source_mask;
+        s_car_plan_2_debug.lock_center_x = clusters[selected_index].center_x;
+        s_car_plan_2_debug.lock_center_y = clusters[selected_index].center_y;
+        s_car_plan_2_debug.target_strafe_mps = candidate_result.target_strafe_mps;
+        s_car_plan_2_debug.target_forward_mps = candidate_result.target_forward_mps;
+        if(challenger_index != 0xFFU)
+        {
+            s_car_plan_2_debug.reason = CAR_PLAN_2_DEBUG_REASON_VELOCITY_PENDING;
+        }
+        else if(nearer_index != 0xFFU)
+        {
+            s_car_plan_2_debug.reason = CAR_PLAN_2_DEBUG_REASON_NEARER_PENDING;
+        }
+        else
+        {
+            s_car_plan_2_debug.reason = CAR_PLAN_2_DEBUG_REASON_TRACK;
+        }
         CarPlan_2_CopyResult(result);
         return 1U;
     }
 
     s_car_plan_2_lock.velocity_conflict_ticks = 0U;
     s_car_plan_2_lock.nearer_target_ticks = 0U;
+    if(s_car_plan_2_debug.failure_reason == 0U)
+    {
+        s_car_plan_2_debug.failure_reason = CAR_PLAN_2_DEBUG_REASON_LOCK_NO_MATCH;
+    }
     if(s_car_plan_2_lock.lost_ticks < CAR_PLAN_2_LOST_HOLD_TICKS)
     {
         s_car_plan_2_lock.lost_ticks++;
+        s_car_plan_2_debug.reason = CAR_PLAN_2_DEBUG_REASON_LOST_HOLD;
         CarPlan_2_CopyResult(result);
         return s_car_plan_2_result.valid;
     }
 
+    expired_source_mask = s_car_plan_2_lock.source_mask;
     s_car_plan_2_lock.valid = 0U;
+    s_car_plan_2_lock.camera_mask = 0U;
+    s_car_plan_2_lock.source_mask = 0U;
     s_car_plan_2_lock.previous_valid = 0U;
     s_car_plan_2_lock.lost_ticks = 0U;
     CarPlan_2_ClearResult(&s_car_plan_2_result);
-    (void)CarPlan_2_Acquire(clusters, cluster_count);
+    s_car_plan_2_debug.reason = CAR_PLAN_2_DEBUG_REASON_REACQUIRE;
+    if(CarPlan_2_Acquire(clusters, cluster_count) != 0U)
+    {
+        s_car_plan_2_debug.previous_lock_source_mask = expired_source_mask;
+        s_car_plan_2_debug.reason = CAR_PLAN_2_DEBUG_REASON_REACQUIRE;
+        s_car_plan_2_debug.lock_change_reason = CAR_PLAN_2_DEBUG_REASON_REACQUIRE;
+    }
 
     CarPlan_2_CopyResult(result);
     return s_car_plan_2_result.valid;
@@ -723,4 +846,18 @@ uint8 CarPlan_2_Update(car_plan_2_result_t *result)
 void CarPlan_2_GetResult(car_plan_2_result_t *result)
 {
     CarPlan_2_CopyResult(result);
+}
+
+void CarPlan_2_GetDebug(car_plan_2_debug_t *debug)
+{
+    if(debug != 0)
+    {
+        *debug = s_car_plan_2_debug;
+        debug->lock_valid = s_car_plan_2_lock.valid;
+        debug->lock_camera_mask = s_car_plan_2_lock.camera_mask;
+        debug->lock_source_mask = s_car_plan_2_lock.source_mask;
+        debug->lost_ticks = s_car_plan_2_lock.lost_ticks;
+        debug->velocity_conflict_ticks = s_car_plan_2_lock.velocity_conflict_ticks;
+        debug->nearer_target_ticks = s_car_plan_2_lock.nearer_target_ticks;
+    }
 }

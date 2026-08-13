@@ -43,7 +43,7 @@ static car_plan_result_t s_air_run_car_plan;
 static uint8 s_air_run_car_plan_valid = 0U;
 
 #define CAR_PLAN_DEBUG_PERIOD_MS          (5U)  /* 规划调试JustFloat发送周期，单位ms。 */
-#define CAR_PLAN_DEBUG_FLOAT_COUNT        (69U) /* 规划调试JustFloat用户float数量。 */
+#define CAR_PLAN_DEBUG_FLOAT_COUNT        (70U) /* 规划调试JustFloat用户float数量。 */
 
 typedef struct
 {
@@ -65,6 +65,7 @@ static void car_plan_debug_200hz(void)
     uint32 tick_now = tick_1000us_cnt;
     CarPlanWifiJustFloatPacket packet;
     car_plan_2_debug_t plan_debug;
+    car_plan_2_result_t plan_result;
     float *data = packet.data;
     uint8 camera;
     uint8 beacon;
@@ -76,6 +77,7 @@ static void car_plan_debug_200hz(void)
     }
     last_tick_ms = tick_now;
     CarPlan_2_GetDebug(&plan_debug);
+    CarPlan_2_GetResult(&plan_result);
 
     /* I1-I30: Front/Center/Back，各两个信标(x,y,area)和一个车灯(x,y,angle,length)。 */
     for (camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
@@ -187,17 +189,18 @@ static void car_plan_debug_200hz(void)
         data[index++] = 0.0f;
     }
 
-    /* I60-I69: 车状态、飞机状态和当前融合信标槽位。 */
+    /* I60-I70: 车状态、CarPlan2规划速度、飞机状态、当前融合信标槽位和关键片段标记。 */
     data[index++] = g_car_yaw;
     data[index++] = g_car_vel_x;
     data[index++] = g_car_vel_y;
-    data[index++] = g_car_vel_target_x;
-    data[index++] = g_car_vel_target_y;
+    data[index++] = (plan_result.valid != 0U) ? plan_result.target_strafe_mps : 0.0f;
+    data[index++] = (plan_result.valid != 0U) ? plan_result.target_forward_mps : 0.0f;
     data[index++] = g_tof_fused_height_mm;
     data[index++] = g_euler.roll;
     data[index++] = g_euler.pitch;
     data[index++] = g_euler.yaw;
     data[index++] = (float)plan_debug.selected_target_id;
+    data[index++] = (CRSF_STD[8] > 0) ? 1.0f : 0.0f;
 
     (void)wifi_justfloat_Array(data, CAR_PLAN_DEBUG_FLOAT_COUNT);
 }

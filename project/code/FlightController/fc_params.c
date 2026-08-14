@@ -112,10 +112,16 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->vel_z_i_limit = 700.0f;
     params->vel_z_d_lpf = 0.0f;
 
-    /* ===== 模式 1 跟杆前馈与刹车参数 ===== */
-    params->mode1_track_ff_deg_per_cmps = 0.06f;
-    params->mode1_brake_kp = 0.18f;
-    params->mode1_brake_exit_vel_cmps = 10.0f;
+    /* ===== 模式 1 直接图像 PD 与角度前馈参数 ===== */
+    params->mode1_img_kp = 0.28f;
+    params->mode1_img_kd = 0.18f;
+    params->mode1_img_d_lpf_hz = 1.0f;
+    params->mode1_car_vel_error_lpf_hz = 1.3f;
+    params->mode1_car_accel_gain_pos = 5.8f;
+    params->mode1_car_accel_gain_neg = 5.8f;
+    params->mode1_car_accel_ff = 4.0f;
+    params->mode1_car_turn_accel_ff = 3.4f;
+    params->mode1_car_turn_accel_lpf_hz = 2.9f;
 
     /* ===== 位置估计参数 ===== */
     params->pos_est_k_flow = 0.5f;
@@ -165,67 +171,27 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode3_turn_accel_ff_limit_x_deg = 18.0f;
     params->mode3_turn_accel_ff_limit_y_deg = 14.0f;
 
-    /* ===== 模式 4 图像、速度与转弯前馈参数 ===== */
-    params->mode4_img_x_kp = 2.0f;
-    params->mode4_img_x_kp2 = 1.0f;
-    params->mode4_img_x_ki = 0.0f;
-    params->mode4_img_x_kd = 0.7f;
-    params->mode4_img_x_kff = 0.0f;
-    params->mode4_img_x_i_limit = 0.0f;
-    params->mode4_img_x_d_lpf = 1.5f;
-    params->mode4_img_y_kp = 2.0f;
-    params->mode4_img_y_kp2 = 1.0f;
-    params->mode4_img_y_ki = 0.0f;
-    params->mode4_img_y_kd = 0.7f;
-    params->mode4_img_y_kff = 0.0f;
-    params->mode4_img_y_i_limit = 0.0f;
-    params->mode4_img_y_d_lpf = 1.5f;
-    params->mode4_vel_x_kp = 0.2f;
-    params->mode4_vel_x_ki = 0.0f;
-    params->mode4_vel_x_kd = 0.0f;
-    params->mode4_vel_x_kff = 0.0f;
-    params->mode4_vel_x_i_limit = 3.0f;
-    params->mode4_vel_x_d_lpf = 10.0f;
-    params->mode4_vel_y_kp = 0.2f;
-    params->mode4_vel_y_ki = 0.0f;
-    params->mode4_vel_y_kd = 0.0f;
-    params->mode4_vel_y_kff = 0.0f;
-    params->mode4_vel_y_i_limit = 3.0f;
-    params->mode4_vel_y_d_lpf = 10.0f;
-    params->mode4_kp_car_x = 60.0f;
-    params->mode4_kp_car_y = 75.0f;
-    params->mode4_turn_accel_ff_gain_x = 0.72f;
-    params->mode4_turn_accel_ff_gain_y = 0.30f;
-    params->mode4_turn_accel_ff_limit_x_deg = 18.0f;
-    params->mode4_turn_accel_ff_limit_y_deg = 14.0f;
+    /* ===== 模式 4 直接图像 PD 与角度前馈参数 ===== */
+    params->mode4_img_kp = 0.28f;
+    params->mode4_img_kd = 0.18f;
+    params->mode4_img_d_lpf_hz = 1.0f;
+    params->mode4_car_vel_error_lpf_hz = 1.3f;
+    params->mode4_car_accel_gain_pos = 5.8f;
+    params->mode4_car_accel_gain_neg = 5.8f;
+    params->mode4_car_accel_ff = 4.0f;
+    params->mode4_car_turn_accel_ff = 3.4f;
+    params->mode4_car_turn_accel_lpf_hz = 2.9f;
 
-    /* ===== Mode 5 image and velocity params ===== */
-    params->mode5_img_x_kp = 2.8f;
-    params->mode5_img_x_ki = 0.0f;
-    params->mode5_img_x_kd = 0.0f;
-    params->mode5_img_x_kff = 0.0f;
-    params->mode5_img_x_i_limit = 0.0f;
-    params->mode5_img_x_d_lpf = 0.0f;
-    params->mode5_img_y_kp = 2.2f;
-    params->mode5_img_y_ki = 0.0f;
-    params->mode5_img_y_kd = 0.0f;
-    params->mode5_img_y_kff = 0.0f;
-    params->mode5_img_y_i_limit = 0.0f;
-    params->mode5_img_y_d_lpf = 0.0f;
-    params->mode5_vel_x_kp = 0.2f;
-    params->mode5_vel_x_ki = 0.02f;
-    params->mode5_vel_x_kd = 0.0f;
-    params->mode5_vel_x_kff = 0.001f;
-    params->mode5_vel_x_i_limit = 3.0f;
-    params->mode5_vel_x_d_lpf = 10.0f;
-    params->mode5_vel_y_kp = 0.2f;
-    params->mode5_vel_y_ki = 0.02f;
-    params->mode5_vel_y_kd = 0.00f;
-    params->mode5_vel_y_kff = 0.001f;
-    params->mode5_vel_y_i_limit = 3.0f;
-    params->mode5_vel_y_d_lpf = 10.0f;
-    params->mode5_kp_car_x = 50.0f;
-    params->mode5_kp_car_y = 65.0f;
+    /* ===== 模式 5 直接图像 PD 与角度前馈参数 ===== */
+    params->mode5_img_kp = 0.28f;
+    params->mode5_img_kd = 0.18f;
+    params->mode5_img_d_lpf_hz = 1.0f;
+    params->mode5_car_vel_error_lpf_hz = 1.3f;
+    params->mode5_car_accel_gain_pos = 5.8f;
+    params->mode5_car_accel_gain_neg = 5.8f;
+    params->mode5_car_accel_ff = 4.0f;
+    params->mode5_car_turn_accel_ff = 3.4f;
+    params->mode5_car_turn_accel_lpf_hz = 2.9f;
 
     /* ===== 模式 7 速度环参数 ===== */
     params->mode7_vel_x_kp = 0.2f;
@@ -270,8 +236,8 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode8_kp_car_y = 65.0f;
 
     /* ===== 各模式航向对准开关 ===== */
-    params->yaw_change_mode1 = 1.0f;
-    params->yaw_change_mode2 = 1.0f;
+    params->yaw_change_mode1 = 0.0f;
+    params->yaw_change_mode2 = 0.0f;
     params->yaw_change_mode3 = 1.0f;
     params->yaw_change_mode4 = 0.0f;
     params->yaw_change_mode5 = 0.0f;

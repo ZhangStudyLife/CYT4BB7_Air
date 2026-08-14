@@ -99,10 +99,16 @@ typedef struct
     float vel_z_i_limit;
     float vel_z_d_lpf;       /* D 项低通截止频率，单位 Hz，0 表示旁路 */
 
-    /* ===== 模式 1 常调参数 ===== */
-    float mode1_track_ff_deg_per_cmps; /* 模式 1 跟杆前馈斜率，单位 deg/(cm/s) */
-    float mode1_brake_kp;              /* 模式 1 刹车阶段速度环 P 增益 */
-    float mode1_brake_exit_vel_cmps;   /* 模式 1 退出刹车的速度阈值，单位 cm/s */
+    /* ===== 模式 1 直接图像 PD 与角度前馈参数 ===== */
+    float mode1_img_kp;                     /* 模式1图像P增益，单位deg/px */
+    float mode1_img_kd;                     /* 模式1图像D增益，单位deg/(px/s) */
+    float mode1_img_d_lpf_hz;               /* 模式1图像D项低通截止频率，单位Hz */
+    float mode1_car_vel_error_lpf_hz;       /* 模式1车速误差低通截止频率，单位Hz */
+    float mode1_car_accel_gain_pos;         /* 模式1正向车速误差加速度增益 */
+    float mode1_car_accel_gain_neg;         /* 模式1负向车速误差加速度增益 */
+    float mode1_car_accel_ff;               /* 模式1车加速度角度前馈，单位deg/(m/s^2) */
+    float mode1_car_turn_accel_ff;          /* 模式1向心加速度角度前馈，单位deg/(m/s^2) */
+    float mode1_car_turn_accel_lpf_hz;      /* 模式1向心加速度低通截止频率，单位Hz */
 
     /* ===== 位置估计参数 ===== */
     float pos_est_k_flow;              /* 光流速度融合权重，范围 0~1 */
@@ -120,42 +126,25 @@ typedef struct
     float mode8_img_y_i_limit;         /* 模式8图像Y位置环积分限幅 */
     float mode8_img_y_d_lpf;           /* 模式8图像Y位置环D项低通截止频率，单位Hz */
     /* ===== 模式 2 直接图像 PD 与角度前馈参数 ===== */
-    float mode2_img_kp;                     /* 模式1/2图像P增益，单位 deg/px */
-    float mode2_img_kd;                     /* 模式1/2图像D增益，单位 deg/(px/s) */
-    float mode2_img_d_lpf_hz;               /* 模式1/2图像D项低通截止频率，单位 Hz */
-    float mode2_car_vel_error_lpf_hz;       /* 模式1/2车速误差低通截止频率，单位 Hz */
-    float mode2_car_accel_gain_pos;         /* 模式1/2正向车速误差加速度增益 */
-    float mode2_car_accel_gain_neg;         /* 模式1/2负向车速误差加速度增益 */
-    float mode2_car_accel_ff;               /* 模式1/2车加速度前馈，单位 deg/(m/s^2) */
-    float mode2_car_turn_accel_ff;          /* 模式1/2向心加速度前馈，单位 deg/(m/s^2) */
-    float mode2_car_turn_accel_lpf_hz;      /* 模式1/2向心加速度低通截止频率，单位 Hz */
-    /* ===== Mode 5 image and velocity params ===== */
-    float mode5_img_x_kp;
-    float mode5_img_x_ki;
-    float mode5_img_x_kd;
-    float mode5_img_x_kff;
-    float mode5_img_x_i_limit;
-    float mode5_img_x_d_lpf;
-    float mode5_img_y_kp;
-    float mode5_img_y_ki;
-    float mode5_img_y_kd;
-    float mode5_img_y_kff;
-    float mode5_img_y_i_limit;
-    float mode5_img_y_d_lpf;
-    float mode5_vel_x_kp;
-    float mode5_vel_x_ki;
-    float mode5_vel_x_kd;
-    float mode5_vel_x_kff;
-    float mode5_vel_x_i_limit;
-    float mode5_vel_x_d_lpf;
-    float mode5_vel_y_kp;
-    float mode5_vel_y_ki;
-    float mode5_vel_y_kd;
-    float mode5_vel_y_kff;
-    float mode5_vel_y_i_limit;
-    float mode5_vel_y_d_lpf;
-    float mode5_kp_car_x;
-    float mode5_kp_car_y;
+    float mode2_img_kp;                     /* 模式2图像P增益，单位deg/px */
+    float mode2_img_kd;                     /* 模式2图像D增益，单位deg/(px/s) */
+    float mode2_img_d_lpf_hz;               /* 模式2图像D项低通截止频率，单位Hz */
+    float mode2_car_vel_error_lpf_hz;       /* 模式2车速误差低通截止频率，单位Hz */
+    float mode2_car_accel_gain_pos;         /* 模式2正向车速误差加速度增益 */
+    float mode2_car_accel_gain_neg;         /* 模式2负向车速误差加速度增益 */
+    float mode2_car_accel_ff;               /* 模式2车加速度角度前馈，单位deg/(m/s^2) */
+    float mode2_car_turn_accel_ff;          /* 模式2向心加速度角度前馈，单位deg/(m/s^2) */
+    float mode2_car_turn_accel_lpf_hz;      /* 模式2向心加速度低通截止频率，单位Hz */
+    /* ===== 模式 5 直接图像 PD 与角度前馈参数 ===== */
+    float mode5_img_kp;                     /* 模式5图像P增益，单位deg/px */
+    float mode5_img_kd;                     /* 模式5图像D增益，单位deg/(px/s) */
+    float mode5_img_d_lpf_hz;               /* 模式5图像D项低通截止频率，单位Hz */
+    float mode5_car_vel_error_lpf_hz;       /* 模式5车速误差低通截止频率，单位Hz */
+    float mode5_car_accel_gain_pos;         /* 模式5正向车速误差加速度增益 */
+    float mode5_car_accel_gain_neg;         /* 模式5负向车速误差加速度增益 */
+    float mode5_car_accel_ff;               /* 模式5车加速度角度前馈，单位deg/(m/s^2) */
+    float mode5_car_turn_accel_ff;          /* 模式5向心加速度角度前馈，单位deg/(m/s^2) */
+    float mode5_car_turn_accel_lpf_hz;      /* 模式5向心加速度低通截止频率，单位Hz */
     float mode8_vel_x_kp;
     float mode8_vel_x_ki;
     float mode8_vel_x_kd;
@@ -170,39 +159,16 @@ typedef struct
     float mode8_vel_y_d_lpf;
     float mode8_kp_car_x;
     float mode8_kp_car_y;
-    /* ===== Mode 4 image, velocity and turn feedforward params ===== */
-    float mode4_img_x_kp;
-    float mode4_img_x_kp2;
-    float mode4_img_x_ki;
-    float mode4_img_x_kd;
-    float mode4_img_x_kff;
-    float mode4_img_x_i_limit;
-    float mode4_img_x_d_lpf;
-    float mode4_img_y_kp;
-    float mode4_img_y_kp2;
-    float mode4_img_y_ki;
-    float mode4_img_y_kd;
-    float mode4_img_y_kff;
-    float mode4_img_y_i_limit;
-    float mode4_img_y_d_lpf;
-    float mode4_vel_x_kp;
-    float mode4_vel_x_ki;
-    float mode4_vel_x_kd;
-    float mode4_vel_x_kff;
-    float mode4_vel_x_i_limit;
-    float mode4_vel_x_d_lpf;
-    float mode4_vel_y_kp;
-    float mode4_vel_y_ki;
-    float mode4_vel_y_kd;
-    float mode4_vel_y_kff;
-    float mode4_vel_y_i_limit;
-    float mode4_vel_y_d_lpf;
-    float mode4_kp_car_x;
-    float mode4_kp_car_y;
-    float mode4_turn_accel_ff_gain_x;
-    float mode4_turn_accel_ff_gain_y;
-    float mode4_turn_accel_ff_limit_x_deg;
-    float mode4_turn_accel_ff_limit_y_deg;
+    /* ===== 模式 4 直接图像 PD 与角度前馈参数 ===== */
+    float mode4_img_kp;                     /* 模式4图像P增益，单位deg/px */
+    float mode4_img_kd;                     /* 模式4图像D增益，单位deg/(px/s) */
+    float mode4_img_d_lpf_hz;               /* 模式4图像D项低通截止频率，单位Hz */
+    float mode4_car_vel_error_lpf_hz;       /* 模式4车速误差低通截止频率，单位Hz */
+    float mode4_car_accel_gain_pos;         /* 模式4正向车速误差加速度增益 */
+    float mode4_car_accel_gain_neg;         /* 模式4负向车速误差加速度增益 */
+    float mode4_car_accel_ff;               /* 模式4车加速度角度前馈，单位deg/(m/s^2) */
+    float mode4_car_turn_accel_ff;          /* 模式4向心加速度角度前馈，单位deg/(m/s^2) */
+    float mode4_car_turn_accel_lpf_hz;      /* 模式4向心加速度低通截止频率，单位Hz */
     /* ===== Mode 3 image, velocity and turn feedforward params ===== */
     float mode3_img_x_kp;
     float mode3_img_x_kp2;

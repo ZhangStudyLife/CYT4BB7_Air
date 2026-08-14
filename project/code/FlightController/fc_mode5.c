@@ -1,336 +1,285 @@
 #include "fc_mode.h"
 #include "yaw_align.h"
-#include "../Estimation/Pos_Est/Pos_Est.h"
 #include "../Estimation/Height_Est/Height_Est.h"
-#include "../Image/image_data.h"
-#include "../Planner/pix_to_distance.h"
-#include "../Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
+#include "../Planner/car_lamp_fused.h"
+#include "../Planner/ProjectionCenter.h"
 #include <math.h>
+
+static const float s_mode5_two_pi = 6.283185307179586f; /* 模式5角频率换算常量。 */
+static const float s_mode5_deg_to_rad = 0.017453292519943295f; /* 模式5角度转弧度系数。 */
+static const float s_mode5_angle_limit_deg = 30.0f; /* 模式5横向姿态目标限幅，单位deg。 */
 
 extern float g_car_vel_x;
 extern float g_car_vel_y;
+extern float g_car_vel_target_x;
+extern float g_car_vel_target_y;
 extern float g_car_yaw;
 extern float g_car_yaw_rate_dps;
 extern float g_car_sync_time_ms;
 extern uint32 g_car_last_update_time_ms;
 extern volatile uint32 tick_1000us_cnt;
 
-pid_t g_mode5_imgx_pid; /* 模式5图像X轴位置环PID状态，供控制与调试访问。 */
-pid_t g_mode5_imgy_pid; /* 模式5图像Y轴位置环PID状态，供控制与调试访问。 */
-pid_t g_mode5_velx_pid;
-pid_t g_mode5_vely_pid;
-float g_mode5_velx_target = 0.0f;
-float g_mode5_vely_target = 0.0f;
-float g_mode5_turn_accel_ff_gain_x = 0.72f; /* 模式5转弯加速度X轴前馈比例，用于直接调试。 */
-float g_mode5_turn_accel_ff_gain_y = 0.30f; /* 模式5转弯加速度Y轴前馈比例，用于直接调试。 */
-float g_mode5_turn_accel_ff_limit_x_deg = 18.0f; /* 模式5转弯加速度X轴前馈限幅，单位 deg。 */
-float g_mode5_turn_accel_ff_limit_y_deg = 14.0f; /* 模式5转弯加速度Y轴前馈限幅，单位 deg。 */
+pid_t g_mode5_imgx_pid; /* 模式5图像X轴PD状态，供控制与调试访问。 */
+pid_t g_mode5_imgy_pid; /* 模式5图像Y轴PD状态，供控制与调试访问。 */
+float g_mode5_car_accel_angle_ff_x_deg = 0.0f; /* 模式5车加速度Roll前馈，单位deg。 */
+float g_mode5_car_accel_angle_ff_y_deg = 0.0f; /* 模式5车加速度Pitch前馈，单位deg。 */
+float g_mode5_car_accel_x_mps2 = 0.0f; /* 模式5投影到飞机X轴的车加速度，单位m/s^2。 */
+float g_mode5_car_accel_y_mps2 = 0.0f; /* 模式5投影到飞机Y轴的车加速度，单位m/s^2。 */
+float g_mode5_raw_roll_correction_deg = 0.0f; /* 模式5限幅前Roll修正，单位deg。 */
+float g_mode5_raw_pitch_correction_deg = 0.0f; /* 模式5限幅前Pitch修正，单位deg。 */
+float g_mode5_img_error_rate_x_pxps = 0.0f; /* 模式5图像X误差变化率，单位px/s。 */
+float g_mode5_img_error_rate_y_pxps = 0.0f; /* 模式5图像Y误差变化率，单位px/s。 */
+float g_mode5_car_dt_ms = 0.0f; /* 模式5车端同步时间间隔，单位ms。 */
+float g_mode5_car_vel_error_x_mps = 0.0f; /* 模式5滤波后的车X速度误差，单位m/s。 */
+float g_mode5_car_vel_error_y_mps = 0.0f; /* 模式5滤波后的车Y速度误差，单位m/s。 */
+float g_mode5_car_body_accel_x_mps2 = 0.0f; /* 模式5车体系X加速度，单位m/s^2。 */
+float g_mode5_car_body_accel_y_mps2 = 0.0f; /* 模式5车体系Y加速度，单位m/s^2。 */
+float g_mode5_car_turn_accel_mps2 = 0.0f; /* 模式5滤波后的车转弯加速度，单位m/s^2。 */
+float g_mode5_yaw_diff_deg = 0.0f; /* 模式5车机航向差，单位deg。 */
+uint32 g_mode5_control_seq = 0U; /* 模式5控制更新序号。 */
 
-static float s_mode5_prev_velx_target = 0.0f;
-static float s_mode5_prev_vely_target = 0.0f;
-static float s_mode5_velx_ff_lpf = 0.0f;
-static float s_mode5_vely_ff_lpf = 0.0f;
+static float s_mode5_prev_img_error_x = 0.0f; /* 模式5上次图像X误差。 */
+static float s_mode5_prev_img_error_y = 0.0f; /* 模式5上次图像Y误差。 */
+static float s_mode5_prev_car_sync_time_ms = 0.0f; /* 模式5上次车端同步时间，单位ms。 */
+static uint8 s_mode5_image_initialized = 0U; /* 模式5图像微分历史有效标志。 */
 
+/*
+ * 函数名: FC_Mode5_Init
+ * 功能: 初始化模式5图像PD控制器并复位控制状态
+ * 输入参数: 无
+ * 返回值: 无
+ */
 void FC_Mode5_Init(void)
 {
-    PID_Init(&g_mode5_imgx_pid,
-             g_fc_params.mode5_img_x_kp, g_fc_params.mode5_img_x_ki, g_fc_params.mode5_img_x_kd,
-             g_fc_params.mode5_img_x_kff, g_fc_params.vel_xy_dt,
-             g_fc_params.mode5_img_x_i_limit, g_fc_params.mode5_img_x_d_lpf);
-    PID_Init(&g_mode5_imgy_pid,
-             g_fc_params.mode5_img_y_kp, g_fc_params.mode5_img_y_ki, g_fc_params.mode5_img_y_kd,
-             g_fc_params.mode5_img_y_kff, g_fc_params.vel_xy_dt,
-             g_fc_params.mode5_img_y_i_limit, g_fc_params.mode5_img_y_d_lpf);
-    PID_Init(&g_mode5_velx_pid,
-             g_fc_params.mode5_vel_x_kp, g_fc_params.mode5_vel_x_ki, g_fc_params.mode5_vel_x_kd,
-             0.0f, g_fc_params.vel_xy_dt,
-             g_fc_params.mode5_vel_x_i_limit, g_fc_params.mode5_vel_x_d_lpf);
-    PID_Init(&g_mode5_vely_pid,
-             g_fc_params.mode5_vel_y_kp, g_fc_params.mode5_vel_y_ki, g_fc_params.mode5_vel_y_kd,
-             0.0f, g_fc_params.vel_xy_dt,
-             g_fc_params.mode5_vel_y_i_limit, g_fc_params.mode5_vel_y_d_lpf);
-    g_mode5_velx_pid.aw_enable = 1U;
-    g_mode5_velx_pid.aw_gain = 0.15f;
-    g_mode5_vely_pid.aw_enable = 1U;
-    g_mode5_vely_pid.aw_gain = 0.15f;
+    PID_Init(&g_mode5_imgx_pid, g_fc_params.mode5_img_kp, 0.0f,
+             g_fc_params.mode5_img_kd, 0.0f, g_fc_params.vel_xy_dt,
+             0.0f, g_fc_params.mode5_img_d_lpf_hz);
+    PID_Init(&g_mode5_imgy_pid, g_fc_params.mode5_img_kp, 0.0f,
+             g_fc_params.mode5_img_kd, 0.0f, g_fc_params.vel_xy_dt,
+             0.0f, g_fc_params.mode5_img_d_lpf_hz);
     FC_Mode5_Reset();
 }
 
+/*
+ * 函数名: FC_Mode5_Reset
+ * 功能: 清空模式5图像、车速前馈和航向控制状态
+ * 输入参数: 无
+ * 返回值: 无
+ */
 void FC_Mode5_Reset(void)
 {
     Beep_SetAlarm(BEEP_ALARM_MODE5_LAMP_LOST, 0U);
     PID_Reset(&g_mode5_imgx_pid);
     PID_Reset(&g_mode5_imgy_pid);
-    PID_Reset(&g_mode5_velx_pid);
-    PID_Reset(&g_mode5_vely_pid);
-    g_mode5_velx_target = 0.0f;
-    g_mode5_vely_target = 0.0f;
-    s_mode5_prev_velx_target = 0.0f;
-    s_mode5_prev_vely_target = 0.0f;
-    s_mode5_velx_ff_lpf = 0.0f;
-    s_mode5_vely_ff_lpf = 0.0f;
-    YawAlign_Reset();
+    g_mode5_car_accel_angle_ff_x_deg = g_mode5_car_accel_angle_ff_y_deg = 0.0f;
+    g_mode5_car_accel_x_mps2 = g_mode5_car_accel_y_mps2 = 0.0f;
+    g_mode5_raw_roll_correction_deg = g_mode5_raw_pitch_correction_deg = 0.0f;
+    g_mode5_img_error_rate_x_pxps = g_mode5_img_error_rate_y_pxps = 0.0f;
+    g_mode5_car_dt_ms = 0.0f;
+    s_mode5_prev_img_error_x = s_mode5_prev_img_error_y = 0.0f;
+    s_mode5_prev_car_sync_time_ms = 0.0f;
+    g_mode5_car_vel_error_x_mps = g_mode5_car_vel_error_y_mps = 0.0f;
+    g_mode5_car_body_accel_x_mps2 = g_mode5_car_body_accel_y_mps2 = 0.0f;
+    g_mode5_car_turn_accel_mps2 = 0.0f;
+    g_mode5_yaw_diff_deg = 0.0f;
+    s_mode5_image_initialized = 0U;
     roll_angle_target = FC_Mode_Get_Roll_Mech_Trim_Deg();
     pitch_angle_target = FC_Mode_Get_Pitch_Mech_Trim_Deg();
-    yaw_angle_target = (g_fc_params.yaw_change_mode5 >= 0.5f) ? g_euler.yaw : 0.0f;
+    YawAlign_Reset();
+    yaw_angle_target = 0.0f;
 }
 
+/*
+ * 函数名: FC_Mode5_100Hz
+ * 功能: 根据模式5独立航向开关更新航向对准目标
+ * 输入参数: 无
+ * 返回值: 无
+ */
 void FC_Mode5_100Hz(void)
 {
-    if (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING)
+    if((FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING) &&
+       (g_fc_params.yaw_change_mode5 >= 0.5f))
     {
-        yaw_angle_target = 0.0f;
-        return;
-    }
-
-    // wifi_justfloat(g_car_vel_x, g_car_vel_y, g_car_yaw, g_car_yaw_rate_dps,
-                   // g_euler.roll, g_euler.pitch, g_euler.yaw,
-                   // roll_angle_target, pitch_angle_target, yaw_angle_target,
-                   // g_car_lamp_fused_distance_projectioncenter_2.x_cm,
-                   // g_car_lamp_fused_distance_projectioncenter_2.y_cm,
-                   // g_mode5_velx_target, g_mode5_vely_target,
-                   // g_mode5_velx_pid.ff_term, g_mode5_vely_pid.ff_term,
-                   // g_mode5_velx_pid.output + g_mode5_velx_pid.ff_term,
-                   // g_mode5_vely_pid.output + g_mode5_vely_pid.ff_term,
-                   // Pos_Est_vel_x, Pos_Est_vel_y);
-}
-
-void FC_Mode5_Control100Hz(float dt)
-{
-    float velx_sp = 0.0f;
-    float vely_sp = 0.0f;
-    float velx_ff;
-    float vely_ff;
-    float velx_target_rate;
-    float vely_target_rate;
-    float velx_out;
-    float vely_out;
-    float img_err_x = 0.0f;
-    float img_err_y = 0.0f;
-    float img_fb_x = 0.0f;
-    float img_fb_y = 0.0f;
-    float roll_trim;
-    float pitch_trim;
-    float car_ff_x = 0.0f;
-    float car_ff_y = 0.0f;
-    float yaw_diff_rad;
-    float yaw_cos;
-    float yaw_sin;
-    float car_turn_accel_x;
-    float car_turn_accel_y;
-    float turn_ff_x = 0.0f;
-    float turn_ff_y = 0.0f;
-    uint8_t car_data_fresh;
-    uint8_t fused_lamp_valid;
-    uint8_t tof_height_valid;
-    if (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING)
-    {
-        FC_Mode5_Reset();
-        return;
-    }
-
-    if (g_fc_params.yaw_change_mode5 >= 0.5f)
-    {
-        YawAlign_Update();
+        (void)YawAlign_Update();
     }
     else
     {
         YawAlign_Reset();
         yaw_angle_target = 0.0f;
     }
+}
 
-    fused_lamp_valid = g_car_lamp_fused_distance_projectioncenter_2.valid;
+/*
+ * 函数名: FC_Mode5_Control100Hz
+ * 功能: 使用图像PD与车加速度前馈计算模式5横向姿态目标
+ * 输入参数:
+ *   dt - 本次调用周期，单位s；非正值时使用飞控默认周期
+ * 返回值: 无
+ */
+void FC_Mode5_Control100Hz(float dt)
+{
+    float img_err_x = 0.0f;
+    float img_err_y = 0.0f;
+    float alpha;
+    float yaw_diff_rad;
+    float yaw_cos;
+    float yaw_sin;
+    float car_accel_x_mps2;
+    float car_accel_y_mps2;
+    uint8 car_data_fresh;
+    uint8 image_valid;
 
-    Beep_SetAlarm(BEEP_ALARM_MODE5_LAMP_LOST,
-                  (fused_lamp_valid == 0U) ? 1U : 0U);
-
-    tof_height_valid = ((0U != g_tof_fused_valid) &&
-                        (g_tof_fused_height_mm > FC_MODE_IMAGE_MIN_HEIGHT_MM)) ? 1U : 0U;
-
-    if ((fused_lamp_valid != 0U) && (tof_height_valid != 0U))
+    if (dt <= 0.0f)
     {
-        img_err_x = g_car_lamp_fused_distance_projectioncenter_2.x_cm;
-        img_err_y = g_car_lamp_fused_distance_projectioncenter_2.y_cm;
-        img_fb_x = PID_Update(&g_mode5_imgx_pid, 0.0f, -img_err_x, dt);
-        img_fb_y = PID_Update(&g_mode5_imgy_pid, 0.0f, -img_err_y, dt);
-        img_fb_x = FC_Mode_Clamp(img_fb_x, -FC_MODE_IMAGE_VEL_LIMIT_CMPS, FC_MODE_IMAGE_VEL_LIMIT_CMPS);
-        img_fb_y = FC_Mode_Clamp(img_fb_y, -FC_MODE_IMAGE_VEL_LIMIT_CMPS, FC_MODE_IMAGE_VEL_LIMIT_CMPS);
+        dt = g_fc_params.vel_xy_dt;
+    }
+    if (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING)
+    {
+        FC_Mode5_Reset();
+        return;
+    }
+
+    image_valid = ((g_car_lamp_fused.valid != 0U) &&
+                   (g_tof_fused_valid != 0U) &&
+                   (g_tof_fused_height_mm > FC_MODE_IMAGE_MIN_HEIGHT_MM))
+                      ? 1U
+                      : 0U;
+    Beep_SetAlarm(BEEP_ALARM_MODE5_LAMP_LOST,
+                  (g_car_lamp_fused.valid == 0U) ? 1U : 0U);
+
+    if (image_valid != 0U)
+    {
+        img_err_x = g_car_lamp_fused.cx - g_projection_center.cx;
+        img_err_y = g_car_lamp_fused.cy - g_projection_center.cy;
+        if (s_mode5_image_initialized != 0U)
+        {
+            alpha = s_mode5_two_pi * g_fc_params.mode5_img_d_lpf_hz * dt;
+            alpha /= 1.0f + alpha;
+            g_mode5_img_error_rate_x_pxps += alpha *
+                ((img_err_x - s_mode5_prev_img_error_x) / dt -
+                 g_mode5_img_error_rate_x_pxps);
+            g_mode5_img_error_rate_y_pxps += alpha *
+                ((img_err_y - s_mode5_prev_img_error_y) / dt -
+                 g_mode5_img_error_rate_y_pxps);
+        }
+        else
+        {
+            s_mode5_image_initialized = 1U;
+        }
+        s_mode5_prev_img_error_x = img_err_x;
+        s_mode5_prev_img_error_y = img_err_y;
+        g_mode5_imgx_pid.error = img_err_x;
+        g_mode5_imgy_pid.error = img_err_y;
+        g_mode5_imgx_pid.p_term = g_fc_params.mode5_img_kp * img_err_x;
+        g_mode5_imgy_pid.p_term = g_fc_params.mode5_img_kp * img_err_y;
+        g_mode5_imgx_pid.d_term = g_fc_params.mode5_img_kd * g_mode5_img_error_rate_x_pxps;
+        g_mode5_imgy_pid.d_term = g_fc_params.mode5_img_kd * g_mode5_img_error_rate_y_pxps;
+        g_mode5_imgx_pid.output = g_mode5_imgx_pid.p_term + g_mode5_imgx_pid.d_term;
+        g_mode5_imgy_pid.output = g_mode5_imgy_pid.p_term + g_mode5_imgy_pid.d_term;
     }
     else
     {
         PID_Reset(&g_mode5_imgx_pid);
         PID_Reset(&g_mode5_imgy_pid);
+        g_mode5_img_error_rate_x_pxps = g_mode5_img_error_rate_y_pxps = 0.0f;
+        s_mode5_prev_img_error_x = s_mode5_prev_img_error_y = 0.0f;
+        s_mode5_image_initialized = 0U;
     }
 
     car_data_fresh = ((g_car_sync_time_ms > 0.0f) &&
-                      ((tick_1000us_cnt - g_car_last_update_time_ms) < 200U)) ? 1U : 0U;
-
-    /* 将车模右/前速度旋转到飞机右/后控制坐标系，车端时间戳超时则不叠加。 */
+                      ((tick_1000us_cnt - g_car_last_update_time_ms) <
+                       FC_MODE_CAR_RUN_DATA_TIMEOUT_MS))
+                         ? 1U
+                         : 0U;
     if (car_data_fresh != 0U)
     {
-        yaw_diff_rad = g_car_yaw - g_euler.yaw;
-        while (yaw_diff_rad > 180.0f)
+        if (g_car_sync_time_ms != s_mode5_prev_car_sync_time_ms)
         {
-            yaw_diff_rad -= 360.0f;
+            g_mode5_car_dt_ms = (s_mode5_prev_car_sync_time_ms > 0.0f)
+                                    ? g_car_sync_time_ms - s_mode5_prev_car_sync_time_ms
+                                    : 0.0f;
+            s_mode5_prev_car_sync_time_ms = g_car_sync_time_ms;
         }
-        while (yaw_diff_rad < -180.0f)
+
+        alpha = s_mode5_two_pi * g_fc_params.mode5_car_vel_error_lpf_hz * dt;
+        alpha /= 1.0f + alpha;
+        g_mode5_car_vel_error_x_mps += alpha *
+            (g_car_vel_target_x - g_car_vel_x - g_mode5_car_vel_error_x_mps);
+        g_mode5_car_vel_error_y_mps += alpha *
+            (g_car_vel_target_y - g_car_vel_y - g_mode5_car_vel_error_y_mps);
+        car_accel_x_mps2 =
+            ((g_mode5_car_vel_error_x_mps >= 0.0f)
+                 ? g_fc_params.mode5_car_accel_gain_pos
+                 : g_fc_params.mode5_car_accel_gain_neg) * g_mode5_car_vel_error_x_mps;
+        car_accel_y_mps2 =
+            ((g_mode5_car_vel_error_y_mps >= 0.0f)
+                 ? g_fc_params.mode5_car_accel_gain_pos
+                 : g_fc_params.mode5_car_accel_gain_neg) * g_mode5_car_vel_error_y_mps;
+        g_mode5_car_body_accel_x_mps2 = car_accel_x_mps2;
+        g_mode5_car_body_accel_y_mps2 = car_accel_y_mps2;
+
+        /* 滤波车模向心加速度，再按实时车机航向差投影到Roll/Pitch。 */
+        alpha = s_mode5_two_pi * g_fc_params.mode5_car_turn_accel_lpf_hz * dt;
+        alpha /= 1.0f + alpha;
+        g_mode5_car_turn_accel_mps2 += alpha *
+            (g_car_vel_y * g_car_yaw_rate_dps * s_mode5_deg_to_rad -
+             g_mode5_car_turn_accel_mps2);
+
+        g_mode5_yaw_diff_deg = g_car_yaw - g_euler.yaw +
+                               g_car_yaw_rate_dps * 0.12f;
+        while (g_mode5_yaw_diff_deg > 180.0f)
         {
-            yaw_diff_rad += 360.0f;
+            g_mode5_yaw_diff_deg -= 360.0f;
         }
-        yaw_diff_rad *= 0.017453292519943295f;
+        while (g_mode5_yaw_diff_deg < -180.0f)
+        {
+            g_mode5_yaw_diff_deg += 360.0f;
+        }
+        yaw_diff_rad = g_mode5_yaw_diff_deg * s_mode5_deg_to_rad;
         yaw_cos = cosf(yaw_diff_rad);
         yaw_sin = sinf(yaw_diff_rad);
-        car_ff_x = (g_car_vel_x * yaw_cos + g_car_vel_y * yaw_sin) *
-                   g_fc_params.mode5_kp_car_x;
-        car_ff_y = (g_car_vel_x * yaw_sin - g_car_vel_y * yaw_cos) *
-                   g_fc_params.mode5_kp_car_y;
-
-        /* omega x velocity 给出车体系转弯加速度，再旋转为飞机 roll/pitch 前馈。 */
-        car_turn_accel_x = g_car_yaw_rate_dps * 0.017453292519943295f * g_car_vel_y;
-        car_turn_accel_y = -g_car_yaw_rate_dps * 0.017453292519943295f * g_car_vel_x;
-        turn_ff_x = g_mode5_turn_accel_ff_gain_x * 57.29577951308232f *
-                    atanf((yaw_cos * car_turn_accel_x + yaw_sin * car_turn_accel_y) / 9.80665f);
-        turn_ff_y = -g_mode5_turn_accel_ff_gain_y * 57.29577951308232f *
-                    atanf((-yaw_sin * car_turn_accel_x + yaw_cos * car_turn_accel_y) / 9.80665f);
-        turn_ff_x = FC_Mode_Clamp(turn_ff_x, -g_mode5_turn_accel_ff_limit_x_deg, g_mode5_turn_accel_ff_limit_x_deg);
-        turn_ff_y = FC_Mode_Clamp(turn_ff_y, -g_mode5_turn_accel_ff_limit_y_deg, g_mode5_turn_accel_ff_limit_y_deg);
-    }
-    velx_sp = img_fb_x + car_ff_x;
-    vely_sp = img_fb_y + car_ff_y;
-    // wifi_justfloat(g_car_vel_x, g_car_vel_y,
-    //                img_fb_x, img_fb_y,
-    //                velx_sp, vely_sp,
-    //                g_mode5_velx_target, g_mode5_vely_target,
-    //                roll_angle_target, pitch_angle_target);
-    velx_target_rate = (velx_sp - s_mode5_prev_velx_target) / dt;
-    vely_target_rate = (vely_sp - s_mode5_prev_vely_target) / dt;
-    g_mode5_velx_target = velx_sp;
-    g_mode5_vely_target = vely_sp;
-    s_mode5_prev_velx_target = g_mode5_velx_target;
-    s_mode5_prev_vely_target = g_mode5_vely_target;
-
-    roll_trim = FC_Mode_Get_Roll_Mech_Trim_Deg();
-    pitch_trim = FC_Mode_Get_Pitch_Mech_Trim_Deg();
-    /* 串口超时同时清空角度KFF滤波残量，避免断链瞬间产生反向前馈。 */
-    if (car_data_fresh != 0U)
-    {
-        velx_ff = FC_Mode_Clamp(g_fc_params.mode5_vel_x_kff * velx_target_rate + turn_ff_x,
-                                -angle_target_max, angle_target_max);
-        vely_ff = FC_Mode_Clamp(g_fc_params.mode5_vel_y_kff * vely_target_rate + turn_ff_y,
-                                -angle_target_max, angle_target_max);
-        s_mode5_velx_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA_100HZ * (velx_ff - s_mode5_velx_ff_lpf);
-        s_mode5_vely_ff_lpf += FC_MODE_VEL_KFF_LPF_ALPHA_100HZ * (vely_ff - s_mode5_vely_ff_lpf);
-        velx_ff = s_mode5_velx_ff_lpf;
-        vely_ff = s_mode5_vely_ff_lpf;
+        g_mode5_car_accel_x_mps2 =
+            car_accel_x_mps2 * yaw_cos + car_accel_y_mps2 * yaw_sin;
+        g_mode5_car_accel_y_mps2 =
+            car_accel_x_mps2 * yaw_sin - car_accel_y_mps2 * yaw_cos;
+        g_mode5_car_accel_angle_ff_x_deg =
+            g_fc_params.mode5_car_accel_ff * g_mode5_car_accel_x_mps2 +
+            g_fc_params.mode5_car_turn_accel_ff * g_mode5_car_turn_accel_mps2 * yaw_cos;
+        g_mode5_car_accel_angle_ff_y_deg =
+            g_fc_params.mode5_car_accel_ff * g_mode5_car_accel_y_mps2 +
+            g_fc_params.mode5_car_turn_accel_ff * g_mode5_car_turn_accel_mps2 * yaw_sin;
     }
     else
     {
-        s_mode5_velx_ff_lpf = 0.0f;
-        s_mode5_vely_ff_lpf = 0.0f;
-        velx_ff = 0.0f;
-        vely_ff = 0.0f;
+        g_mode5_car_accel_angle_ff_x_deg = g_mode5_car_accel_angle_ff_y_deg = 0.0f;
+        g_mode5_car_accel_x_mps2 = g_mode5_car_accel_y_mps2 = 0.0f;
+        g_mode5_car_dt_ms = 0.0f;
+        s_mode5_prev_car_sync_time_ms = 0.0f;
+        g_mode5_car_vel_error_x_mps = g_mode5_car_vel_error_y_mps = 0.0f;
+        g_mode5_car_body_accel_x_mps2 = g_mode5_car_body_accel_y_mps2 = 0.0f;
+        g_mode5_car_turn_accel_mps2 = 0.0f;
+        g_mode5_yaw_diff_deg = 0.0f;
     }
 
-    g_mode5_velx_pid.output_min = -angle_target_max - roll_trim - velx_ff;
-    g_mode5_velx_pid.output_max = angle_target_max - roll_trim - velx_ff;
-    g_mode5_vely_pid.output_min = -angle_target_max - pitch_trim - vely_ff;
-    g_mode5_vely_pid.output_max = angle_target_max - pitch_trim - vely_ff;
-
-    velx_out = PID_Update(&g_mode5_velx_pid, g_mode5_velx_target, -Pos_Est_vel_x, dt) + velx_ff;
-    vely_out = PID_Update(&g_mode5_vely_pid, g_mode5_vely_target, -Pos_Est_vel_y, dt) + vely_ff;
-    g_mode5_velx_pid.ff_term = velx_ff;
-    g_mode5_vely_pid.ff_term = vely_ff;
-
-    roll_angle_target = FC_Mode_Clamp(velx_out + roll_trim, -angle_target_max, angle_target_max);
-    pitch_angle_target = FC_Mode_Clamp(vely_out + pitch_trim, -angle_target_max, angle_target_max);
-
-    // wifi_justfloat(g_car_vel_x,                 /* I1 */
-    //              g_car_vel_y,                   /* I2 */
-    //              Pos_Est_vel_x,                 /* I3 */
-    //              Pos_Est_vel_y,                 /* I4 */
-    //              g_car_lamp_fused_distance_projectioncenter_2.x_cm,/* I5 */
-    //              g_car_lamp_fused_distance_projectioncenter_2.y_cm,/* I6 */
-    //              img_err_x,                     /* I7 */
-    //              img_err_y,                     /* I8 */
-    //              img_fb_x,                      /* I9 */
-    //              img_fb_y,                      /* I10 */
-    //              velx_sp,                       /* I11 */
-    //              vely_sp,                       /* I12 */
-    //              g_mode5_velx_target,           /* I13 */
-    //              g_mode5_vely_target,           /* I14 */
-    //              roll_angle_target,             /* I15 */
-    //              pitch_angle_target,            /* I16 */
-    //              g_euler.roll,                  /* I17 */
-    //              g_euler.pitch,                 /* I18 */
-    //              opflow_vel_x,                  /* I19 */
-    //              opflow_vel_y,                  /* I20 */
-    //              opflow_vel_x_lpf,              /* I21 */
-    //              opflow_vel_y_lpf,              /* I22 */
-    //              g_mode5_velx_pid.p_term,       /* I23 */
-    //              g_mode5_velx_pid.i_term,       /* I24 */
-    //              g_mode5_velx_pid.d_term,       /* I25 */
-    //              g_mode5_velx_pid.output,       /* I26 */
-    //              g_mode5_vely_pid.p_term,       /* I27 */
-    //              g_mode5_vely_pid.i_term,       /* I28 */
-    //              (float)g_tof_fused_valid,      /* I29 */
-    //              g_tof_fused_height_mm,         /* I30 */
-    //              velx_ff,                       /* I31 */
-    //              vely_ff);                      /* I32 */
-    // wifi_justfloat(image_data[Front].beacon_data[0].x,     /* I1 */
-    //                image_data[Front].beacon_data[0].y,     /* I2 */
-    //                image_data[Front].beacon_data[1].x,     /* I3 */
-    //                image_data[Front].beacon_data[1].y,     /* I4 */
-    //                image_data[Front].beacon_data[2].x,     /* I5 */
-    //                image_data[Front].beacon_data[2].y,     /* I6 */
-    //                image_data[Front].car_lamp_data[0].cx,  /* I7 */
-    //                image_data[Front].car_lamp_data[0].cy,  /* I8 */
-    //                image_data[Front].car_lamp_data[1].cx,  /* I9 */
-    //                image_data[Front].car_lamp_data[1].cy,  /* I10 */
-    //                image_data[Center].beacon_data[0].x,    /* I11 */
-    //                image_data[Center].beacon_data[0].y,    /* I12 */
-    //                image_data[Center].beacon_data[1].x,    /* I13 */
-    //                image_data[Center].beacon_data[1].y,    /* I14 */
-    //                image_data[Center].beacon_data[2].x,    /* I15 */
-    //                image_data[Center].beacon_data[2].y,    /* I16 */
-    //                image_data[Center].car_lamp_data[0].cx, /* I17 */
-    //                image_data[Center].car_lamp_data[0].cy, /* I18 */
-    //                image_data[Center].car_lamp_data[1].cx, /* I19 */
-    //                image_data[Center].car_lamp_data[1].cy, /* I20 */
-    //                image_data[Back].beacon_data[0].x,      /* I21 */
-    //                image_data[Back].beacon_data[0].y,      /* I22 */
-    //                image_data[Back].beacon_data[1].x,      /* I23 */
-    //                image_data[Back].beacon_data[1].y,      /* I24 */
-    //                image_data[Back].beacon_data[2].x,      /* I25 */
-    //                image_data[Back].beacon_data[2].y,      /* I26 */
-    //                image_data[Back].car_lamp_data[0].cx,   /* I27 */
-    //                image_data[Back].car_lamp_data[0].cy,   /* I28 */
-    //                image_data[Back].car_lamp_data[1].cx,   /* I29 */
-    //                image_data[Back].car_lamp_data[1].cy,   /* I30 */
-    //                g_euler.yaw,                            /* I36 */
-    //                yaw_angle_target,                       /* I37 */
-    //                yaw_gyro_target,                        /* I38 */
-    //                yaw_gyro_pid.output);                   /* I39 */
-    // wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw,
-                   // roll_angle_target, pitch_angle_target, yaw_angle_target,
-                   // g_tof_fused_height_mm,g_height_fused_vz_mps,
-                   // g_car_vel_x, g_car_vel_y,g_car_yaw,
-                   // Pos_Est_vel_x, Pos_Est_vel_y,
-                   // g_mode5_velx_target, g_mode5_vely_target,
-                   // g_car_lamp_fused_distance_projectioncenter_2.x_cm,
-                   // g_car_lamp_fused_distance_projectioncenter_2.y_cm,
-                   // velx_ff, vely_ff,
-                   // g_mode5_velx_pid.p_term, g_mode5_velx_pid.i_term,
-                   // g_mode5_vely_pid.p_term, g_mode5_vely_pid.i_term,
-                   // g_mode5_imgx_pid.p_term, g_mode5_imgx_pid.i_term,g_mode5_imgx_pid.d_term,
-                   // g_mode5_imgy_pid.p_term, g_mode5_imgy_pid.i_term,g_mode5_imgy_pid.d_term,
-                   // car_ff_x, car_ff_y,
-                   // (float)g_car_lamp_fused_distance_projectioncenter_2.valid,
-                   // g_mode5_imgy_pid.kp,
-                   // g_mode5_velx_pid.d_term, g_mode5_vely_pid.d_term,
-                   // g_car_sync_time_ms
-                   // );
+    g_mode5_raw_roll_correction_deg = g_mode5_imgx_pid.output +
+                                      g_mode5_car_accel_angle_ff_x_deg;
+    g_mode5_raw_pitch_correction_deg = g_mode5_imgy_pid.output +
+                                       g_mode5_car_accel_angle_ff_y_deg;
+    roll_angle_target = FC_Mode_Clamp(
+        FC_Mode_Get_Roll_Mech_Trim_Deg() + g_mode5_raw_roll_correction_deg,
+        -s_mode5_angle_limit_deg, s_mode5_angle_limit_deg);
+    pitch_angle_target = FC_Mode_Clamp(
+        FC_Mode_Get_Pitch_Mech_Trim_Deg() + g_mode5_raw_pitch_correction_deg,
+        -s_mode5_angle_limit_deg, s_mode5_angle_limit_deg);
+    g_mode5_control_seq++;
 }
 
+/*
+ * 函数名: FC_Mode5_Get_Fixed_Height_M
+ * 功能: 获取模式5使用的固定高度目标
+ * 输入参数: 无
+ * 返回值: 模式5固定高度目标，单位m
+ */
 float FC_Mode5_Get_Fixed_Height_M(void)
 {
     return 1.1f;

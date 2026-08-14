@@ -1767,10 +1767,22 @@
                 <name>$PROJ_DIR$\..\..\code\Planner\car_plan_2.h</name>
             </file>
             <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\car_plan_3.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\car_plan_3.h</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\..\..\code\Planner\CameraModel.c</name>
             </file>
             <file>
                 <name>$PROJ_DIR$\..\..\code\Planner\CameraModel.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\Three_Camera.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\Three_Camera.h</name>
             </file>
             <file>
                 <name>$PROJ_DIR$\..\..\code\Planner\pix_to_distance.c</name>

@@ -14,7 +14,7 @@
 #define CAR_PLAN_2_CROSS_CAMERA_MERGE_DIST_PX    (15.0f) /* 跨摄像头同灯候选的合并距离，单位px。 */
 #define CAR_PLAN_2_LOCK_MATCH_DIST_PX            (25.0f) /* 锁定目标预测位置的匹配距离，单位px。 */
 #define CAR_PLAN_2_PREDICT_STEP_LIMIT_PX         (8.0f)  /* 单次位置预测增量上限，单位px。 */
-#define CAR_PLAN_2_LOST_HOLD_TICKS               (10U)   /* 100Hz下目标丢失保持约100ms。 */
+#define CAR_PLAN_2_LOST_HOLD_TICKS               (0U)   /* 100Hz下目标丢失保持约500ms。 */
 #define CAR_PLAN_2_VELOCITY_CONFLICT_TICKS       (10U)   /* 100Hz下车速冲突持续约100ms后切换。 */
 #define CAR_PLAN_2_VELOCITY_MIN_MPS              (0.8f)  /* 启用车速方向判断的最低合速度，单位m/s。 */
 #define CAR_PLAN_2_LOCKED_VELOCITY_COS_MAX       (0.2f)  /* 锁定目标与车速明显冲突的余弦上限。 */

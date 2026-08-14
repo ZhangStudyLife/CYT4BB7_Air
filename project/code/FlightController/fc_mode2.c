@@ -1,5 +1,4 @@
 #include "fc_mode.h"
-#include "yaw_align.h"
 #include "../Estimation/Height_Est/Height_Est.h"
 #include "../Planner/car_lamp_fused.h"
 #include "../Planner/ProjectionCenter.h"
@@ -71,12 +70,9 @@ void FC_Mode2_Reset(void)
     g_mode2_car_turn_accel_mps2 = 0.0f;
     g_mode2_yaw_diff_deg = 0.0f;
     s_mode2_image_initialized = 0U;
-    YawAlign_Reset();
     roll_angle_target = FC_Mode_Get_Roll_Mech_Trim_Deg();
     pitch_angle_target = FC_Mode_Get_Pitch_Mech_Trim_Deg();
-    yaw_angle_target = (g_fc_params.yaw_change_mode2 >= 0.5f)
-                           ? g_euler.yaw
-                           : 0.0f;
+    yaw_angle_target = 0.0f;
 }
 
 void FC_Mode2_100Hz(void)
@@ -110,15 +106,7 @@ void FC_Mode2_Control100Hz(float dt)
         return;
     }
 
-    if (g_fc_params.yaw_change_mode2 >= 0.5f)
-    {
-        (void)YawAlign_Update();
-    }
-    else
-    {
-        YawAlign_Reset();
-        yaw_angle_target = 0.0f;
-    }
+    yaw_angle_target = 0.0f;
     image_valid = ((g_car_lamp_fused.valid != 0U) &&
                    (g_tof_fused_valid != 0U) &&
                    (g_tof_fused_height_mm > FC_MODE_IMAGE_MIN_HEIGHT_MM))

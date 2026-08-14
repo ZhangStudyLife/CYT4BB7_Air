@@ -1,0 +1,64 @@
+#ifndef THREE_CAMERA_H
+#define THREE_CAMERA_H
+
+#include "../Image/image_data.h"
+
+#define THREE_CAMERA_MAX_BEACON_COUNT   (IMAGE_MAX_BEACON_COUNT) /* 三摄融合后的物理信标最大数量。 */
+
+/*
+ * 输出坐标系说明:
+ * 1. 原点位于飞机的相机/机体参考点，不是场地固定原点。
+ * 2. X、Y 轴方向与经过飞机欧拉角解耦后的水平全局坐标系对齐，不随飞机机头方向旋转。
+ * 3. x_m、y_m 表示目标相对飞机原点的水平位移，单位 m。
+ * 4. 输出未叠加飞机的绝对位置，因此不是场地中的绝对全局坐标。
+ * 5. 如需绝对全局坐标，应在外部计算:
+ *      target_global_x = aircraft_global_x + x_m;
+ *      target_global_y = aircraft_global_y + y_m;
+ */
+typedef struct
+{
+    uint8 valid;
+    uint8 camera_mask;
+    float x_m; /* 信标相对飞机原点、沿水平全局 X 轴方向的位移，单位 m。 */
+    float y_m; /* 信标相对飞机原点、沿水平全局 Y 轴方向的位移，单位 m。 */
+    float area;
+} three_camera_beacon_t;
+
+typedef struct
+{
+    uint8 valid;
+    uint8 camera_mask;
+    float x_m;      /* 车灯相对飞机原点、沿水平全局 X 轴方向的位移，单位 m。 */
+    float y_m;      /* 车灯相对飞机原点、沿水平全局 Y 轴方向的位移，单位 m。 */
+    float angle_deg; /* 车灯长轴在水平全局坐标系中的无向角度，单位 deg。 */
+} three_camera_lamp_t;
+
+typedef struct
+{
+    three_camera_lamp_t car_lamp;
+    three_camera_beacon_t beacon[THREE_CAMERA_MAX_BEACON_COUNT];
+    uint8 beacon_count;
+} three_camera_result_t;
+
+/*
+ * 函数功能: 使用三台相机独立模型，将当前图像检测结果投影到以飞机参考点为原点、
+ *           轴向与水平全局坐标系对齐的局部坐标系，并完成跨摄融合。
+ * 输入参数:
+ *   image - 三路原始图像检测结果；x/y 为相机算法中心化像素坐标。
+ *   roll_deg/pitch_deg/yaw_deg - 飞机欧拉角，单位 deg。
+ *   height_mm - 飞机到地面的垂直高度，单位 mm。
+ *   height_valid - 高度有效标志，非零时允许地面求交。
+ *   result - 输出融合车灯与物理信标相对飞机的水平位移，单位 m；不得为空。
+ *            该结果已使用欧拉角解耦飞机姿态，但未叠加飞机绝对位置。
+ * 输出参数/返回值:
+ *   返回 1 表示完成有效高度下的投影，返回 0 表示输入高度无效或输出指针为空。
+ */
+uint8 Three_Camera_Update(const struct image_data image[IMAGE_CAMERA_COUNT],
+                          float roll_deg,
+                          float pitch_deg,
+                          float yaw_deg,
+                          float height_mm,
+                          uint8 height_valid,
+                          three_camera_result_t *result);
+
+#endif /* THREE_CAMERA_H */

@@ -37,7 +37,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->vel_z_dt = 0.01f;   /* 100Hz */
 
     /* ===== 油门与机械配平参数 ===== */
-    params->base_throttle = 3500;         /* 悬停油门 */
+    params->base_throttle = 3800;         /* 悬停油门 */
     params->roll_mech_trim_deg = 0.5f;    /* Roll 机械配平角 */
     params->pitch_mech_trim_deg = -1.5f;   /* Pitch 机械配平角 */
 

@@ -6,6 +6,23 @@
 
 #define CAR_PLAN_3_DEG_TO_RAD       (0.017453292519943295f)
 #define CAR_PLAN_3_MIN_DISTANCE_M   (0.001f)
+#define CAR_PLAN_3_NEAR_LAMP_DIST_PX (3.0f)  /* 信标与同摄车灯中心的近距离阈值，单位 px。 */
+#define CAR_PLAN_3_TRACK_MATCH_PX    (15.0f) /* 原始信标短时轨迹匹配半径，单位 px。 */
+#define CAR_PLAN_3_FAR_LAMP_DIST_PX  (10.0f) /* 允许信标靠近车灯前必须到达的历史距离，单位 px。 */
+#define CAR_PLAN_3_HISTORY_TICKS     (30U)   /* 100Hz 下保留约 300ms 的远距离历史。 */
+#define CAR_PLAN_3_GAP_TICKS         (2U)    /* 100Hz 下允许约 20ms 的短暂丢失。 */
+#define CAR_PLAN_3_CONFIRM_TICKS     (3U)    /* 连续匹配三次后确认信标轨迹。 */
+
+typedef struct
+{
+    uint8 valid;
+    uint8 gap_ticks;
+    uint8 sample_ticks;
+    uint8 far_age_ticks;
+    uint8 suspect_age_ticks;
+    float x;
+    float y;
+} car_plan_3_beacon_track_t;
 
 extern float g_car_yaw;
 extern float Car_Speed;
@@ -13,6 +30,156 @@ extern float Car_Speed;
 static car_plan_3_result_t s_car_plan_3_result;
 static three_camera_result_t s_car_plan_3_camera;
 static int8 s_car_plan_3_selected = -1;
+static car_plan_3_beacon_track_t
+    s_car_plan_3_track[IMAGE_CAMERA_COUNT][IMAGE_MAX_BEACON_COUNT]; /* 三摄原始信标短时轨迹。 */
+
+/**
+ * @brief 过滤突然出现在同摄车灯附近且没有远距离连续历史的原始信标。
+ * @param filtered 输出过滤后的三摄图像数据，不得为空。
+ * @return 无。
+ */
+static void CarPlan_3_FilterNearLamp(
+    struct image_data filtered[IMAGE_CAMERA_COUNT])
+{
+    uint8 camera;
+    uint8 index;
+
+    for(camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
+    {
+        uint8 track_used[IMAGE_MAX_BEACON_COUNT] = {0U};
+        const car_lamp_data *lamp = &image_data[camera].car_lamp_data[0];
+        uint8 lamp_valid = image_data_car_lamp_valid(lamp);
+
+        filtered[camera] = image_data[camera];
+        for(index = 0U; index < IMAGE_MAX_BEACON_COUNT; index++)
+        {
+            car_plan_3_beacon_track_t *track = &s_car_plan_3_track[camera][index];
+            if(track->valid != 0U)
+            {
+                if(track->far_age_ticks <= CAR_PLAN_3_HISTORY_TICKS)
+                {
+                    track->far_age_ticks++;
+                }
+                if(track->suspect_age_ticks <= CAR_PLAN_3_HISTORY_TICKS)
+                {
+                    track->suspect_age_ticks++;
+                }
+            }
+        }
+
+        for(index = 0U; index < IMAGE_MAX_BEACON_COUNT; index++)
+        {
+            const beacon_data *beacon = &image_data[camera].beacon_data[index];
+            uint8 best = 0xFFU;
+            uint8 matched = 0U;
+            float best_distance_sq = CAR_PLAN_3_TRACK_MATCH_PX *
+                                     CAR_PLAN_3_TRACK_MATCH_PX;
+            uint8 track_index;
+            float lamp_distance = CAR_PLAN_3_FAR_LAMP_DIST_PX;
+
+            if(image_data_beacon_valid(beacon) == 0U)
+            {
+                continue;
+            }
+            for(track_index = 0U; track_index < IMAGE_MAX_BEACON_COUNT; track_index++)
+            {
+                car_plan_3_beacon_track_t *track =
+                    &s_car_plan_3_track[camera][track_index];
+                float dx;
+                float dy;
+                float distance_sq;
+
+                if((track->valid == 0U) || (track_used[track_index] != 0U) ||
+                   (track->gap_ticks > CAR_PLAN_3_GAP_TICKS))
+                {
+                    continue;
+                }
+                dx = beacon->x - track->x;
+                dy = beacon->y - track->y;
+                distance_sq = dx * dx + dy * dy;
+                if(distance_sq < best_distance_sq)
+                {
+                    best = track_index;
+                    matched = 1U;
+                    best_distance_sq = distance_sq;
+                }
+            }
+            if(best == 0xFFU)
+            {
+                for(track_index = 0U; track_index < IMAGE_MAX_BEACON_COUNT; track_index++)
+                {
+                    if(track_used[track_index] == 0U)
+                    {
+                        best = track_index;
+                        break;
+                    }
+                }
+            }
+
+            {
+                car_plan_3_beacon_track_t *track = &s_car_plan_3_track[camera][best];
+
+                if(lamp_valid != 0U)
+                {
+                    float dx = beacon->x - lamp->cx;
+                    float dy = beacon->y - lamp->cy;
+                    lamp_distance = sqrtf(dx * dx + dy * dy);
+                }
+                track_used[best] = 1U;
+                track->valid = 1U;
+                track->gap_ticks = 0U;
+                track->sample_ticks = matched
+                                          ? (uint8)((track->sample_ticks < 0xFFU)
+                                                        ? track->sample_ticks + 1U
+                                                        : 0xFFU)
+                                          : 1U;
+                if(matched == 0U)
+                {
+                    track->far_age_ticks = CAR_PLAN_3_HISTORY_TICKS + 1U;
+                    track->suspect_age_ticks =
+                        ((lamp_valid != 0U) &&
+                         (lamp_distance < CAR_PLAN_3_TRACK_MATCH_PX))
+                            ? 0U
+                            : CAR_PLAN_3_HISTORY_TICKS + 1U;
+                }
+                track->x = beacon->x;
+                track->y = beacon->y;
+                if(lamp_valid != 0U)
+                {
+                    if(lamp_distance >= CAR_PLAN_3_FAR_LAMP_DIST_PX)
+                    {
+                        track->far_age_ticks = 0U;
+                    }
+                }
+                if((track->suspect_age_ticks <= CAR_PLAN_3_HISTORY_TICKS) ||
+                   ((lamp_valid != 0U) &&
+                    (lamp_distance < CAR_PLAN_3_NEAR_LAMP_DIST_PX) &&
+                    ((track->sample_ticks < CAR_PLAN_3_CONFIRM_TICKS) ||
+                     (track->far_age_ticks > CAR_PLAN_3_HISTORY_TICKS))))
+                {
+                    image_data_clear_beacon(&filtered[camera].beacon_data[index]);
+                }
+            }
+        }
+
+        for(index = 0U; index < IMAGE_MAX_BEACON_COUNT; index++)
+        {
+            car_plan_3_beacon_track_t *track = &s_car_plan_3_track[camera][index];
+            if((track->valid != 0U) && (track_used[index] == 0U) &&
+               (track->gap_ticks < 0xFFU))
+            {
+                track->gap_ticks++;
+            }
+            if(track->gap_ticks > CAR_PLAN_3_GAP_TICKS)
+            {
+                track->valid = 0U;
+                track->sample_ticks = 0U;
+                track->far_age_ticks = CAR_PLAN_3_HISTORY_TICKS + 1U;
+                track->suspect_age_ticks = CAR_PLAN_3_HISTORY_TICKS + 1U;
+            }
+        }
+    }
+}
 
 static void CarPlan_3_ClearResult(void)
 {
@@ -27,6 +194,7 @@ static void CarPlan_3_ClearResult(void)
 
 void CarPlan_3_Reset(void)
 {
+    uint8 camera;
     uint8 i;
 
     CarPlan_3_ClearResult();
@@ -36,10 +204,26 @@ void CarPlan_3_Reset(void)
     {
         s_car_plan_3_camera.beacon[i].valid = 0U;
     }
+    for(camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
+    {
+        for(i = 0U; i < IMAGE_MAX_BEACON_COUNT; i++)
+        {
+            s_car_plan_3_track[camera][i].valid = 0U;
+            s_car_plan_3_track[camera][i].gap_ticks = 0U;
+            s_car_plan_3_track[camera][i].sample_ticks = 0U;
+            s_car_plan_3_track[camera][i].far_age_ticks =
+                CAR_PLAN_3_HISTORY_TICKS + 1U;
+            s_car_plan_3_track[camera][i].suspect_age_ticks =
+                CAR_PLAN_3_HISTORY_TICKS + 1U;
+            s_car_plan_3_track[camera][i].x = 0.0f;
+            s_car_plan_3_track[camera][i].y = 0.0f;
+        }
+    }
 }
 
 uint8 CarPlan_3_Update(car_plan_3_result_t *result)
 {
+    struct image_data filtered[IMAGE_CAMERA_COUNT];
     uint8 i;
     uint8 selected = 0xFFU;
     float selected_distance_sq = 0.0f;
@@ -52,7 +236,8 @@ uint8 CarPlan_3_Update(car_plan_3_result_t *result)
     float scale;
 
     CarPlan_3_ClearResult();
-    if(Three_Camera_Update(image_data,
+    CarPlan_3_FilterNearLamp(filtered);
+    if(Three_Camera_Update(filtered,
                            g_euler.roll,
                            g_euler.pitch,
                            g_euler.yaw,

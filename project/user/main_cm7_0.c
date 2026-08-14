@@ -5,6 +5,7 @@
 #include "../code/Planner/CameraModel.h"
 #include "../code/Planner/car_lamp_fused.h"
 #include "../code/Planner/car_plan_2.h"
+#include "../code/Planner/car_plan_3.h"
 #include "../code/Estimation/Pos_Est/FlowGyroDecoupler_LC302.h"
 
 volatile uint32 tick_1000us_cnt = 0U;
@@ -39,7 +40,7 @@ float g_car_sync_time_ms = 0.0f; /* Last car-side sync timestamp, unit: ms */
 uint32 g_car_last_update_time_ms = 0U; /* 最近一次收到新车端时间戳的飞机本机时刻，单位ms */
 float g_car_yaw_target_deg = 0.0f; /* 车端yaw控制目标角(经SPI data[2])，单位deg */
 float g_car_large_turn_state = 0.0f; /* 车端大角度状态机(经SPI data[7]): 0正常 1刹车 2原地转 3退出 */
-static car_plan_result_t s_air_run_car_plan;
+static car_plan_3_result_t s_air_run_car_plan;
 static uint8 s_air_run_car_plan_valid = 0U;
 
 #define CAR_PLAN_DEBUG_PERIOD_MS          (5U)  /* 规划调试JustFloat发送周期，单位ms。 */
@@ -240,7 +241,7 @@ static void on_car_data(const float *data, uint8 count)
 static void send_air_run_data_200hz(void)
 {
     FC_START_CRSF_state_e state = FC_START_CRSF_Get_State();
-    const car_plan_result_t *car_plan = &s_air_run_car_plan;
+    const car_plan_3_result_t *car_plan = &s_air_run_car_plan;
     uint8 car_plan_send_valid = s_air_run_car_plan_valid;
     float plan_strafe_mps = (car_plan_send_valid != 0U) ? car_plan->target_strafe_mps : 0.0f;
     float plan_forward_mps = (car_plan_send_valid != 0U) ? car_plan->target_forward_mps : 0.0f;
@@ -297,9 +298,9 @@ static void send_air_run_data_200hz(void)
         air_data[17] = (float)car_plan_send_valid;
         air_data[18] = plan_strafe_mps;
         air_data[19] = plan_forward_mps;
-        air_data[20] = (float)car_plan->camera;
-        air_data[21] = (float)car_plan->beacon_index;
-        air_data[22] = car_plan->dist_px;
+        air_data[20] = 0.0f;
+        air_data[21] = 0.0f;
+        air_data[22] = 0.0f;
         air_data[23] = beacon_lost;
         air_data[24] = (float)CRSF_STD[8];
         air_data[25] = g_tof1_height_mm;
@@ -426,6 +427,7 @@ static void core0_plan_update_100hz(void)
 {
     car_plan_result_t car_plan = {0};
     car_plan_2_result_t car_plan_2 = {0};
+    car_plan_3_result_t car_plan_3 = {0};
     uint8 car_plan_send_valid;
 
     (void)BeaconLostDetector_Update();
@@ -433,17 +435,11 @@ static void core0_plan_update_100hz(void)
     {
         (void)CarPlan_Update(&car_plan);
         (void)CarPlan_2_Update(&car_plan_2);
-        if ((FC_START_CRSF_Get_Flight_Mode() == FC_START_CRSF_FLIGHT_MODE_1) ||
-            (Car_Plan_Mode >= 1.5f))
-        {
-            car_plan.valid = car_plan_2.valid;
-            car_plan.target_strafe_mps = car_plan_2.target_strafe_mps;
-            car_plan.target_forward_mps = car_plan_2.target_forward_mps;
-        }
+        (void)CarPlan_3_Update(&car_plan_3);
     }
 
-    car_plan_send_valid = ((car_plan.valid != 0U) && (g_tof_fused_height_mm > 500.0f)) ? 1U : 0U;
-    s_air_run_car_plan = car_plan;
+    car_plan_send_valid = ((car_plan_3.valid != 0U) && (g_tof_fused_height_mm > 500.0f)) ? 1U : 0U;
+    s_air_run_car_plan = car_plan_3;
     s_air_run_car_plan_valid = car_plan_send_valid;
 
 }

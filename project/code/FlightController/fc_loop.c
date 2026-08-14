@@ -12,7 +12,6 @@
 #include "../Planner/ProjectionCenter.h"
 #include "../Planner/pull_detect.h"
 #include "../Protocols/crsf/crsf.h"
-#include "../Protocols/AirComm/air_comm_air.h"
 
 pid_t roll_gyro_pid;
 pid_t pitch_gyro_pid;
@@ -418,12 +417,9 @@ void FC_Loop_100Hz(void)
 {
     static uint32 tick_1000us_cnt_last = 0;
     FC_START_CRSF_state_e fc_state;
-    car_plan_3_result_t car_plan = {0};
-    float car_data[15];
     uint32 tick_now = tick_1000us_cnt;
     uint32 diff = tick_now - tick_1000us_cnt_last;
     float dt = diff * 0.001f;
-    uint8 i;
 
     tick_1000us_cnt_last = tick_now;
     if (dt < 0.0001f)
@@ -499,7 +495,7 @@ void FC_Loop_100Hz(void)
     if (fc_state == FC_START_CRSF_STATE_LANDING)
     {
         FC_Mode0_100Hz();
-        goto send_car_data;
+        return;
     }
 
     switch (s_flight_mode)
@@ -509,7 +505,6 @@ void FC_Loop_100Hz(void)
         break;
 
     case FC_START_CRSF_FLIGHT_MODE_1:
-        (void)CarPlan_3_Update(&car_plan);
         FC_Mode1_100Hz();
         FC_Mode1_Control100Hz(dt);
         break;
@@ -551,20 +546,6 @@ void FC_Loop_100Hz(void)
         FC_Mode0_100Hz();
         break;
     }
-
-send_car_data:
-    car_data[0] = (float)fc_state;
-    for (i = 0U; i < 9U; i++)
-    {
-        car_data[i + 1U] = (float)CRSF_STD[i];
-    }
-    car_data[10] = yaw_angle_target;
-    car_data[11] = (float)car_plan.valid;
-    car_data[12] = car_plan.target_strafe_mps;
-    car_data[13] = car_plan.target_forward_mps;
-    car_data[14] = (float)g_beacon_lost_flag;
-    (void)air_comm_air_send_run_data(car_data, 15U);
-
 }
 
 void FC_Loop_500Hz(void)

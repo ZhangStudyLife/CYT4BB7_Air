@@ -50,7 +50,7 @@ extern float g_image_down_filter_pos_alpha;
 extern float g_image_down_filter_vel_alpha;
 
 /*
- * 函数功能: 初始化下摄图像算法、摄像头接口及5000帧性能统计窗口。
+ * 函数功能: 初始化下摄图像算法和摄像头接口。
  * 输入参数: 无。
  * 返回值: 无。
  */

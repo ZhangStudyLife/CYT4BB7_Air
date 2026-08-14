@@ -5,6 +5,7 @@
 #include "Protocols/CameraSpi/camera_spi.h"
 
 #define IMAGE_PIT                          (PIT_CH10)
+#define IMAGE_TIME_PIT                     (PIT_CH11)
 #define IMAGE_CORE1_TASK_PERIOD_US         CAMERA_SPI_UPDATE_PERIOD_US
 #define IMAGE_ATTITUDE_TIMEOUT_US          (50000U)
 #define IMAGE_ATTITUDE_TIMEOUT_TICKS \
@@ -242,6 +243,7 @@ static void air_beacon0_stabilize(uint8 fresh_mask)
 volatile uint8 g_image_tick_100hz = 0U;
 volatile uint32 g_image_core1_tick_generated;
 volatile uint32 g_image_core1_tick_overflow_count;
+volatile uint32 g_image_master_time_ms = 0U; /* 核心1统一毫秒时间。 */
 
 static ipc_attitude_data_t s_image_attitude;
 static uint32 s_image_attitude_sequence;
@@ -336,10 +338,15 @@ int main(void)
 
     clock_init(SYSTEM_CLOCK_250M);
     SCB_DisableDCache();
+    pit_ms_init(IMAGE_TIME_PIT, 1U);
 
     ipc_communicate_init(IPC_PORT_2, ipc_image_callback);
     ipc_remote_param_core1_init();
     ipc_image_init();
+    image_frame_meta_clear(&image_frame_meta[Front], Front);
+    image_frame_meta_clear(&image_frame_meta[Center], Center);
+    image_frame_meta_clear(&image_frame_meta[Back], Back);
+    memset((void *)&g_image_sync_diag, 0, sizeof(g_image_sync_diag));
     image_down_init();
     image_down_horizon_init();
     CameraSpi_Init();

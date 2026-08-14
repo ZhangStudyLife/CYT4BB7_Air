@@ -37,7 +37,26 @@ struct image_data
 {
     beacon_data beacon_data[IMAGE_MAX_BEACON_COUNT];
     car_lamp_data car_lamp_data[IMAGE_MAX_CAR_LAMP_COUNT];
+    uint8 car_lamp_measured_mask;
 };
+
+typedef struct
+{
+    uint32 frame_sequence;
+    uint32 capture_time_ms;
+    uint8 source_camera;
+    uint8 frame_valid;
+    uint8 timestamp_valid;
+    uint8 reserved;
+} image_frame_meta_t;
+
+typedef struct
+{
+    uint32 anchor_sequence;
+    uint32 max_skew_ms;
+    uint8 valid;
+    uint8 reserved[3];
+} image_sync_diag_t;
 
 static inline void image_data_clear_beacon(beacon_data *beacon)
 {
@@ -102,8 +121,33 @@ static inline void image_data_clear(struct image_data *data)
     {
         image_data_clear_car_lamp(&data->car_lamp_data[i]);
     }
+    data->car_lamp_measured_mask = 0U;
+}
+
+/**
+ * @brief 将帧元数据清为无效并保留指定来源身份。
+ * @param meta 待清理的帧元数据指针。
+ * @param source 需要写入的摄像头来源。
+ * @return 无。
+ */
+static inline void image_frame_meta_clear(image_frame_meta_t *meta,
+                                          image_camera_e source)
+{
+    if(meta == 0)
+    {
+        return;
+    }
+
+    meta->frame_sequence = 0U;
+    meta->capture_time_ms = 0U;
+    meta->source_camera = (uint8)source;
+    meta->frame_valid = 0U;
+    meta->timestamp_valid = 0U;
+    meta->reserved = 0U;
 }
 
 extern struct image_data image_data[IMAGE_CAMERA_COUNT];
+extern image_frame_meta_t image_frame_meta[IMAGE_CAMERA_COUNT]; /* 本核三摄最新来源帧元数据。 */
+extern volatile image_sync_diag_t g_image_sync_diag; /* 本核最新帧新鲜度和采集时差诊断。 */
 
 #endif /* IMAGE_DATA_H_ */

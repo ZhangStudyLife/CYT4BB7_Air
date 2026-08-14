@@ -37,6 +37,7 @@
 ********************************************************************************************************************/
 
 #include "zf_common_headfile.h"
+#include "zf_device_mt9v03x.h"
 
 extern volatile uint8 g_image_tick_100hz;                 // 主循环待消费的100Hz节拍数
 extern volatile uint32 g_image_core1_tick_generated;      // PIT累计生成的100Hz节拍数
@@ -82,6 +83,7 @@ void pit0_ch10_isr()                    // 定时器通道 10 周期中断服务函数
 void pit0_ch11_isr()                    // 定时器通道 11 周期中断服务函数      
 {
     pit_isr_flag_clear(PIT_CH11);
+    g_image_master_time_ms++;
     
 }
 

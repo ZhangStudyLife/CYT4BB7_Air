@@ -6,11 +6,24 @@
 #include "Protocols/CameraSpi/camera_spi.h"
 #endif
 
+/* 固定兼容f6b62dc2核心0：单摄112字节，不传输核心1本地测量状态。 */
+typedef struct
+{
+    beacon_data beacon_data[IMAGE_MAX_BEACON_COUNT];
+    car_lamp_data car_lamp_data[IMAGE_MAX_CAR_LAMP_COUNT];
+} ipc_image_wire_camera_t;
+
+typedef char ipc_image_wire_beacon_size_must_be_16[
+    (sizeof(beacon_data) == 16U) ? 1 : -1];
+typedef char ipc_image_wire_car_lamp_size_must_be_24[
+    (sizeof(car_lamp_data) == 24U) ? 1 : -1];
+typedef char ipc_image_wire_camera_size_must_be_112[
+    (sizeof(ipc_image_wire_camera_t) == 112U) ? 1 : -1];
 typedef char ipc_image_shared_data_size_must_be_336[
-    ((sizeof(struct image_data) * IMAGE_CAMERA_COUNT) == 336U) ? 1 : -1];
+    ((sizeof(ipc_image_wire_camera_t) * IMAGE_CAMERA_COUNT) == 336U) ? 1 : -1];
 
 #pragma location=".ipc_image_data"
-static volatile struct image_data s_ipc_image_data[IMAGE_CAMERA_COUNT];
+static volatile ipc_image_wire_camera_t s_ipc_image_data[IMAGE_CAMERA_COUNT];
 #pragma location=".ipc_image_camera_seq"
 volatile uint32 g_image_camera_seq[IMAGE_CAMERA_COUNT];
 #pragma location=".ipc_image_fresh_mask"
@@ -19,6 +32,8 @@ volatile uint32 g_image_data_fresh_mask;
 volatile uint32 g_image_data_seq;
 #pragma location=".ipc_image_guard"
 volatile uint32 g_image_data_guard;
+image_frame_meta_t image_frame_meta[IMAGE_CAMERA_COUNT]; /* 本核三摄最新帧号和统一采集时间。 */
+volatile image_sync_diag_t g_image_sync_diag; /* 本核最新帧新鲜度和采集时差诊断。 */
 #pragma location=".ipc_camera_spi_log"
 volatile ipc_camera_spi_log_t g_ipc_camera_spi_log;
 #pragma location=".ipc_remote_param_request"
@@ -108,6 +123,21 @@ typedef struct
 /* 最近一次已回复成功的核1 SET，用于处理响应与取消墓碑交叉时的补偿回滚。 */
 static ipc_remote_param_core1_set_cache_t s_remote_param_core1_set_cache;
 
+static void ipc_image_pack_shared_snapshot(void)
+{
+    uint8 camera_id;
+
+    for(camera_id = 0U; camera_id < IMAGE_CAMERA_COUNT; camera_id++)
+    {
+        memcpy((void *)s_ipc_image_data[camera_id].beacon_data,
+               image_data[camera_id].beacon_data,
+               sizeof(s_ipc_image_data[camera_id].beacon_data));
+        memcpy((void *)s_ipc_image_data[camera_id].car_lamp_data,
+               image_data[camera_id].car_lamp_data,
+               sizeof(s_ipc_image_data[camera_id].car_lamp_data));
+    }
+}
+
 /*
  * 函数功能: 将CM7_1本地图像结果一致性发布到共享内存并发送非阻塞通知。
  * 输入参数: fresh_mask为本次真实新算法结果对应的摄像头位掩码。
@@ -122,7 +152,7 @@ void ipc_image_publish(uint8 fresh_mask)
                             sizeof(g_image_data_guard));
     __DMB();
 
-    memcpy((void *)s_ipc_image_data, image_data, sizeof(image_data));
+    ipc_image_pack_shared_snapshot();
     SCB_CleanDCache_by_Addr((volatile void *)s_ipc_image_data,
                             sizeof(s_ipc_image_data));
     for(camera_id = 0U; camera_id < IMAGE_CAMERA_COUNT; camera_id++)
@@ -162,7 +192,23 @@ static volatile uint8 s_image_data_hint = 0U;
 static ipc_remote_param_mailbox_t s_remote_param_core0_request;
 static uint32 s_attitude_sequence = 0U;
 static uint32 s_image_data_last_seq = 0U;
-static struct image_data s_image_data_snapshot[IMAGE_CAMERA_COUNT];
+static ipc_image_wire_camera_t s_image_data_snapshot[IMAGE_CAMERA_COUNT];
+
+static void ipc_image_unpack_snapshot(void)
+{
+    uint8 camera_id;
+
+    for(camera_id = 0U; camera_id < IMAGE_CAMERA_COUNT; camera_id++)
+    {
+        memcpy(image_data[camera_id].beacon_data,
+               s_image_data_snapshot[camera_id].beacon_data,
+               sizeof(image_data[camera_id].beacon_data));
+        memcpy(image_data[camera_id].car_lamp_data,
+               s_image_data_snapshot[camera_id].car_lamp_data,
+               sizeof(image_data[camera_id].car_lamp_data));
+        image_data[camera_id].car_lamp_measured_mask = 0U;
+    }
+}
 
 void ipc_image_publish(uint8 fresh_mask)
 {
@@ -183,6 +229,8 @@ void ipc_image_init(void)
     for(camera_id = 0U; camera_id < IMAGE_CAMERA_COUNT; camera_id++)
     {
         image_data_clear(&image_data[camera_id]);
+        image_frame_meta_clear(&image_frame_meta[camera_id],
+                               (image_camera_e)camera_id);
     }
     g_image_data_rx_seq = 0U;
     g_image_data_rx_fresh_mask = 0U;
@@ -194,7 +242,8 @@ void ipc_image_init(void)
     g_image_data_fresh_mask = 0U;
     g_image_data_guard = 0U;
     memset((void *)g_image_camera_seq, 0, sizeof(g_image_camera_seq));
-    memcpy((void *)s_ipc_image_data, image_data, sizeof(image_data));
+    memset((void *)&g_image_sync_diag, 0, sizeof(g_image_sync_diag));
+    ipc_image_pack_shared_snapshot();
     SCB_CleanDCache_by_Addr((volatile void *)s_ipc_image_data,
                             sizeof(s_ipc_image_data));
     SCB_CleanDCache_by_Addr((volatile void *)g_image_camera_seq,
@@ -893,7 +942,7 @@ uint8 ipc_image_poll(void)
         return 0U;
     }
 
-    memcpy(image_data, s_image_data_snapshot, sizeof(image_data));
+    ipc_image_unpack_snapshot();
     memcpy((void *)g_image_camera_rx_seq,
            camera_seq_snapshot,
            sizeof(g_image_camera_rx_seq));

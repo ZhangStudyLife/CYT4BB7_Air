@@ -2,8 +2,6 @@
 #include "../code/FlightController/fc_mode.h"
 #include "../code/Image/image_data.h"
 #include "../code/Planner/beacon_lost_detector.h"
-#include "../code/Planner/CameraModel.h"
-#include "../code/Planner/car_lamp_fused.h"
 #include "../code/Planner/car_plan_2.h"
 #include "../code/Planner/car_plan_3.h"
 #include "../code/Estimation/Pos_Est/FlowGyroDecoupler_LC302.h"
@@ -44,7 +42,8 @@ static car_plan_3_result_t s_air_run_car_plan;
 static uint8 s_air_run_car_plan_valid = 0U;
 
 #define CAR_PLAN_DEBUG_PERIOD_MS          (5U)  /* 规划调试JustFloat发送周期，单位ms。 */
-#define CAR_PLAN_DEBUG_FLOAT_COUNT        (70U) /* 规划调试JustFloat用户float数量。 */
+#define CAR_PLAN_DEBUG_FLOAT_COUNT        (63U) /* CarPlan3 V2调试协议用户float数量。 */
+#define CAR_PLAN_DEBUG_PROTOCOL_VERSION   (3.0f) /* CarPlan3全局坐标调试协议版本。 */
 
 typedef struct
 {
@@ -65,8 +64,8 @@ static void car_plan_debug_200hz(void)
     static uint32 last_tick_ms = 0U;
     uint32 tick_now = tick_1000us_cnt;
     CarPlanWifiJustFloatPacket packet;
-    car_plan_2_debug_t plan_debug;
-    car_plan_2_result_t plan_result;
+    car_plan_3_debug_t plan_debug;
+    car_plan_3_result_t plan_result;
     float *data = packet.data;
     uint8 camera;
     uint8 beacon;
@@ -77,8 +76,8 @@ static void car_plan_debug_200hz(void)
         return;
     }
     last_tick_ms = tick_now;
-    CarPlan_2_GetDebug(&plan_debug);
-    CarPlan_2_GetResult(&plan_result);
+    CarPlan_3_GetDebug(&plan_debug);
+    CarPlan_3_GetResult(&plan_result);
 
     /* I1-I30: Front/Center/Back，各两个信标(x,y,area)和一个车灯(x,y,angle,length)。 */
     for (camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
@@ -119,22 +118,22 @@ static void car_plan_debug_200hz(void)
         }
     }
 
-    /* I31-I42: 三个Center融合信标(x,y,area,camera_mask)。 */
-    for (beacon = 0U; beacon < CAR_PLAN_2_DEBUG_BEACON_COUNT; beacon++)
+    /* I31-I46: 四个CarPlan3全局融合信标(x_m,y_m,area,camera_mask)。 */
+    for (beacon = 0U; beacon < CAR_PLAN_3_DEBUG_BEACON_COUNT; beacon++)
     {
-        const car_plan_2_debug_beacon_t *item = &plan_debug.beacon[beacon];
+        const car_plan_3_debug_beacon_t *item = &plan_debug.beacon[beacon];
         data[index++] = item->center_x;
         data[index++] = item->center_y;
         data[index++] = item->area;
         data[index++] = (float)item->camera_mask;
     }
-    /* I43-I46: Center融合车灯(x,y,angle,length)。 */
-    if (g_car_lamp_fused.valid != 0U)
+    /* I47-I50: CarPlan3全局融合车灯(x_m,y_m,angle,camera_mask)。 */
+    if (plan_debug.car_lamp.valid != 0U)
     {
-        data[index++] = g_car_lamp_fused.cx;
-        data[index++] = g_car_lamp_fused.cy;
-        data[index++] = g_car_lamp_fused.angle;
-        data[index++] = g_car_lamp_fused.length;
+        data[index++] = plan_debug.car_lamp.center_x;
+        data[index++] = plan_debug.car_lamp.center_y;
+        data[index++] = plan_debug.car_lamp.angle_deg;
+        data[index++] = (float)plan_debug.car_lamp.camera_mask;
     }
     else
     {
@@ -143,54 +142,8 @@ static void car_plan_debug_200hz(void)
         data[index++] = IMAGE_DATA_INVALID_VALUE;
         data[index++] = 0.0f;
     }
-
-    /* I47-I55: 三个CameraModel信标(x,y,area)。 */
-    for (beacon = 0U; beacon < CAR_PLAN_2_DEBUG_BEACON_COUNT; beacon++)
-    {
-        const car_plan_2_debug_beacon_t *item = &plan_debug.beacon[beacon];
-        if (item->valid != 0U)
-        {
-            CameraModel_MapPoint(item->center_x, item->center_y,
-                                 g_euler.roll, g_euler.pitch,
-                                 &data[index], &data[index + 1U]);
-            index += 2U;
-            data[index++] = item->area;
-        }
-        else
-        {
-            data[index++] = IMAGE_DATA_INVALID_VALUE;
-            data[index++] = IMAGE_DATA_INVALID_VALUE;
-            data[index++] = 0.0f;
-        }
-    }
-
-    /* I56-I59: CameraModel车灯(x,y,angle,length)。 */
-    if (g_car_lamp_fused.valid != 0U)
-    {
-        float angle_rad = g_car_lamp_fused.angle * 0.017453292519943295f;
-        float model_vx;
-        float model_vy;
-        CameraModel_MapPoint(g_car_lamp_fused.cx, g_car_lamp_fused.cy,
-                             g_euler.roll, g_euler.pitch,
-                             &data[index], &data[index + 1U]);
-        index += 2U;
-        CameraModel_MapVector(g_car_lamp_fused.cx, g_car_lamp_fused.cy,
-                              cosf(angle_rad), sinf(angle_rad),
-                              g_euler.roll, g_euler.pitch,
-                              &model_vx, &model_vy);
-        data[index++] = atan2f(model_vy, model_vx) * 57.29577951308232f;
-        data[index++] = g_car_lamp_fused.length *
-                        sqrtf(model_vx * model_vx + model_vy * model_vy);
-    }
-    else
-    {
-        data[index++] = IMAGE_DATA_INVALID_VALUE;
-        data[index++] = IMAGE_DATA_INVALID_VALUE;
-        data[index++] = IMAGE_DATA_INVALID_VALUE;
-        data[index++] = 0.0f;
-    }
-
-    /* I60-I70: 车状态、CarPlan2规划速度、飞机状态、当前融合信标槽位和关键片段标记。 */
+    /* I51-I63: CarPlan3有效状态、车状态、飞机状态、选中槽位、标记和协议版本。 */
+    data[index++] = (plan_result.valid != 0U) ? 1.0f : 0.0f;
     data[index++] = g_car_yaw;
     data[index++] = g_car_vel_x;
     data[index++] = g_car_vel_y;
@@ -202,6 +155,7 @@ static void car_plan_debug_200hz(void)
     data[index++] = g_euler.yaw;
     data[index++] = (float)plan_debug.selected_target_id;
     data[index++] = (CRSF_STD[8] > 0) ? 1.0f : 0.0f;
+    data[index++] = CAR_PLAN_DEBUG_PROTOCOL_VERSION;
 
     (void)wifi_justfloat_Array(data, CAR_PLAN_DEBUG_FLOAT_COUNT);
 }

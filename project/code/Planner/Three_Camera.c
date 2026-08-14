@@ -5,7 +5,7 @@
 #define THREE_CAMERA_BEACON_HEIGHT_M          (0.0233670966f) /* 标定信标有效高度，单位 m。 */
 #define THREE_CAMERA_LAMP_HEIGHT_M            (0.2490776486f) /* 标定车灯有效高度，单位 m。 */
 #define THREE_CAMERA_YAW_BIAS_RAD             (0.4068566800f) /* 标定全局航向偏置，单位 rad。 */
-#define THREE_CAMERA_BEACON_MERGE_DIST_M      (0.30f) /* 跨摄相同信标的保守合并半径，单位 m。 */
+#define THREE_CAMERA_BEACON_MERGE_DIST_M      (0.35f) /* 跨摄相同信标的Center锚点合并半径，单位 m。 */
 #define THREE_CAMERA_MAX_GROUND_DISTANCE_M    (15.0f) /* 射线地面求交允许的最大距离，单位 m。 */
 
 typedef struct
@@ -321,8 +321,7 @@ static void Three_Camera_BuildBeacons(const struct image_data image[IMAGE_CAMERA
         for(j = 0U; j < result->beacon_count; j++)
         {
             uint8 camera_bit = (uint8)(1U << candidate[i].camera);
-            uint8 member_camera;
-            float max_distance_sq = 0.0f;
+            float match_distance_sq = 0.0f;
 
             if(((result->beacon[j].camera_mask & camera_bit) != 0U) ||
                ((candidate[i].camera != Center) &&
@@ -331,24 +330,31 @@ static void Three_Camera_BuildBeacons(const struct image_data image[IMAGE_CAMERA
                 continue;
             }
 
-            for(member_camera = Front; member_camera < IMAGE_CAMERA_COUNT; member_camera++)
+            if(candidate[i].camera != Center)
             {
-                if((result->beacon[j].camera_mask & (uint8)(1U << member_camera)) != 0U)
+                float dx = candidate[i].x_m - member_x[j][Center];
+                float dy = candidate[i].y_m - member_y[j][Center];
+                match_distance_sq = dx * dx + dy * dy;
+            }
+            else
+            {
+                uint8 member_camera;
+                for(member_camera = Front; member_camera < IMAGE_CAMERA_COUNT; member_camera++)
                 {
-                    float dx = candidate[i].x_m - member_x[j][member_camera];
-                    float dy = candidate[i].y_m - member_y[j][member_camera];
-                    float distance_sq = dx * dx + dy * dy;
-                    if(distance_sq > max_distance_sq)
+                    if((result->beacon[j].camera_mask & (uint8)(1U << member_camera)) != 0U)
                     {
-                        max_distance_sq = distance_sq;
+                        float dx = candidate[i].x_m - member_x[j][member_camera];
+                        float dy = candidate[i].y_m - member_y[j][member_camera];
+                        match_distance_sq = dx * dx + dy * dy;
+                        break;
                     }
                 }
             }
 
-            if(max_distance_sq < best_distance_sq)
+            if(match_distance_sq < best_distance_sq)
             {
                 best = j;
-                best_distance_sq = max_distance_sq;
+                best_distance_sq = match_distance_sq;
             }
         }
 

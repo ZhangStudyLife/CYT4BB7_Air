@@ -13,7 +13,7 @@ typedef struct
     float target_center_y; /* 所选信标的世界对齐局部 Y 坐标，单位 m。 */
 } car_plan_3_result_t;
 
-#define CAR_PLAN_3_DEBUG_BEACON_COUNT (3U)
+#define CAR_PLAN_3_DEBUG_BEACON_COUNT (4U) /* 调试输出的全局融合信标最大数量。 */
 
 typedef struct
 {
@@ -26,7 +26,17 @@ typedef struct
 
 typedef struct
 {
+    uint8 valid;
+    uint8 camera_mask;
+    float center_x; /* 世界对齐局部 X 坐标，单位 m。 */
+    float center_y; /* 世界对齐局部 Y 坐标，单位 m。 */
+    float angle_deg; /* 车灯长轴在水平全局坐标系中的无向角度，单位 deg。 */
+} car_plan_3_debug_lamp_t;
+
+typedef struct
+{
     car_plan_3_debug_beacon_t beacon[CAR_PLAN_3_DEBUG_BEACON_COUNT];
+    car_plan_3_debug_lamp_t car_lamp;
     int8 selected_target_id;
 } car_plan_3_debug_t;
 

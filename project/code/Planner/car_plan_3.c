@@ -344,6 +344,11 @@ void CarPlan_3_GetDebug(car_plan_3_debug_t *debug)
         debug->beacon[i].center_y = IMAGE_DATA_INVALID_VALUE;
         debug->beacon[i].area = 0.0f;
     }
+    debug->car_lamp.valid = s_car_plan_3_camera.car_lamp.valid;
+    debug->car_lamp.camera_mask = s_car_plan_3_camera.car_lamp.camera_mask;
+    debug->car_lamp.center_x = s_car_plan_3_camera.car_lamp.x_m;
+    debug->car_lamp.center_y = s_car_plan_3_camera.car_lamp.y_m;
+    debug->car_lamp.angle_deg = s_car_plan_3_camera.car_lamp.angle_deg;
     debug->selected_target_id = -1;
 
     output_count = s_car_plan_3_camera.beacon_count;
@@ -358,16 +363,6 @@ void CarPlan_3_GetDebug(car_plan_3_debug_t *debug)
         debug->beacon[i].center_x = s_car_plan_3_camera.beacon[i].x_m;
         debug->beacon[i].center_y = s_car_plan_3_camera.beacon[i].y_m;
         debug->beacon[i].area = s_car_plan_3_camera.beacon[i].area;
-    }
-    if(s_car_plan_3_selected >= (int8)CAR_PLAN_3_DEBUG_BEACON_COUNT)
-    {
-        i = CAR_PLAN_3_DEBUG_BEACON_COUNT - 1U;
-        debug->beacon[i].valid = s_car_plan_3_camera.beacon[s_car_plan_3_selected].valid;
-        debug->beacon[i].camera_mask = s_car_plan_3_camera.beacon[s_car_plan_3_selected].camera_mask;
-        debug->beacon[i].center_x = s_car_plan_3_camera.beacon[s_car_plan_3_selected].x_m;
-        debug->beacon[i].center_y = s_car_plan_3_camera.beacon[s_car_plan_3_selected].y_m;
-        debug->beacon[i].area = s_car_plan_3_camera.beacon[s_car_plan_3_selected].area;
-        selected_output = (int8)i;
     }
     if(s_car_plan_3_result.valid != 0U)
     {

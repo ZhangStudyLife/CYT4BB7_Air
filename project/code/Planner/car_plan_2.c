@@ -1,5 +1,4 @@
 #include "car_plan_2.h"
-#include "car_plan.h"
 #include "CameraModel.h"
 #include "ProjectionCenter.h"
 #include "car_lamp_fused.h"
@@ -87,7 +86,7 @@ extern float g_car_vel_y; /* 车体前向实际速度，单位m/s。 */
 extern float g_car_yaw; /* 车模yaw角，单位deg。 */
 extern float g_car_sync_time_ms; /* 最近一次车端同步时间戳，单位ms。 */
 
-static car_plan_2_result_t s_car_plan_2_result; /* 最近一次影子规划输出。 */
+static car_plan_result_t s_car_plan_2_result; /* 最近一次影子规划输出。 */
 static car_plan_2_lock_t s_car_plan_2_lock; /* 物理信标锁定位置、历史位置和计数状态。 */
 static car_plan_2_cluster_t s_car_plan_2_debug_clusters[CAR_PLAN_2_MAX_CANDIDATE_COUNT]; /* 最近一次融合信标簇快照。 */
 static uint8 s_car_plan_2_debug_cluster_count; /* 最近一次融合信标簇数量。 */
@@ -97,14 +96,11 @@ static uint8 s_car_plan_2_debug_cluster_count; /* 最近一次融合信标簇数
  * @param result 待清零的结果指针。
  * @return 无。
  */
-static void CarPlan_2_ClearResult(car_plan_2_result_t *result)
+static void CarPlan_2_ClearResult(car_plan_result_t *result)
 {
     result->valid = 0U;
-    result->camera_mask = 0U;
     result->target_strafe_mps = 0.0f;
     result->target_forward_mps = 0.0f;
-    result->target_center_x = 0.0f;
-    result->target_center_y = 0.0f;
 }
 
 /**
@@ -112,7 +108,7 @@ static void CarPlan_2_ClearResult(car_plan_2_result_t *result)
  * @param result 输出结果指针；允许为空。
  * @return 无。
  */
-static void CarPlan_2_CopyResult(car_plan_2_result_t *result)
+static void CarPlan_2_CopyResult(car_plan_result_t *result)
 {
     if(result != 0)
     {
@@ -278,7 +274,7 @@ static uint8 CarPlan_2_BuildClusters(car_plan_2_cluster_t clusters[CAR_PLAN_2_MA
  * @return 结果有效时返回1，否则返回0。
  */
 static uint8 CarPlan_2_MakeResult(const car_plan_2_cluster_t *cluster,
-                                  car_plan_2_result_t *result)
+                                  car_plan_result_t *result)
 {
     float car_center_x;
     float car_center_y;
@@ -379,11 +375,8 @@ static uint8 CarPlan_2_MakeResult(const car_plan_2_cluster_t *cluster,
     /* 差速车按速度向量模长归一化，避免斜向指令被放大。 */
     speed_scale = plan_speed / sqrtf(strafe * strafe + forward * forward);
     result->valid = 1U;
-    result->camera_mask = cluster->camera_mask;
     result->target_strafe_mps = strafe * speed_scale;
     result->target_forward_mps = forward * speed_scale;
-    result->target_center_x = cluster->center_x;
-    result->target_center_y = cluster->center_y;
     return 1U;
 }
 
@@ -392,7 +385,7 @@ static uint8 CarPlan_2_MakeResult(const car_plan_2_cluster_t *cluster,
  * @param result 输入速度规划结果。
  * @return 两个速度方向的余弦值；速度无效时返回-1。
  */
-static float CarPlan_2_VelocityCos(const car_plan_2_result_t *result)
+static float CarPlan_2_VelocityCos(const car_plan_result_t *result)
 {
     float car_speed = sqrtf(g_car_vel_x * g_car_vel_x + g_car_vel_y * g_car_vel_y);
     float target_speed = sqrtf(result->target_strafe_mps * result->target_strafe_mps +
@@ -413,7 +406,7 @@ static float CarPlan_2_VelocityCos(const car_plan_2_result_t *result)
  * @return 无。
  */
 static void CarPlan_2_LockCluster(const car_plan_2_cluster_t *cluster,
-                                  const car_plan_2_result_t *result)
+                                  const car_plan_result_t *result)
 {
     s_car_plan_2_lock.valid = 1U;
     s_car_plan_2_lock.center_x = cluster->center_x;
@@ -434,7 +427,7 @@ static void CarPlan_2_LockCluster(const car_plan_2_cluster_t *cluster,
 static uint8 CarPlan_2_Acquire(const car_plan_2_cluster_t *clusters,
                                uint8 cluster_count)
 {
-    car_plan_2_result_t result;
+    car_plan_result_t result;
     uint8 selected_index = 0xFFU;
     uint8 selected_compatible = 0U;
     uint8 i;
@@ -530,10 +523,10 @@ void CarPlan_2_Reset(void)
  * @param result 输出规划结果；允许传入空指针。
  * @return 规划结果有效时返回1，否则返回0。
  */
-uint8 CarPlan_2_Update(car_plan_2_result_t *result)
+uint8 CarPlan_2_Update(car_plan_result_t *result)
 {
     car_plan_2_cluster_t clusters[CAR_PLAN_2_MAX_CANDIDATE_COUNT];
-    car_plan_2_result_t candidate_result;
+    car_plan_result_t candidate_result;
     uint8 cluster_count = CarPlan_2_BuildClusters(clusters);
     uint8 selected_index = 0xFFU;
     uint8 i;
@@ -599,7 +592,7 @@ uint8 CarPlan_2_Update(car_plan_2_result_t *result)
         /* 每个替代目标同时检查严重逆速纠错和明显近灯抢占。 */
         for(i = 0U; i < cluster_count; i++)
         {
-            car_plan_2_result_t challenger_result;
+            car_plan_result_t challenger_result;
             float dist_sq;
             float velocity_cos;
             uint8 same_camera;
@@ -729,7 +722,7 @@ uint8 CarPlan_2_Update(car_plan_2_result_t *result)
  * @param result 输出规划结果；允许传入空指针。
  * @return 无。
  */
-void CarPlan_2_GetResult(car_plan_2_result_t *result)
+void CarPlan_2_GetResult(car_plan_result_t *result)
 {
     CarPlan_2_CopyResult(result);
 }
@@ -766,9 +759,9 @@ void CarPlan_2_GetDebug(car_plan_2_debug_t *debug)
         for(i = 0U; i < s_car_plan_2_debug_cluster_count; i++)
         {
             float dx = s_car_plan_2_debug_clusters[i].center_x -
-                       s_car_plan_2_result.target_center_x;
+                       s_car_plan_2_lock.center_x;
             float dy = s_car_plan_2_debug_clusters[i].center_y -
-                       s_car_plan_2_result.target_center_y;
+                       s_car_plan_2_lock.center_y;
             float dist_sq = dx * dx + dy * dy;
             if(dist_sq < best_dist_sq)
             {

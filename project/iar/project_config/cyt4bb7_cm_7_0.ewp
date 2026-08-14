@@ -1755,6 +1755,12 @@
                 <name>$PROJ_DIR$\..\..\code\Planner\car_lamp_fused.h</name>
             </file>
             <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\car_plan_entry.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\car_plan_entry.h</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\..\..\code\Planner\car_plan.c</name>
             </file>
             <file>

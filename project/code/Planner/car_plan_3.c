@@ -25,9 +25,7 @@ typedef struct
 } car_plan_3_beacon_track_t;
 
 extern float g_car_yaw;
-extern float Car_Speed;
-
-static car_plan_3_result_t s_car_plan_3_result;
+static car_plan_result_t s_car_plan_3_result;
 static three_camera_result_t s_car_plan_3_camera;
 static int8 s_car_plan_3_selected = -1;
 static car_plan_3_beacon_track_t
@@ -184,11 +182,8 @@ static void CarPlan_3_FilterNearLamp(
 static void CarPlan_3_ClearResult(void)
 {
     s_car_plan_3_result.valid = 0U;
-    s_car_plan_3_result.camera_mask = 0U;
     s_car_plan_3_result.target_strafe_mps = 0.0f;
     s_car_plan_3_result.target_forward_mps = 0.0f;
-    s_car_plan_3_result.target_center_x = 0.0f;
-    s_car_plan_3_result.target_center_y = 0.0f;
     s_car_plan_3_selected = -1;
 }
 
@@ -221,7 +216,7 @@ void CarPlan_3_Reset(void)
     }
 }
 
-uint8 CarPlan_3_Update(car_plan_3_result_t *result)
+uint8 CarPlan_3_Update(car_plan_result_t *result)
 {
     struct image_data filtered[IMAGE_CAMERA_COUNT];
     uint8 i;
@@ -302,13 +297,10 @@ uint8 CarPlan_3_Update(car_plan_3_result_t *result)
 
     scale = Car_Speed / distance;
     s_car_plan_3_result.valid = 1U;
-    s_car_plan_3_result.camera_mask = s_car_plan_3_camera.beacon[selected].camera_mask;
     s_car_plan_3_result.target_strafe_mps =
         (dx * right_x + dy * right_y) * scale;
     s_car_plan_3_result.target_forward_mps =
         (dx * right_y - dy * right_x) * scale;
-    s_car_plan_3_result.target_center_x = s_car_plan_3_camera.beacon[selected].x_m;
-    s_car_plan_3_result.target_center_y = s_car_plan_3_camera.beacon[selected].y_m;
     s_car_plan_3_selected = (int8)selected;
 
     if(result != 0)
@@ -318,7 +310,7 @@ uint8 CarPlan_3_Update(car_plan_3_result_t *result)
     return 1U;
 }
 
-void CarPlan_3_GetResult(car_plan_3_result_t *result)
+void CarPlan_3_GetResult(car_plan_result_t *result)
 {
     if(result != 0)
     {

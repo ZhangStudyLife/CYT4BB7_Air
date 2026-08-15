@@ -42,6 +42,7 @@ static car_plan_result_t s_air_run_car_plan;
 #define CAR_PLAN_DEBUG_PERIOD_MS          (5U)  /* 规划调试JustFloat发送周期，单位ms。 */
 #define CAR_PLAN_DEBUG_FLOAT_COUNT        (63U) /* CarPlan3 V2调试协议用户float数量。 */
 #define CAR_PLAN_DEBUG_PROTOCOL_VERSION   (3.0f) /* CarPlan3全局坐标调试协议版本。 */
+#define MODE12_DEBUG_FLOAT_COUNT          (48U) /* Mode1/2跟车控制调试数据数量。 */
 
 typedef struct
 {
@@ -156,6 +157,92 @@ static void car_plan_debug_200hz(void)
     data[index++] = CAR_PLAN_DEBUG_PROTOCOL_VERSION;
 
     (void)wifi_justfloat_Array(data, CAR_PLAN_DEBUG_FLOAT_COUNT);
+}
+
+/**
+ * @brief 以200Hz发送当前Mode1/2无人机跟车控制调试数据。
+ * @param 无。
+ * @return 无。
+ */
+static void mode12_wifi_debug_200hz(void)
+{
+    static uint32 last_tick_ms = 0U;
+    FC_START_CRSF_flight_mode_e mode = FC_START_CRSF_Get_Flight_Mode();
+    uint32 tick_now = tick_1000us_cnt;
+    float data[MODE12_DEBUG_FLOAT_COUNT];
+
+    if ((FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING) ||
+        ((mode != FC_START_CRSF_FLIGHT_MODE_1) &&
+         (mode != FC_START_CRSF_FLIGHT_MODE_2)))
+    {
+        last_tick_ms = tick_now;
+        return;
+    }
+    if ((tick_now - last_tick_ms) < CAR_PLAN_DEBUG_PERIOD_MS)
+    {
+        return;
+    }
+    last_tick_ms = tick_now;
+
+    data[0] = (float)mode;                         /* I1 飞行模式。 */
+    data[1] = (float)((mode == FC_START_CRSF_FLIGHT_MODE_1) ?
+                          g_mode1_control_seq : g_mode2_control_seq); /* I2 100Hz控制序号。 */
+    data[2] = (float)tick_now;                     /* I3 飞机时间，ms。 */
+    data[3] = g_car_sync_time_ms;                  /* I4 车端时间，ms。 */
+    data[4] = g_car_vel_x;                         /* I5 车实际横移速度，m/s。 */
+    data[5] = g_car_vel_y;                         /* I6 车实际前进速度，m/s。 */
+    data[6] = g_car_yaw;                           /* I7 车Yaw，deg。 */
+    data[7] = g_car_yaw_rate_dps;                  /* I8 车Yaw角速度，deg/s。 */
+    data[8] = g_car_vel_target_x;                  /* I9 车目标横移速度，m/s。 */
+    data[9] = g_car_vel_target_y;                  /* I10 车目标前进速度，m/s。 */
+    data[10] = g_euler.roll;                       /* I11 飞机实际Roll，deg。 */
+    data[11] = g_euler.pitch;                      /* I12 飞机实际Pitch，deg。 */
+    data[12] = g_euler.yaw;                        /* I13 飞机实际Yaw，deg。 */
+    data[13] = roll_angle_target;                  /* I14 飞机目标Roll，deg。 */
+    data[14] = pitch_angle_target;                 /* I15 飞机目标Pitch，deg。 */
+    data[15] = yaw_angle_target;                   /* I16 飞机目标Yaw，deg。 */
+    data[16] = g_imufilter_1000hz.gyrox;           /* I17 实际Roll角速度，deg/s。 */
+    data[17] = g_imufilter_1000hz.gyroy;           /* I18 实际Pitch角速度，deg/s。 */
+    data[18] = g_imufilter_1000hz.gyroz;           /* I19 实际Yaw角速度，deg/s。 */
+    data[19] = roll_gyro_target;                   /* I20 目标Roll角速度，deg/s。 */
+    data[20] = pitch_gyro_target;                  /* I21 目标Pitch角速度，deg/s。 */
+    data[21] = yaw_gyro_target;                    /* I22 目标Yaw角速度，deg/s。 */
+    data[30] = g_car_vel_target_x - g_car_vel_x;   /* I31 车X速度误差滤波前，m/s。 */
+    data[31] = g_car_vel_target_y - g_car_vel_y;   /* I32 车Y速度误差滤波前，m/s。 */
+    data[38] = g_car_vel_y * g_car_yaw_rate_dps * 0.017453292519943295f; /* I39 向心加速度滤波前，m/s^2。 */
+
+    if (mode == FC_START_CRSF_FLIGHT_MODE_1)
+    {
+        data[22] = g_mode1_imgx_pid.error; data[23] = g_mode1_imgy_pid.error;
+        data[24] = g_mode1_imgx_pid.p_term; data[25] = g_mode1_imgy_pid.p_term;
+        data[26] = g_mode1_imgx_pid.d_term; data[27] = g_mode1_imgy_pid.d_term;
+        data[28] = g_mode1_img_error_rate_x_pxps; data[29] = g_mode1_img_error_rate_y_pxps;
+        data[32] = g_mode1_car_vel_error_x_mps; data[33] = g_mode1_car_vel_error_y_mps;
+        data[34] = g_mode1_car_body_accel_x_mps2; data[35] = g_mode1_car_body_accel_y_mps2;
+        data[36] = g_mode1_car_accel_x_mps2; data[37] = g_mode1_car_accel_y_mps2;
+        data[39] = g_mode1_car_turn_accel_mps2;
+        data[40] = g_mode1_car_accel_angle_ff_x_deg; data[41] = g_mode1_car_accel_angle_ff_y_deg;
+        data[42] = g_mode1_imgx_pid.output; data[43] = g_mode1_imgy_pid.output;
+        data[44] = g_mode1_raw_roll_correction_deg; data[45] = g_mode1_raw_pitch_correction_deg;
+        data[46] = g_mode1_yaw_diff_deg; data[47] = g_mode1_car_dt_ms;
+    }
+    else
+    {
+        data[22] = g_mode2_imgx_pid.error; data[23] = g_mode2_imgy_pid.error;
+        data[24] = g_mode2_imgx_pid.p_term; data[25] = g_mode2_imgy_pid.p_term;
+        data[26] = g_mode2_imgx_pid.d_term; data[27] = g_mode2_imgy_pid.d_term;
+        data[28] = g_mode2_img_error_rate_x_pxps; data[29] = g_mode2_img_error_rate_y_pxps;
+        data[32] = g_mode2_car_vel_error_x_mps; data[33] = g_mode2_car_vel_error_y_mps;
+        data[34] = g_mode2_car_body_accel_x_mps2; data[35] = g_mode2_car_body_accel_y_mps2;
+        data[36] = g_mode2_car_accel_x_mps2; data[37] = g_mode2_car_accel_y_mps2;
+        data[39] = g_mode2_car_turn_accel_mps2;
+        data[40] = g_mode2_car_accel_angle_ff_x_deg; data[41] = g_mode2_car_accel_angle_ff_y_deg;
+        data[42] = g_mode2_imgx_pid.output; data[43] = g_mode2_imgy_pid.output;
+        data[44] = g_mode2_raw_roll_correction_deg; data[45] = g_mode2_raw_pitch_correction_deg;
+        data[46] = g_mode2_yaw_diff_deg; data[47] = g_mode2_car_dt_ms;
+    }
+
+    (void)wifi_justfloat_Array(data, MODE12_DEBUG_FLOAT_COUNT);
 }
 
 /**
@@ -307,7 +394,8 @@ static void core0_run_fast_loop_step(void)
 
     FC_Loop_1000Hz();
     air_comm_air_poll();
-    car_plan_debug_200hz();
+    // car_plan_debug_200hz(); /* 临时关闭CarPlan3调试，改发Mode1/2跟车控制数据。 */
+    mode12_wifi_debug_200hz();
 }
 
 /**

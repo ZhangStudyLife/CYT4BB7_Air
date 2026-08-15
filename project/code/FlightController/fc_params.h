@@ -169,39 +169,6 @@ typedef struct
     float mode4_car_accel_ff;               /* 模式4车加速度角度前馈，单位deg/(m/s^2) */
     float mode4_car_turn_accel_ff;          /* 模式4向心加速度角度前馈，单位deg/(m/s^2) */
     float mode4_car_turn_accel_lpf_hz;      /* 模式4向心加速度低通截止频率，单位Hz */
-    /* ===== Mode 3 image, velocity and turn feedforward params ===== */
-    float mode3_img_x_kp;
-    float mode3_img_x_kp2;
-    float mode3_img_x_ki;
-    float mode3_img_x_kd;
-    float mode3_img_x_kff;
-    float mode3_img_x_i_limit;
-    float mode3_img_x_d_lpf;
-    float mode3_img_y_kp;
-    float mode3_img_y_kp2;
-    float mode3_img_y_ki;
-    float mode3_img_y_kd;
-    float mode3_img_y_kff;
-    float mode3_img_y_i_limit;
-    float mode3_img_y_d_lpf;
-    float mode3_vel_x_kp;
-    float mode3_vel_x_ki;
-    float mode3_vel_x_kd;
-    float mode3_vel_x_kff;
-    float mode3_vel_x_i_limit;
-    float mode3_vel_x_d_lpf;
-    float mode3_vel_y_kp;
-    float mode3_vel_y_ki;
-    float mode3_vel_y_kd;
-    float mode3_vel_y_kff;
-    float mode3_vel_y_i_limit;
-    float mode3_vel_y_d_lpf;
-    float mode3_kp_car_x;
-    float mode3_kp_car_y;
-    float mode3_turn_accel_ff_gain_x;
-    float mode3_turn_accel_ff_gain_y;
-    float mode3_turn_accel_ff_limit_x_deg;
-    float mode3_turn_accel_ff_limit_y_deg;
     float mode7_vel_x_kp;
     float mode7_vel_x_ki;
     float mode7_vel_x_kd;
@@ -217,7 +184,6 @@ typedef struct
     /* ===== 各模式航向对准开关：0=关闭，1=开启 ===== */
     float yaw_change_mode1;
     float yaw_change_mode2;
-    float yaw_change_mode3;
     float yaw_change_mode4;
     float yaw_change_mode5;
     float yaw_change_mode8;

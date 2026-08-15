@@ -18,8 +18,6 @@
 #define BEEP_ALARM_CAR_DATA_LOST    (1U << 3)
 /* Mode4飞行中融合车灯丢失持续报警位 */
 #define BEEP_ALARM_MODE4_LAMP_LOST  (1U << 4)
-/* Mode3飞行中融合车灯丢失持续报警位 */
-#define BEEP_ALARM_MODE3_LAMP_LOST  (1U << 5)
 /* Mode1飞行中融合车灯丢失持续报警位 */
 #define BEEP_ALARM_MODE1_LAMP_LOST  (1U << 6)
 

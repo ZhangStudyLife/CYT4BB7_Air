@@ -208,6 +208,39 @@ void FC_Mode2_Control100Hz(float dt);
 float FC_Mode2_Get_Fixed_Height_M(void);
 
 /*
+ * 函数名: FC_Mode3_Init
+ * 功能: 初始化模式3控制所需资源
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode3_Init(void);
+
+/*
+ * 函数名: FC_Mode3_Reset
+ * 功能: 复位模式3控制状态
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode3_Reset(void);
+
+/*
+ * 函数名: FC_Mode3_100Hz
+ * 功能: 执行模式3的100Hz控制
+ * 输入参数: 无
+ * 返回值: 无
+ */
+void FC_Mode3_100Hz(void);
+
+/*
+ * 函数名: FC_Mode3_50Hz
+ * 功能: 执行模式3的50Hz控制
+ * 输入参数:
+ *   dt - 本次50Hz调用周期，单位 s
+ * 返回值: 无
+ */
+void FC_Mode3_50Hz(float dt);
+
+/*
  * 模式7 X/Y 轴速度环 PID 实例。
  * 作用: 供外部模块读取速度环输出和调试状态。
  */
@@ -296,17 +329,6 @@ extern float g_mode5_yaw_diff_deg;
 extern uint32 g_mode5_control_seq;
 
 /*
- * 模式3 X/Y 轴速度环 PID 实例。
- * 作用: 供外部模块读取图像跟随速度目标和速度环调试状态。
- */
-extern pid_t g_mode3_velx_pid;
-extern pid_t g_mode3_vely_pid;
-extern pid_t g_mode3_imgx_pid;
-extern pid_t g_mode3_imgy_pid;
-extern float g_mode3_velx_target;
-extern float g_mode3_vely_target;
-
-/*
  * 模式8 X/Y 轴速度环 PID 实例。
  * 作用: 供外部模块读取图像跟随速度目标和速度环调试状态。
  */
@@ -316,39 +338,6 @@ extern pid_t g_mode8_imgx_pid;
 extern pid_t g_mode8_imgy_pid;
 extern float g_mode8_velx_target;
 extern float g_mode8_vely_target;
-
-/*
- * 函数名: FC_Mode3_Init
- * 功能: 初始化模式3控制所需资源
- * 输入参数: 无
- * 返回值: 无
- */
-void FC_Mode3_Init(void);
-
-/*
- * 函数名: FC_Mode3_Reset
- * 功能: 复位模式3控制状态
- * 输入参数: 无
- * 返回值: 无
- */
-void FC_Mode3_Reset(void);
-
-/*
- * 函数名: FC_Mode3_100Hz
- * 功能: 执行模式3的100Hz控制
- * 输入参数: 无
- * 返回值: 无
- */
-void FC_Mode3_100Hz(void);
-
-/*
- * 函数名: FC_Mode3_Control100Hz
- * 功能: 执行模式3的100Hz图像控制
- * 输入参数:
- *   dt - 本次100Hz调用周期，单位s
- * 返回值: 无
- */
-void FC_Mode3_Control100Hz(float dt);
 
 /*
  * 函数名: FC_Mode4_Init

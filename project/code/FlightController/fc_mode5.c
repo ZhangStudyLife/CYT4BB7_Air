@@ -15,6 +15,7 @@ extern float g_car_vel_target_x;
 extern float g_car_vel_target_y;
 extern float g_car_yaw;
 extern float g_car_yaw_rate_dps;
+extern float g_car_large_turn_state;
 extern float g_car_sync_time_ms;
 extern uint32 g_car_last_update_time_ms;
 extern volatile uint32 tick_1000us_cnt;
@@ -191,7 +192,7 @@ void FC_Mode5_Control100Hz(float dt)
                        FC_MODE_CAR_RUN_DATA_TIMEOUT_MS))
                          ? 1U
                          : 0U;
-    if (car_data_fresh != 0U)
+    if ((car_data_fresh != 0U) && (g_car_large_turn_state != 2.0f))
     {
         if (g_car_sync_time_ms != s_mode5_prev_car_sync_time_ms)
         {

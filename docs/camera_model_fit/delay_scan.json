@@ -1,0 +1,50 @@
+{
+  "pinhole_k1": {
+    "delays_ms": [
+      5.0,
+      5.0,
+      10.0
+    ],
+    "baseline_worst_p90": 9.1965303510593,
+    "best_worst_p90": 9.190459953689368,
+    "baseline_coverage": 0.981473154060617,
+    "best_coverage": 0.9814881434181731,
+    "accepted": false
+  },
+  "double_sphere": {
+    "delays_ms": [
+      0.0,
+      20.0,
+      5.0
+    ],
+    "baseline_worst_p90": 7.466011201284334,
+    "best_worst_p90": 7.458658292659889,
+    "baseline_coverage": 0.9814434534962152,
+    "best_coverage": 0.981413475230458,
+    "accepted": false
+  },
+  "kb8": {
+    "delays_ms": [
+      0.0,
+      25.0,
+      0.0
+    ],
+    "baseline_worst_p90": 7.434299924980035,
+    "best_worst_p90": 7.420112889016336,
+    "baseline_coverage": 0.981593068921066,
+    "best_coverage": 0.9816380369937344,
+    "accepted": false
+  },
+  "double_sphere_lut": {
+    "delays_ms": [
+      5.0,
+      25.0,
+      0.0
+    ],
+    "baseline_worst_p90": 7.843576572358457,
+    "best_worst_p90": 7.829551450374326,
+    "baseline_coverage": 0.9817282470209099,
+    "best_coverage": 0.9820130405456045,
+    "accepted": false
+  }
+}

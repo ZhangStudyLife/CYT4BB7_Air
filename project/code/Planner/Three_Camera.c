@@ -2,19 +2,23 @@
 #include <math.h>
 
 #define THREE_CAMERA_DEG_TO_RAD              (0.017453292519943295f) /* 角度转弧度系数。 */
-#define THREE_CAMERA_BEACON_HEIGHT_M          (0.0233670966f) /* 标定信标有效高度，单位 m。 */
-#define THREE_CAMERA_LAMP_HEIGHT_M            (0.2490776486f) /* 标定车灯有效高度，单位 m。 */
 #define THREE_CAMERA_YAW_BIAS_RAD             (0.4068566800f) /* 标定全局航向偏置，单位 rad。 */
 #define THREE_CAMERA_BEACON_MERGE_DIST_M      (0.35f) /* 跨摄相同信标的Center锚点合并半径，单位 m。 */
 #define THREE_CAMERA_MAX_GROUND_DISTANCE_M    (15.0f) /* 射线地面求交允许的最大距离，单位 m。 */
+#define THREE_CAMERA_MIN_TARGET_DISTANCE_M    (0.20f) /* 可信车灯到信标的最小水平距离，单位 m。 */
+#define THREE_CAMERA_MAX_TARGET_DISTANCE_M    (6.00f) /* 可信车灯到信标的最大水平距离，单位 m。 */
+#define THREE_CAMERA_MODEL_EPSILON            (1.0e-9f) /* Double Sphere 反投影数值有效下限。 */
 
 typedef struct
 {
-    float f;
+    float fx;
+    float fy;
     float cx;
     float cy;
-    float k1;
+    float xi;
+    float alpha;
     float camera_to_body[3][3];
+    float translation_body_m[3];
 } three_camera_model_t;
 
 typedef struct
@@ -25,31 +29,45 @@ typedef struct
     float area;
 } three_camera_beacon_candidate_t;
 
-static const three_camera_model_t s_camera_model[IMAGE_CAMERA_COUNT] = /* 三摄经验内参与相机到机体安装旋转。 */
+typedef struct
+{
+    uint8 valid;
+    float x_m;
+    float y_m;
+    float angle_deg;
+} three_camera_lamp_candidate_t;
+
+static const three_camera_model_t s_camera_model[IMAGE_CAMERA_COUNT] = /* 全部十四份日志拟合的三摄 Double Sphere 内参与外参。 */
 {
     {
-        77.2632115f, 10.0431456f, 7.1929172f, 0.7000000f,
+        71.7570054f, 70.0177938f, 5.8066460f, -2.5659040f,
+        0.0009974444f, 0.6857957924f,
         {
-            { -0.053257901f, -0.823901336f, 0.564225295f },
-            {  0.997565442f, -0.018423355f, 0.067258975f },
-            { -0.045019836f,  0.566433728f, 0.822876690f }
-        }
+            {  0.328805000f, -0.673514123f,  0.662016614f },
+            {  0.944181161f,  0.249454533f, -0.215161269f },
+            { -0.020228892f,  0.695809717f,  0.717941245f }
+        },
+        { 0.097267947f, -0.073577331f, 0.108041939f }
     },
     {
-        81.0801880f, 5.4973460f, 1.2174406f, 0.7000000f,
+        88.6280238f, 88.8896160f, -0.9190572f, -8.5521674f,
+        0.0817724181f, 0.8428244724f,
         {
-            { -0.032443015f, -0.995479870f, -0.089259618f },
-            {  0.996951194f, -0.038572645f,  0.067826744f },
-            { -0.070963138f, -0.086786978f,  0.993696258f }
-        }
+            { 0.373888666f, -0.923008236f,  0.090901382f },
+            { 0.926386770f,  0.366909197f, -0.084765525f },
+            { 0.044886725f,  0.115902707f,  0.992245808f }
+        },
+        { 0.0f, 0.0f, 0.0f }
     },
     {
-        82.3499934f, -1.1395418f, -5.2939230f, 0.7000000f,
+        96.5658910f, 95.0879483f, -2.4708303f, -4.0846191f,
+        0.3264669553f, 0.8498357380f,
         {
-            {  0.156584158f, 0.727257310f, -0.668265072f },
-            { -0.985382340f, 0.069061905f, -0.155730851f },
-            { -0.067104741f, 0.682881584f,  0.727440510f }
-        }
+            { -0.274327186f,  0.686353730f, -0.673545212f },
+            { -0.958778654f, -0.249173054f,  0.136588003f },
+            { -0.074081632f,  0.683250574f,  0.726416248f }
+        },
+        { -0.047753704f, -0.018246207f, 0.131915899f }
     }
 };
 
@@ -72,9 +90,14 @@ static void Three_Camera_ClearResult(three_camera_result_t *result)
     {
         result->beacon[i].valid = 0U;
         result->beacon[i].camera_mask = 0U;
+        result->beacon[i].pair_valid = 0U;
+        result->beacon[i].pair_same_camera = 0U;
         result->beacon[i].x_m = 0.0f;
         result->beacon[i].y_m = 0.0f;
         result->beacon[i].area = 0.0f;
+        result->beacon[i].pair_dx_m = 0.0f;
+        result->beacon[i].pair_dy_m = 0.0f;
+        result->beacon[i].pair_lamp_angle_deg = 0.0f;
     }
 }
 
@@ -107,55 +130,91 @@ static void Three_Camera_BuildWorldRotation(float roll_rad,
 }
 
 /*
- * 函数功能: 将单个相机像素射线与目标高度平面求交，得到飞机光心原点的水平全局坐标。
- * 输入参数: camera - 相机编号；x/y - 中心化像素坐标；height_m - 目标高度；air_height_m - 飞机高度；world - 姿态旋转矩阵。
- * 输出参数/返回值: 成功时通过 out_x/out_y 返回坐标，返回 1；射线不朝向地面或超量程时返回 0。
+ * 函数功能: 使用 Double Sphere 将单个像素反投影，并与 z=0 地面求交得到水平全局坐标。
+ * 输入参数: camera - 相机编号；x/y - 中心化像素坐标；air_height_m - 飞机高度；world - 姿态旋转矩阵。
+ * 输出参数/返回值: 成功时通过 out_x/out_y 返回坐标，返回 1；模型无解、射线不朝向地面或超量程时返回 0。
  */
 static uint8 Three_Camera_ProjectPoint(uint8 camera,
                                        float x,
                                        float y,
-                                       float height_m,
                                        float air_height_m,
                                        const float world[3][3],
                                        float *out_x,
                                        float *out_y)
 {
     const three_camera_model_t *model = &s_camera_model[camera];
-    float ray_x = (x - model->cx) / model->f;
-    float ray_y = (y - model->cy) / model->f;
-    float gain = 1.0f + model->k1 * (ray_x * ray_x + ray_y * ray_y);
+    float normalized_x = (x - model->cx) / model->fx;
+    float normalized_y = (y - model->cy) / model->fy;
+    float radius_sq = normalized_x * normalized_x + normalized_y * normalized_y;
+    float inside = 1.0f - (2.0f * model->alpha - 1.0f) * radius_sq;
+    float mz;
+    float second;
+    float gain;
+    float ray_x;
+    float ray_y;
+    float ray_z;
     float body_x;
     float body_y;
     float body_z;
+    float world_origin_x;
+    float world_origin_y;
+    float world_origin_z;
     float world_x;
     float world_y;
     float world_z;
     float distance;
 
-    ray_x *= gain;
-    ray_y *= gain;
+    if(inside <= THREE_CAMERA_MODEL_EPSILON)
+    {
+        return 0U;
+    }
+    mz = (1.0f - model->alpha * model->alpha * radius_sq) /
+         (model->alpha * sqrtf(inside) + 1.0f - model->alpha);
+    second = mz * mz + (1.0f - model->xi * model->xi) * radius_sq;
+    if(second <= THREE_CAMERA_MODEL_EPSILON ||
+       (mz * mz + radius_sq) <= THREE_CAMERA_MODEL_EPSILON)
+    {
+        return 0U;
+    }
+    gain = (mz * model->xi + sqrtf(second)) / (mz * mz + radius_sq);
+    ray_x = gain * normalized_x;
+    ray_y = gain * normalized_y;
+    ray_z = gain * mz - model->xi;
+
     body_x = model->camera_to_body[0][0] * ray_x +
-             model->camera_to_body[0][1] * ray_y + model->camera_to_body[0][2];
+             model->camera_to_body[0][1] * ray_y +
+             model->camera_to_body[0][2] * ray_z;
     body_y = model->camera_to_body[1][0] * ray_x +
-             model->camera_to_body[1][1] * ray_y + model->camera_to_body[1][2];
+             model->camera_to_body[1][1] * ray_y +
+             model->camera_to_body[1][2] * ray_z;
     body_z = model->camera_to_body[2][0] * ray_x +
-             model->camera_to_body[2][1] * ray_y + model->camera_to_body[2][2];
+             model->camera_to_body[2][1] * ray_y +
+             model->camera_to_body[2][2] * ray_z;
     world_x = world[0][0] * body_x + world[0][1] * body_y + world[0][2] * body_z;
     world_y = world[1][0] * body_x + world[1][1] * body_y + world[1][2] * body_z;
     world_z = world[2][0] * body_x + world[2][1] * body_y + world[2][2] * body_z;
+    world_origin_x = world[0][0] * model->translation_body_m[0] +
+                     world[0][1] * model->translation_body_m[1] +
+                     world[0][2] * model->translation_body_m[2];
+    world_origin_y = world[1][0] * model->translation_body_m[0] +
+                     world[1][1] * model->translation_body_m[1] +
+                     world[1][2] * model->translation_body_m[2];
+    world_origin_z = world[2][0] * model->translation_body_m[0] +
+                     world[2][1] * model->translation_body_m[1] +
+                     world[2][2] * model->translation_body_m[2];
     if(world_z <= 0.0001f)
     {
         return 0U;
     }
 
-    distance = (air_height_m - height_m) / world_z;
+    distance = (air_height_m - world_origin_z) / world_z;
     if((distance <= 0.0f) || (distance > THREE_CAMERA_MAX_GROUND_DISTANCE_M))
     {
         return 0U;
     }
 
-    *out_x = distance * world_x;
-    *out_y = distance * world_y;
+    *out_x = world_origin_x + distance * world_x;
+    *out_y = world_origin_y + distance * world_y;
     return 1U;
 }
 
@@ -181,7 +240,6 @@ static uint8 Three_Camera_ProjectLampAngle(uint8 camera,
        (Three_Camera_ProjectPoint(camera,
                                   lamp->cx - half_length * cosf(angle_rad),
                                   lamp->cy - half_length * sinf(angle_rad),
-                                  THREE_CAMERA_LAMP_HEIGHT_M,
                                   air_height_m,
                                   world,
                                   &x1,
@@ -189,7 +247,6 @@ static uint8 Three_Camera_ProjectLampAngle(uint8 camera,
        (Three_Camera_ProjectPoint(camera,
                                   lamp->cx + half_length * cosf(angle_rad),
                                   lamp->cy + half_length * sinf(angle_rad),
-                                  THREE_CAMERA_LAMP_HEIGHT_M,
                                   air_height_m,
                                   world,
                                   &x2,
@@ -204,12 +261,13 @@ static uint8 Three_Camera_ProjectLampAngle(uint8 camera,
 
 /*
  * 函数功能: 融合三路车灯的世界坐标与无向长轴角度。
- * 输入参数: image - 三路原始图像检测结果；air_height_m - 飞机高度；world - 姿态旋转矩阵；result - 融合输出。
+ * 输入参数: image - 三路原始图像检测结果；air_height_m - 飞机高度；world - 姿态旋转矩阵；lamp_candidate - 各摄像头车灯投影；result - 融合输出。
  * 输出参数/返回值: 无。
  */
 static void Three_Camera_BuildLamp(const struct image_data image[IMAGE_CAMERA_COUNT],
                                    float air_height_m,
                                    const float world[3][3],
+                                   three_camera_lamp_candidate_t lamp_candidate[IMAGE_CAMERA_COUNT],
                                    three_camera_result_t *result)
 {
     uint8 camera;
@@ -225,15 +283,20 @@ static void Three_Camera_BuildLamp(const struct image_data image[IMAGE_CAMERA_CO
         float x_m;
         float y_m;
         float angle_deg;
+
+        lamp_candidate[camera].valid = 0U;
         if((image_data_car_lamp_valid(lamp) == 0U) ||
            (Three_Camera_ProjectPoint(camera, lamp->cx, lamp->cy,
-                                      THREE_CAMERA_LAMP_HEIGHT_M, air_height_m,
-                                      world, &x_m, &y_m) == 0U) ||
+                                      air_height_m, world, &x_m, &y_m) == 0U) ||
            (Three_Camera_ProjectLampAngle(camera, lamp, air_height_m,
                                           world, &angle_deg) == 0U))
         {
             continue;
         }
+        lamp_candidate[camera].valid = 1U;
+        lamp_candidate[camera].x_m = x_m;
+        lamp_candidate[camera].y_m = y_m;
+        lamp_candidate[camera].angle_deg = angle_deg;
         sum_x += x_m;
         sum_y += y_m;
         sum_cos2 += cosf(2.0f * angle_deg * THREE_CAMERA_DEG_TO_RAD);
@@ -251,7 +314,65 @@ static void Three_Camera_BuildLamp(const struct image_data image[IMAGE_CAMERA_CO
     }
 }
 
+/*
+ * 函数功能: 为融合信标更新同摄优先、距离最近的车灯相对向量。
+ * 输入参数: candidate - 当前信标投影；lamp_candidate - 各摄像头车灯投影；beacon - 待更新融合信标。
+ * 输出参数/返回值: 无；仅接受 0.20-6.00 m 的可信组合。
+ */
+static void Three_Camera_UpdateBeaconPair(
+    const three_camera_beacon_candidate_t *candidate,
+    const three_camera_lamp_candidate_t lamp_candidate[IMAGE_CAMERA_COUNT],
+    three_camera_beacon_t *beacon)
+{
+    uint8 camera;
+
+    for(camera = Front; camera < IMAGE_CAMERA_COUNT; camera++)
+    {
+        uint8 same_camera;
+        float dx;
+        float dy;
+        float distance_sq;
+        float current_distance_sq;
+
+        if(lamp_candidate[camera].valid == 0U)
+        {
+            continue;
+        }
+        same_camera = (camera == candidate->camera) ? 1U : 0U;
+        dx = candidate->x_m - lamp_candidate[camera].x_m;
+        dy = candidate->y_m - lamp_candidate[camera].y_m;
+        distance_sq = dx * dx + dy * dy;
+        if((distance_sq < THREE_CAMERA_MIN_TARGET_DISTANCE_M *
+                          THREE_CAMERA_MIN_TARGET_DISTANCE_M) ||
+           (distance_sq > THREE_CAMERA_MAX_TARGET_DISTANCE_M *
+                          THREE_CAMERA_MAX_TARGET_DISTANCE_M))
+        {
+            continue;
+        }
+        current_distance_sq = beacon->pair_dx_m * beacon->pair_dx_m +
+                              beacon->pair_dy_m * beacon->pair_dy_m;
+        if((beacon->pair_valid != 0U) &&
+           ((beacon->pair_same_camera > same_camera) ||
+            ((beacon->pair_same_camera == same_camera) &&
+             (current_distance_sq <= distance_sq))))
+        {
+            continue;
+        }
+        beacon->pair_valid = 1U;
+        beacon->pair_same_camera = same_camera;
+        beacon->pair_dx_m = dx;
+        beacon->pair_dy_m = dy;
+        beacon->pair_lamp_angle_deg = lamp_candidate[camera].angle_deg;
+    }
+}
+
+/*
+ * 函数功能: 将一个相机信标成员加入融合信标，并更新优选车灯相对向量。
+ * 输入参数: candidate - 当前信标投影；lamp_candidate - 各摄像头车灯投影；camera - 当前相机；result - 融合输出；result_index - 融合信标下标；member_count - 成员计数。
+ * 输出参数/返回值: 无。
+ */
 static void Three_Camera_AddBeacon(const three_camera_beacon_candidate_t *candidate,
+                                   const three_camera_lamp_candidate_t lamp_candidate[IMAGE_CAMERA_COUNT],
                                    uint8 camera,
                                    three_camera_result_t *result,
                                    uint8 result_index,
@@ -270,16 +391,19 @@ static void Three_Camera_AddBeacon(const three_camera_beacon_candidate_t *candid
     }
     result->beacon[result_index].camera_mask |= (uint8)(1U << camera);
     member_count[result_index]++;
+    Three_Camera_UpdateBeaconPair(candidate, lamp_candidate,
+                                  &result->beacon[result_index]);
 }
 
 /*
  * 函数功能: 将三摄信标候选按世界坐标合并为物理信标。
- * 输入参数: image - 三路原始图像检测结果；air_height_m - 飞机高度；world - 姿态旋转矩阵；result - 融合输出。
+ * 输入参数: image - 三路原始图像检测结果；air_height_m - 飞机高度；world - 姿态旋转矩阵；lamp_candidate - 各摄像头车灯投影；result - 融合输出。
  * 输出参数/返回值: 无。
  */
 static void Three_Camera_BuildBeacons(const struct image_data image[IMAGE_CAMERA_COUNT],
                                       float air_height_m,
                                       const float world[3][3],
+                                      const three_camera_lamp_candidate_t lamp_candidate[IMAGE_CAMERA_COUNT],
                                       three_camera_result_t *result)
 {
     three_camera_beacon_candidate_t candidate[IMAGE_CAMERA_COUNT * IMAGE_MAX_BEACON_COUNT];
@@ -298,7 +422,6 @@ static void Three_Camera_BuildBeacons(const struct image_data image[IMAGE_CAMERA
             const beacon_data *beacon = &image[camera].beacon_data[index];
             if((image_data_beacon_valid(beacon) == 0U) ||
                (Three_Camera_ProjectPoint(camera, beacon->x, beacon->y,
-                                           THREE_CAMERA_BEACON_HEIGHT_M,
                                            air_height_m, world,
                                            &candidate[candidate_count].x_m,
                                            &candidate[candidate_count].y_m) == 0U))
@@ -367,7 +490,8 @@ static void Three_Camera_BuildBeacons(const struct image_data image[IMAGE_CAMERA
             best = result->beacon_count++;
         }
 
-        Three_Camera_AddBeacon(&candidate[i], candidate[i].camera, result,
+        Three_Camera_AddBeacon(&candidate[i], lamp_candidate,
+                               candidate[i].camera, result,
                                best, member_count);
         member_x[best][candidate[i].camera] = candidate[i].x_m;
         member_y[best][candidate[i].camera] = candidate[i].y_m;
@@ -375,10 +499,10 @@ static void Three_Camera_BuildBeacons(const struct image_data image[IMAGE_CAMERA
 }
 
 /*
- * 函数功能: 将三摄原始检测直接投影到水平全局坐标系，并融合车灯与信标。
+ * 函数功能: 使用三摄 Double Sphere 模型将原始检测投影到水平全局坐标系，融合物理信标并生成同摄优先相对向量。
  * 输入参数: image - 三路原始检测；roll_deg/pitch_deg/yaw_deg - 飞机欧拉角，单位 deg；
  *           height_mm - 飞机离地高度，单位 mm；height_valid - 高度有效标志；result - 融合输出。
- * 输出参数/返回值: 投影输入有效时返回 1；高度无效、输入为空或输出为空时返回 0。
+ * 输出参数/返回值: 通过 result 输出融合坐标和优选相对向量；投影输入有效时返回 1，高度无效、输入为空或输出为空时返回 0。
  */
 uint8 Three_Camera_Update(const struct image_data image[IMAGE_CAMERA_COUNT],
                           float roll_deg,
@@ -390,6 +514,7 @@ uint8 Three_Camera_Update(const struct image_data image[IMAGE_CAMERA_COUNT],
 {
     float world[3][3];
     float air_height_m;
+    three_camera_lamp_candidate_t lamp_candidate[IMAGE_CAMERA_COUNT];
 
     if(result == 0)
     {
@@ -406,7 +531,9 @@ uint8 Three_Camera_Update(const struct image_data image[IMAGE_CAMERA_COUNT],
                                     pitch_deg * THREE_CAMERA_DEG_TO_RAD,
                                     yaw_deg * THREE_CAMERA_DEG_TO_RAD + THREE_CAMERA_YAW_BIAS_RAD,
                                     world);
-    Three_Camera_BuildLamp(image, air_height_m, world, result);
-    Three_Camera_BuildBeacons(image, air_height_m, world, result);
+    Three_Camera_BuildLamp(image, air_height_m, world,
+                           lamp_candidate, result);
+    Three_Camera_BuildBeacons(image, air_height_m, world,
+                              lamp_candidate, result);
     return 1U;
 }

@@ -4,8 +4,9 @@
 #include "../Estimation/Height_Est/Height_Est.h"
 #include <math.h>
 
-#define CAR_PLAN_3_DEG_TO_RAD       (0.017453292519943295f)
-#define CAR_PLAN_3_MIN_DISTANCE_M   (0.001f)
+#define CAR_PLAN_3_DEG_TO_RAD       (0.017453292519943295f) /* 角度转弧度系数。 */
+#define CAR_PLAN_3_MIN_DISTANCE_M   (0.20f) /* 可信车灯到信标的最小水平距离，单位 m。 */
+#define CAR_PLAN_3_MAX_DISTANCE_M   (6.00f) /* 可信车灯到信标的最大水平距离，单位 m。 */
 #define CAR_PLAN_3_NEAR_LAMP_DIST_PX (3.0f)  /* 信标与同摄车灯中心的近距离阈值，单位 px。 */
 #define CAR_PLAN_3_TRACK_MATCH_PX    (15.0f) /* 原始信标短时轨迹匹配半径，单位 px。 */
 #define CAR_PLAN_3_FAR_LAMP_DIST_PX  (10.0f) /* 允许信标靠近车灯前必须到达的历史距离，单位 px。 */
@@ -216,11 +217,17 @@ void CarPlan_3_Reset(void)
     }
 }
 
+/**
+ * @brief 使用三摄 Double Sphere 几何计算最近信标的车体系目标速度，同摄组合优先于跨摄组合。
+ * @param result 输出车体系横向和前向目标速度；允许传入空指针。
+ * @return 成功得到 0.20-6.00 m 内可信目标方向时返回 1，否则清空输出并返回 0。
+ */
 uint8 CarPlan_3_Update(car_plan_result_t *result)
 {
     struct image_data filtered[IMAGE_CAMERA_COUNT];
     uint8 i;
     uint8 selected = 0xFFU;
+    uint8 same_pair_available = 0U;
     float selected_distance_sq = 0.0f;
     float dx;
     float dy;
@@ -248,20 +255,34 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
         return 0U;
     }
 
+    /* 只要存在同摄组合，本帧就不使用跨摄组合。 */
+    for(i = 0U; i < s_car_plan_3_camera.beacon_count; i++)
+    {
+        if((s_car_plan_3_camera.beacon[i].valid != 0U) &&
+           (s_car_plan_3_camera.beacon[i].pair_valid != 0U) &&
+           (s_car_plan_3_camera.beacon[i].pair_same_camera != 0U))
+        {
+            same_pair_available = 1U;
+            break;
+        }
+    }
+
+    /* 在允许的同摄或跨摄组合中选择水平距离最近的物理信标。 */
     for(i = 0U; i < s_car_plan_3_camera.beacon_count; i++)
     {
         float candidate_dx;
         float candidate_dy;
         float candidate_distance_sq;
 
-        if(s_car_plan_3_camera.beacon[i].valid == 0U)
+        if((s_car_plan_3_camera.beacon[i].valid == 0U) ||
+           (s_car_plan_3_camera.beacon[i].pair_valid == 0U) ||
+           ((same_pair_available != 0U) &&
+            (s_car_plan_3_camera.beacon[i].pair_same_camera == 0U)))
         {
             continue;
         }
-        candidate_dx = s_car_plan_3_camera.beacon[i].x_m -
-                       s_car_plan_3_camera.car_lamp.x_m;
-        candidate_dy = s_car_plan_3_camera.beacon[i].y_m -
-                       s_car_plan_3_camera.car_lamp.y_m;
+        candidate_dx = s_car_plan_3_camera.beacon[i].pair_dx_m;
+        candidate_dy = s_car_plan_3_camera.beacon[i].pair_dy_m;
         candidate_distance_sq = candidate_dx * candidate_dx +
                                 candidate_dy * candidate_dy;
         if(selected == 0xFFU || candidate_distance_sq < selected_distance_sq)
@@ -272,7 +293,8 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
     }
 
     if(selected == 0xFFU ||
-       selected_distance_sq <= CAR_PLAN_3_MIN_DISTANCE_M * CAR_PLAN_3_MIN_DISTANCE_M)
+       selected_distance_sq < CAR_PLAN_3_MIN_DISTANCE_M * CAR_PLAN_3_MIN_DISTANCE_M ||
+       selected_distance_sq > CAR_PLAN_3_MAX_DISTANCE_M * CAR_PLAN_3_MAX_DISTANCE_M)
     {
         if(result != 0)
         {
@@ -281,14 +303,16 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
         return 0U;
     }
 
-    dx = s_car_plan_3_camera.beacon[selected].x_m - s_car_plan_3_camera.car_lamp.x_m;
-    dy = s_car_plan_3_camera.beacon[selected].y_m - s_car_plan_3_camera.car_lamp.y_m;
+    dx = s_car_plan_3_camera.beacon[selected].pair_dx_m;
+    dy = s_car_plan_3_camera.beacon[selected].pair_dy_m;
     distance = sqrtf(selected_distance_sq);
-    angle_rad = s_car_plan_3_camera.car_lamp.angle_deg * CAR_PLAN_3_DEG_TO_RAD;
+    angle_rad = s_car_plan_3_camera.beacon[selected].pair_lamp_angle_deg *
+                CAR_PLAN_3_DEG_TO_RAD;
     right_x = cosf(angle_rad);
     right_y = sinf(angle_rad);
     /* 车灯长轴是车体横轴；yaw只用于将无向长轴统一到车体右向。 */
-    if(cosf((s_car_plan_3_camera.car_lamp.angle_deg - g_car_yaw - 90.0f) *
+    if(cosf((s_car_plan_3_camera.beacon[selected].pair_lamp_angle_deg -
+             g_car_yaw - 90.0f) *
             CAR_PLAN_3_DEG_TO_RAD) < 0.0f)
     {
         right_x = -right_x;

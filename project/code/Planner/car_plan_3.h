@@ -32,9 +32,11 @@ typedef struct
 
 void CarPlan_3_Reset(void);
 
-/*
- * 使用三摄图像确定车灯到最近信标的目标向量，并使用融合车灯长轴建立车体横轴。
- * g_car_yaw 只用于消除车灯长轴的 180 度方向歧义，不替代图像目标方向。
+/**
+ * @brief 使用三摄 Double Sphere 几何确定车灯到最近信标的目标速度，同摄组合优先于跨摄组合。
+ * @param result 输出车体系横向和前向目标速度；允许传入空指针。
+ * @return 成功得到可信目标方向时返回 1，否则清空输出并返回 0。
+ * @note g_car_yaw 只用于消除所选车灯长轴的 180 度方向歧义，不替代图像目标方向。
  */
 uint8 CarPlan_3_Update(car_plan_result_t *result);
 void CarPlan_3_GetResult(car_plan_result_t *result);

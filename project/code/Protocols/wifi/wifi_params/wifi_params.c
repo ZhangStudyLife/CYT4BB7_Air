@@ -102,9 +102,6 @@ static const wifi_params_entry_t s_wifi_params_table[] =
     WIFI_PARAMS_FLOAT_ITEM("vel_z_i_limit", vel_z_i_limit, 0.0f, 5000.0f),
     WIFI_PARAMS_FLOAT_ITEM("vel_z_d_lpf", vel_z_d_lpf, 0.0f, 500.0f),
 
-    WIFI_PARAMS_FLOAT_ITEM("mode1_track_ff_deg_per_cmps", mode1_track_ff_deg_per_cmps, 0.0f, 1.0f),
-    WIFI_PARAMS_FLOAT_ITEM("mode1_brake_kp", mode1_brake_kp, 0.0f, 50.0f),
-    WIFI_PARAMS_FLOAT_ITEM("mode1_brake_exit_vel_cmps", mode1_brake_exit_vel_cmps, 0.0f, 300.0f),
     WIFI_PARAMS_FLOAT_ITEM("mode7_vel_x_kp", mode7_vel_x_kp, 0.0f, 3000.0f),
     WIFI_PARAMS_FLOAT_ITEM("mode7_vel_x_ki", mode7_vel_x_ki, 0.0f, 3000.0f),
     WIFI_PARAMS_FLOAT_ITEM("mode7_vel_x_kd", mode7_vel_x_kd, 0.0f, 3000.0f),

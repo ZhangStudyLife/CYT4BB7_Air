@@ -9,7 +9,7 @@ volatile uint32 tick_1000us_cnt = 0U;
 volatile uint16 g_tick_1000HZ = 0U;
 static uint16 s_air_comm_beep_tick = 200U; /* 空地串口断联蜂鸣器的100Hz节拍计数 */
 
-#define AIR_RUN_DATA_CRITICAL_COUNT       (15U) /* 飞行期间下发的关键数据数量 */
+#define AIR_RUN_DATA_CRITICAL_COUNT       (16U) /* 飞行期间下发的关键数据数量 */
 #define AIR_RUN_DATA_DIAGNOSTIC_COUNT     (52U) /* 常态下发的完整诊断数据数量 */
 #define AIR_RUN_CRITICAL_STATE            (0U)  /* 飞机运行状态 */
 #define AIR_RUN_CRITICAL_CRSF_CH0         (1U)  /* CRSF标准化通道0 */
@@ -26,6 +26,7 @@ static uint16 s_air_comm_beep_tick = 200U; /* 空地串口断联蜂鸣器的100H
 #define AIR_RUN_CRITICAL_PLAN_STRAFE      (12U) /* 车模规划横移速度，单位m/s */
 #define AIR_RUN_CRITICAL_PLAN_FORWARD     (13U) /* 车模规划前进速度，单位m/s */
 #define AIR_RUN_CRITICAL_BEACON_LOST      (14U) /* 信标丢失标志 */
+#define AIR_RUN_CRITICAL_SYNC_TIME        (15U) /* 飞机同步时间，单位ms */
 
 float g_car_vel_x = 0.0f; // 这个是车的速度 这个变量大于0 , 车往右
 float g_car_vel_y = 0.0f; // 这个是车的速度 这个变量大于0 , 车往前
@@ -42,6 +43,11 @@ static car_plan_result_t s_air_run_car_plan;
 #define CAR_PLAN_DEBUG_PERIOD_MS          (5U)  /* 规划调试JustFloat发送周期，单位ms。 */
 #define CAR_PLAN_DEBUG_FLOAT_COUNT        (63U) /* CarPlan3 V2调试协议用户float数量。 */
 #define CAR_PLAN_DEBUG_PROTOCOL_VERSION   (3.0f) /* CarPlan3全局坐标调试协议版本。 */
+#define MODE1245_DEBUG_FLOAT_COUNT        (30U) /* Mode1/2/4/5飞机控制调试数据数量。 */
+
+#if (MODE1245_DEBUG_FLOAT_COUNT > (WIFI_JUSTFLOAT_MAX_FLOAT_NUM - 1U))
+#error "Mode1/2/4/5 debug channels exceed JustFloat protocol capacity"
+#endif
 
 typedef struct
 {
@@ -159,6 +165,125 @@ static void car_plan_debug_200hz(void)
 }
 
 /**
+ * @brief 以200Hz发送当前Mode1/2/4/5无人机控制调试数据。
+ * @param 无。
+ * @return 无。
+ */
+static void mode1245_wifi_debug_200hz(void)
+{
+    static uint32 last_tick_ms = 0U;
+    FC_START_CRSF_flight_mode_e mode = FC_START_CRSF_Get_Flight_Mode();
+    uint32 tick_now = tick_1000us_cnt;
+    pid_t *imgx_pid;
+    pid_t *imgy_pid;
+    uint32 control_seq;
+    float car_vel_error_x_mps;
+    float car_vel_error_y_mps;
+    float car_accel_angle_ff_x_deg;
+    float car_accel_angle_ff_y_deg;
+    float car_dt_ms;
+    float data[MODE1245_DEBUG_FLOAT_COUNT];
+
+    if (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING)
+    {
+        last_tick_ms = tick_now;
+        return;
+    }
+
+    switch (mode)
+    {
+        case FC_START_CRSF_FLIGHT_MODE_1:
+            imgx_pid = &g_mode1_imgx_pid;
+            imgy_pid = &g_mode1_imgy_pid;
+            control_seq = g_mode1_control_seq;
+            car_vel_error_x_mps = g_mode1_car_vel_error_x_mps;
+            car_vel_error_y_mps = g_mode1_car_vel_error_y_mps;
+            car_accel_angle_ff_x_deg = g_mode1_car_accel_angle_ff_x_deg;
+            car_accel_angle_ff_y_deg = g_mode1_car_accel_angle_ff_y_deg;
+            car_dt_ms = g_mode1_car_dt_ms;
+            break;
+
+        case FC_START_CRSF_FLIGHT_MODE_2:
+            imgx_pid = &g_mode2_imgx_pid;
+            imgy_pid = &g_mode2_imgy_pid;
+            control_seq = g_mode2_control_seq;
+            car_vel_error_x_mps = g_mode2_car_vel_error_x_mps;
+            car_vel_error_y_mps = g_mode2_car_vel_error_y_mps;
+            car_accel_angle_ff_x_deg = g_mode2_car_accel_angle_ff_x_deg;
+            car_accel_angle_ff_y_deg = g_mode2_car_accel_angle_ff_y_deg;
+            car_dt_ms = g_mode2_car_dt_ms;
+            break;
+
+        case FC_START_CRSF_FLIGHT_MODE_4:
+            imgx_pid = &g_mode4_imgx_pid;
+            imgy_pid = &g_mode4_imgy_pid;
+            control_seq = g_mode4_control_seq;
+            car_vel_error_x_mps = g_mode4_car_vel_error_x_mps;
+            car_vel_error_y_mps = g_mode4_car_vel_error_y_mps;
+            car_accel_angle_ff_x_deg = g_mode4_car_accel_angle_ff_x_deg;
+            car_accel_angle_ff_y_deg = g_mode4_car_accel_angle_ff_y_deg;
+            car_dt_ms = g_mode4_car_dt_ms;
+            break;
+
+        case FC_START_CRSF_FLIGHT_MODE_5:
+            imgx_pid = &g_mode5_imgx_pid;
+            imgy_pid = &g_mode5_imgy_pid;
+            control_seq = g_mode5_control_seq;
+            car_vel_error_x_mps = g_mode5_car_vel_error_x_mps;
+            car_vel_error_y_mps = g_mode5_car_vel_error_y_mps;
+            car_accel_angle_ff_x_deg = g_mode5_car_accel_angle_ff_x_deg;
+            car_accel_angle_ff_y_deg = g_mode5_car_accel_angle_ff_y_deg;
+            car_dt_ms = g_mode5_car_dt_ms;
+            break;
+
+        default:
+            last_tick_ms = tick_now;
+            return;
+    }
+
+    if ((tick_now - last_tick_ms) < CAR_PLAN_DEBUG_PERIOD_MS)
+    {
+        return;
+    }
+    last_tick_ms = tick_now;
+
+    data[0] = (float)mode;
+    data[1] = (float)control_seq;
+    data[2] = (float)CRSF_STD[0];
+    data[3] = (float)CRSF_STD[1];
+    data[4] = (float)s_air_run_car_plan.valid;
+    data[5] = (s_air_run_car_plan.valid != 0U) ?
+                  s_air_run_car_plan.target_strafe_mps : 0.0f;
+    data[6] = (s_air_run_car_plan.valid != 0U) ?
+                  s_air_run_car_plan.target_forward_mps : 0.0f;
+    data[7] = g_euler.roll;
+    data[8] = g_euler.pitch;
+    data[9] = g_euler.yaw;
+    data[10] = roll_angle_target;
+    data[11] = pitch_angle_target;
+    data[12] = yaw_angle_target;
+    data[13] = g_imufilter_1000hz.gyrox;
+    data[14] = g_imufilter_1000hz.gyroy;
+    data[15] = g_imufilter_1000hz.gyroz;
+    data[16] = roll_gyro_target;
+    data[17] = pitch_gyro_target;
+    data[18] = yaw_gyro_target;
+    data[19] = imgx_pid->error;
+    data[20] = imgy_pid->error;
+    data[21] = imgx_pid->p_term;
+    data[22] = imgy_pid->p_term;
+    data[23] = imgx_pid->d_term;
+    data[24] = imgy_pid->d_term;
+    data[25] = car_vel_error_x_mps;
+    data[26] = car_vel_error_y_mps;
+    data[27] = car_accel_angle_ff_x_deg;
+    data[28] = car_accel_angle_ff_y_deg;
+    data[29] = car_dt_ms;
+
+    (void)wifi_justfloat_Array(data, MODE1245_DEBUG_FLOAT_COUNT);
+}
+
+/**
  * @brief 接收并保存小车实时运行数据。
  * @param data 小车发送的float数据数组。
  * @param count 数组中的float数量，当前协议固定为11。
@@ -219,6 +344,7 @@ static void send_air_run_data_200hz(void)
         air_data[AIR_RUN_CRITICAL_PLAN_STRAFE] = plan_strafe_mps;
         air_data[AIR_RUN_CRITICAL_PLAN_FORWARD] = plan_forward_mps;
         air_data[AIR_RUN_CRITICAL_BEACON_LOST] = beacon_lost;
+        air_data[AIR_RUN_CRITICAL_SYNC_TIME] = (float)tick_1000us_cnt;
         (void)air_comm_send_run_data(air_data, AIR_RUN_DATA_CRITICAL_COUNT);
         return;
     }
@@ -307,7 +433,8 @@ static void core0_run_fast_loop_step(void)
 
     FC_Loop_1000Hz();
     air_comm_air_poll();
-    car_plan_debug_200hz();
+    // car_plan_debug_200hz(); /* 临时关闭CarPlan3调试，改发Mode1/2/4/5控制数据。 */
+    mode1245_wifi_debug_200hz();
 }
 
 /**

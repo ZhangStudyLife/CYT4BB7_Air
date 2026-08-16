@@ -208,84 +208,6 @@ void FC_Mode2_Control100Hz(float dt);
 float FC_Mode2_Get_Fixed_Height_M(void);
 
 /*
- * 模式7 X/Y 轴速度环 PID 实例。
- * 作用: 供外部模块读取速度环输出和调试状态。
- */
-extern pid_t g_mode7_velx_pid;
-extern pid_t g_mode7_vely_pid;
-extern float g_mode7_velx_target;
-extern float g_mode7_vely_target;
-/* 模式2 X/Y轴图像PD状态，供控制与调试读取。 */
-extern pid_t g_mode2_imgx_pid;
-extern pid_t g_mode2_imgy_pid;
-/* 模式2车加速度前馈产生的Roll角度，单位deg。 */
-extern float g_mode2_car_accel_angle_ff_x_deg;
-/* 模式2车加速度前馈产生的Pitch角度，单位deg。 */
-extern float g_mode2_car_accel_angle_ff_y_deg;
-/* 模式2滤波车加速度X/Y，单位m/s^2。 */
-extern float g_mode2_car_accel_x_mps2;
-extern float g_mode2_car_accel_y_mps2;
-/* 模式2限幅前的Roll/Pitch修正，单位deg。 */
-extern float g_mode2_raw_roll_correction_deg;
-extern float g_mode2_raw_pitch_correction_deg;
-extern float g_mode2_img_error_rate_x_pxps;
-extern float g_mode2_img_error_rate_y_pxps;
-extern float g_mode2_car_vel_error_x_mps;
-extern float g_mode2_car_vel_error_y_mps;
-extern float g_mode2_car_body_accel_x_mps2;
-extern float g_mode2_car_body_accel_y_mps2;
-extern float g_mode2_car_turn_accel_mps2;
-extern float g_mode2_yaw_diff_deg;
-extern uint32 g_mode2_control_seq;
-extern pid_t g_mode5_velx_pid;
-extern pid_t g_mode5_vely_pid;
-extern pid_t g_mode5_imgx_pid;
-extern pid_t g_mode5_imgy_pid;
-extern float g_mode5_velx_target;
-extern float g_mode5_vely_target;
-
-/*
- * 模式4 X/Y 轴速度环 PID 实例。
- * 作用: 供外部模块读取图像跟随速度目标和速度环调试状态。
- */
-extern pid_t g_mode4_velx_pid;
-extern pid_t g_mode4_vely_pid;
-extern pid_t g_mode4_imgx_pid;
-extern pid_t g_mode4_imgy_pid;
-extern float g_mode4_velx_target;
-extern float g_mode4_vely_target;
-/* 模式4车速前馈产生的X轴速度目标，单位cm/s。 */
-extern float g_mode4_car_velocity_ff_x_cmps;
-/* 模式4车速前馈产生的Y轴速度目标，单位cm/s。 */
-extern float g_mode4_car_velocity_ff_y_cmps;
-/* 模式4转向加速度前馈产生的Roll角度，单位deg。 */
-extern float g_mode4_turn_angle_ff_x_deg;
-/* 模式4转向加速度前馈产生的Pitch角度，单位deg。 */
-extern float g_mode4_turn_angle_ff_y_deg;
-
-/*
- * 模式3 X/Y 轴速度环 PID 实例。
- * 作用: 供外部模块读取图像跟随速度目标和速度环调试状态。
- */
-extern pid_t g_mode3_velx_pid;
-extern pid_t g_mode3_vely_pid;
-extern pid_t g_mode3_imgx_pid;
-extern pid_t g_mode3_imgy_pid;
-extern float g_mode3_velx_target;
-extern float g_mode3_vely_target;
-
-/*
- * 模式8 X/Y 轴速度环 PID 实例。
- * 作用: 供外部模块读取图像跟随速度目标和速度环调试状态。
- */
-extern pid_t g_mode8_velx_pid;
-extern pid_t g_mode8_vely_pid;
-extern pid_t g_mode8_imgx_pid;
-extern pid_t g_mode8_imgy_pid;
-extern float g_mode8_velx_target;
-extern float g_mode8_vely_target;
-
-/*
  * 函数名: FC_Mode3_Init
  * 功能: 初始化模式3控制所需资源
  * 输入参数: 无
@@ -310,13 +232,112 @@ void FC_Mode3_Reset(void);
 void FC_Mode3_100Hz(void);
 
 /*
- * 函数名: FC_Mode3_Control100Hz
- * 功能: 执行模式3的100Hz图像控制
+ * 函数名: FC_Mode3_50Hz
+ * 功能: 执行模式3的50Hz控制
  * 输入参数:
- *   dt - 本次100Hz调用周期，单位s
+ *   dt - 本次50Hz调用周期，单位 s
  * 返回值: 无
  */
-void FC_Mode3_Control100Hz(float dt);
+void FC_Mode3_50Hz(float dt);
+
+/*
+ * 模式7 X/Y 轴速度环 PID 实例。
+ * 作用: 供外部模块读取速度环输出和调试状态。
+ */
+extern pid_t g_mode7_velx_pid;
+extern pid_t g_mode7_vely_pid;
+extern float g_mode7_velx_target;
+extern float g_mode7_vely_target;
+/* 模式1图像PD、车加速度前馈与调试状态。 */
+extern pid_t g_mode1_imgx_pid;
+extern pid_t g_mode1_imgy_pid;
+extern float g_mode1_car_accel_angle_ff_x_deg;
+extern float g_mode1_car_accel_angle_ff_y_deg;
+extern float g_mode1_car_accel_x_mps2;
+extern float g_mode1_car_accel_y_mps2;
+extern float g_mode1_raw_roll_correction_deg;
+extern float g_mode1_raw_pitch_correction_deg;
+extern float g_mode1_img_error_rate_x_pxps;
+extern float g_mode1_img_error_rate_y_pxps;
+extern float g_mode1_car_dt_ms;
+extern float g_mode1_car_vel_error_x_mps;
+extern float g_mode1_car_vel_error_y_mps;
+extern float g_mode1_car_body_accel_x_mps2;
+extern float g_mode1_car_body_accel_y_mps2;
+extern float g_mode1_car_turn_accel_mps2;
+extern float g_mode1_yaw_diff_deg;
+extern uint32 g_mode1_control_seq;
+
+/* 模式2图像PD、车加速度前馈与调试状态。 */
+extern pid_t g_mode2_imgx_pid;
+extern pid_t g_mode2_imgy_pid;
+extern float g_mode2_car_accel_angle_ff_x_deg;
+extern float g_mode2_car_accel_angle_ff_y_deg;
+extern float g_mode2_car_accel_x_mps2;
+extern float g_mode2_car_accel_y_mps2;
+extern float g_mode2_raw_roll_correction_deg;
+extern float g_mode2_raw_pitch_correction_deg;
+extern float g_mode2_img_error_rate_x_pxps;
+extern float g_mode2_img_error_rate_y_pxps;
+extern float g_mode2_car_dt_ms;
+extern float g_mode2_car_vel_error_x_mps;
+extern float g_mode2_car_vel_error_y_mps;
+extern float g_mode2_car_body_accel_x_mps2;
+extern float g_mode2_car_body_accel_y_mps2;
+extern float g_mode2_car_turn_accel_mps2;
+extern float g_mode2_yaw_diff_deg;
+extern uint32 g_mode2_control_seq;
+
+/* 模式4图像PD、车加速度前馈与调试状态。 */
+extern pid_t g_mode4_imgx_pid;
+extern pid_t g_mode4_imgy_pid;
+extern float g_mode4_car_accel_angle_ff_x_deg;
+extern float g_mode4_car_accel_angle_ff_y_deg;
+extern float g_mode4_car_accel_x_mps2;
+extern float g_mode4_car_accel_y_mps2;
+extern float g_mode4_raw_roll_correction_deg;
+extern float g_mode4_raw_pitch_correction_deg;
+extern float g_mode4_img_error_rate_x_pxps;
+extern float g_mode4_img_error_rate_y_pxps;
+extern float g_mode4_car_dt_ms;
+extern float g_mode4_car_vel_error_x_mps;
+extern float g_mode4_car_vel_error_y_mps;
+extern float g_mode4_car_body_accel_x_mps2;
+extern float g_mode4_car_body_accel_y_mps2;
+extern float g_mode4_car_turn_accel_mps2;
+extern float g_mode4_yaw_diff_deg;
+extern uint32 g_mode4_control_seq;
+
+/* 模式5图像PD、车加速度前馈与调试状态。 */
+extern pid_t g_mode5_imgx_pid;
+extern pid_t g_mode5_imgy_pid;
+extern float g_mode5_car_accel_angle_ff_x_deg;
+extern float g_mode5_car_accel_angle_ff_y_deg;
+extern float g_mode5_car_accel_x_mps2;
+extern float g_mode5_car_accel_y_mps2;
+extern float g_mode5_raw_roll_correction_deg;
+extern float g_mode5_raw_pitch_correction_deg;
+extern float g_mode5_img_error_rate_x_pxps;
+extern float g_mode5_img_error_rate_y_pxps;
+extern float g_mode5_car_dt_ms;
+extern float g_mode5_car_vel_error_x_mps;
+extern float g_mode5_car_vel_error_y_mps;
+extern float g_mode5_car_body_accel_x_mps2;
+extern float g_mode5_car_body_accel_y_mps2;
+extern float g_mode5_car_turn_accel_mps2;
+extern float g_mode5_yaw_diff_deg;
+extern uint32 g_mode5_control_seq;
+
+/*
+ * 模式8 X/Y 轴速度环 PID 实例。
+ * 作用: 供外部模块读取图像跟随速度目标和速度环调试状态。
+ */
+extern pid_t g_mode8_velx_pid;
+extern pid_t g_mode8_vely_pid;
+extern pid_t g_mode8_imgx_pid;
+extern pid_t g_mode8_imgy_pid;
+extern float g_mode8_velx_target;
+extern float g_mode8_vely_target;
 
 /*
  * 函数名: FC_Mode4_Init

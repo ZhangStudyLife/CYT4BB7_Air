@@ -44,9 +44,14 @@ static car_plan_result_t s_air_run_car_plan;
 #define CAR_PLAN_DEBUG_FLOAT_COUNT        (63U) /* CarPlan3 V2调试协议用户float数量。 */
 #define CAR_PLAN_DEBUG_PROTOCOL_VERSION   (3.0f) /* CarPlan3全局坐标调试协议版本。 */
 #define MODE1245_DEBUG_FLOAT_COUNT        (30U) /* Mode1/2/4/5飞机控制调试数据数量。 */
+#define CAMERA_MODEL_CALIBRATION_LOG_FLOAT_COUNT (63U) /* 相机模型标定日志用户float数量。 */
 
 #if (MODE1245_DEBUG_FLOAT_COUNT > (WIFI_JUSTFLOAT_MAX_FLOAT_NUM - 1U))
 #error "Mode1/2/4/5 debug channels exceed JustFloat protocol capacity"
+#endif
+
+#if (CAMERA_MODEL_CALIBRATION_LOG_FLOAT_COUNT > (WIFI_JUSTFLOAT_MAX_FLOAT_NUM - 1U))
+#error "Camera model calibration log channels exceed JustFloat protocol capacity"
 #endif
 
 typedef struct
@@ -162,6 +167,120 @@ static void car_plan_debug_200hz(void)
     data[index++] = CAR_PLAN_DEBUG_PROTOCOL_VERSION;
 
     (void)wifi_justfloat_Array(data, CAR_PLAN_DEBUG_FLOAT_COUNT);
+}
+
+/**
+ * @brief 以200Hz发送相机模型标定日志。
+ * @param 无。
+ * @return 无。
+ */
+static void camera_model_calibration_log_200hz(void)
+{
+    static uint32 last_tick_ms = 0U;
+    uint32 tick_now = tick_1000us_cnt;
+    car_plan_3_debug_t plan_debug;
+    float data[CAMERA_MODEL_CALIBRATION_LOG_FLOAT_COUNT];
+    uint8 camera;
+    uint8 beacon;
+    uint8 index = 0U;
+
+    if ((tick_now - last_tick_ms) < CAR_PLAN_DEBUG_PERIOD_MS)
+    {
+        return;
+    }
+    last_tick_ms = tick_now;
+    CarPlan_3_GetDebug(&plan_debug);
+
+    /* I1-I36: Front/Center/Back各四个原始信标(x,y,area)。 */
+    for (camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
+    {
+        for (beacon = 0U; beacon < IMAGE_MAX_BEACON_COUNT; beacon++)
+        {
+            const beacon_data *item = &image_data[camera].beacon_data[beacon];
+            if (image_data_beacon_valid(item) != 0U)
+            {
+                data[index++] = item->x;
+                data[index++] = item->y;
+                data[index++] = item->area;
+            }
+            else
+            {
+                data[index++] = IMAGE_DATA_INVALID_VALUE;
+                data[index++] = IMAGE_DATA_INVALID_VALUE;
+                data[index++] = 0.0f;
+            }
+        }
+    }
+
+    /* I37-I48: Front/Center/Back各一个原始车灯(cx,cy,angle,length)。 */
+    for (camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
+    {
+        const car_lamp_data *item = &image_data[camera].car_lamp_data[0];
+        if (image_data_car_lamp_valid(item) != 0U)
+        {
+            data[index++] = item->cx;
+            data[index++] = item->cy;
+            data[index++] = item->angle;
+            data[index++] = item->length;
+        }
+        else
+        {
+            data[index++] = IMAGE_DATA_INVALID_VALUE;
+            data[index++] = IMAGE_DATA_INVALID_VALUE;
+            data[index++] = IMAGE_DATA_INVALID_VALUE;
+            data[index++] = 0.0f;
+        }
+    }
+
+    /* I49-I55: 车端yaw/yaw_rate和飞机欧拉角、高度及高度有效标志。 */
+    data[index++] = g_car_yaw;
+    data[index++] = g_car_yaw_rate_dps;
+    data[index++] = g_euler.roll;
+    data[index++] = g_euler.pitch;
+    data[index++] = g_euler.yaw;
+    data[index++] = g_tof_fused_height_mm;
+    data[index++] = (float)g_tof_fused_valid;
+
+    /* I56-I59: Three_Camera融合车灯(x_m,y_m,angle,camera_mask)。 */
+    if (plan_debug.car_lamp.valid != 0U)
+    {
+        data[index++] = plan_debug.car_lamp.center_x;
+        data[index++] = plan_debug.car_lamp.center_y;
+        data[index++] = plan_debug.car_lamp.angle_deg;
+        data[index++] = (float)plan_debug.car_lamp.camera_mask;
+    }
+    else
+    {
+        data[index++] = IMAGE_DATA_INVALID_VALUE;
+        data[index++] = IMAGE_DATA_INVALID_VALUE;
+        data[index++] = IMAGE_DATA_INVALID_VALUE;
+        data[index++] = 0.0f;
+    }
+
+    /* I60-I63: 第一个有效Three_Camera融合信标(x_m,y_m,area,camera_mask)。 */
+    for (beacon = 0U; beacon < CAR_PLAN_3_DEBUG_BEACON_COUNT; beacon++)
+    {
+        if (plan_debug.beacon[beacon].valid != 0U)
+        {
+            break;
+        }
+    }
+    if (beacon < CAR_PLAN_3_DEBUG_BEACON_COUNT)
+    {
+        data[index++] = plan_debug.beacon[beacon].center_x;
+        data[index++] = plan_debug.beacon[beacon].center_y;
+        data[index++] = plan_debug.beacon[beacon].area;
+        data[index++] = (float)plan_debug.beacon[beacon].camera_mask;
+    }
+    else
+    {
+        data[index++] = IMAGE_DATA_INVALID_VALUE;
+        data[index++] = IMAGE_DATA_INVALID_VALUE;
+        data[index++] = IMAGE_DATA_INVALID_VALUE;
+        data[index++] = 0.0f;
+    }
+
+    (void)wifi_justfloat_Array(data, CAMERA_MODEL_CALIBRATION_LOG_FLOAT_COUNT);
 }
 
 /**
@@ -433,8 +552,9 @@ static void core0_run_fast_loop_step(void)
 
     FC_Loop_1000Hz();
     air_comm_air_poll();
-    // car_plan_debug_200hz(); /* 临时关闭CarPlan3调试，改发Mode1/2/4/5控制数据。 */
-    mode1245_wifi_debug_200hz();
+    // car_plan_debug_200hz(); /* 临时关闭原CarPlan3调试日志。 */
+    // mode1245_wifi_debug_200hz(); /* 临时关闭Mode1/2/4/5调试，改发相机模型标定日志。 */
+    camera_model_calibration_log_200hz();
 }
 
 /**

@@ -77,6 +77,7 @@ static uint32 s_image_down_latched_frame_sequence;                 /* 最近成�
 #define DOWN_GRAY_BACKGROUND_OUTER_SQ  100
 #define DOWN_BEACON_LEFT_EDGE_MARGIN    24
 #define DOWN_BEACON_RIGHT_EDGE_MARGIN   16
+#define DOWN_BEACON_CORNER_MARGIN       12
 #define DOWN_GRAY_EDGE_MIN_PEAK         200U
 #define DOWN_GRAY_EDGE_MAX_OCCUPANCY    0.25f
 #define DOWN_EDGE_SUPPORT_RADIUS        12
@@ -88,6 +89,25 @@ static uint32 s_image_down_latched_frame_sequence;                 /* 最近成�
 #define DOWN_CAR_ENVELOPE_MIN_PAD       4
 #define DOWN_CAR_ENVELOPE_PAD_SCALE     0.75f
 #define DOWN_CAR_OUTPUT_ENVELOPE_PAD    10
+#define DOWN_CAR_GROUP_MAX_CORES        3U
+#define DOWN_CAR_GROUP_ANGLE_MAX        25.0f
+#define DOWN_CAR_GROUP_MINOR_PAD        2.0f
+#define DOWN_CAR_GROUP_MAJOR_GAP        4.0f
+#define DOWN_CAR_RECOVER_MIN_CORE_AREA  3
+#define DOWN_CAR_RECOVER_MAX_CORE_AREA  18
+#define DOWN_CAR_RECOVER_CONNECT_THRESHOLD 150U
+#define DOWN_CAR_RECOVER_TRACK_THRESHOLD   120U
+#define DOWN_CAR_RECOVER_BRIDGE_THRESHOLD   80U
+#define DOWN_CAR_RECOVER_SUPPORT_PAD        3.0f
+#define DOWN_CAR_SUPPORT_PAD            1
+#define DOWN_CAR_SUPPORT_MASK_SIZE      ((IMAGE_QUEUE_SIZE + 7U) / 8U)
+#define DOWN_NEAR_CAR_BEACON_TRACKS     2U
+#define DOWN_NEAR_CAR_BEACON_CONFIRM    3U
+#define DOWN_NEAR_CAR_BEACON_MAX_MISSES 2U
+#define DOWN_EDGE_BEACON_TRACKS         2U
+#define DOWN_EDGE_BEACON_CONFIRM        2U
+#define DOWN_EDGE_BEACON_RECOVER_RADIUS 6
+#define DOWN_EDGE_BEACON_RECOVER_PEAK   170U
 #define DOWN_CAR_STRONG_SCORE           0.53f
 #define DOWN_CAR_WEAK_SCORE             0.50f
 #define DOWN_CAR_TRACK_SCORE            0.47f
@@ -170,6 +190,29 @@ typedef struct
 
 typedef struct
 {
+    float x;
+    float y;
+    unsigned char active;
+    unsigned char confirmed;
+    unsigned char hits;
+    unsigned char misses;
+} down_near_car_beacon_track_t;
+
+typedef struct
+{
+    float x;
+    float y;
+    float vx;
+    float vy;
+    float area;
+    unsigned char active;
+    unsigned char confirmed;
+    unsigned char hits;
+    unsigned char misses;
+} down_edge_beacon_track_t;
+
+typedef struct
+{
     signed short response;
     unsigned char x;
     unsigned char y;
@@ -226,9 +269,10 @@ typedef struct
 typedef struct
 {
     component_t component;
-    component_t mask;
+    component_t core;
     float score;
     unsigned char classification;
+    unsigned char output_eligible;
 } down_car_candidate_t;
 
 uint8 g_image_frame[MT9V03X_H][MT9V03X_W];
@@ -236,6 +280,11 @@ uint8 g_image_frame[MT9V03X_H][MT9V03X_W];
 static unsigned char g_binary[BEACON_IMAGE_H][BEACON_IMAGE_W];
 static unsigned char g_beacon_binary_snapshot[BEACON_IMAGE_H][BEACON_IMAGE_W];
 static unsigned char g_car_lamp_binary_snapshot[BEACON_IMAGE_H][BEACON_IMAGE_W];
+/* 最终车灯的实际支持像素及一像素保护带，每像素占一位。 */
+static unsigned char g_car_support_mask[DOWN_CAR_SUPPORT_MASK_SIZE];
+static unsigned char g_car_support_valid;
+static component_t g_car_output_override;
+static unsigned char g_car_output_override_valid;
 static unsigned char g_visit_stamp[IMAGE_QUEUE_SIZE];
 static unsigned char g_current_stamp = 0;
 /* 连通域队列：低8位为X，高8位为Y。 */
@@ -243,17 +292,15 @@ static unsigned short g_queue[IMAGE_QUEUE_SIZE];
 static const unsigned char (*g_current_image)[BEACON_IMAGE_W] = 0;
 static temporal_track_t g_b0_track;
 static temporal_track_t g_car_track;
-static component_t g_current_lamp_masks[DOWN_CAR_MAX_MASKS];
-/* 当前帧车灯屏蔽区的几何缓存，避免候选扫描重复计算三角函数。 */
-static down_lamp_geometry_t g_current_lamp_geometries[DOWN_CAR_MAX_MASKS];
+static down_near_car_beacon_track_t
+    g_near_car_beacon_tracks[DOWN_NEAR_CAR_BEACON_TRACKS];
+static down_edge_beacon_track_t
+    g_edge_beacon_tracks[DOWN_EDGE_BEACON_TRACKS];
 static float g_current_beacon_classification_x[BEACON_MAX_BEACON_COUNT];
 static float g_current_beacon_classification_y[BEACON_MAX_BEACON_COUNT];
 static unsigned char
     g_current_beacon_classification_valid[BEACON_MAX_BEACON_COUNT];
-static unsigned char g_selected_car_component_mask_stamp;
-static unsigned char g_selected_car_component_mask_valid;
 static component_t g_weak_car_pending;
-static unsigned char g_current_lamp_mask_count;
 static unsigned char g_weak_car_pending_hits;
 static unsigned char g_weak_car_pending_misses;
 /* Box3列方向滑动和，前后预留镜像边界槽。 */
@@ -264,6 +311,7 @@ static signed short g_gray_response_rows[3][BEACON_IMAGE_W];
 
 static void beacon_image_reset_temporal(void);
 static void begin_visit_pass(void);
+static unsigned char down_gray_point_in_current_lamps(int x, int y);
 static unsigned char down_local_shape_measure(
     const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
     int center_x,
@@ -299,7 +347,8 @@ static unsigned char down_gray_refine_candidate_region(
     seed_y = (int)candidate->seed_y;
     if(seed_x < 0 || seed_x >= BEACON_IMAGE_W ||
        seed_y < 0 || seed_y >= BEACON_IMAGE_H ||
-       image[seed_y][seed_x] < DOWN_GRAY_SUPPORT_THRESHOLD)
+       image[seed_y][seed_x] < DOWN_GRAY_SUPPORT_THRESHOLD ||
+       down_gray_point_in_current_lamps(seed_x, seed_y) != 0U)
     {
         return 0U;
     }
@@ -331,7 +380,10 @@ static unsigned char down_gray_refine_candidate_region(
         do { \
             if ((condition) && \
                 g_visit_stamp[(neighbor_index)] != stamp && \
-                image[(unsigned char)((neighbor_coordinate) >> 8)] \
+                 down_gray_point_in_current_lamps( \
+                     (unsigned char)((neighbor_coordinate) & 0xFFU), \
+                     (unsigned char)((neighbor_coordinate) >> 8)) == 0U && \
+                 image[(unsigned char)((neighbor_coordinate) >> 8)] \
                      [(unsigned char)((neighbor_coordinate) & 0xFFU)] >= \
                     DOWN_GRAY_SUPPORT_THRESHOLD) \
             { \
@@ -399,14 +451,13 @@ static void beacon_image_init(void)
     memset(g_binary, 0, sizeof(g_binary));
     memset(g_beacon_binary_snapshot, 0, sizeof(g_beacon_binary_snapshot));
     memset(g_car_lamp_binary_snapshot, 0, sizeof(g_car_lamp_binary_snapshot));
+    memset(g_car_support_mask, 0, sizeof(g_car_support_mask));
+    g_car_support_valid = 0U;
+    memset(&g_car_output_override, 0, sizeof(g_car_output_override));
+    g_car_output_override_valid = 0U;
     memset(g_visit_stamp, 0, sizeof(g_visit_stamp));
-    memset(g_current_lamp_masks, 0, sizeof(g_current_lamp_masks));
-    memset(g_current_lamp_geometries, 0, sizeof(g_current_lamp_geometries));
     memset(&g_weak_car_pending, 0, sizeof(g_weak_car_pending));
     g_current_image = 0;
-    g_current_lamp_mask_count = 0U;
-    g_selected_car_component_mask_stamp = 0U;
-    g_selected_car_component_mask_valid = 0U;
     g_weak_car_pending_hits = 0U;
     g_weak_car_pending_misses = 0U;
     g_current_stamp = 0;
@@ -417,6 +468,10 @@ static void beacon_image_reset_temporal(void)
 {
     memset(&g_b0_track, 0, sizeof(g_b0_track));
     memset(&g_car_track, 0, sizeof(g_car_track));
+    memset(g_near_car_beacon_tracks, 0,
+           sizeof(g_near_car_beacon_tracks));
+    memset(g_edge_beacon_tracks, 0,
+           sizeof(g_edge_beacon_tracks));
     memset(&g_weak_car_pending, 0, sizeof(g_weak_car_pending));
     g_weak_car_pending_hits = 0U;
     g_weak_car_pending_misses = 0U;
@@ -444,6 +499,26 @@ static unsigned char is_visited(unsigned char x, unsigned char y)
 {
     return (g_visit_stamp[(unsigned int)y * BEACON_IMAGE_W + x] ==
             g_current_stamp) ? 1 : 0;
+}
+
+static unsigned char car_support_get(unsigned int pixel_index)
+{
+    return (g_car_support_mask[pixel_index >> 3U] &
+            (unsigned char)(1U << (pixel_index & 7U))) != 0U ? 1U : 0U;
+}
+
+static void car_support_set(unsigned int pixel_index, unsigned char value)
+{
+    unsigned char bit = (unsigned char)(1U << (pixel_index & 7U));
+
+    if(value != 0U)
+    {
+        g_car_support_mask[pixel_index >> 3U] |= bit;
+    }
+    else
+    {
+        g_car_support_mask[pixel_index >> 3U] &= (unsigned char)~bit;
+    }
 }
 
 #if defined(__ICCARM__)
@@ -998,26 +1073,6 @@ static unsigned char car_component_features(
     return (features->classification != DOWN_CAR_CLASS_NONE) ? 1U : 0U;
 }
 
-static void add_car_mask(const component_t *comp)
-{
-    if (comp != 0 && comp->valid != 0 &&
-        g_current_lamp_mask_count < DOWN_CAR_MAX_MASKS)
-    {
-        unsigned char index = g_current_lamp_mask_count;
-
-        if (down_gray_side_edge_beacon_like(g_current_image, comp) != 0U)
-        {
-            return;
-        }
-        g_current_lamp_masks[index] = *comp;
-        component_resolve_angle(&g_current_lamp_masks[index]);
-        down_gray_lamp_geometry_init(
-            &g_current_lamp_masks[index],
-            &g_current_lamp_geometries[index]);
-        g_current_lamp_mask_count++;
-    }
-}
-
 static void finish_component(
     component_t *comp,
     int sum_x,
@@ -1268,13 +1323,15 @@ static unsigned char same_car_candidate(const component_t *left,
 static void store_car_candidate(
     down_car_candidate_t candidates[DOWN_CAR_MAX_MASKS],
     unsigned char *candidate_count,
-    const down_car_features_t *features)
+    const down_car_features_t *features,
+    const component_t *core,
+    unsigned char output_eligible)
 {
     unsigned char index;
 
     for (index = 0U; index < *candidate_count; index++)
     {
-        if (same_car_candidate(&candidates[index].mask,
+        if (same_car_candidate(&candidates[index].component,
                                &features->envelope) == 0U)
         {
             continue;
@@ -1282,18 +1339,26 @@ static void store_car_candidate(
         if (features->score > candidates[index].score)
         {
             candidates[index].component = features->envelope;
-            candidates[index].mask = features->envelope;
+            candidates[index].core = *core;
+            component_resolve_angle(&candidates[index].core);
             candidates[index].score = features->score;
             candidates[index].classification = features->classification;
+            candidates[index].output_eligible = output_eligible;
+        }
+        else if(output_eligible != 0U)
+        {
+            candidates[index].output_eligible = 1U;
         }
         return;
     }
     if (*candidate_count < DOWN_CAR_MAX_MASKS)
     {
         candidates[*candidate_count].component = features->envelope;
-        candidates[*candidate_count].mask = features->envelope;
+        candidates[*candidate_count].core = *core;
+        component_resolve_angle(&candidates[*candidate_count].core);
         candidates[*candidate_count].score = features->score;
         candidates[*candidate_count].classification = features->classification;
+        candidates[*candidate_count].output_eligible = output_eligible;
         (*candidate_count)++;
     }
 }
@@ -1313,7 +1378,8 @@ static unsigned char select_car_candidate(
 
     for (index = 0U; index < candidate_count; index++)
     {
-        if (candidates[index].classification != classification)
+        if (candidates[index].classification != classification ||
+            candidates[index].output_eligible == 0U)
         {
             continue;
         }
@@ -1335,7 +1401,8 @@ static unsigned char select_car_candidate(
             float dx;
             float dy;
             float distance;
-            if (candidates[index].classification != classification)
+            if (candidates[index].classification != classification ||
+                candidates[index].output_eligible == 0U)
             {
                 continue;
             }
@@ -1358,113 +1425,671 @@ static unsigned char select_car_candidate(
     return best;
 }
 
-/* 精确记录最终车灯的原始连通域，避免同一亮域再次进入信标结果。 */
-static void mark_selected_car_component(unsigned char seed_x,
-                                        unsigned char seed_y)
+static float down_car_axis_angle_difference(float left, float right)
 {
-    component_t component;
+    float difference = fabsf(left - right);
 
-    g_selected_car_component_mask_valid = 0U;
-    if((seed_x >= BEACON_IMAGE_W) || (seed_y >= BEACON_IMAGE_H) ||
-       (g_binary[seed_y][seed_x] == 0U))
+    while(difference >= 180.0f)
+    {
+        difference -= 180.0f;
+    }
+    return (difference > 90.0f) ? 180.0f - difference : difference;
+}
+
+static unsigned char down_car_select_track_group_primary(
+    const down_car_candidate_t candidates[DOWN_CAR_MAX_MASKS],
+    unsigned char candidate_count)
+{
+    unsigned char best = 255U;
+    unsigned char index;
+    float predicted_x;
+    float predicted_y;
+    float gate_sq;
+
+    if(g_car_track.confirmed == 0U)
+    {
+        return best;
+    }
+    predicted_x = g_car_track.x + (float)BEACON_IMAGE_W * 0.5f +
+                  g_car_track.vx;
+    predicted_y = g_car_track.y + (float)BEACON_IMAGE_H * 0.5f +
+                  g_car_track.vy;
+    gate_sq = g_image_down_gate_distance * g_image_down_gate_distance;
+    if(gate_sq < 1.0f) gate_sq = 1.0f;
+
+    for(index = 0U; index < candidate_count; index++)
+    {
+        float dx;
+        float dy;
+
+        if(candidates[index].output_eligible != 0U ||
+           candidates[index].classification < DOWN_CAR_CLASS_WEAK ||
+           candidates[index].core.valid == 0U ||
+           down_car_axis_angle_difference(
+               candidates[index].core.angle, g_car_track.angle) >
+               DOWN_CAR_GROUP_ANGLE_MAX)
+        {
+            continue;
+        }
+        dx = candidates[index].core.cx - predicted_x;
+        dy = candidates[index].core.cy - predicted_y;
+        if(dx * dx + dy * dy > gate_sq)
+        {
+            continue;
+        }
+        if(best >= candidate_count ||
+           candidates[index].classification >
+               candidates[best].classification ||
+           (candidates[index].classification ==
+                candidates[best].classification &&
+            candidates[index].score > candidates[best].score))
+        {
+            best = index;
+        }
+    }
+    return best;
+}
+
+static unsigned char down_car_group_cores_match(
+    const component_t *primary,
+    const component_t *candidate,
+    float predicted_x,
+    float predicted_y,
+    unsigned char allow_compact_axis,
+    float *quality)
+{
+    float angle;
+    float axis_x;
+    float axis_y;
+    float dx;
+    float dy;
+    float major_offset;
+    float minor_offset;
+    float major_gap;
+    float minor_limit;
+    float distance_sq;
+    float gate_sq;
+    float angle_difference;
+
+    if(primary == 0 || candidate == 0 || quality == 0 ||
+       primary->valid == 0U || candidate->valid == 0U)
+    {
+        return 0U;
+    }
+    dx = candidate->cx - primary->cx;
+    dy = candidate->cy - primary->cy;
+    distance_sq = dx * dx + dy * dy;
+    gate_sq = g_image_down_gate_distance * g_image_down_gate_distance;
+    if(gate_sq < 1.0f) gate_sq = 1.0f;
+    if(distance_sq > gate_sq)
+    {
+        return 0U;
+    }
+    if(allow_compact_axis != 0U &&
+       candidate->elongation < g_image_down_car_lamp_min_elongation)
+    {
+        float connection_angle = atan2f(dy, dx) * (180.0f / PI_F);
+        angle_difference = down_car_axis_angle_difference(
+            primary->angle, connection_angle);
+    }
+    else
+    {
+        angle_difference = down_car_axis_angle_difference(
+            primary->angle, candidate->angle);
+    }
+    if(angle_difference > DOWN_CAR_GROUP_ANGLE_MAX)
+    {
+        return 0U;
+    }
+    dx = candidate->cx - predicted_x;
+    dy = candidate->cy - predicted_y;
+    if(dx * dx + dy * dy > gate_sq)
+    {
+        return 0U;
+    }
+
+    angle = primary->angle * (PI_F / 180.0f);
+    axis_x = cosf(angle);
+    axis_y = sinf(angle);
+    dx = candidate->cx - primary->cx;
+    dy = candidate->cy - primary->cy;
+    major_offset = fabsf(dx * axis_x + dy * axis_y);
+    minor_offset = fabsf(-dx * axis_y + dy * axis_x);
+    major_gap = major_offset -
+                (primary->major + candidate->major) * 0.5f;
+    minor_limit = (primary->minor + candidate->minor) * 0.5f +
+                  DOWN_CAR_GROUP_MINOR_PAD;
+    if(major_gap > DOWN_CAR_GROUP_MAJOR_GAP ||
+       minor_offset > minor_limit)
+    {
+        return 0U;
+    }
+    if(major_gap < 0.0f) major_gap = 0.0f;
+    *quality = distance_sq / gate_sq +
+               angle_difference / DOWN_CAR_GROUP_ANGLE_MAX +
+               minor_offset / ((minor_limit > 1.0f) ? minor_limit : 1.0f) +
+               major_gap / DOWN_CAR_GROUP_MAJOR_GAP;
+    return 1U;
+}
+
+static unsigned char down_car_group_candidate_matches(
+    const down_car_candidate_t *primary,
+    const down_car_candidate_t *candidate,
+    float predicted_x,
+    float predicted_y,
+    float *quality)
+{
+    if(primary == 0 || candidate == 0 ||
+       (candidate->classification != DOWN_CAR_CLASS_WEAK &&
+        candidate->classification != DOWN_CAR_CLASS_STRONG))
+    {
+        return 0U;
+    }
+    return down_car_group_cores_match(
+        &primary->core, &candidate->core,
+        predicted_x, predicted_y, 0U, quality);
+}
+
+static unsigned char down_car_select_group(
+    const down_car_candidate_t candidates[DOWN_CAR_MAX_MASKS],
+    unsigned char candidate_count,
+    unsigned char selected,
+    unsigned char group[DOWN_CAR_GROUP_MAX_CORES])
+{
+    unsigned char group_count = 1U;
+    unsigned char slot;
+    float predicted_x;
+    float predicted_y;
+
+    group[0] = selected;
+    if(selected >= candidate_count || g_car_track.confirmed == 0U)
+    {
+        return group_count;
+    }
+    predicted_x = g_car_track.x + (float)BEACON_IMAGE_W * 0.5f +
+                  g_car_track.vx;
+    predicted_y = g_car_track.y + (float)BEACON_IMAGE_H * 0.5f +
+                  g_car_track.vy;
+    for(slot = 1U; slot < DOWN_CAR_GROUP_MAX_CORES; slot++)
+    {
+        unsigned char index;
+        unsigned char best = 255U;
+        float best_quality = 1.0e9f;
+
+        for(index = 0U; index < candidate_count; index++)
+        {
+            unsigned char used = 0U;
+            unsigned char matched = 0U;
+            unsigned char group_index;
+            float quality = 1.0e9f;
+
+            for(group_index = 0U; group_index < group_count; group_index++)
+            {
+                if(group[group_index] == index)
+                {
+                    used = 1U;
+                    break;
+                }
+            }
+            if(used != 0U ||
+               down_car_axis_angle_difference(
+                   candidates[selected].core.angle,
+                   candidates[index].core.angle) > DOWN_CAR_GROUP_ANGLE_MAX)
+            {
+                continue;
+            }
+            for(group_index = 0U; group_index < group_count; group_index++)
+            {
+                float pair_quality;
+
+                if(down_car_group_candidate_matches(
+                       &candidates[group[group_index]], &candidates[index],
+                       predicted_x, predicted_y, &pair_quality) != 0U)
+                {
+                    matched = 1U;
+                    if(pair_quality < quality) quality = pair_quality;
+                }
+            }
+            if(matched == 0U) continue;
+            if(quality < best_quality)
+            {
+                best = index;
+                best_quality = quality;
+            }
+        }
+        if(best >= candidate_count)
+        {
+            break;
+        }
+        group[group_count++] = best;
+    }
+    return group_count;
+}
+
+static unsigned char down_car_point_in_recovery_roi(
+    float x,
+    float y,
+    float predicted_x,
+    float predicted_y,
+    float axis_x,
+    float axis_y,
+    float major_limit,
+    float minor_limit)
+{
+    float dx = x - predicted_x;
+    float dy = y - predicted_y;
+    float major = dx * axis_x + dy * axis_y;
+    float minor = -dx * axis_y + dy * axis_x;
+
+    return (fabsf(major) <= major_limit &&
+            fabsf(minor) <= minor_limit) ? 1U : 0U;
+}
+
+/* 已确认信标只保护与车灯主核心可分离的当前亮核，避免历史误轨迹阻断车灯。 */
+static unsigned char down_car_core_near_confirmed_beacon(
+    const component_t *primary,
+    const component_t *core,
+    unsigned char allow_track_roi_override)
+{
+    float match_distance_sq =
+        g_image_down_match_distance * g_image_down_match_distance;
+    float primary_angle;
+    float primary_axis_x;
+    float primary_axis_y;
+    float predicted_x;
+    float predicted_y;
+    float track_angle;
+    float track_axis_x;
+    float track_axis_y;
+    float track_major_limit;
+    float track_minor_limit;
+    unsigned char index;
+
+    if(primary == 0 || core == 0 ||
+       primary->valid == 0U || core->valid == 0U)
+    {
+        return 0U;
+    }
+    if(match_distance_sq < 1.0f) match_distance_sq = 1.0f;
+    primary_angle = primary->angle * (PI_F / 180.0f);
+    primary_axis_x = cosf(primary_angle);
+    primary_axis_y = sinf(primary_angle);
+    predicted_x = g_car_track.x + (float)BEACON_IMAGE_W * 0.5f +
+                  g_car_track.vx;
+    predicted_y = g_car_track.y + (float)BEACON_IMAGE_H * 0.5f +
+                  g_car_track.vy;
+    track_angle = g_car_track.angle * (PI_F / 180.0f);
+    track_axis_x = cosf(track_angle);
+    track_axis_y = sinf(track_angle);
+    track_major_limit = g_car_track.length * 0.5f +
+                        DOWN_CAR_GROUP_MAJOR_GAP +
+                        DOWN_CAR_RECOVER_SUPPORT_PAD;
+    track_minor_limit = g_car_track.width * 0.5f +
+                        DOWN_CAR_GROUP_MINOR_PAD;
+
+#define DOWN_CAR_BEACON_TRACK_PROTECT(track_x, track_y)                 \
+    do                                                                  \
+    {                                                                   \
+        float protect_x = (track_x);                                    \
+        float protect_y = (track_y);                                    \
+        float core_dx = core->cx - protect_x;                           \
+        float core_dy = core->cy - protect_y;                           \
+                                                                        \
+        if(core_dx * core_dx + core_dy * core_dy <= match_distance_sq &&\
+           down_car_point_in_recovery_roi(                              \
+               protect_x, protect_y, primary->cx, primary->cy,          \
+               primary_axis_x, primary_axis_y,                          \
+               primary->major * 0.5f + DOWN_CAR_SUPPORT_PAD,            \
+               primary->minor * 0.5f + DOWN_CAR_SUPPORT_PAD) == 0U &&   \
+           (allow_track_roi_override == 0U ||                           \
+            down_car_point_in_recovery_roi(                             \
+                protect_x, protect_y, predicted_x, predicted_y,         \
+                track_axis_x, track_axis_y,                             \
+                track_major_limit, track_minor_limit) == 0U))           \
+        {                                                               \
+            return 1U;                                                  \
+        }                                                               \
+    } while(0)
+
+    if(g_b0_track.confirmed != 0U)
+    {
+        DOWN_CAR_BEACON_TRACK_PROTECT(
+            g_b0_track.x + (float)BEACON_IMAGE_W * 0.5f + g_b0_track.vx,
+            g_b0_track.y + (float)BEACON_IMAGE_H * 0.5f + g_b0_track.vy);
+    }
+    for(index = 0U; index < DOWN_NEAR_CAR_BEACON_TRACKS; index++)
+    {
+        const down_near_car_beacon_track_t *track =
+            &g_near_car_beacon_tracks[index];
+
+        if(track->active == 0U || track->confirmed == 0U)
+        {
+            continue;
+        }
+        DOWN_CAR_BEACON_TRACK_PROTECT(
+            track->x + (float)BEACON_IMAGE_W * 0.5f,
+            track->y + (float)BEACON_IMAGE_H * 0.5f);
+    }
+    for(index = 0U; index < DOWN_EDGE_BEACON_TRACKS; index++)
+    {
+        const down_edge_beacon_track_t *track =
+            &g_edge_beacon_tracks[index];
+
+        if(track->active == 0U || track->confirmed == 0U)
+        {
+            continue;
+        }
+        DOWN_CAR_BEACON_TRACK_PROTECT(
+            track->x + track->vx,
+            track->y + track->vy);
+    }
+#undef DOWN_CAR_BEACON_TRACK_PROTECT
+    return 0U;
+}
+
+/* 仅在已确认车灯的严格预测范围内，回收与正式车灯组同包络的小亮核。 */
+static unsigned char down_car_select_recoverable_cores(
+    const down_car_candidate_t candidates[DOWN_CAR_MAX_MASKS],
+    const unsigned char group[DOWN_CAR_GROUP_MAX_CORES],
+    unsigned char group_count,
+    const component_t cores[DOWN_CAR_MAX_COMPONENTS],
+    const unsigned char core_classifications[DOWN_CAR_MAX_COMPONENTS],
+    unsigned char core_count,
+    unsigned char recovered_indices[DOWN_CAR_GROUP_MAX_CORES],
+    unsigned char connect_threshold,
+    unsigned char allow_track_roi_override,
+    unsigned char use_strict_classification)
+{
+    static const signed char neighbor_x[8] =
+        {1, -1, 0, 0, 1, 1, -1, -1};
+    static const signed char neighbor_y[8] =
+        {0, 0, 1, -1, 1, -1, 1, -1};
+    unsigned short *head = g_queue;
+    unsigned short *tail = g_queue;
+    unsigned short *queue_end = g_queue + IMAGE_QUEUE_SIZE;
+    unsigned char recovered_count = 0U;
+    unsigned char selected;
+    unsigned char stamp;
+    unsigned char index;
+    float predicted_x;
+    float predicted_y;
+    float gate_sq;
+    float angle;
+    float axis_x;
+    float axis_y;
+    float major_limit;
+    float minor_limit;
+
+    if(candidates == 0 || group == 0 || cores == 0 ||
+       core_classifications == 0 || recovered_indices == 0 ||
+       group_count == 0U || group_count >= DOWN_CAR_GROUP_MAX_CORES ||
+       g_car_track.confirmed == 0U || g_current_image == 0)
+    {
+        return 0U;
+    }
+    selected = group[0];
+    if(selected >= DOWN_CAR_MAX_MASKS ||
+       candidates[selected].core.valid == 0U ||
+       candidates[selected].classification < DOWN_CAR_CLASS_TRACK ||
+       g_car_track.length <= 0.0f || g_car_track.width <= 0.0f)
+    {
+        return 0U;
+    }
+    predicted_x = g_car_track.x + (float)BEACON_IMAGE_W * 0.5f +
+                  g_car_track.vx;
+    predicted_y = g_car_track.y + (float)BEACON_IMAGE_H * 0.5f +
+                  g_car_track.vy;
+    gate_sq = g_image_down_gate_distance * g_image_down_gate_distance;
+    if(gate_sq < 1.0f) gate_sq = 1.0f;
+    {
+        float dx = candidates[selected].core.cx - predicted_x;
+        float dy = candidates[selected].core.cy - predicted_y;
+
+        if(dx * dx + dy * dy > gate_sq ||
+           down_car_axis_angle_difference(
+               candidates[selected].core.angle, g_car_track.angle) >
+               DOWN_CAR_GROUP_ANGLE_MAX)
+        {
+            return 0U;
+        }
+    }
+    angle = g_car_track.angle * (PI_F / 180.0f);
+    axis_x = cosf(angle);
+    axis_y = sinf(angle);
+    major_limit = g_car_track.length * 0.5f + DOWN_CAR_GROUP_MAJOR_GAP +
+                  DOWN_CAR_RECOVER_SUPPORT_PAD;
+    minor_limit = g_car_track.width * 0.5f + DOWN_CAR_GROUP_MINOR_PAD;
+    if(connect_threshold == DOWN_CAR_RECOVER_BRIDGE_THRESHOLD)
+    {
+        major_limit = g_image_down_gate_distance;
+        minor_limit = g_image_down_gate_distance;
+        if(major_limit < 1.0f) major_limit = 1.0f;
+        if(minor_limit < 1.0f) minor_limit = 1.0f;
+    }
+
+    begin_visit_pass();
+    stamp = g_current_stamp;
+    for(index = 0U; index < group_count; index++)
+    {
+        const component_t *core = &candidates[group[index]].core;
+        unsigned int pixel_index;
+
+        if(core->valid == 0U || core->seed_x >= BEACON_IMAGE_W ||
+           core->seed_y >= BEACON_IMAGE_H ||
+           g_current_image[core->seed_y][core->seed_x] <
+               connect_threshold ||
+           down_car_point_in_recovery_roi(
+               core->seed_x, core->seed_y, predicted_x, predicted_y,
+               axis_x, axis_y, major_limit, minor_limit) == 0U)
+        {
+            continue;
+        }
+        pixel_index = (unsigned int)core->seed_y * BEACON_IMAGE_W +
+                      core->seed_x;
+        if(g_visit_stamp[pixel_index] == stamp)
+        {
+            continue;
+        }
+        if(tail >= queue_end)
+        {
+            return 0U;
+        }
+        g_visit_stamp[pixel_index] = stamp;
+        *tail++ = (unsigned short)(core->seed_x |
+                                  ((unsigned short)core->seed_y << 8U));
+    }
+    if(head == tail)
+    {
+        return 0U;
+    }
+    while(head < tail)
+    {
+        unsigned short coordinate = *head++;
+        int center_x = (unsigned char)coordinate;
+        int center_y = (unsigned char)(coordinate >> 8U);
+        unsigned char neighbor;
+
+        for(neighbor = 0U; neighbor < 8U; neighbor++)
+        {
+            int next_x = center_x + neighbor_x[neighbor];
+            int next_y = center_y + neighbor_y[neighbor];
+            unsigned int next_index;
+
+            if(next_x < 0 || next_x >= BEACON_IMAGE_W ||
+               next_y < 0 || next_y >= BEACON_IMAGE_H ||
+               g_current_image[next_y][next_x] <
+                   connect_threshold ||
+               down_car_point_in_recovery_roi(
+                   next_x, next_y, predicted_x, predicted_y,
+                   axis_x, axis_y, major_limit, minor_limit) == 0U)
+            {
+                continue;
+            }
+            next_index = (unsigned int)next_y * BEACON_IMAGE_W + next_x;
+            if(g_visit_stamp[next_index] == stamp)
+            {
+                continue;
+            }
+            if(tail >= queue_end)
+            {
+                return 0U;
+            }
+            g_visit_stamp[next_index] = stamp;
+            *tail++ = (unsigned short)(next_x | (next_y << 8));
+        }
+    }
+
+    while(group_count + recovered_count < DOWN_CAR_GROUP_MAX_CORES)
+    {
+        unsigned char best = 255U;
+        float best_quality = 1.0e9f;
+
+        for(index = 0U; index < core_count; index++)
+        {
+            const component_t *core = &cores[index];
+            unsigned char used = 0U;
+            unsigned char matched = 0U;
+            unsigned char member;
+            float quality = 1.0e9f;
+            unsigned int seed_index;
+
+            if(core->valid == 0U ||
+               (use_strict_classification != 0U &&
+                !((core_classifications[index] < DOWN_CAR_CLASS_WEAK) ||
+                  (core_classifications[index] >= DOWN_CAR_CLASS_STRONG &&
+                   core->elongation >=
+                       g_image_down_car_lamp_min_elongation))) ||
+               (use_strict_classification == 0U &&
+                allow_track_roi_override == 0U &&
+                (core_classifications[index] == DOWN_CAR_CLASS_WEAK ||
+                 (core_classifications[index] == DOWN_CAR_CLASS_NONE &&
+                  core->elongation >= g_image_down_car_lamp_min_elongation) ||
+                 (core_classifications[index] >= DOWN_CAR_CLASS_STRONG &&
+                  core->elongation < g_image_down_car_lamp_min_elongation))) ||
+               core->area < DOWN_CAR_RECOVER_MIN_CORE_AREA ||
+               core->area > DOWN_CAR_RECOVER_MAX_CORE_AREA ||
+               core->seed_x >= BEACON_IMAGE_W ||
+               core->seed_y >= BEACON_IMAGE_H ||
+               down_car_point_in_recovery_roi(
+                   core->cx, core->cy, predicted_x, predicted_y,
+                   axis_x, axis_y, major_limit, minor_limit) == 0U)
+            {
+                continue;
+            }
+            if(down_car_core_near_confirmed_beacon(
+                   &candidates[selected].core, core,
+                   allow_track_roi_override) != 0U)
+            {
+                continue;
+            }
+            seed_index = (unsigned int)core->seed_y * BEACON_IMAGE_W +
+                         core->seed_x;
+            if(g_visit_stamp[seed_index] != stamp)
+            {
+                continue;
+            }
+            for(member = 0U; member < group_count; member++)
+            {
+                const component_t *group_core =
+                    &candidates[group[member]].core;
+                float pair_quality;
+
+                if(group_core->seed_x == core->seed_x &&
+                   group_core->seed_y == core->seed_y)
+                {
+                    used = 1U;
+                    break;
+                }
+                if(down_car_group_cores_match(
+                       group_core, core, predicted_x, predicted_y,
+                       1U, &pair_quality) != 0U)
+                {
+                    matched = 1U;
+                    if(pair_quality < quality) quality = pair_quality;
+                }
+            }
+            if(used != 0U)
+            {
+                continue;
+            }
+            for(member = 0U; member < recovered_count; member++)
+            {
+                const component_t *group_core =
+                    &cores[recovered_indices[member]];
+                float pair_quality;
+
+                if(recovered_indices[member] == index)
+                {
+                    used = 1U;
+                    break;
+                }
+                if(down_car_group_cores_match(
+                       group_core, core, predicted_x, predicted_y,
+                       1U, &pair_quality) != 0U)
+                {
+                    matched = 1U;
+                    if(pair_quality < quality) quality = pair_quality;
+                }
+            }
+            if(used != 0U || matched == 0U)
+            {
+                continue;
+            }
+            if(quality < best_quality)
+            {
+                best = index;
+                best_quality = quality;
+            }
+        }
+        if(best >= core_count)
+        {
+            break;
+        }
+        recovered_indices[recovered_count++] = best;
+    }
+    return recovered_count;
+}
+
+static void down_car_mark_core_pixels(const component_t *core)
+{
+    component_t connected;
+    unsigned short *coordinate;
+    unsigned short *end;
+
+    if(core == 0 || core->valid == 0U ||
+       core->seed_x >= BEACON_IMAGE_W || core->seed_y >= BEACON_IMAGE_H ||
+       g_binary[core->seed_y][core->seed_x] == 0U)
     {
         return;
     }
     begin_visit_pass();
-    component = grow_component(seed_x, seed_y);
-    if(component.valid == 0U)
+    connected = grow_component(core->seed_x, core->seed_y);
+    coordinate = g_queue;
+    end = g_queue + connected.area;
+    while(coordinate < end)
     {
-        return;
+        unsigned short value = *coordinate++;
+        unsigned int pixel_index =
+            (unsigned int)(unsigned char)(value >> 8U) * BEACON_IMAGE_W +
+            (unsigned char)value;
+        car_support_set(pixel_index, 1U);
     }
-    g_selected_car_component_mask_stamp = g_current_stamp;
-    g_selected_car_component_mask_valid = 1U;
 }
 
-/* 分类完成后仅细化最终输出框，避免改变候选得分和准入结果。 */
-static unsigned char car_output_envelope_has_continuation(
-    const component_t *lamp)
+static unsigned char down_car_fit_support_geometry(
+    component_t *lamp,
+    int min_x,
+    int max_x,
+    int min_y,
+    int max_y,
+    unsigned char envelope_threshold)
 {
-    int x;
-    int y;
-    int offset;
-    unsigned char threshold;
-
-    if(lamp == 0 || lamp->valid == 0U || g_current_image == 0 ||
-       lamp->envelope_threshold == 0U)
-    {
-        return 0U;
-    }
-    threshold = lamp->envelope_threshold;
-    for(x = lamp->min_x; x <= lamp->max_x; x++)
-    {
-        if(lamp->min_y > 0 &&
-           g_current_image[lamp->min_y - 1][x] >= threshold)
-        {
-            for(offset = -1; offset <= 1; offset++)
-            {
-                int neighbor_x = x + offset;
-                if(neighbor_x >= lamp->min_x &&
-                   neighbor_x <= lamp->max_x &&
-                   g_current_image[lamp->min_y][neighbor_x] >= threshold)
-                {
-                    return 1U;
-                }
-            }
-        }
-        if(lamp->max_y + 1 < BEACON_IMAGE_H &&
-           g_current_image[lamp->max_y + 1][x] >= threshold)
-        {
-            for(offset = -1; offset <= 1; offset++)
-            {
-                int neighbor_x = x + offset;
-                if(neighbor_x >= lamp->min_x &&
-                   neighbor_x <= lamp->max_x &&
-                   g_current_image[lamp->max_y][neighbor_x] >= threshold)
-                {
-                    return 1U;
-                }
-            }
-        }
-    }
-    for(y = lamp->min_y; y <= lamp->max_y; y++)
-    {
-        if(lamp->min_x > 0 &&
-           g_current_image[y][lamp->min_x - 1] >= threshold)
-        {
-            for(offset = -1; offset <= 1; offset++)
-            {
-                int neighbor_y = y + offset;
-                if(neighbor_y >= lamp->min_y &&
-                   neighbor_y <= lamp->max_y &&
-                   g_current_image[neighbor_y][lamp->min_x] >= threshold)
-                {
-                    return 1U;
-                }
-            }
-        }
-        if(lamp->max_x + 1 < BEACON_IMAGE_W &&
-           g_current_image[y][lamp->max_x + 1] >= threshold)
-        {
-            for(offset = -1; offset <= 1; offset++)
-            {
-                int neighbor_y = y + offset;
-                if(neighbor_y >= lamp->min_y &&
-                   neighbor_y <= lamp->max_y &&
-                   g_current_image[neighbor_y][lamp->max_x] >= threshold)
-                {
-                    return 1U;
-                }
-            }
-        }
-    }
-    return 0U;
-}
-
-static unsigned char refine_car_output_geometry(component_t *lamp)
-{
-    component_t refined;
+    component_t fitted;
+    unsigned short *tail = g_queue;
     unsigned short *head;
     unsigned short *end;
+    int sum_x = 0;
+    int sum_y = 0;
     float axis_x;
     float axis_y;
     float orientation_norm;
@@ -1474,37 +2099,62 @@ static unsigned char refine_car_output_geometry(component_t *lamp)
     float max_major = -1.0e9f;
     float min_minor = 1.0e9f;
     float max_minor = -1.0e9f;
+    int x;
+    int y;
 
-    if(lamp == 0 || lamp->valid == 0U ||
-       lamp->envelope_threshold == 0U)
+    memset(&fitted, 0, sizeof(fitted));
+    fitted.min_x = BEACON_IMAGE_W - 1;
+    fitted.min_y = BEACON_IMAGE_H - 1;
+    for(y = min_y; y <= max_y; y++)
+    {
+        for(x = min_x; x <= max_x; x++)
+        {
+            unsigned int pixel_index = (unsigned int)y * BEACON_IMAGE_W + x;
+            unsigned int gray;
+
+            if(car_support_get(pixel_index) == 0U)
+            {
+                continue;
+            }
+            if(tail >= g_queue + IMAGE_QUEUE_SIZE)
+            {
+                return 0U;
+            }
+            *tail++ = (unsigned short)(x | (y << 8));
+            fitted.area++;
+            sum_x += x;
+            sum_y += y;
+            gray = g_current_image[y][x];
+            fitted.gray_sum += gray;
+            fitted.gray_sum_sq += gray * gray;
+            if(gray > fitted.peak) fitted.peak = (unsigned char)gray;
+            if(x < fitted.min_x) fitted.min_x = x;
+            if(x > fitted.max_x) fitted.max_x = x;
+            if(y < fitted.min_y) fitted.min_y = y;
+            if(y > fitted.max_y) fitted.max_y = y;
+        }
+    }
+    if(fitted.area <= 0 || fitted.area > g_image_down_car_lamp_max_area)
     {
         return 0U;
     }
-    refined = grow_car_envelope(
-        lamp, lamp->envelope_threshold, DOWN_CAR_OUTPUT_ENVELOPE_PAD);
-    if(refined.valid == 0U || refined.area < lamp->area ||
-       refined.area > g_image_down_car_lamp_max_area)
-    {
-        return 0U;
-    }
-
-    refined.envelope_threshold = lamp->envelope_threshold;
-    component_resolve_angle(&refined);
+    finish_component(&fitted, sum_x, sum_y, (unsigned short)fitted.area);
+    fitted.seed_x = lamp->seed_x;
+    fitted.seed_y = lamp->seed_y;
+    fitted.envelope_threshold = envelope_threshold;
+    component_resolve_angle(&fitted);
     orientation_norm = sqrtf(
-        refined.orientation_numerator * refined.orientation_numerator +
-        refined.orientation_denominator * refined.orientation_denominator);
+        fitted.orientation_numerator * fitted.orientation_numerator +
+        fitted.orientation_denominator * fitted.orientation_denominator);
     if(orientation_norm > 0.0001f)
     {
         cos_double_angle =
-            refined.orientation_denominator / orientation_norm;
+            fitted.orientation_denominator / orientation_norm;
         if(cos_double_angle < -1.0f) cos_double_angle = -1.0f;
         if(cos_double_angle > 1.0f) cos_double_angle = 1.0f;
         axis_x = sqrtf((1.0f + cos_double_angle) * 0.5f);
         axis_y = sqrtf((1.0f - cos_double_angle) * 0.5f);
-        if(refined.orientation_numerator < 0.0f)
-        {
-            axis_y = -axis_y;
-        }
+        if(fitted.orientation_numerator < 0.0f) axis_y = -axis_y;
     }
     else
     {
@@ -1512,14 +2162,14 @@ static unsigned char refine_car_output_geometry(component_t *lamp)
         axis_y = 0.0f;
     }
     head = g_queue;
-    end = g_queue + refined.area;
+    end = tail;
     while(head < end)
     {
         unsigned short coordinate = *head++;
-        float x = (float)(unsigned char)coordinate;
-        float y = (float)(unsigned char)(coordinate >> 8U);
-        float major = x * axis_x + y * axis_y;
-        float minor = -x * axis_y + y * axis_x;
+        float pixel_x = (float)(unsigned char)coordinate;
+        float pixel_y = (float)(unsigned char)(coordinate >> 8U);
+        float major = pixel_x * axis_x + pixel_y * axis_y;
+        float minor = -pixel_x * axis_y + pixel_y * axis_x;
 
         if(major < min_major) min_major = major;
         if(major > max_major) max_major = major;
@@ -1527,19 +2177,870 @@ static unsigned char refine_car_output_geometry(component_t *lamp)
         if(minor > max_minor) max_minor = minor;
     }
     pixel_extent = fabsf(axis_x) + fabsf(axis_y);
-    refined.major = max_major - min_major + pixel_extent;
-    refined.minor = max_minor - min_minor + pixel_extent;
-    refined.cx = ((min_major + max_major) * axis_x -
-                  (min_minor + max_minor) * axis_y) * 0.5f;
-    refined.cy = ((min_major + max_major) * axis_y +
-                  (min_minor + max_minor) * axis_x) * 0.5f;
-    if(refined.minor < 1.0f)
+    fitted.major = max_major - min_major + pixel_extent;
+    fitted.minor = max_minor - min_minor + pixel_extent;
+    fitted.cx = ((min_major + max_major) * axis_x -
+                 (min_minor + max_minor) * axis_y) * 0.5f;
+    fitted.cy = ((min_major + max_major) * axis_y +
+                 (min_minor + max_minor) * axis_x) * 0.5f;
+    if(fitted.minor < 1.0f) fitted.minor = 1.0f;
+    fitted.elongation = fitted.major / fitted.minor;
+    *lamp = fitted;
+
+    head = g_queue;
+    while(head < end)
     {
-        refined.minor = 1.0f;
+        unsigned short coordinate = *head++;
+        int center_x = (unsigned char)coordinate;
+        int center_y = (unsigned char)(coordinate >> 8U);
+        int pad_x;
+        int pad_y;
+
+        for(pad_y = -DOWN_CAR_SUPPORT_PAD;
+            pad_y <= DOWN_CAR_SUPPORT_PAD; pad_y++)
+        {
+            int support_y = center_y + pad_y;
+            if(support_y < 0 || support_y >= BEACON_IMAGE_H) continue;
+            for(pad_x = -DOWN_CAR_SUPPORT_PAD;
+                pad_x <= DOWN_CAR_SUPPORT_PAD; pad_x++)
+            {
+                int support_x = center_x + pad_x;
+                if(support_x < 0 || support_x >= BEACON_IMAGE_W) continue;
+                car_support_set(
+                    (unsigned int)support_y * BEACON_IMAGE_W + support_x, 1U);
+            }
+        }
     }
-    refined.elongation = refined.major / refined.minor;
-    *lamp = refined;
+    g_car_support_valid = 1U;
     return 1U;
+}
+
+/* 分类和轨迹继续使用动态包络，最终输出只拟合阈值120的实际亮核。 */
+static unsigned char down_car_fit_output_geometry(
+    const component_t *identity,
+    component_t *output)
+{
+    component_t fitted;
+
+    if(identity == 0 || output == 0 || identity->valid == 0U ||
+       identity->seed_x >= BEACON_IMAGE_W ||
+       identity->seed_y >= BEACON_IMAGE_H || g_current_image == 0)
+    {
+        return 0U;
+    }
+    fitted = grow_car_envelope(
+        identity, DOWN_GRAY_SUPPORT_THRESHOLD,
+        DOWN_CAR_OUTPUT_ENVELOPE_PAD);
+    if(fitted.valid == 0U ||
+       fitted.area < g_image_down_car_lamp_min_area)
+    {
+        return 0U;
+    }
+    fitted.seed_x = identity->seed_x;
+    fitted.seed_y = identity->seed_y;
+    fitted.envelope_threshold = DOWN_GRAY_SUPPORT_THRESHOLD;
+    component_resolve_angle(&fitted);
+    *output = fitted;
+    return 1U;
+}
+
+/* 低阈值只证明连通性，最终支持掩码和几何统一收紧到阈值120。 */
+static unsigned char down_car_refit_bridge_output(
+    component_t *merged,
+    component_t *output)
+{
+    int min_x;
+    int max_x;
+    int min_y;
+    int max_y;
+    int x;
+    int y;
+
+    if(merged == 0 || output == 0 || merged->valid == 0U ||
+       g_car_support_valid == 0U || g_current_image == 0)
+    {
+        return 0U;
+    }
+    min_x = merged->min_x - DOWN_CAR_SUPPORT_PAD;
+    max_x = merged->max_x + DOWN_CAR_SUPPORT_PAD;
+    min_y = merged->min_y - DOWN_CAR_SUPPORT_PAD;
+    max_y = merged->max_y + DOWN_CAR_SUPPORT_PAD;
+    if(min_x < 0) min_x = 0;
+    if(min_y < 0) min_y = 0;
+    if(max_x >= BEACON_IMAGE_W) max_x = BEACON_IMAGE_W - 1;
+    if(max_y >= BEACON_IMAGE_H) max_y = BEACON_IMAGE_H - 1;
+    for(y = min_y; y <= max_y; y++)
+    {
+        for(x = min_x; x <= max_x; x++)
+        {
+            unsigned int pixel_index = (unsigned int)y * BEACON_IMAGE_W + x;
+
+            if(car_support_get(pixel_index) != 0U &&
+               g_current_image[y][x] < DOWN_GRAY_SUPPORT_THRESHOLD)
+            {
+                car_support_set(pixel_index, 0U);
+            }
+        }
+    }
+    *output = *merged;
+    if(down_car_fit_support_geometry(
+           output, min_x, max_x, min_y, max_y,
+           DOWN_GRAY_SUPPORT_THRESHOLD) == 0U ||
+       output->area < g_image_down_car_lamp_min_area)
+    {
+        return 0U;
+    }
+    return 1U;
+}
+
+static unsigned char down_car_assign_support(
+    component_t *lamp,
+    const down_car_candidate_t *candidates,
+    const unsigned char *group,
+    unsigned char group_count,
+    const component_t *extra_cores,
+    const unsigned char *extra_indices,
+    unsigned char extra_count)
+{
+    static const signed char neighbor_x[8] =
+        {1, -1, 0, 0, 1, 1, -1, -1};
+    static const signed char neighbor_y[8] =
+        {0, 0, 1, -1, 1, -1, 1, -1};
+    unsigned short *head = g_queue;
+    unsigned short *tail = g_queue;
+    unsigned short *queue_end = g_queue + IMAGE_QUEUE_SIZE;
+    unsigned char stamp;
+    unsigned char threshold = 255U;
+    unsigned char index;
+    int min_x = BEACON_IMAGE_W - 1;
+    int max_x = 0;
+    int min_y = BEACON_IMAGE_H - 1;
+    int max_y = 0;
+    int x;
+    int y;
+
+    if(lamp == 0 || candidates == 0 || group == 0 || group_count == 0U ||
+       (extra_count != 0U &&
+        (extra_cores == 0 || extra_indices == 0)))
+    {
+        return 0U;
+    }
+    memset(g_car_support_mask, 0, sizeof(g_car_support_mask));
+    g_car_support_valid = 0U;
+    for(index = 0U; index < group_count; index++)
+    {
+        const down_car_candidate_t *candidate = &candidates[group[index]];
+
+        if(candidate->component.min_x < min_x) min_x = candidate->component.min_x;
+        if(candidate->component.max_x > max_x) max_x = candidate->component.max_x;
+        if(candidate->component.min_y < min_y) min_y = candidate->component.min_y;
+        if(candidate->component.max_y > max_y) max_y = candidate->component.max_y;
+        if(candidate->component.envelope_threshold != 0U &&
+           candidate->component.envelope_threshold < threshold)
+        {
+            threshold = candidate->component.envelope_threshold;
+        }
+        down_car_mark_core_pixels(&candidate->core);
+    }
+    for(index = 0U; index < extra_count; index++)
+    {
+        const component_t *core = &extra_cores[extra_indices[index]];
+
+        if(core->valid == 0U)
+        {
+            continue;
+        }
+        if(core->min_x < min_x) min_x = core->min_x;
+        if(core->max_x > max_x) max_x = core->max_x;
+        if(core->min_y < min_y) min_y = core->min_y;
+        if(core->max_y > max_y) max_y = core->max_y;
+        down_car_mark_core_pixels(core);
+    }
+    if(threshold == 255U) threshold = DOWN_GRAY_SUPPORT_THRESHOLD;
+    min_x -= DOWN_CAR_OUTPUT_ENVELOPE_PAD;
+    max_x += DOWN_CAR_OUTPUT_ENVELOPE_PAD;
+    min_y -= DOWN_CAR_OUTPUT_ENVELOPE_PAD;
+    max_y += DOWN_CAR_OUTPUT_ENVELOPE_PAD;
+    if(min_x < 0) min_x = 0;
+    if(min_y < 0) min_y = 0;
+    if(max_x >= BEACON_IMAGE_W) max_x = BEACON_IMAGE_W - 1;
+    if(max_y >= BEACON_IMAGE_H) max_y = BEACON_IMAGE_H - 1;
+
+    begin_visit_pass();
+    stamp = g_current_stamp;
+    for(y = min_y; y <= max_y; y++)
+    {
+        for(x = min_x; x <= max_x; x++)
+        {
+            unsigned int pixel_index = (unsigned int)y * BEACON_IMAGE_W + x;
+
+            if(g_binary[y][x] == 0U)
+            {
+                continue;
+            }
+            if(tail >= queue_end)
+            {
+                return 0U;
+            }
+            g_visit_stamp[pixel_index] = stamp;
+            *tail++ = (unsigned short)(x | (y << 8));
+        }
+    }
+    if(head == tail)
+    {
+        return 0U;
+    }
+    while(head < tail)
+    {
+        unsigned short coordinate = *head++;
+        int center_x = (unsigned char)coordinate;
+        int center_y = (unsigned char)(coordinate >> 8U);
+        unsigned int center_index =
+            (unsigned int)center_y * BEACON_IMAGE_W + center_x;
+        unsigned char owner = car_support_get(center_index);
+
+        for(index = 0U; index < 8U; index++)
+        {
+            int next_x = center_x + neighbor_x[index];
+            int next_y = center_y + neighbor_y[index];
+            unsigned int next_index;
+
+            if(next_x < min_x || next_x > max_x ||
+               next_y < min_y || next_y > max_y)
+            {
+                continue;
+            }
+            next_index = (unsigned int)next_y * BEACON_IMAGE_W + next_x;
+            if(g_visit_stamp[next_index] == stamp ||
+               g_current_image[next_y][next_x] < threshold)
+            {
+                continue;
+            }
+            if(tail >= queue_end)
+            {
+                return 0U;
+            }
+            g_visit_stamp[next_index] = stamp;
+            car_support_set(next_index, owner);
+            *tail++ = (unsigned short)(next_x | (next_y << 8));
+        }
+    }
+    return down_car_fit_support_geometry(
+        lamp, min_x, max_x, min_y, max_y, threshold);
+}
+
+static unsigned char down_car_recovered_support_matches_track(
+    const component_t *lamp,
+    float maximum_major_ratio)
+{
+    float predicted_x;
+    float predicted_y;
+    float dx;
+    float dy;
+    float gate_sq;
+    float major_ratio;
+    float minor_ratio;
+
+    if(lamp == 0 || lamp->valid == 0U ||
+       lamp->area < g_image_down_car_lamp_min_area ||
+       g_car_track.confirmed == 0U ||
+       g_car_track.length <= 0.0f || g_car_track.width <= 0.0f)
+    {
+        return 0U;
+    }
+    predicted_x = g_car_track.x + (float)BEACON_IMAGE_W * 0.5f +
+                  g_car_track.vx;
+    predicted_y = g_car_track.y + (float)BEACON_IMAGE_H * 0.5f +
+                  g_car_track.vy;
+    dx = lamp->cx - predicted_x;
+    dy = lamp->cy - predicted_y;
+    gate_sq = g_image_down_gate_distance * g_image_down_gate_distance;
+    if(gate_sq < 1.0f) gate_sq = 1.0f;
+    major_ratio = lamp->major / g_car_track.length;
+    minor_ratio = lamp->minor / g_car_track.width;
+    return (dx * dx + dy * dy <= gate_sq &&
+            down_car_axis_angle_difference(
+                lamp->angle, g_car_track.angle) <=
+                DOWN_CAR_GROUP_ANGLE_MAX &&
+            major_ratio >= 0.5f && major_ratio <= maximum_major_ratio &&
+            minor_ratio >= 0.5f && minor_ratio <= 2.0f) ? 1U : 0U;
+}
+
+static unsigned char down_car_recovered_support_improves_fragment(
+    const component_t *original,
+    const component_t *recovered)
+{
+    if(original == 0 || recovered == 0 ||
+       original->valid == 0U || recovered->valid == 0U)
+    {
+        return 0U;
+    }
+    return (recovered->major > original->major + 1.0f &&
+            recovered->area > original->area) ? 1U : 0U;
+}
+
+/*
+ * 阈值80仅用于确认碎片与车灯同属一片光晕；最终输出和互斥掩码
+ * 均重新收紧到阈值120。失败时由调用方重建原有支持区域。
+ */
+static unsigned char down_car_try_bridge_output(
+    const component_t *identity,
+    const down_car_candidate_t candidates[DOWN_CAR_MAX_MASKS],
+    const unsigned char group[DOWN_CAR_GROUP_MAX_CORES],
+    unsigned char group_count,
+    const component_t cores[DOWN_CAR_MAX_COMPONENTS],
+    const unsigned char core_classifications[DOWN_CAR_MAX_COMPONENTS],
+    unsigned char core_count,
+    const unsigned char *base_extra_indices,
+    unsigned char base_extra_count)
+{
+    unsigned char recovered_indices[DOWN_CAR_GROUP_MAX_CORES];
+    unsigned char combined_indices[DOWN_CAR_GROUP_MAX_CORES];
+    unsigned char recovered_count;
+    unsigned char combined_count = 0U;
+    unsigned char added_count = 0U;
+    unsigned char index;
+    component_t merged;
+    component_t output;
+
+    if(identity == 0 || identity->valid == 0U ||
+       g_car_track.confirmed == 0U)
+    {
+        return 0U;
+    }
+    recovered_count = down_car_select_recoverable_cores(
+        candidates, group, group_count,
+        cores, core_classifications, core_count, recovered_indices,
+        DOWN_CAR_RECOVER_BRIDGE_THRESHOLD, 1U, 1U);
+    if(recovered_count == 0U)
+    {
+        return 0U;
+    }
+    for(index = 0U;
+        index < base_extra_count &&
+        group_count + combined_count < DOWN_CAR_GROUP_MAX_CORES;
+        index++)
+    {
+        combined_indices[combined_count++] = base_extra_indices[index];
+    }
+    for(index = 0U;
+        index < recovered_count &&
+        group_count + combined_count < DOWN_CAR_GROUP_MAX_CORES;
+        index++)
+    {
+        unsigned char duplicate = 0U;
+        unsigned char existing;
+
+        for(existing = 0U; existing < combined_count; existing++)
+        {
+            if(combined_indices[existing] == recovered_indices[index])
+            {
+                duplicate = 1U;
+                break;
+            }
+        }
+        if(duplicate == 0U)
+        {
+            combined_indices[combined_count++] = recovered_indices[index];
+            added_count++;
+        }
+    }
+    if(added_count == 0U)
+    {
+        return 0U;
+    }
+    merged = *identity;
+    if(down_car_assign_support(
+           &merged, candidates, group, group_count,
+           cores, combined_indices, combined_count) == 0U)
+    {
+        return 0U;
+    }
+    if(down_car_refit_bridge_output(&merged, &output) == 0U)
+    {
+        return 0U;
+    }
+    if(down_car_recovered_support_matches_track(&output, 2.2f) == 0U)
+    {
+        return 0U;
+    }
+    if(down_car_recovered_support_improves_fragment(identity, &output) == 0U)
+    {
+        return 0U;
+    }
+    g_car_output_override = output;
+    g_car_output_override_valid = 1U;
+    return 1U;
+}
+
+static void down_car_clear_support(void)
+{
+    memset(g_car_support_mask, 0, sizeof(g_car_support_mask));
+    g_car_support_valid = 0U;
+}
+
+static unsigned char down_car_finalize_candidate(
+    component_t *lamp,
+    const down_car_candidate_t candidates[DOWN_CAR_MAX_MASKS],
+    unsigned char candidate_count,
+    unsigned char selected,
+    const component_t cores[DOWN_CAR_MAX_COMPONENTS],
+    const unsigned char core_classifications[DOWN_CAR_MAX_COMPONENTS],
+    unsigned char core_count)
+{
+    unsigned char group[DOWN_CAR_GROUP_MAX_CORES];
+    unsigned char recovered_indices[DOWN_CAR_GROUP_MAX_CORES];
+    unsigned char group_count;
+    unsigned char recovered_count;
+    component_t original_lamp;
+
+    if(lamp == 0 || selected >= candidate_count)
+    {
+        return 0U;
+    }
+    original_lamp = candidates[selected].component;
+    *lamp = original_lamp;
+    component_resolve_angle(lamp);
+    group_count = down_car_select_group(
+        candidates, candidate_count, selected, group);
+    recovered_count = down_car_select_recoverable_cores(
+        candidates, group, group_count,
+        cores, core_classifications, core_count, recovered_indices,
+        DOWN_CAR_RECOVER_CONNECT_THRESHOLD, 0U, 0U);
+    if(recovered_count != 0U)
+    {
+        if(down_car_assign_support(
+               lamp, candidates, group, group_count,
+               cores, recovered_indices, recovered_count) != 0U &&
+           down_car_recovered_support_matches_track(lamp, 2.0f) != 0U)
+        {
+            component_t identity_lamp = *lamp;
+
+            if(down_car_try_bridge_output(
+                   &identity_lamp, candidates, group, group_count,
+                   cores, core_classifications, core_count,
+                   recovered_indices, recovered_count) == 0U)
+            {
+                (void)down_car_assign_support(
+                    lamp, candidates, group, group_count,
+                    cores, recovered_indices, recovered_count);
+            }
+            *lamp = identity_lamp;
+            component_resolve_angle(lamp);
+            return 1U;
+        }
+        /* 合并失败时完整回退，不能删除原候选车灯输出。 */
+        down_car_clear_support();
+        *lamp = original_lamp;
+        component_resolve_angle(lamp);
+    }
+    recovered_count = down_car_select_recoverable_cores(
+        candidates, group, group_count,
+        cores, core_classifications, core_count, recovered_indices,
+        DOWN_CAR_RECOVER_TRACK_THRESHOLD, 1U, 0U);
+    if(recovered_count != 0U)
+    {
+        if(down_car_assign_support(
+               lamp, candidates, group, group_count,
+               cores, recovered_indices, recovered_count) != 0U &&
+           down_car_recovered_support_matches_track(lamp, 2.0f) != 0U &&
+           down_car_recovered_support_improves_fragment(
+               &candidates[selected].core, lamp) != 0U)
+        {
+            component_t identity_lamp = *lamp;
+
+            if(down_car_try_bridge_output(
+                   &identity_lamp, candidates, group, group_count,
+                   cores, core_classifications, core_count,
+                   recovered_indices, recovered_count) == 0U)
+            {
+                (void)down_car_assign_support(
+                    lamp, candidates, group, group_count,
+                    cores, recovered_indices, recovered_count);
+            }
+            *lamp = identity_lamp;
+            component_resolve_angle(lamp);
+            return 1U;
+        }
+        down_car_clear_support();
+        *lamp = original_lamp;
+        component_resolve_angle(lamp);
+    }
+    if(down_car_assign_support(
+           lamp, candidates, group, group_count, 0, 0, 0U) != 0U)
+    {
+        component_t identity_lamp = *lamp;
+
+        if(down_car_try_bridge_output(
+               &identity_lamp, candidates, group, group_count,
+               cores, core_classifications, core_count, 0, 0U) == 0U)
+        {
+            (void)down_car_assign_support(
+                lamp, candidates, group, group_count, 0, 0, 0U);
+        }
+        *lamp = identity_lamp;
+        component_resolve_angle(lamp);
+        return 1U;
+    }
+    if(group_count <= 1U)
+    {
+        down_car_clear_support();
+        return 0U;
+    }
+
+    *lamp = original_lamp;
+    component_resolve_angle(lamp);
+    group[0] = selected;
+    if(down_car_assign_support(
+           lamp, candidates, group, 1U, 0, 0, 0U) != 0U)
+    {
+        component_t identity_lamp = *lamp;
+
+        if(down_car_try_bridge_output(
+               &identity_lamp, candidates, group, 1U,
+               cores, core_classifications, core_count, 0, 0U) == 0U)
+        {
+            (void)down_car_assign_support(
+                lamp, candidates, group, 1U, 0, 0, 0U);
+        }
+        *lamp = identity_lamp;
+        component_resolve_angle(lamp);
+        return 1U;
+    }
+    down_car_clear_support();
+    return 0U;
+}
+
+static void down_car_mark_unreported_priority_core(
+    const down_car_candidate_t *candidates,
+    unsigned char candidate_count)
+{
+    unsigned char group[DOWN_CAR_GROUP_MAX_CORES] = {0U, 0U, 0U};
+    unsigned char best = 255U;
+    unsigned char index;
+    component_t ignored_geometry;
+
+    for(index = 0U; index < candidate_count; index++)
+    {
+        if(candidates[index].output_eligible != 0U ||
+           candidates[index].classification < DOWN_CAR_CLASS_WEAK ||
+           down_gray_side_edge_beacon_like(
+               g_current_image, &candidates[index].component) != 0U)
+        {
+            continue;
+        }
+        if(best >= candidate_count ||
+           candidates[index].classification > candidates[best].classification ||
+           (candidates[index].classification == candidates[best].classification &&
+            candidates[index].score > candidates[best].score))
+        {
+            best = index;
+        }
+    }
+    if(best >= candidate_count)
+    {
+        return;
+    }
+    group[0] = best;
+    ignored_geometry = candidates[best].component;
+    (void)down_car_assign_support(
+        &ignored_geometry, candidates, group, 1U, 0, 0, 0U);
+}
+
+static unsigned char down_car_build_low_track_support(
+    component_t *lamp,
+    int min_x,
+    int max_x,
+    int min_y,
+    int max_y,
+    float axis_x,
+    float axis_y)
+{
+    static const signed char neighbor_x[8] =
+        {1, -1, 0, 0, 1, 1, -1, -1};
+    static const signed char neighbor_y[8] =
+        {0, 0, 1, -1, 1, -1, 1, -1};
+    component_t component;
+    unsigned short *head = g_queue;
+    unsigned short *tail = g_queue;
+    unsigned char stamp;
+    float best_distance = 1.0e9f;
+    int seed_x = 0;
+    int seed_y = 0;
+    int sum_x = 0;
+    int sum_y = 0;
+    int x;
+    int y;
+
+    for(y = min_y; y <= max_y; y++)
+    {
+        for(x = min_x; x <= max_x; x++)
+        {
+            float dx;
+            float dy;
+            float major;
+            float minor;
+            float distance;
+
+            if(g_current_image[y][x] < DOWN_GRAY_SUPPORT_THRESHOLD)
+            {
+                continue;
+            }
+            dx = (float)x - lamp->cx;
+            dy = (float)y - lamp->cy;
+            major = dx * axis_x + dy * axis_y;
+            minor = -dx * axis_y + dy * axis_x;
+            if(fabsf(major) > lamp->major * 0.5f + DOWN_CAR_SUPPORT_PAD ||
+               fabsf(minor) > lamp->minor * 0.5f + DOWN_CAR_SUPPORT_PAD)
+            {
+                continue;
+            }
+            distance = dx * dx + dy * dy;
+            if(distance < best_distance)
+            {
+                best_distance = distance;
+                seed_x = x;
+                seed_y = y;
+            }
+        }
+    }
+    if(best_distance >= 1.0e9f)
+    {
+        return 0U;
+    }
+
+    memset(&component, 0, sizeof(component));
+    component.min_x = seed_x;
+    component.max_x = seed_x;
+    component.min_y = seed_y;
+    component.max_y = seed_y;
+    component.seed_x = (unsigned char)seed_x;
+    component.seed_y = (unsigned char)seed_y;
+    begin_visit_pass();
+    stamp = g_current_stamp;
+    g_visit_stamp[(unsigned int)seed_y * BEACON_IMAGE_W + seed_x] = stamp;
+    *tail++ = (unsigned short)(seed_x | (seed_y << 8));
+    while(head < tail)
+    {
+        unsigned short coordinate = *head++;
+        int center_x = (unsigned char)coordinate;
+        int center_y = (unsigned char)(coordinate >> 8U);
+        unsigned int gray = g_current_image[center_y][center_x];
+        unsigned char index;
+
+        component.area++;
+        component.gray_sum += gray;
+        component.gray_sum_sq += gray * gray;
+        if(gray > component.peak) component.peak = (unsigned char)gray;
+        sum_x += center_x;
+        sum_y += center_y;
+        if(center_x < component.min_x) component.min_x = center_x;
+        if(center_x > component.max_x) component.max_x = center_x;
+        if(center_y < component.min_y) component.min_y = center_y;
+        if(center_y > component.max_y) component.max_y = center_y;
+        for(index = 0U; index < 8U; index++)
+        {
+            int next_x = center_x + neighbor_x[index];
+            int next_y = center_y + neighbor_y[index];
+            unsigned int next_pixel;
+            float dx;
+            float dy;
+            float major;
+            float minor;
+
+            if(next_x < min_x || next_x > max_x ||
+               next_y < min_y || next_y > max_y)
+            {
+                continue;
+            }
+            next_pixel = (unsigned int)next_y * BEACON_IMAGE_W + next_x;
+            if(g_visit_stamp[next_pixel] == stamp ||
+               g_current_image[next_y][next_x] < DOWN_GRAY_SUPPORT_THRESHOLD)
+            {
+                continue;
+            }
+            dx = (float)next_x - lamp->cx;
+            dy = (float)next_y - lamp->cy;
+            major = dx * axis_x + dy * axis_y;
+            minor = -dx * axis_y + dy * axis_x;
+            if(fabsf(major) > lamp->major * 0.5f + DOWN_CAR_SUPPORT_PAD ||
+               fabsf(minor) > lamp->minor * 0.5f + DOWN_CAR_SUPPORT_PAD)
+            {
+                continue;
+            }
+            g_visit_stamp[next_pixel] = stamp;
+            *tail++ = (unsigned short)(next_x | (next_y << 8));
+        }
+    }
+    if(component.area < CAR_LAMP_TEMPORAL_MIN_BRIGHT_AREA)
+    {
+        return 0U;
+    }
+    finish_component(
+        &component, sum_x, sum_y, (unsigned short)component.area);
+    component_resolve_angle(&component);
+    if(component.elongation < DOWN_CAR_SCORE_ELONGATION_BASE ||
+       down_car_axis_angle_difference(component.angle, lamp->angle) >
+           DOWN_CAR_GROUP_ANGLE_MAX)
+    {
+        return 0U;
+    }
+    memset(g_car_support_mask, 0, sizeof(g_car_support_mask));
+    head = g_queue;
+    while(head < tail)
+    {
+        unsigned short coordinate = *head++;
+        car_support_set(
+            (unsigned int)(unsigned char)(coordinate >> 8U) * BEACON_IMAGE_W +
+            (unsigned char)coordinate,
+            1U);
+    }
+    lamp->seed_x = component.seed_x;
+    lamp->seed_y = component.seed_y;
+    return down_car_fit_support_geometry(
+        lamp, min_x, max_x, min_y, max_y, DOWN_GRAY_SUPPORT_THRESHOLD);
+}
+
+static unsigned char down_car_build_single_support(
+    component_t *lamp,
+    unsigned char require_track_shape)
+{
+    down_car_candidate_t candidate;
+    component_t core;
+    unsigned char group[DOWN_CAR_GROUP_MAX_CORES] = {0U, 0U, 0U};
+    float angle;
+    float axis_x;
+    float axis_y;
+    float best_distance = 1.0e9f;
+    unsigned char seed_x = 0U;
+    unsigned char seed_y = 0U;
+    int min_x;
+    int max_x;
+    int min_y;
+    int max_y;
+    int x;
+    int y;
+
+    if(lamp == 0 || lamp->valid == 0U || g_current_image == 0)
+    {
+        return 0U;
+    }
+    angle = lamp->angle * (PI_F / 180.0f);
+    axis_x = cosf(angle);
+    axis_y = sinf(angle);
+    min_x = lamp->min_x - DOWN_CAR_SUPPORT_PAD;
+    max_x = lamp->max_x + DOWN_CAR_SUPPORT_PAD;
+    min_y = lamp->min_y - DOWN_CAR_SUPPORT_PAD;
+    max_y = lamp->max_y + DOWN_CAR_SUPPORT_PAD;
+    if(min_x < 0) min_x = 0;
+    if(min_y < 0) min_y = 0;
+    if(max_x >= BEACON_IMAGE_W) max_x = BEACON_IMAGE_W - 1;
+    if(max_y >= BEACON_IMAGE_H) max_y = BEACON_IMAGE_H - 1;
+    for(y = min_y; y <= max_y; y++)
+    {
+        for(x = min_x; x <= max_x; x++)
+        {
+            float dx;
+            float dy;
+            float major;
+            float minor;
+            float distance;
+
+            if(g_binary[y][x] == 0U)
+            {
+                continue;
+            }
+            dx = (float)x - lamp->cx;
+            dy = (float)y - lamp->cy;
+            major = dx * axis_x + dy * axis_y;
+            minor = -dx * axis_y + dy * axis_x;
+            if(fabsf(major) > lamp->major * 0.5f + DOWN_CAR_SUPPORT_PAD ||
+               fabsf(minor) > lamp->minor * 0.5f + DOWN_CAR_SUPPORT_PAD)
+            {
+                continue;
+            }
+            distance = dx * dx + dy * dy;
+            if(distance < best_distance)
+            {
+                best_distance = distance;
+                seed_x = (unsigned char)x;
+                seed_y = (unsigned char)y;
+            }
+        }
+    }
+    if(best_distance >= 1.0e9f)
+    {
+        return (require_track_shape != 0U) ?
+            down_car_build_low_track_support(
+                lamp, min_x, max_x, min_y, max_y, axis_x, axis_y) : 0U;
+    }
+    begin_visit_pass();
+    core = grow_component(seed_x, seed_y);
+    if(core.valid == 0U)
+    {
+        return 0U;
+    }
+    memset(&candidate, 0, sizeof(candidate));
+    candidate.core = core;
+    component_resolve_angle(&candidate.core);
+    if(require_track_shape != 0U)
+    {
+        if(core.area < CAR_LAMP_TEMPORAL_MIN_BRIGHT_AREA ||
+           candidate.core.elongation < DOWN_CAR_SCORE_ELONGATION_BASE ||
+           down_car_axis_angle_difference(
+               candidate.core.angle, lamp->angle) > DOWN_CAR_GROUP_ANGLE_MAX)
+        {
+            return 0U;
+        }
+        candidate.component = *lamp;
+        candidate.classification = DOWN_CAR_CLASS_TRACK;
+    }
+    else
+    {
+        candidate.component = *lamp;
+        candidate.classification = DOWN_CAR_CLASS_CENTER_RECOVERED;
+    }
+    candidate.output_eligible = 1U;
+    return down_car_assign_support(
+        lamp, &candidate, group, 1U, 0, 0, 0U);
+}
+
+static unsigned char down_car_merge_temporal_support(component_t *lamp)
+{
+    unsigned char *saved_support = &g_beacon_binary_snapshot[0][0];
+    unsigned char had_support = g_car_support_valid;
+    unsigned int index;
+
+    if(had_support != 0U)
+    {
+        memcpy(saved_support, g_car_support_mask,
+               sizeof(g_car_support_mask));
+    }
+    if(down_car_build_single_support(lamp, 1U) != 0U)
+    {
+        if(had_support != 0U)
+        {
+            for(index = 0U; index < DOWN_CAR_SUPPORT_MASK_SIZE; index++)
+            {
+                g_car_support_mask[index] |= saved_support[index];
+            }
+        }
+        g_car_support_valid = 1U;
+        return 1U;
+    }
+
+    if(had_support != 0U)
+    {
+        memcpy(g_car_support_mask, saved_support,
+               sizeof(g_car_support_mask));
+        g_car_support_valid = 1U;
+    }
+    else
+    {
+        memset(g_car_support_mask, 0, sizeof(g_car_support_mask));
+        g_car_support_valid = 0U;
+    }
+    return 0U;
 }
 
 #if defined(__ICCARM__)
@@ -1550,6 +3051,7 @@ static unsigned char find_car_lamp(
     unsigned char *selected_classification)
 {
     component_t cores[DOWN_CAR_MAX_COMPONENTS];
+    unsigned char core_classifications[DOWN_CAR_MAX_COMPONENTS];
     down_car_candidate_t candidates[DOWN_CAR_MAX_MASKS];
     unsigned char core_count = 0U;
     unsigned char candidate_count = 0U;
@@ -1565,8 +3067,8 @@ static unsigned char find_car_lamp(
         *selected_classification = DOWN_CAR_CLASS_NONE;
     }
     memset(cores, 0, sizeof(cores));
+    memset(core_classifications, 0, sizeof(core_classifications));
     memset(candidates, 0, sizeof(candidates));
-    g_current_lamp_mask_count = 0U;
     begin_visit_pass();
     for (y = 0U; y < BEACON_IMAGE_H; y++)
     {
@@ -1599,54 +3101,26 @@ static unsigned char find_car_lamp(
     for (index = 0U; index < core_count; index++)
     {
         down_car_features_t features;
+
+        memset(&features, 0, sizeof(features));
+        component_resolve_angle(&cores[index]);
         if (car_component_features(&cores[index], &features) != 0U)
         {
-            if(features.envelope.area < g_image_down_car_lamp_min_area)
-            {
-                if(features.classification >= DOWN_CAR_CLASS_WEAK)
-                {
-                    add_car_mask(&features.envelope);
-                }
-                else if(g_car_track.confirmed != 0U)
-                {
-                    float predicted_x =
-                        g_car_track.x + (float)BEACON_IMAGE_W * 0.5f +
-                        g_car_track.vx;
-                    float predicted_y =
-                        g_car_track.y + (float)BEACON_IMAGE_H * 0.5f +
-                        g_car_track.vy;
-                    float dx = features.envelope.cx - predicted_x;
-                    float dy = features.envelope.cy - predicted_y;
-
-                    if(dx * dx + dy * dy <=
-                       g_image_down_gate_distance *
-                       g_image_down_gate_distance)
-                    {
-                        add_car_mask(&features.envelope);
-                    }
-                }
-            }
-            else
-            {
-                store_car_candidate(candidates, &candidate_count,
-                                    &features);
-            }
-        }
-    }
-    for (index = 0U; index < candidate_count; index++)
-    {
-        if (candidates[index].classification != DOWN_CAR_CLASS_TRACK)
-        {
-            add_car_mask(&candidates[index].mask);
+            core_classifications[index] = features.classification;
+            store_car_candidate(
+                candidates, &candidate_count, &features, &cores[index],
+                (features.envelope.area >=
+                 g_image_down_car_lamp_min_area) ? 1U : 0U);
         }
     }
 
     best = select_car_candidate(candidates, candidate_count,
                                 DOWN_CAR_CLASS_STRONG);
-    if (best < candidate_count)
+    if (best < candidate_count &&
+        down_car_finalize_candidate(
+            best_lamp, candidates, candidate_count, best,
+            cores, core_classifications, core_count) != 0U)
     {
-        *best_lamp = candidates[best].component;
-        component_resolve_angle(best_lamp);
         reset_weak_car_pending();
         if(selected_classification != 0)
         {
@@ -1658,13 +3132,29 @@ static unsigned char find_car_lamp(
     weak_best = select_car_candidate(candidates, candidate_count,
                                      DOWN_CAR_CLASS_WEAK);
     if (weak_best < candidate_count &&
-        weak_car_confirmed(&candidates[weak_best].component, 1U) != 0U)
+        weak_car_confirmed(&candidates[weak_best].component, 1U) != 0U &&
+        down_car_finalize_candidate(
+            best_lamp, candidates, candidate_count, weak_best,
+            cores, core_classifications, core_count) != 0U)
     {
-        *best_lamp = candidates[weak_best].component;
-        component_resolve_angle(best_lamp);
         if(selected_classification != 0)
         {
             *selected_classification = DOWN_CAR_CLASS_WEAK;
+        }
+        return 1U;
+    }
+    best = down_car_select_track_group_primary(
+        candidates, candidate_count);
+    if(best < candidate_count &&
+       down_car_finalize_candidate(
+           best_lamp, candidates, candidate_count, best,
+           cores, core_classifications, core_count) != 0U &&
+       best_lamp->area >= g_image_down_car_lamp_min_area)
+    {
+        reset_weak_car_pending();
+        if(selected_classification != 0)
+        {
+            *selected_classification = candidates[best].classification;
         }
         return 1U;
     }
@@ -1679,11 +3169,11 @@ static unsigned char find_car_lamp(
         float dx = candidates[best].component.cx - predicted_x;
         float dy = candidates[best].component.cy - predicted_y;
         if (dx * dx + dy * dy <=
-            g_image_down_gate_distance * g_image_down_gate_distance)
+                g_image_down_gate_distance * g_image_down_gate_distance &&
+            down_car_finalize_candidate(
+                best_lamp, candidates, candidate_count, best,
+                cores, core_classifications, core_count) != 0U)
         {
-            *best_lamp = candidates[best].component;
-            component_resolve_angle(best_lamp);
-            add_car_mask(&candidates[best].mask);
             reset_weak_car_pending();
             if(selected_classification != 0)
             {
@@ -1696,6 +3186,7 @@ static unsigned char find_car_lamp(
     {
         age_weak_car_pending();
     }
+    down_car_mark_unreported_priority_core(candidates, candidate_count);
     return 0U;
 }
 
@@ -1796,32 +3287,6 @@ static unsigned char component_from_temporal_car(
     if (lamp->max_y >= BEACON_IMAGE_H) lamp->max_y = BEACON_IMAGE_H - 1;
     lamp->valid = 1;
     return 1;
-}
-
-static unsigned char down_car_temporal_prediction_has_support(
-    const component_t *lamp)
-{
-    down_lamp_geometry_t geometry;
-    int x;
-    int y;
-
-    if(lamp == 0 || lamp->valid == 0U || g_current_image == 0)
-    {
-        return 0U;
-    }
-    down_gray_lamp_geometry_init(lamp, &geometry);
-    for(y = lamp->min_y; y <= lamp->max_y; y++)
-    {
-        for(x = lamp->min_x; x <= lamp->max_x; x++)
-        {
-            if(g_current_image[y][x] >= DOWN_GRAY_SUPPORT_THRESHOLD &&
-               down_gray_point_in_lamp_geometry(x, y, &geometry) != 0U)
-            {
-                return 1U;
-            }
-        }
-    }
-    return 0U;
 }
 
 static unsigned char down_car_component_in_temporal_core(
@@ -1934,6 +3399,94 @@ static unsigned char down_car_center_track_mismatch(
     return (dx * dx + dy * dy > distance_limit) ? 1U : 0U;
 }
 
+static unsigned char down_car_try_center_recovery_bridge(
+    const component_t *identity,
+    int min_x,
+    int max_x,
+    int min_y,
+    int max_y)
+{
+    component_t cores[DOWN_CAR_MAX_COMPONENTS];
+    unsigned char core_classifications[DOWN_CAR_MAX_COMPONENTS];
+    down_car_candidate_t primary[DOWN_CAR_MAX_MASKS];
+    unsigned char group[DOWN_CAR_GROUP_MAX_CORES] = {0U, 0U, 0U};
+    unsigned char core_count = 0U;
+    unsigned char primary_index = DOWN_CAR_MAX_COMPONENTS;
+    float best_distance_sq = 1.0e9f;
+    int x;
+    int y;
+    unsigned char index;
+
+    if(identity == 0 || identity->valid == 0U ||
+       g_car_track.confirmed == 0U)
+    {
+        return 0U;
+    }
+    memset(cores, 0, sizeof(cores));
+    memset(core_classifications, 0, sizeof(core_classifications));
+    memset(primary, 0, sizeof(primary));
+    begin_visit_pass();
+    for(y = min_y; y <= max_y; y++)
+    {
+        for(x = min_x; x <= max_x; x++)
+        {
+            component_t component;
+
+            if(g_binary[y][x] == 0U ||
+               is_visited((unsigned char)x, (unsigned char)y) != 0U)
+            {
+                continue;
+            }
+            component = grow_component((unsigned char)x, (unsigned char)y);
+            if(component.valid != 0U)
+            {
+                store_car_core(cores, &core_count, &component);
+            }
+        }
+    }
+    for(index = 0U; index < core_count; index++)
+    {
+        down_car_features_t features;
+        float dx;
+        float dy;
+        float distance_sq;
+
+        component_resolve_angle(&cores[index]);
+        memset(&features, 0, sizeof(features));
+        (void)car_component_features(&cores[index], &features);
+        core_classifications[index] = features.classification;
+        if(down_car_component_in_temporal_core(
+               &cores[index], identity) == 0U)
+        {
+            continue;
+        }
+        dx = cores[index].cx - identity->cx;
+        dy = cores[index].cy - identity->cy;
+        distance_sq = dx * dx + dy * dy;
+        if(distance_sq < best_distance_sq)
+        {
+            best_distance_sq = distance_sq;
+            primary_index = index;
+        }
+    }
+    if(primary_index >= core_count)
+    {
+        return 0U;
+    }
+    primary[0].component = *identity;
+    primary[0].core = cores[primary_index];
+    primary[0].classification = DOWN_CAR_CLASS_CENTER_RECOVERED;
+    primary[0].output_eligible = 1U;
+    if(down_car_try_bridge_output(
+           identity, primary, group, 1U,
+           cores, core_classifications, core_count, 0, 0U) != 0U)
+    {
+        return 1U;
+    }
+    down_car_clear_support();
+    return 0U;
+}
+
 /* 已确认车灯在画面中心漏检时，以轨迹先验重新接管当前真实亮域。 */
 static unsigned char down_car_recover_center_track(
     component_t *best_lamp,
@@ -2032,7 +3585,6 @@ static unsigned char down_car_recover_center_track(
         candidate_morphology_scores[index] = features.score;
         if(features.envelope.area < g_image_down_car_lamp_min_area)
         {
-            add_car_mask(&features.envelope);
             candidates[index].valid = 0U;
             continue;
         }
@@ -2088,10 +3640,8 @@ static unsigned char down_car_recover_center_track(
     *best_lamp = candidates[best];
     component_resolve_angle(best_lamp);
     *selected_classification = DOWN_CAR_CLASS_CENTER_RECOVERED;
-    /* 中心恢复只使用最终车灯自身的原几何遮罩。 */
-    g_current_lamp_mask_count = 0U;
-    g_selected_car_component_mask_valid = 0U;
-    add_car_mask(best_lamp);
+    (void)down_car_try_center_recovery_bridge(
+        best_lamp, min_x, max_x, min_y, max_y);
     reset_weak_car_pending();
     return 1U;
 }
@@ -2169,28 +3719,50 @@ static unsigned char down_gray_point_in_lamp_geometry(
 
 static unsigned char down_gray_point_in_current_lamps(int x, int y)
 {
-    unsigned char index;
-
     if((x < 0) || (x >= BEACON_IMAGE_W) ||
        (y < 0) || (y >= BEACON_IMAGE_H))
     {
         return 0U;
     }
-    if((g_selected_car_component_mask_valid != 0U) &&
-       (g_visit_stamp[(unsigned int)y * BEACON_IMAGE_W + x] ==
-        g_selected_car_component_mask_stamp))
+    return (g_car_support_valid != 0U) ?
+        car_support_get((unsigned int)y * BEACON_IMAGE_W + x) : 0U;
+}
+
+static void down_car_clear_supported_beacon_tracks(void)
+{
+    unsigned char index;
+    int x;
+    int y;
+
+    if(g_car_support_valid == 0U || g_car_track.confirmed == 0U)
     {
-        return 1U;
+        return;
     }
-    for (index = 0U; index < g_current_lamp_mask_count; index++)
+    if(g_b0_track.active != 0U)
     {
-        if (down_gray_point_in_lamp_geometry(
-                x, y, &g_current_lamp_geometries[index]) != 0U)
+        x = (int)(g_b0_track.x + (float)BEACON_IMAGE_W * 0.5f + 0.5f);
+        y = (int)(g_b0_track.y + (float)BEACON_IMAGE_H * 0.5f + 0.5f);
+        if(down_gray_point_in_current_lamps(x, y) != 0U)
         {
-            return 1U;
+            memset(&g_b0_track, 0, sizeof(g_b0_track));
         }
     }
-    return 0U;
+    for(index = 0U; index < DOWN_NEAR_CAR_BEACON_TRACKS; index++)
+    {
+        down_near_car_beacon_track_t *track =
+            &g_near_car_beacon_tracks[index];
+
+        if(track->active == 0U)
+        {
+            continue;
+        }
+        x = (int)(track->x + (float)BEACON_IMAGE_W * 0.5f + 0.5f);
+        y = (int)(track->y + (float)BEACON_IMAGE_H * 0.5f + 0.5f);
+        if(down_gray_point_in_current_lamps(x, y) != 0U)
+        {
+            memset(track, 0, sizeof(*track));
+        }
+    }
 }
 
 static unsigned char down_gray_point_in_range(int x, int y)
@@ -3474,6 +5046,10 @@ static unsigned char down_gray_bind_candidate_source(
     }
     if(image[response_y][response_x] >= DOWN_GRAY_SUPPORT_THRESHOLD)
     {
+        if(down_gray_point_in_current_lamps(response_x, response_y) != 0U)
+        {
+            return 0U;
+        }
         candidate->seed_x = (unsigned char)response_x;
         candidate->seed_y = (unsigned char)response_y;
         return 1U;
@@ -3502,7 +5078,8 @@ static unsigned char down_gray_bind_candidate_source(
                 continue;
             }
             gray = image[y][x];
-            if(gray < DOWN_GRAY_SUPPORT_THRESHOLD)
+            if(gray < DOWN_GRAY_SUPPORT_THRESHOLD ||
+               down_gray_point_in_current_lamps(x, y) != 0U)
             {
                 continue;
             }
@@ -3517,6 +5094,50 @@ static unsigned char down_gray_bind_candidate_source(
         }
     }
     return (best_gray >= DOWN_GRAY_SUPPORT_THRESHOLD) ? 1U : 0U;
+}
+
+/* 同一高阈值连通域只能归属车灯或信标，低阈值光晕连接不参与该互斥。 */
+static unsigned char down_gray_candidate_shares_car_core(
+    const down_gray_candidate_t *candidate)
+{
+    component_t component;
+    unsigned short *coordinate;
+    unsigned short *end;
+    unsigned int seed_index;
+
+    if(candidate == 0 || g_car_support_valid == 0U)
+    {
+        return 0U;
+    }
+    seed_index = (unsigned int)candidate->seed_y * BEACON_IMAGE_W +
+                 candidate->seed_x;
+    if(candidate->seed_x >= BEACON_IMAGE_W ||
+       candidate->seed_y >= BEACON_IMAGE_H ||
+       g_binary[candidate->seed_y][candidate->seed_x] == 0U)
+    {
+        return 0U;
+    }
+    if(car_support_get(seed_index) != 0U)
+    {
+        return 1U;
+    }
+    begin_visit_pass();
+    component = grow_component(candidate->seed_x, candidate->seed_y);
+    coordinate = g_queue;
+    end = g_queue + component.area;
+    while(coordinate < end)
+    {
+        unsigned short value = *coordinate++;
+        unsigned int pixel_index =
+            (unsigned int)(unsigned char)(value >> 8U) * BEACON_IMAGE_W +
+            (unsigned char)value;
+
+        if(car_support_get(pixel_index) != 0U)
+        {
+            return 1U;
+        }
+    }
+    return 0U;
 }
 
 static void down_gray_add_candidate(
@@ -3574,6 +5195,51 @@ static void down_beacon_clear_slot(beacon_result_t *result,
 {
     memset(&result->beacons[index], 0, sizeof(result->beacons[index]));
     g_current_beacon_classification_valid[index] = 0U;
+}
+
+static unsigned char down_beacon_corner_clipped(
+    const beacon_circle_t *beacon)
+{
+    float x;
+    float y;
+
+    if(beacon == 0 || beacon->valid == 0U)
+    {
+        return 0U;
+    }
+    x = beacon->x + (float)BEACON_IMAGE_W * 0.5f;
+    y = beacon->y + (float)BEACON_IMAGE_H * 0.5f;
+    return ((x < (float)DOWN_BEACON_LEFT_EDGE_MARGIN ||
+             x >= (float)(BEACON_IMAGE_W - DOWN_BEACON_RIGHT_EDGE_MARGIN)) &&
+            (y < (float)DOWN_BEACON_CORNER_MARGIN ||
+             y >= (float)(BEACON_IMAGE_H - DOWN_BEACON_CORNER_MARGIN))) ?
+        1U : 0U;
+}
+
+/* 候选超额时优先舍弃同时被两个边界裁切的目标，角点目标本身不做硬过滤。 */
+static void down_beacon_limit_result(beacon_result_t *result)
+{
+    while(result != 0 && result->beacon_count > 2U)
+    {
+        unsigned char remove = (unsigned char)(result->beacon_count - 1U);
+        unsigned char index = result->beacon_count;
+
+        while(index > 0U)
+        {
+            index--;
+            if(down_beacon_corner_clipped(&result->beacons[index]) != 0U)
+            {
+                remove = index;
+                break;
+            }
+        }
+        for(index = remove; index + 1U < result->beacon_count; index++)
+        {
+            down_beacon_copy_slot(result, index, (unsigned char)(index + 1U));
+        }
+        result->beacon_count--;
+        down_beacon_clear_slot(result, result->beacon_count);
+    }
 }
 
 static void down_gray_insert_result(
@@ -3697,12 +5363,10 @@ static void find_beacons(
     memset(candidates, 0, sizeof(candidates));
     memset(g_current_beacon_classification_valid, 0,
            sizeof(g_current_beacon_classification_valid));
-    down_gray_lamp_geometry_init(lamp, &lamp_geometry);
-    down_gray_lamp_geometry_init(temporal_lamp, &temporal_lamp_geometry);
-    if (down_gray_side_edge_beacon_like(image, lamp) != 0U)
-    {
-        memset(&lamp_geometry, 0, sizeof(lamp_geometry));
-    }
+    (void)lamp;
+    (void)temporal_lamp;
+    memset(&lamp_geometry, 0, sizeof(lamp_geometry));
+    memset(&temporal_lamp_geometry, 0, sizeof(temporal_lamp_geometry));
     peak_count = down_gray_find_peaks(
         image, &lamp_geometry, &temporal_lamp_geometry, scene_mean, peaks);
     for (index = 0U; index < peak_count; index++)
@@ -3754,6 +5418,10 @@ static void find_beacons(
         {
             continue;
         }
+        if(down_gray_candidate_shares_car_core(&candidate) != 0U)
+        {
+            continue;
+        }
         candidate.score = (float)peaks[index].response +
                           features.inner_contrast * 8.0f +
                           features.concentration * 500.0f;
@@ -3763,14 +5431,7 @@ static void find_beacons(
     {
         down_gray_insert_result(&candidates[index], result);
     }
-    if (result->beacon_count > 2U)
-    {
-        for(index = 2U; index < result->beacon_count; index++)
-        {
-            down_beacon_clear_slot(result, index);
-        }
-        result->beacon_count = 2U;
-    }
+    down_beacon_limit_result(result);
     sync_legacy_beacons(result);
     down_gray_build_snapshot(result);
 }
@@ -3786,6 +5447,462 @@ static float square_distance(float ax, float ay, float bx, float by)
 static void reset_track(temporal_track_t *track)
 {
     memset(track, 0, sizeof(*track));
+}
+
+static unsigned char down_beacon_in_near_car_axis(
+    const beacon_circle_t *beacon,
+    const component_t *lamp)
+{
+    component_t core;
+    float angle;
+    float axis_x;
+    float axis_y;
+    float dx;
+    float dy;
+    float minor;
+    int center_x;
+    int center_y;
+    int seed_x = -1;
+    int seed_y = -1;
+    int best_distance_sq = 0x7FFFFFFF;
+    int offset_x;
+    int offset_y;
+
+    if(beacon == 0 || beacon->valid == 0U ||
+       lamp == 0 || lamp->valid == 0U)
+    {
+        return 0U;
+    }
+    dx = beacon->x + (float)BEACON_IMAGE_W * 0.5f - lamp->cx;
+    dy = beacon->y + (float)BEACON_IMAGE_H * 0.5f - lamp->cy;
+    if(dx * dx + dy * dy >
+       g_image_down_gate_distance * g_image_down_gate_distance)
+    {
+        return 0U;
+    }
+    angle = lamp->angle * (PI_F / 180.0f);
+    axis_x = cosf(angle);
+    axis_y = sinf(angle);
+    minor = -dx * axis_y + dy * axis_x;
+    if(fabsf(minor) >
+       lamp->minor * 0.5f + DOWN_CAR_GROUP_MINOR_PAD)
+    {
+        return 0U;
+    }
+    center_x = (int)(beacon->x + (float)BEACON_IMAGE_W * 0.5f + 0.5f);
+    center_y = (int)(beacon->y + (float)BEACON_IMAGE_H * 0.5f + 0.5f);
+    for(offset_y = -DOWN_GRAY_PATCH_RADIUS;
+        offset_y <= DOWN_GRAY_PATCH_RADIUS; offset_y++)
+    {
+        int y = center_y + offset_y;
+
+        if(y < 0 || y >= BEACON_IMAGE_H)
+        {
+            continue;
+        }
+        for(offset_x = -DOWN_GRAY_PATCH_RADIUS;
+            offset_x <= DOWN_GRAY_PATCH_RADIUS; offset_x++)
+        {
+            int x = center_x + offset_x;
+            int distance_sq = offset_x * offset_x + offset_y * offset_y;
+
+            if(x < 0 || x >= BEACON_IMAGE_W ||
+               distance_sq > DOWN_GRAY_PATCH_RADIUS * DOWN_GRAY_PATCH_RADIUS ||
+               g_binary[y][x] == 0U || distance_sq >= best_distance_sq)
+            {
+                continue;
+            }
+            seed_x = x;
+            seed_y = y;
+            best_distance_sq = distance_sq;
+        }
+    }
+    if(seed_x < 0 || seed_y < 0)
+    {
+        return 1U;
+    }
+    begin_visit_pass();
+    core = grow_component((unsigned char)seed_x, (unsigned char)seed_y);
+    if(core.valid == 0U ||
+       core.area <= g_image_down_near_lamp_isolated_min_area)
+    {
+        return 1U;
+    }
+    component_resolve_angle(&core);
+    return (core.angle_valid != 0U &&
+            down_car_axis_angle_difference(core.angle, lamp->angle) <=
+                DOWN_CAR_GROUP_ANGLE_MAX) ? 1U : 0U;
+}
+
+static unsigned char down_near_car_beacon_track_update(
+    const beacon_circle_t *beacon,
+    unsigned char matched[DOWN_NEAR_CAR_BEACON_TRACKS])
+{
+    float best_distance_sq =
+        g_image_down_match_distance * g_image_down_match_distance;
+    unsigned char best = DOWN_NEAR_CAR_BEACON_TRACKS;
+    unsigned char index;
+
+    for(index = 0U; index < DOWN_NEAR_CAR_BEACON_TRACKS; index++)
+    {
+        down_near_car_beacon_track_t *track =
+            &g_near_car_beacon_tracks[index];
+        float distance_sq;
+
+        if(track->active == 0U || matched[index] != 0U)
+        {
+            continue;
+        }
+        distance_sq = square_distance(
+            track->x, track->y, beacon->x, beacon->y);
+        if(distance_sq <= best_distance_sq)
+        {
+            best = index;
+            best_distance_sq = distance_sq;
+        }
+    }
+    if(best >= DOWN_NEAR_CAR_BEACON_TRACKS)
+    {
+        for(index = 0U; index < DOWN_NEAR_CAR_BEACON_TRACKS; index++)
+        {
+            if(g_near_car_beacon_tracks[index].active == 0U)
+            {
+                best = index;
+                break;
+            }
+        }
+        if(best >= DOWN_NEAR_CAR_BEACON_TRACKS)
+        {
+            return 0U;
+        }
+        memset(&g_near_car_beacon_tracks[best], 0,
+               sizeof(g_near_car_beacon_tracks[best]));
+        g_near_car_beacon_tracks[best].active = 1U;
+        g_near_car_beacon_tracks[best].hits = 1U;
+    }
+    else if(g_near_car_beacon_tracks[best].hits < 255U)
+    {
+        g_near_car_beacon_tracks[best].hits++;
+    }
+    g_near_car_beacon_tracks[best].x = beacon->x;
+    g_near_car_beacon_tracks[best].y = beacon->y;
+    g_near_car_beacon_tracks[best].misses = 0U;
+    matched[best] = 1U;
+    if(g_near_car_beacon_tracks[best].hits >=
+       DOWN_NEAR_CAR_BEACON_CONFIRM)
+    {
+        g_near_car_beacon_tracks[best].confirmed = 1U;
+    }
+    return g_near_car_beacon_tracks[best].confirmed;
+}
+
+/* 车灯主轴窄带内的紧凑独立核心需连续出现，避免断裂车灯单帧冒充信标。 */
+static void down_filter_near_car_beacons(
+    beacon_result_t *result,
+    const component_t *lamp)
+{
+    unsigned char matched[DOWN_NEAR_CAR_BEACON_TRACKS] = {0U, 0U};
+    unsigned char index = 0U;
+    unsigned char removed = 0U;
+
+    if(result == 0)
+    {
+        return;
+    }
+    while(index < result->beacon_count)
+    {
+        unsigned char keep = 1U;
+
+        if(down_beacon_in_near_car_axis(
+               &result->beacons[index], lamp) != 0U)
+        {
+            float match_distance_sq =
+                g_image_down_match_distance * g_image_down_match_distance;
+            if(g_b0_track.confirmed != 0U &&
+               square_distance(
+                   g_b0_track.x + g_b0_track.vx,
+                   g_b0_track.y + g_b0_track.vy,
+                   result->beacons[index].x,
+                   result->beacons[index].y) <= match_distance_sq)
+            {
+                keep = 1U;
+            }
+            else
+            {
+                keep = down_near_car_beacon_track_update(
+                    &result->beacons[index], matched);
+            }
+        }
+        if(keep != 0U)
+        {
+            index++;
+            continue;
+        }
+        {
+            unsigned char remove = index;
+
+            for(; remove + 1U < result->beacon_count; remove++)
+            {
+                down_beacon_copy_slot(
+                    result, remove, (unsigned char)(remove + 1U));
+            }
+        }
+        result->beacon_count--;
+        down_beacon_clear_slot(result, result->beacon_count);
+        removed = 1U;
+    }
+    for(index = 0U; index < DOWN_NEAR_CAR_BEACON_TRACKS; index++)
+    {
+        down_near_car_beacon_track_t *track =
+            &g_near_car_beacon_tracks[index];
+
+        if(track->active == 0U || matched[index] != 0U)
+        {
+            continue;
+        }
+        if(track->confirmed == 0U ||
+           track->misses >= DOWN_NEAR_CAR_BEACON_MAX_MISSES)
+        {
+            memset(track, 0, sizeof(*track));
+        }
+        else
+        {
+            track->misses++;
+        }
+    }
+    if(removed != 0U)
+    {
+        sync_legacy_beacons(result);
+        down_gray_build_snapshot(result);
+    }
+}
+
+static int down_edge_beacon_track_slot(float image_x)
+{
+    if(image_x < (float)DOWN_BEACON_LEFT_EDGE_MARGIN)
+    {
+        return 0;
+    }
+    if(image_x >= (float)(BEACON_IMAGE_W - DOWN_BEACON_RIGHT_EDGE_MARGIN))
+    {
+        return 1;
+    }
+    return -1;
+}
+
+static void down_edge_beacon_update_strict(
+    down_edge_beacon_track_t *track,
+    const beacon_circle_t *beacon,
+    float image_x,
+    float image_y)
+{
+    float gate = g_image_down_match_distance;
+    float dx;
+    float dy;
+
+    if(track == 0 || beacon == 0)
+    {
+        return;
+    }
+    if(gate < 1.0f) gate = 1.0f;
+    dx = image_x - track->x;
+    dy = image_y - track->y;
+    if(track->active == 0U || dx * dx + dy * dy > gate * gate)
+    {
+        memset(track, 0, sizeof(*track));
+        track->active = 1U;
+        track->hits = 1U;
+    }
+    else
+    {
+        track->vx = dx;
+        track->vy = dy;
+        if(track->hits < 255U) track->hits++;
+    }
+    track->x = image_x;
+    track->y = image_y;
+    track->area = beacon->area;
+    track->misses = 0U;
+    if(track->hits >= DOWN_EDGE_BEACON_CONFIRM)
+    {
+        track->confirmed = 1U;
+    }
+}
+
+/* 只在已确认边缘轨迹的13x13预测窗口内恢复当前帧真实亮点。 */
+static unsigned char down_edge_beacon_recover(
+    down_edge_beacon_track_t *track,
+    unsigned char slot,
+    beacon_result_t *result)
+{
+    down_gray_features_t features;
+    down_gray_candidate_t candidate;
+    float predicted_x;
+    float predicted_y;
+    int center_x;
+    int center_y;
+    int best_x = -1;
+    int best_y = -1;
+    int best_gray = -1;
+    int x;
+    int y;
+    unsigned char index;
+
+    if(track == 0 || result == 0 || track->confirmed == 0U ||
+       g_current_image == 0 || result->beacon_count != 1U)
+    {
+        return 0U;
+    }
+    predicted_x = track->x + track->vx;
+    predicted_y = track->y + track->vy;
+    if(down_edge_beacon_track_slot(predicted_x) != (int)slot)
+    {
+        return 0U;
+    }
+    center_x = (int)(predicted_x + 0.5f);
+    center_y = (int)(predicted_y + 0.5f);
+    for(y = center_y - DOWN_EDGE_BEACON_RECOVER_RADIUS;
+        y <= center_y + DOWN_EDGE_BEACON_RECOVER_RADIUS; y++)
+    {
+        if(y < 0 || y >= BEACON_IMAGE_H) continue;
+        for(x = center_x - DOWN_EDGE_BEACON_RECOVER_RADIUS;
+            x <= center_x + DOWN_EDGE_BEACON_RECOVER_RADIUS; x++)
+        {
+            int gray;
+
+            if(x < 0 || x >= BEACON_IMAGE_W ||
+               down_edge_beacon_track_slot((float)x) != (int)slot ||
+               down_gray_point_in_range(x, y) == 0U ||
+               down_gray_point_in_current_lamps(x, y) != 0U)
+            {
+                continue;
+            }
+            gray = g_current_image[y][x];
+            if(gray > best_gray)
+            {
+                best_gray = gray;
+                best_x = x;
+                best_y = y;
+            }
+        }
+    }
+    if(best_gray < (int)DOWN_EDGE_BEACON_RECOVER_PEAK ||
+       down_gray_local_features(
+           g_current_image, best_x, best_y, &features) == 0U ||
+       features.half_area < 3U || features.half_area > 32U ||
+       features.inner_contrast < 80.0f ||
+       features.radial_drop < 65.0f ||
+       features.concentration < 0.42f ||
+       features.elongation > 2.20f ||
+       features.offset > 2.00f ||
+       features.outer_occupancy > 0.30f)
+    {
+        return 0U;
+    }
+    memset(&candidate, 0, sizeof(candidate));
+    candidate.x = (float)best_x + features.centroid_x;
+    candidate.y = (float)best_y + features.centroid_y;
+    candidate.classification_x = candidate.x;
+    candidate.classification_y = candidate.y;
+    candidate.seed_x = (unsigned char)best_x;
+    candidate.seed_y = (unsigned char)best_y;
+    if(down_gray_refine_candidate_region(
+           g_current_image, &candidate) == 0U ||
+       candidate.area < 3.0f || candidate.area > 84.0f ||
+       down_gray_candidate_shares_car_core(&candidate) != 0U)
+    {
+        return 0U;
+    }
+    for(index = 0U; index < result->beacon_count; index++)
+    {
+        float existing_x = result->beacons[index].x +
+                           (float)BEACON_IMAGE_W * 0.5f;
+        float existing_y = result->beacons[index].y +
+                           (float)BEACON_IMAGE_H * 0.5f;
+
+        if(square_distance(
+               existing_x, existing_y,
+               candidate.x, candidate.y) <= DOWN_GRAY_DEDUP_DISTANCE_SQ)
+        {
+            return 0U;
+        }
+    }
+    index = result->beacon_count;
+    memset(&result->beacons[index], 0, sizeof(result->beacons[index]));
+    result->beacons[index].x = candidate.x -
+                               (float)BEACON_IMAGE_W * 0.5f;
+    result->beacons[index].y = candidate.y -
+                               (float)BEACON_IMAGE_H * 0.5f;
+    result->beacons[index].area = candidate.area;
+    result->beacons[index].radius = sqrtf(candidate.area / PI_F);
+    result->beacons[index].valid = 1U;
+    g_current_beacon_classification_x[index] = candidate.classification_x;
+    g_current_beacon_classification_y[index] = candidate.classification_y;
+    g_current_beacon_classification_valid[index] = 1U;
+    result->beacon_count++;
+    track->x = candidate.x;
+    track->y = candidate.y;
+    track->area = candidate.area;
+    return 1U;
+}
+
+static void down_edge_beacon_continue(beacon_result_t *result)
+{
+    unsigned char matched[DOWN_EDGE_BEACON_TRACKS] = {0U, 0U};
+    unsigned char changed = 0U;
+    unsigned char index;
+    unsigned char max_misses = 3U;
+
+    if(result == 0)
+    {
+        return;
+    }
+    if(g_image_down_max_misses >= 0 &&
+       g_image_down_max_misses < (int32)max_misses)
+    {
+        max_misses = (unsigned char)g_image_down_max_misses;
+    }
+    for(index = 0U; index < result->beacon_count; index++)
+    {
+        float image_x = result->beacons[index].x +
+                        (float)BEACON_IMAGE_W * 0.5f;
+        float image_y = result->beacons[index].y +
+                        (float)BEACON_IMAGE_H * 0.5f;
+        int slot = down_edge_beacon_track_slot(image_x);
+
+        if(slot < 0 || matched[slot] != 0U)
+        {
+            continue;
+        }
+        down_edge_beacon_update_strict(
+            &g_edge_beacon_tracks[slot],
+            &result->beacons[index], image_x, image_y);
+        matched[slot] = 1U;
+    }
+    for(index = 0U; index < DOWN_EDGE_BEACON_TRACKS; index++)
+    {
+        down_edge_beacon_track_t *track = &g_edge_beacon_tracks[index];
+
+        if(matched[index] != 0U || track->active == 0U)
+        {
+            continue;
+        }
+        if(track->confirmed == 0U || track->misses >= max_misses)
+        {
+            memset(track, 0, sizeof(*track));
+            continue;
+        }
+        if(down_edge_beacon_recover(track, index, result) != 0U)
+        {
+            changed = 1U;
+        }
+        track->misses++;
+    }
+    if(changed != 0U)
+    {
+        sync_legacy_beacons(result);
+        down_gray_build_snapshot(result);
+    }
 }
 
 static unsigned char predict_missed_track(temporal_track_t *track, unsigned char max_misses)
@@ -3985,9 +6102,13 @@ static void update_current_beacon_track(const beacon_circle_t *measurement)
     set_beacon_track_shape(&g_b0_track, measurement);
 }
 
-static unsigned char update_temporal_car(beacon_result_t *result)
+static unsigned char update_temporal_car(
+    beacon_result_t *result,
+    const component_t *identity_lamp,
+    unsigned char identity_classification)
 {
     beacon_rect_t *measurement = 0;
+    beacon_rect_t identity_measurement;
 
     if (result->car_lamp_count > 0 && result->car_lamps[0].valid != 0)
     {
@@ -4002,7 +6123,17 @@ static unsigned char update_temporal_car(beacon_result_t *result)
             clear_car_result(result);
             return 0U;
         }
-        measurement = &result->car_lamps[0];
+        if(identity_lamp != 0 && identity_lamp->valid != 0U &&
+           identity_classification != DOWN_CAR_CLASS_NONE)
+        {
+            memset(&identity_measurement, 0, sizeof(identity_measurement));
+            fill_car_lamp_rect(identity_lamp, &identity_measurement);
+            measurement = &identity_measurement;
+        }
+        else
+        {
+            measurement = &result->car_lamps[0];
+        }
     }
     if (measurement == 0)
     {
@@ -4119,23 +6250,36 @@ static void apply_temporal_beacon(beacon_result_t *result)
     {
         unsigned char pending_car_fragment =
             down_gray_pending_car_fragment(&result->beacons[0], 0U);
-        unsigned char index;
 
-        update_current_beacon_track(&result->beacons[0]);
-        /* 未确认的拉长小亮域先积累轨迹，连续命中后再作为信标输出。 */
         if(pending_car_fragment != 0U && g_b0_track.confirmed == 0U)
         {
-            for(index = 0U; index + 1U < result->beacon_count; index++)
+            if(result->beacon_count == 1U)
             {
-                down_beacon_copy_slot(result, index,
-                                      (unsigned char)(index + 1U));
+                /* 单个拉长小亮域只积累轨迹，确认前不对外输出。 */
+                update_current_beacon_track(&result->beacons[0]);
+                result->beacon_count--;
+                down_beacon_clear_slot(result, result->beacon_count);
             }
-            down_beacon_clear_slot(
-                result, (unsigned char)(result->beacon_count - 1U));
-            result->beacon_count--;
+            else
+            {
+                unsigned char index;
+
+                /* 多目标时先移除可疑项，避免它污染真正 B0 的主轨迹。 */
+                for(index = 0U; index + 1U < result->beacon_count; index++)
+                {
+                    down_beacon_copy_slot(
+                        result, index, (unsigned char)(index + 1U));
+                }
+                down_beacon_clear_slot(
+                    result, (unsigned char)(result->beacon_count - 1U));
+                result->beacon_count--;
+                update_current_beacon_track(&result->beacons[0]);
+            }
             sync_legacy_beacons(result);
             down_gray_build_snapshot(result);
+            return;
         }
+        update_current_beacon_track(&result->beacons[0]);
         return;
     }
     if (g_b0_track.confirmed != 0U &&
@@ -4162,31 +6306,41 @@ static void apply_temporal_beacon(beacon_result_t *result)
     }
 }
 
-static void apply_temporal_car(beacon_result_t *result)
+static void apply_temporal_car(
+    beacon_result_t *result,
+    unsigned char current_track_support,
+    const component_t *identity_lamp,
+    unsigned char identity_classification)
 {
     unsigned char has_measurement =
         (result->car_lamp_count > 0U &&
          result->car_lamps[0].valid != 0U) ? 1U : 0U;
 
-    if (update_temporal_car(result) == 0)
+    if (update_temporal_car(
+            result, identity_lamp, identity_classification) == 0)
     {
         return;
     }
     if (has_measurement == 0U)
     {
-        if(temporal_track_has_current_support(&g_car_track) == 0U)
+        if(current_track_support == 0U)
         {
-            reset_track(&g_car_track);
             return;
         }
         output_temporal_car(&g_car_track, result);
     }
 }
 
-static void update_temporal_result(beacon_result_t *result)
+static void update_temporal_result(
+    beacon_result_t *result,
+    unsigned char current_car_track_support,
+    const component_t *identity_lamp,
+    unsigned char identity_classification)
 {
     apply_temporal_beacon(result);
-    apply_temporal_car(result);
+    apply_temporal_car(
+        result, current_car_track_support,
+        identity_lamp, identity_classification);
 }
 
 static void beacon_image_process(
@@ -4194,13 +6348,12 @@ static void beacon_image_process(
     beacon_result_t *result)
 {
     component_t lamp;
+    component_t output_lamp;
     component_t temporal_lamp;
     const component_t *temporal_lamp_ptr = 0;
     float scene_mean;
     unsigned char has_lamp;
     unsigned char center_track_mismatch;
-    unsigned char lamp_seed_x = 0U;
-    unsigned char lamp_seed_y = 0U;
     unsigned char lamp_classification = DOWN_CAR_CLASS_NONE;
     unsigned char i;
 
@@ -4220,7 +6373,10 @@ static void beacon_image_process(
         image, (unsigned char)g_image_down_car_lamp_binary_threshold);
     memcpy(g_car_lamp_binary_snapshot, g_binary,
            sizeof(g_car_lamp_binary_snapshot));
-    g_selected_car_component_mask_valid = 0U;
+    memset(g_car_support_mask, 0, sizeof(g_car_support_mask));
+    g_car_support_valid = 0U;
+    memset(&g_car_output_override, 0, sizeof(g_car_output_override));
+    g_car_output_override_valid = 0U;
     has_lamp = find_car_lamp(&lamp, &lamp_classification);
     center_track_mismatch =
         (has_lamp != 0U) ? down_car_center_track_mismatch(&lamp) : 0U;
@@ -4232,6 +6388,8 @@ static void beacon_image_process(
                &lamp, &lamp_classification) != 0U)
         {
             has_lamp = 1U;
+            memset(g_car_support_mask, 0, sizeof(g_car_support_mask));
+            g_car_support_valid = 0U;
         }
     }
     if (has_lamp == 0)
@@ -4240,35 +6398,93 @@ static void beacon_image_process(
     }
     else
     {
-        lamp_seed_x = lamp.seed_x;
-        lamp_seed_y = lamp.seed_y;
-        if(lamp_classification != DOWN_CAR_CLASS_NONE &&
-           car_output_envelope_has_continuation(&lamp) != 0U)
+        if(g_car_support_valid == 0U &&
+           lamp_classification != DOWN_CAR_CLASS_NONE)
         {
-            (void)refine_car_output_geometry(&lamp);
-        }
-        if(lamp_classification >= DOWN_CAR_CLASS_WEAK)
-        {
-            mark_selected_car_component(lamp_seed_x, lamp_seed_y);
+            if(down_car_build_single_support(&lamp, 0U) == 0U)
+            {
+                down_car_clear_support();
+                memset(&lamp, 0, sizeof(lamp));
+                has_lamp = 0U;
+                lamp_classification = DOWN_CAR_CLASS_NONE;
+            }
         }
     }
 
-    write_car_lamp(&lamp, lamp_classification, result);
+    output_lamp = lamp;
+    if(has_lamp != 0U && lamp_classification != DOWN_CAR_CLASS_NONE)
+    {
+        if(g_car_output_override_valid != 0U)
+        {
+            output_lamp = g_car_output_override;
+        }
+        else
+        {
+            (void)down_car_fit_output_geometry(&lamp, &output_lamp);
+        }
+    }
+    write_car_lamp(&output_lamp, lamp_classification, result);
+    if(lamp_classification >= DOWN_CAR_CLASS_WEAK)
+    {
+        down_car_clear_supported_beacon_tracks();
+    }
     memset(&temporal_lamp, 0, sizeof(temporal_lamp));
     if((has_lamp == 0U ||
         lamp_classification < DOWN_CAR_CLASS_WEAK) &&
        g_car_track.confirmed != 0U &&
        component_from_temporal_car(
-           &g_car_track, &temporal_lamp, 1U) != 0U &&
-       down_car_temporal_prediction_has_support(&temporal_lamp) != 0U)
+           &g_car_track, &temporal_lamp, 1U) != 0U)
     {
-        temporal_lamp_ptr = &temporal_lamp;
+        if(down_car_merge_temporal_support(&temporal_lamp) != 0U)
+        {
+            int bridge_min_x = temporal_lamp.min_x -
+                               CAR_LAMP_TEMPORAL_TAKEOVER_PAD;
+            int bridge_max_x = temporal_lamp.max_x +
+                               CAR_LAMP_TEMPORAL_TAKEOVER_PAD;
+            int bridge_min_y = temporal_lamp.min_y -
+                               CAR_LAMP_TEMPORAL_TAKEOVER_PAD;
+            int bridge_max_y = temporal_lamp.max_y +
+                               CAR_LAMP_TEMPORAL_TAKEOVER_PAD;
+
+            if(bridge_min_x < 0) bridge_min_x = 0;
+            if(bridge_min_y < 0) bridge_min_y = 0;
+            if(bridge_max_x >= BEACON_IMAGE_W)
+            {
+                bridge_max_x = BEACON_IMAGE_W - 1;
+            }
+            if(bridge_max_y >= BEACON_IMAGE_H)
+            {
+                bridge_max_y = BEACON_IMAGE_H - 1;
+            }
+            if(down_car_try_center_recovery_bridge(
+                   &temporal_lamp,
+                   bridge_min_x, bridge_max_x,
+                   bridge_min_y, bridge_max_y) == 0U)
+            {
+                (void)down_car_merge_temporal_support(&temporal_lamp);
+            }
+            temporal_lamp_ptr = &temporal_lamp;
+        }
     }
     find_beacons(
         image,
         (lamp_classification >= DOWN_CAR_CLASS_WEAK) ? &lamp : 0,
         temporal_lamp_ptr, scene_mean, result);
-    update_temporal_result(result);
+    down_filter_near_car_beacons(
+        result,
+        (result->car_lamp_measured_mask != 0U) ? &lamp :
+        ((temporal_lamp.valid != 0U) ? &temporal_lamp : 0));
+    down_edge_beacon_continue(result);
+    update_temporal_result(
+        result, (temporal_lamp_ptr != 0) ? 1U : 0U,
+        &lamp, lamp_classification);
+    if(result->car_lamp_measured_mask == 0U &&
+       result->car_lamp_count > 0U &&
+       g_car_output_override_valid != 0U)
+    {
+        fill_car_lamp_rect(
+            &g_car_output_override, &result->car_lamps[0]);
+    }
 
     for (i = result->car_lamp_count; i < BEACON_MAX_CAR_LAMP_COUNT; i++)
     {

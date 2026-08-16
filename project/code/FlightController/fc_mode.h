@@ -240,6 +240,9 @@ void FC_Mode3_100Hz(void);
  */
 void FC_Mode3_50Hz(float dt);
 
+/* 获取模式3缓慢随机变化的目标高度，单位 m。 */
+float FC_Mode3_Get_Target_Height_M(void);
+
 /*
  * 模式7 X/Y 轴速度环 PID 实例。
  * 作用: 供外部模块读取速度环输出和调试状态。

@@ -357,7 +357,8 @@ void FC_Loop_50Hz(void)
     {
         height_pos_pid.kp = g_fc_params.pos_z_kp;
         height_pos_out = PID_Update(&height_pos_pid,
-                                    (fc_state == FC_START_CRSF_STATE_LANDING) ? FC_LANDING_TARGET_HEIGHT_M : g_fc_target_height_m,
+                                    (fc_state == FC_START_CRSF_STATE_LANDING) ? FC_LANDING_TARGET_HEIGHT_M :
+                                    ((s_flight_mode == FC_START_CRSF_FLIGHT_MODE_3) ? FC_Mode3_Get_Target_Height_M() : g_fc_target_height_m),
                                     g_tof_fused_height_mm * 0.001f,
                                     dt);
         height_pos_out = fc_clampf(height_pos_out, -FC_HEIGHT_VEL_TARGET_LIMIT, FC_HEIGHT_VEL_TARGET_LIMIT);
@@ -619,9 +620,10 @@ void FC_Loop_500Hz(void)
             s_yaw_target_inited = 1U;
         }
 
-        /* Mode1/2/4/5/8 保留独立 yaw 目标，其余模式固定为 0 度。 */
+        /* Mode1/2/3/4/5/8 保留独立 yaw 目标，其余模式固定为 0 度。 */
         if ((s_flight_mode != FC_START_CRSF_FLIGHT_MODE_1) &&
             (s_flight_mode != FC_START_CRSF_FLIGHT_MODE_2) &&
+            (s_flight_mode != FC_START_CRSF_FLIGHT_MODE_3) &&
             (s_flight_mode != FC_START_CRSF_FLIGHT_MODE_4) &&
             (s_flight_mode != FC_START_CRSF_FLIGHT_MODE_5) &&
             (s_flight_mode != FC_START_CRSF_FLIGHT_MODE_8))

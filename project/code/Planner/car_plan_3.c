@@ -12,6 +12,10 @@
 #define CAR_PLAN_3_HISTORY_TICKS     (30U)   /* 100Hz 下保留约 300ms 的远距离历史。 */
 #define CAR_PLAN_3_GAP_TICKS         (2U)    /* 100Hz 下允许约 20ms 的短暂丢失。 */
 #define CAR_PLAN_3_CONFIRM_TICKS     (3U)    /* 连续匹配三次后确认信标轨迹。 */
+#define CAR_PLAN_3_SMALL_BEACON_AREA (8.0f)  /* 近同摄车灯信标的面积过滤阈值，单位像素。 */
+#define CAR_PLAN_3_FUSED_LAMP_EXCLUDE_DIST_M (0.10f) /* 融合信标靠近车灯的排除阈值，单位 m。 */
+#define CAR_PLAN_3_TARGET_LOCK_MATCH_M (0.25f) /* 融合目标锁的位置匹配半径，单位 m。 */
+#define CAR_PLAN_3_TARGET_LOST_HOLD_TICKS (3U) /* 锁定目标丢失时保持输出的周期数。 */
 
 typedef struct
 {
@@ -24,12 +28,22 @@ typedef struct
     float y;
 } car_plan_3_beacon_track_t;
 
+typedef struct
+{
+    uint8 valid;
+    uint8 lost_ticks;
+    float x_m;
+    float y_m;
+    car_plan_result_t result;
+} car_plan_3_target_lock_t;
+
 extern float g_car_yaw;
 static car_plan_result_t s_car_plan_3_result;
 static three_camera_result_t s_car_plan_3_camera;
 static int8 s_car_plan_3_selected = -1;
 static car_plan_3_beacon_track_t
     s_car_plan_3_track[IMAGE_CAMERA_COUNT][IMAGE_MAX_BEACON_COUNT]; /* 三摄原始信标短时轨迹。 */
+static car_plan_3_target_lock_t s_car_plan_3_target_lock; /* 融合目标锁及短时保持输出。 */
 
 /**
  * @brief 过滤突然出现在同摄车灯附近且没有远距离连续历史的原始信标。
@@ -153,7 +167,10 @@ static void CarPlan_3_FilterNearLamp(
                    ((lamp_valid != 0U) &&
                     (lamp_distance < CAR_PLAN_3_NEAR_LAMP_DIST_PX) &&
                     ((track->sample_ticks < CAR_PLAN_3_CONFIRM_TICKS) ||
-                     (track->far_age_ticks > CAR_PLAN_3_HISTORY_TICKS))))
+                     (track->far_age_ticks > CAR_PLAN_3_HISTORY_TICKS))) ||
+                   ((lamp_valid != 0U) &&
+                    (lamp_distance < CAR_PLAN_3_FAR_LAMP_DIST_PX) &&
+                    (beacon->area < CAR_PLAN_3_SMALL_BEACON_AREA)))
                 {
                     image_data_clear_beacon(&filtered[camera].beacon_data[index]);
                 }
@@ -179,6 +196,11 @@ static void CarPlan_3_FilterNearLamp(
     }
 }
 
+/**
+ * @brief 清除当前车模规划输出和调试目标槽位。
+ * @param 无。
+ * @return 无。
+ */
 static void CarPlan_3_ClearResult(void)
 {
     s_car_plan_3_result.valid = 0U;
@@ -187,12 +209,22 @@ static void CarPlan_3_ClearResult(void)
     s_car_plan_3_selected = -1;
 }
 
+/**
+ * @brief 重置三摄车模规划器、原始信标轨迹和融合目标锁。
+ * @param 无。
+ * @return 无。
+ */
 void CarPlan_3_Reset(void)
 {
     uint8 camera;
     uint8 i;
 
     CarPlan_3_ClearResult();
+    s_car_plan_3_target_lock.valid = 0U;
+    s_car_plan_3_target_lock.lost_ticks = 0U;
+    s_car_plan_3_target_lock.x_m = 0.0f;
+    s_car_plan_3_target_lock.y_m = 0.0f;
+    s_car_plan_3_target_lock.result = s_car_plan_3_result;
     s_car_plan_3_camera.car_lamp.valid = 0U;
     s_car_plan_3_camera.beacon_count = 0U;
     for(i = 0U; i < THREE_CAMERA_MAX_BEACON_COUNT; i++)
@@ -216,12 +248,21 @@ void CarPlan_3_Reset(void)
     }
 }
 
+/**
+ * @brief 更新三摄车模规划目标并计算车灯到信标的速度向量。
+ * @param result 输出规划结果，可为空；非空时返回本次有效状态和速度。
+ * @return 1 表示输出有效，0 表示高度、车灯或目标无效。
+ */
 uint8 CarPlan_3_Update(car_plan_result_t *result)
 {
     struct image_data filtered[IMAGE_CAMERA_COUNT];
     uint8 i;
     uint8 selected = 0xFFU;
+    uint8 locked = 0xFFU;
     float selected_distance_sq = 0.0f;
+    float locked_distance_sq = 0.0f;
+    float best_lock_match_sq =
+        CAR_PLAN_3_TARGET_LOCK_MATCH_M * CAR_PLAN_3_TARGET_LOCK_MATCH_M;
     float dx;
     float dy;
     float distance;
@@ -229,6 +270,9 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
     float right_x;
     float right_y;
     float scale;
+    const float fused_lamp_exclude_dist_sq =
+        CAR_PLAN_3_FUSED_LAMP_EXCLUDE_DIST_M *
+        CAR_PLAN_3_FUSED_LAMP_EXCLUDE_DIST_M;
 
     CarPlan_3_ClearResult();
     CarPlan_3_FilterNearLamp(filtered);
@@ -239,8 +283,11 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
                            g_tof_fused_height_mm,
                            g_tof_fused_valid,
                            &s_car_plan_3_camera) == 0U ||
-       s_car_plan_3_camera.car_lamp.valid == 0U)
+       s_car_plan_3_camera.car_lamp.valid == 0U ||
+       g_tof_fused_valid == 0U)
     {
+        s_car_plan_3_target_lock.valid = 0U;
+        s_car_plan_3_target_lock.lost_ticks = 0U;
         if(result != 0)
         {
             *result = s_car_plan_3_result;
@@ -248,6 +295,7 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
         return 0U;
     }
 
+    /* 排除与融合车灯重叠的候选，同时寻找最近候选和上一锁定目标。 */
     for(i = 0U; i < s_car_plan_3_camera.beacon_count; i++)
     {
         float candidate_dx;
@@ -264,6 +312,25 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
                        s_car_plan_3_camera.car_lamp.y_m;
         candidate_distance_sq = candidate_dx * candidate_dx +
                                 candidate_dy * candidate_dy;
+        if(candidate_distance_sq < fused_lamp_exclude_dist_sq)
+        {
+            continue;
+        }
+        if(s_car_plan_3_target_lock.valid != 0U)
+        {
+            float lock_dx = s_car_plan_3_camera.beacon[i].x_m -
+                            s_car_plan_3_target_lock.x_m;
+            float lock_dy = s_car_plan_3_camera.beacon[i].y_m -
+                            s_car_plan_3_target_lock.y_m;
+            float lock_match_sq = lock_dx * lock_dx + lock_dy * lock_dy;
+
+            if(lock_match_sq < best_lock_match_sq)
+            {
+                locked = i;
+                locked_distance_sq = candidate_distance_sq;
+                best_lock_match_sq = lock_match_sq;
+            }
+        }
         if(selected == 0xFFU || candidate_distance_sq < selected_distance_sq)
         {
             selected = i;
@@ -271,9 +338,48 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
         }
     }
 
-    if(selected == 0xFFU ||
-       selected_distance_sq <= CAR_PLAN_3_MIN_DISTANCE_M * CAR_PLAN_3_MIN_DISTANCE_M)
+    /* 锁定目标未匹配时短暂保持旧输出，第 4 帧释放并使用当帧候选。 */
+    if((s_car_plan_3_target_lock.valid != 0U) && (locked == 0xFFU))
     {
+        if(s_car_plan_3_target_lock.lost_ticks <
+           CAR_PLAN_3_TARGET_LOST_HOLD_TICKS)
+        {
+            s_car_plan_3_target_lock.lost_ticks++;
+            s_car_plan_3_result = s_car_plan_3_target_lock.result;
+            if(result != 0)
+            {
+                *result = s_car_plan_3_result;
+            }
+            return 1U;
+        }
+        s_car_plan_3_target_lock.valid = 0U;
+        s_car_plan_3_target_lock.lost_ticks = 0U;
+    }
+
+    /* 已锁目标仍在时，小面积的更近候选不能抢占目标。 */
+    if((locked != 0xFFU) && (selected != 0xFFU) &&
+       (selected != locked) &&
+       (s_car_plan_3_camera.beacon[selected].area <
+        s_car_plan_3_camera.beacon[locked].area))
+    {
+        selected = locked;
+        selected_distance_sq = locked_distance_sq;
+    }
+
+    if(selected == 0xFFU)
+    {
+        if(result != 0)
+        {
+            *result = s_car_plan_3_result;
+        }
+        return 0U;
+    }
+
+    if(selected_distance_sq <= CAR_PLAN_3_MIN_DISTANCE_M *
+                               CAR_PLAN_3_MIN_DISTANCE_M)
+    {
+        s_car_plan_3_target_lock.valid = 0U;
+        s_car_plan_3_target_lock.lost_ticks = 0U;
         if(result != 0)
         {
             *result = s_car_plan_3_result;
@@ -302,6 +408,11 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
     s_car_plan_3_result.target_forward_mps =
         (dx * right_y - dy * right_x) * scale;
     s_car_plan_3_selected = (int8)selected;
+    s_car_plan_3_target_lock.valid = 1U;
+    s_car_plan_3_target_lock.lost_ticks = 0U;
+    s_car_plan_3_target_lock.x_m = s_car_plan_3_camera.beacon[selected].x_m;
+    s_car_plan_3_target_lock.y_m = s_car_plan_3_camera.beacon[selected].y_m;
+    s_car_plan_3_target_lock.result = s_car_plan_3_result;
 
     if(result != 0)
     {

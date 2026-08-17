@@ -48,6 +48,32 @@ extern int32 g_image_down_confirm_frames;
 extern int32 g_image_down_max_misses;
 extern float g_image_down_filter_pos_alpha;
 extern float g_image_down_filter_vel_alpha;
+extern int32 g_image_down_car_lamp_edge_max_misses;
+extern int32 g_image_down_car_lamp_center_max_misses;
+extern int32 g_image_down_car_lamp_temporal_core_pad;
+extern int32 g_image_down_car_lamp_temporal_takeover_pad;
+extern int32 g_image_down_car_lamp_temporal_min_bright_area;
+extern int32 g_image_down_car_output_envelope_pad;
+extern float g_image_down_car_group_angle_max;
+extern float g_image_down_car_group_minor_pad;
+extern float g_image_down_car_group_major_gap;
+extern int32 g_image_down_car_recover_min_core_area;
+extern int32 g_image_down_car_recover_max_core_area;
+extern int32 g_image_down_car_recover_connect_threshold;
+extern int32 g_image_down_car_recover_track_threshold;
+extern int32 g_image_down_car_recover_bridge_threshold;
+extern float g_image_down_car_recover_support_pad;
+extern int32 g_image_down_car_support_pad;
+extern int32 g_image_down_gray_support_threshold;
+extern int32 g_image_down_car_compact_edge_margin;
+extern float g_image_down_car_compact_edge_max_major;
+extern int32 g_image_down_beacon_coast_frames;
+extern int32 g_image_down_beacon_corner_margin;
+extern int32 g_image_down_near_car_beacon_confirm;
+extern int32 g_image_down_near_car_beacon_max_misses;
+extern int32 g_image_down_edge_beacon_confirm;
+extern int32 g_image_down_edge_beacon_recover_radius;
+extern int32 g_image_down_edge_beacon_recover_peak;
 
 /*
  * 函数功能: 初始化下摄图像算法和摄像头接口。

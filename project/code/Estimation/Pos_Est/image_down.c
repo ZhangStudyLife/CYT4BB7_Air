@@ -52,21 +52,47 @@ int32 g_image_down_confirm_frames = 2;
 int32 g_image_down_max_misses = 3;
 float g_image_down_filter_pos_alpha = 0.65f;
 float g_image_down_filter_vel_alpha = 0.30f;
+int32 g_image_down_car_lamp_edge_max_misses = 3;              /* 边缘车灯最大丢失帧数。 */
+int32 g_image_down_car_lamp_center_max_misses = 24;           /* 中部车灯最大丢失帧数。 */
+int32 g_image_down_car_lamp_temporal_core_pad = 2;            /* 时序核心外扩距离，单位像素。 */
+int32 g_image_down_car_lamp_temporal_takeover_pad = 10;       /* 时序接管外扩距离，单位像素。 */
+int32 g_image_down_car_lamp_temporal_min_bright_area = 3;     /* 时序车灯最小亮区面积。 */
+int32 g_image_down_car_output_envelope_pad = 10;              /* 车灯输出包络外扩距离，单位像素。 */
+float g_image_down_car_group_angle_max = 25.0f;               /* 车灯分组最大角度差，单位度。 */
+float g_image_down_car_group_minor_pad = 2.0f;                /* 车灯分组短轴外扩距离，单位像素。 */
+float g_image_down_car_group_major_gap = 4.0f;                /* 车灯分组长轴最大间隙，单位像素。 */
+int32 g_image_down_car_recover_min_core_area = 3;             /* 车灯恢复核心最小面积。 */
+int32 g_image_down_car_recover_max_core_area = 18;            /* 车灯恢复核心最大面积。 */
+int32 g_image_down_car_recover_connect_threshold = 150;      /* 车灯连接恢复灰度阈值。 */
+int32 g_image_down_car_recover_track_threshold = 120;        /* 车灯跟踪恢复灰度阈值。 */
+int32 g_image_down_car_recover_bridge_threshold = 80;        /* 车灯桥接恢复灰度阈值。 */
+float g_image_down_car_recover_support_pad = 3.0f;            /* 车灯恢复支持区外扩距离，单位像素。 */
+int32 g_image_down_car_support_pad = 1;                       /* 车灯支持区外扩距离，单位像素。 */
+int32 g_image_down_gray_support_threshold = 120;             /* 车灯支持区灰度阈值。 */
+int32 g_image_down_car_compact_edge_margin = 2;              /* 紧凑车灯边缘余量，单位像素。 */
+float g_image_down_car_compact_edge_max_major = 10.0f;        /* 边缘紧凑车灯最大长轴，单位像素。 */
+int32 g_image_down_beacon_coast_frames = 4;                  /* 信标无测量惯性跟踪帧数。 */
+int32 g_image_down_beacon_corner_margin = 12;                /* 信标角落判定边距，单位像素。 */
+int32 g_image_down_near_car_beacon_confirm = 3;              /* 近车灯信标确认帧数。 */
+int32 g_image_down_near_car_beacon_max_misses = 2;           /* 近车灯信标最大丢失帧数。 */
+int32 g_image_down_edge_beacon_confirm = 2;                  /* 边缘信标确认帧数。 */
+int32 g_image_down_edge_beacon_recover_radius = 6;           /* 边缘信标恢复搜索半径，单位像素。 */
+int32 g_image_down_edge_beacon_recover_peak = 170;           /* 边缘信标恢复最小峰值灰度。 */
 
 static uint8 s_mt9v03x_initialized;
 static uint32 s_image_down_latched_frame_sequence;                 /* 最近成功锁存并处理的摄像头来源帧号。 */
 
-#define CAR_LAMP_EDGE_MAX_MISSES        3
-#define CAR_LAMP_CENTER_MAX_MISSES      24
+#define CAR_LAMP_EDGE_MAX_MISSES        g_image_down_car_lamp_edge_max_misses
+#define CAR_LAMP_CENTER_MAX_MISSES      g_image_down_car_lamp_center_max_misses
 #define CAR_LAMP_TEMPORAL_EDGE_MARGIN   8
 #define CAR_LAMP_TEMPORAL_MASK_PAD      5
-#define CAR_LAMP_TEMPORAL_CORE_PAD      2
-#define CAR_LAMP_TEMPORAL_TAKEOVER_PAD  10
-#define CAR_LAMP_TEMPORAL_MIN_BRIGHT_AREA 3
+#define CAR_LAMP_TEMPORAL_CORE_PAD      g_image_down_car_lamp_temporal_core_pad
+#define CAR_LAMP_TEMPORAL_TAKEOVER_PAD  g_image_down_car_lamp_temporal_takeover_pad
+#define CAR_LAMP_TEMPORAL_MIN_BRIGHT_AREA g_image_down_car_lamp_temporal_min_bright_area
 
 #define IMAGE_QUEUE_SIZE                (BEACON_IMAGE_W * BEACON_IMAGE_H)
 #define PI_F                            3.1415926f
-#define DOWN_BEACON_COAST_FRAMES        4U
+#define DOWN_BEACON_COAST_FRAMES        g_image_down_beacon_coast_frames
 #define DOWN_GRAY_MAX_PEAKS             20U
 #define DOWN_GRAY_MAX_CANDIDATES        12U
 #define DOWN_OBJECT_BOUNDARY_MARGIN     3.0f
@@ -77,7 +103,7 @@ static uint32 s_image_down_latched_frame_sequence;                 /* 最近成�
 #define DOWN_GRAY_BACKGROUND_OUTER_SQ  100
 #define DOWN_BEACON_LEFT_EDGE_MARGIN    24
 #define DOWN_BEACON_RIGHT_EDGE_MARGIN   16
-#define DOWN_BEACON_CORNER_MARGIN       12
+#define DOWN_BEACON_CORNER_MARGIN       g_image_down_beacon_corner_margin
 #define DOWN_GRAY_EDGE_MIN_PEAK         200U
 #define DOWN_GRAY_EDGE_MAX_OCCUPANCY    0.25f
 #define DOWN_EDGE_SUPPORT_RADIUS        12
@@ -88,26 +114,26 @@ static uint32 s_image_down_latched_frame_sequence;                 /* 最近成�
 #define DOWN_CAR_MAX_COMPONENTS         32U
 #define DOWN_CAR_ENVELOPE_MIN_PAD       4
 #define DOWN_CAR_ENVELOPE_PAD_SCALE     0.75f
-#define DOWN_CAR_OUTPUT_ENVELOPE_PAD    10
+#define DOWN_CAR_OUTPUT_ENVELOPE_PAD    g_image_down_car_output_envelope_pad
 #define DOWN_CAR_GROUP_MAX_CORES        3U
-#define DOWN_CAR_GROUP_ANGLE_MAX        25.0f
-#define DOWN_CAR_GROUP_MINOR_PAD        2.0f
-#define DOWN_CAR_GROUP_MAJOR_GAP        4.0f
-#define DOWN_CAR_RECOVER_MIN_CORE_AREA  3
-#define DOWN_CAR_RECOVER_MAX_CORE_AREA  18
-#define DOWN_CAR_RECOVER_CONNECT_THRESHOLD 150U
-#define DOWN_CAR_RECOVER_TRACK_THRESHOLD   120U
-#define DOWN_CAR_RECOVER_BRIDGE_THRESHOLD   80U
-#define DOWN_CAR_RECOVER_SUPPORT_PAD        3.0f
-#define DOWN_CAR_SUPPORT_PAD            1
+#define DOWN_CAR_GROUP_ANGLE_MAX        g_image_down_car_group_angle_max
+#define DOWN_CAR_GROUP_MINOR_PAD        g_image_down_car_group_minor_pad
+#define DOWN_CAR_GROUP_MAJOR_GAP        g_image_down_car_group_major_gap
+#define DOWN_CAR_RECOVER_MIN_CORE_AREA  g_image_down_car_recover_min_core_area
+#define DOWN_CAR_RECOVER_MAX_CORE_AREA  g_image_down_car_recover_max_core_area
+#define DOWN_CAR_RECOVER_CONNECT_THRESHOLD g_image_down_car_recover_connect_threshold
+#define DOWN_CAR_RECOVER_TRACK_THRESHOLD   g_image_down_car_recover_track_threshold
+#define DOWN_CAR_RECOVER_BRIDGE_THRESHOLD  g_image_down_car_recover_bridge_threshold
+#define DOWN_CAR_RECOVER_SUPPORT_PAD        g_image_down_car_recover_support_pad
+#define DOWN_CAR_SUPPORT_PAD            g_image_down_car_support_pad
 #define DOWN_CAR_SUPPORT_MASK_SIZE      ((IMAGE_QUEUE_SIZE + 7U) / 8U)
 #define DOWN_NEAR_CAR_BEACON_TRACKS     2U
-#define DOWN_NEAR_CAR_BEACON_CONFIRM    3U
-#define DOWN_NEAR_CAR_BEACON_MAX_MISSES 2U
+#define DOWN_NEAR_CAR_BEACON_CONFIRM    g_image_down_near_car_beacon_confirm
+#define DOWN_NEAR_CAR_BEACON_MAX_MISSES g_image_down_near_car_beacon_max_misses
 #define DOWN_EDGE_BEACON_TRACKS         2U
-#define DOWN_EDGE_BEACON_CONFIRM        2U
-#define DOWN_EDGE_BEACON_RECOVER_RADIUS 6
-#define DOWN_EDGE_BEACON_RECOVER_PEAK   170U
+#define DOWN_EDGE_BEACON_CONFIRM        g_image_down_edge_beacon_confirm
+#define DOWN_EDGE_BEACON_RECOVER_RADIUS g_image_down_edge_beacon_recover_radius
+#define DOWN_EDGE_BEACON_RECOVER_PEAK   g_image_down_edge_beacon_recover_peak
 #define DOWN_CAR_STRONG_SCORE           0.53f
 #define DOWN_CAR_WEAK_SCORE             0.50f
 #define DOWN_CAR_TRACK_SCORE            0.47f
@@ -121,10 +147,9 @@ static uint32 s_image_down_latched_frame_sequence;                 /* 最近成�
 #define DOWN_CAR_SCORE_CONTRAST_RANGE   80.0f
 #define DOWN_CAR_SCORE_AREA_BASE        10.0f
 #define DOWN_CAR_SCORE_AREA_RANGE       70.0f
-#define DOWN_CAR_COMPACT_EDGE_MARGIN     2
-#define DOWN_CAR_COMPACT_EDGE_MAX_MAJOR 10.0f
-#define DOWN_CAR_COMPACT_VERTICAL_MIN_ELONGATION 1.95f
-#define DOWN_GRAY_SUPPORT_THRESHOLD     120
+#define DOWN_CAR_COMPACT_EDGE_MARGIN     g_image_down_car_compact_edge_margin
+#define DOWN_CAR_COMPACT_EDGE_MAX_MAJOR g_image_down_car_compact_edge_max_major
+#define DOWN_GRAY_SUPPORT_THRESHOLD     g_image_down_gray_support_threshold
 
 #define DOWN_CAR_CLASS_NONE             0U
 #define DOWN_CAR_CLASS_TRACK            1U
@@ -6783,11 +6808,63 @@ static const image_down_param_descriptor_t s_image_down_params[] =
     IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_POS_ALPHA,
                        g_image_down_filter_pos_alpha, 0.0f, 1.0f),
     IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_VEL_ALPHA,
-                       g_image_down_filter_vel_alpha, 0.0f, 1.0f)
+                       g_image_down_filter_vel_alpha, 0.0f, 1.0f),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_LAMP_EDGE_MISSES,
+                       g_image_down_car_lamp_edge_max_misses, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_LAMP_CENTER_MISSES,
+                       g_image_down_car_lamp_center_max_misses, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_TEMP_CORE_PAD,
+                       g_image_down_car_lamp_temporal_core_pad, 0, 224),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_TEMP_TAKEOVER_PAD,
+                       g_image_down_car_lamp_temporal_takeover_pad, 0, 224),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_TEMP_MIN_BRIGHT,
+                       g_image_down_car_lamp_temporal_min_bright_area, 0, 22560),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_OUTPUT_ENV_PAD,
+                       g_image_down_car_output_envelope_pad, 0, 224),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_GROUP_ANGLE_MAX,
+                       g_image_down_car_group_angle_max, 0.1f, 180.0f),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_GROUP_MINOR_PAD,
+                       g_image_down_car_group_minor_pad, 0.0f, 224.0f),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_GROUP_MAJOR_GAP,
+                       g_image_down_car_group_major_gap, 0.1f, 224.0f),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_RECOVER_MIN_CORE,
+                       g_image_down_car_recover_min_core_area, 0, 22560),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_RECOVER_MAX_CORE,
+                       g_image_down_car_recover_max_core_area, 0, 22560),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_RECOVER_CONNECT_THR,
+                       g_image_down_car_recover_connect_threshold, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_RECOVER_TRACK_THR,
+                       g_image_down_car_recover_track_threshold, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_RECOVER_BRIDGE_THR,
+                       g_image_down_car_recover_bridge_threshold, 0, 255),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_RECOVER_SUPPORT_PAD,
+                       g_image_down_car_recover_support_pad, 0.0f, 224.0f),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_SUPPORT_PAD,
+                       g_image_down_car_support_pad, 0, 224),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_GRAY_SUPPORT_THR,
+                       g_image_down_gray_support_threshold, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_COMPACT_EDGE_MARGIN,
+                       g_image_down_car_compact_edge_margin, 0, 120),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_COMPACT_MAX_MAJOR,
+                       g_image_down_car_compact_edge_max_major, 0.0f, 224.0f),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_BEACON_COAST,
+                       g_image_down_beacon_coast_frames, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_BEACON_CORNER_MARGIN,
+                       g_image_down_beacon_corner_margin, 0, 120),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_NEAR_BEACON_CONFIRM,
+                       g_image_down_near_car_beacon_confirm, 1, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_NEAR_BEACON_MISSES,
+                       g_image_down_near_car_beacon_max_misses, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_EDGE_BEACON_CONFIRM,
+                       g_image_down_edge_beacon_confirm, 1, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_EDGE_BEACON_RADIUS,
+                       g_image_down_edge_beacon_recover_radius, 0, 224),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_EDGE_BEACON_PEAK,
+                       g_image_down_edge_beacon_recover_peak, 0, 255)
 };
 
 typedef char image_down_param_count_must_match[
-    (sizeof(s_image_down_params) / sizeof(s_image_down_params[0]) == 22U) ?
+    (sizeof(s_image_down_params) / sizeof(s_image_down_params[0]) == 48U) ?
     1 : -1];
 
 static const image_down_param_descriptor_t *image_down_find_param(uint16 id)
@@ -6832,8 +6909,10 @@ static uint8 image_down_param_values_valid(
         }
     }
 
-    return (g_image_down_car_lamp_min_area <=
-            g_image_down_car_lamp_max_area) ? 1U : 0U;
+    return ((g_image_down_car_lamp_min_area <=
+             g_image_down_car_lamp_max_area) &&
+            (g_image_down_car_recover_min_core_area <=
+             g_image_down_car_recover_max_core_area)) ? 1U : 0U;
 }
 
 uint8 image_down_remote_param_execute(uint8 op,

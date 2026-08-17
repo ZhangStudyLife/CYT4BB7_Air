@@ -55,6 +55,8 @@ volatile uint32 g_image_data_rx_fresh_mask;                                     
 #define IPC_FLIGHT_STATE_MASK    (0xFFFF0000UL)
 #define IPC_FLIGHT_STATE_FLYING  (0x00000001UL)
 #define IPC_FLIGHT_STATE_SCREEN_REFRESH_ENABLE (0x00000002UL)
+#define IPC_FLIGHT_STATE_BL3_SCREEN_ENABLE (0x00000004UL) /* 核0允许前后摄本地屏幕显示。 */
+#define IPC_FLIGHT_STATE_BL3_HORIZON_ENABLE (0x00000008UL) /* 核0允许前后摄地平线算法。 */
 /* 图传发送模式在 IPC 数据低 16 位中的偏移 */
 #define IPC_IMAGE_SEND_SHIFT     (8U)
 /* 图传发送模式在 IPC 数据低 16 位中的掩码 */
@@ -106,6 +108,8 @@ static volatile uint8 s_core0_flying = 0U;
 static volatile uint8 s_core0_image_send_enable = 0U;
 /* 核1上电默认禁止刷屏，收到核0明确许可后才初始化IPS114。 */
 static volatile uint8 s_core0_screen_refresh_enable = 0U;
+static volatile uint8 s_core0_bl3_screen_enable = 0U; /* 核0下发的前后摄屏幕使能状态。 */
+static volatile uint8 s_core0_bl3_horizon_enable = 0U; /* 核0下发的前后摄地平线状态。 */
 static volatile uint8 s_remote_param_hint = 0U;
 static uint32 s_remote_param_last_transaction = 0U;
 static uint32 s_remote_param_last_checksum = 0U;
@@ -392,9 +396,19 @@ static void ipc_remote_param_publish_response(const ipc_remote_param_mailbox_t *
 #endif
 }
 
+/**
+ * @brief 将核0飞行状态和图像输出控制发送给核1。
+ * @param flying 非0表示飞行中，0表示待机。
+ * @param image_send_enable 前后摄WiFi图传模式，范围0至2。
+ * @param screen_refresh_enable 非0表示允许核1本地屏幕刷新。
+ * @param bl3_screen_enable 非0表示允许前后摄本地屏幕显示。
+ * @return 0表示IPC数据发送成功，1表示发送失败。
+ */
 uint8 ipc_flight_state_send(uint8 flying,
                             uint8 image_send_enable,
-                            uint8 screen_refresh_enable)
+                            uint8 screen_refresh_enable,
+                            uint8 bl3_screen_enable,
+                            uint8 bl3_horizon_enable)
 {
 #if defined(CY_CORE_CM7_0)
     uint32 ipc_data = IPC_FLIGHT_STATE_MAGIC;
@@ -412,6 +426,14 @@ uint8 ipc_flight_state_send(uint8 flying,
     {
         ipc_data |= IPC_FLIGHT_STATE_SCREEN_REFRESH_ENABLE;
     }
+    if(0U != bl3_screen_enable)
+    {
+        ipc_data |= IPC_FLIGHT_STATE_BL3_SCREEN_ENABLE;
+    }
+    if(0U != bl3_horizon_enable)
+    {
+        ipc_data |= IPC_FLIGHT_STATE_BL3_HORIZON_ENABLE;
+    }
     ipc_data |= (((uint32)image_send_enable << IPC_IMAGE_SEND_SHIFT) & IPC_IMAGE_SEND_MASK);
 
     return ipc_try_send_data(ipc_data);
@@ -419,6 +441,8 @@ uint8 ipc_flight_state_send(uint8 flying,
     (void)flying;
     (void)image_send_enable;
     (void)screen_refresh_enable;
+    (void)bl3_screen_enable;
+    (void)bl3_horizon_enable;
     return 1U;
 #endif
 }
@@ -445,6 +469,29 @@ uint8 ipc_core0_screen_refresh_enable(void)
 {
 #if defined(CY_CORE_CM7_1)
     return s_core0_screen_refresh_enable;
+#else
+    return 0U;
+#endif
+}
+
+/**
+ * @brief 获取核0下发的前后摄本地屏幕使能状态。
+ * @param 无。
+ * @return 核1返回0表示关闭，1表示允许显示；其他核心固定返回0。
+ */
+uint8 ipc_core0_bl3_screen_enable(void)
+{
+#if defined(CY_CORE_CM7_1)
+    return s_core0_bl3_screen_enable;
+#else
+    return 0U;
+#endif
+}
+
+uint8 ipc_core0_bl3_horizon_enable(void)
+{
+#if defined(CY_CORE_CM7_1)
+    return s_core0_bl3_horizon_enable;
 #else
     return 0U;
 #endif
@@ -871,6 +918,10 @@ void ipc_image_callback(uint32 ipc_data)
         s_core0_flying = (0U != (ipc_data & IPC_FLIGHT_STATE_FLYING)) ? 1U : 0U;
         s_core0_screen_refresh_enable =
             (0U != (ipc_data & IPC_FLIGHT_STATE_SCREEN_REFRESH_ENABLE)) ? 1U : 0U;
+        s_core0_bl3_screen_enable =
+            (0U != (ipc_data & IPC_FLIGHT_STATE_BL3_SCREEN_ENABLE)) ? 1U : 0U;
+        s_core0_bl3_horizon_enable =
+            (0U != (ipc_data & IPC_FLIGHT_STATE_BL3_HORIZON_ENABLE)) ? 1U : 0U;
         s_core0_image_send_enable = (uint8)((ipc_data & IPC_IMAGE_SEND_MASK) >> IPC_IMAGE_SEND_SHIFT);
         if(s_core0_image_send_enable > 2U)
         {

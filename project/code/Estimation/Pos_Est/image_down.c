@@ -6,12 +6,16 @@
 #include "zf_device_mt9v03x.h"
 #include "Display/image_debug_screen.h"
 #include "Image/image_down_horizon.h"
+#include "Protocols/AirComm/air_comm_air.h"
 
 #define BEACON_IMAGE_W 188
 #define BEACON_IMAGE_H 120
 #define BEACON_MAX_CIRCLE_COUNT 8
 #define BEACON_MAX_BEACON_COUNT 8
 #define BEACON_MAX_CAR_LAMP_COUNT IMAGE_MAX_CAR_LAMP_COUNT
+
+/* Core1实际地平线开关；Core0的同名变量仅作为空地菜单镜像。 */
+int32 c1_horizon_enable = 1;
 
 typedef struct
 {
@@ -6771,6 +6775,8 @@ static const image_down_param_descriptor_t s_image_down_params[] =
                               image_down_exposure_param_execute),
     IMAGE_DOWN_PARAM_CUSTOM_I(IPC_REMOTE_PARAM_ID_C1_SCREEN_MODE,
                               image_down_screen_param_execute),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_HORIZON_ENABLE,
+                       c1_horizon_enable, 0, 1),
     IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_BEACON_MIN,
                        g_image_down_beacon_min_area, 0, 22560),
     IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_EDGE_MIN,
@@ -6864,7 +6870,7 @@ static const image_down_param_descriptor_t s_image_down_params[] =
 };
 
 typedef char image_down_param_count_must_match[
-    (sizeof(s_image_down_params) / sizeof(s_image_down_params[0]) == 48U) ?
+    (sizeof(s_image_down_params) / sizeof(s_image_down_params[0]) == 49U) ?
     1 : -1];
 
 static const image_down_param_descriptor_t *image_down_find_param(uint16 id)

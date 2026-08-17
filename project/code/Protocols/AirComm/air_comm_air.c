@@ -23,9 +23,11 @@
 #define AIR_COMM_TX_RUN_DATA_LIMIT           (3U)    /* RUN_DATA最多占用的发送帧槽数量 */
 #define AIR_COMM_TX_FIFO_LEVEL               (64U)   /* SCB4发送FIFO触发水位 */
 #define AIR_COMM_PARAM_TABLE_MAX             (384U)  /* 最多注册参数个数 */
-#define AIR_COMM_DEFAULT_PARAM_COUNT         (266U)
+#define AIR_COMM_DEFAULT_PARAM_COUNT         (269U)
 #define AIR_COMM_REMOTE_CANCEL_MS            (400U)
 #define AIR_COMM_REMOTE_TIMEOUT_MS           (700U)
+#define AIR_COMM_BL3_SCREEN_SET_CANCEL_MS    (800U)  /* 前后摄开屏时SET事务的取消等待时间。 */
+#define AIR_COMM_BL3_SCREEN_SET_TIMEOUT_MS   (1200U) /* 前后摄开屏时SET事务的硬超时时间。 */
 #define AIR_COMM_REMOTE_EXP_CANCEL_MS        (1800U)
 #define AIR_COMM_REMOTE_EXP_TIMEOUT_MS       (2600U)
 #define AIR_COMM_PARAM_ACK_CACHE_MS          (1000U)
@@ -319,6 +321,10 @@ float bl3_pos_alpha = 0;
 float bl3_vel_alpha = 0;
 /* 两颗2BL3图传内容模式的核0菜单镜像：0原图，1车灯二值图，2信标二值图。 */
 int32 bl3_stream_mode = 0;
+/* 两颗2BL3本地屏幕使能，上电默认关闭。 */
+int32 bl3_screen_enable = 0;
+int32 bl3_horizon_enable = 0;
+int32 c1_horizon_enable = 1;
 float bl3_lamp_width = 0;
 float bl3_narrow_width = 0;
 float bl3_narrow_elong = 0;
@@ -1089,6 +1095,7 @@ static void air_comm_remote_poll(void)
     float actual;
     uint8 status;
     uint8 slow_operation;
+    uint8 bl3_screen_set;
     uint32 cancel_ms;
     uint32 timeout_ms;
 
@@ -1101,10 +1108,24 @@ static void air_comm_remote_poll(void)
     /* 曝光与面积表持久化命令需要等待传感器或Flash操作，使用较长取消和硬超时。 */
     slow_operation = ((pending.param->param_id == IPC_REMOTE_PARAM_ID_C1_EXP_TIME) ||
                       (pending.param->param_id == IPC_REMOTE_PARAM_ID_BL3_EXP_TIME)) ? 1U : 0U;
-    cancel_ms = (slow_operation != 0U) ?
-                AIR_COMM_REMOTE_EXP_CANCEL_MS : AIR_COMM_REMOTE_CANCEL_MS;
-    timeout_ms = (slow_operation != 0U) ?
-                  AIR_COMM_REMOTE_EXP_TIMEOUT_MS : AIR_COMM_REMOTE_TIMEOUT_MS;
+    bl3_screen_set = ((pending.op == IPC_REMOTE_PARAM_OP_SET) &&
+                      (pending.param->target == IPC_REMOTE_PARAM_TARGET_2BL3) &&
+                      (bl3_screen_enable != 0)) ? 1U : 0U;
+    if(slow_operation != 0U)
+    {
+        cancel_ms = AIR_COMM_REMOTE_EXP_CANCEL_MS;
+        timeout_ms = AIR_COMM_REMOTE_EXP_TIMEOUT_MS;
+    }
+    else if(bl3_screen_set != 0U)
+    {
+        cancel_ms = AIR_COMM_BL3_SCREEN_SET_CANCEL_MS;
+        timeout_ms = AIR_COMM_BL3_SCREEN_SET_TIMEOUT_MS;
+    }
+    else
+    {
+        cancel_ms = AIR_COMM_REMOTE_CANCEL_MS;
+        timeout_ms = AIR_COMM_REMOTE_TIMEOUT_MS;
+    }
     if(ipc_remote_param_core0_poll(&response) != 0U)
     {
         status = response.status;
@@ -1315,7 +1336,10 @@ static void air_comm_handle_set_param(uint8 seq, const uint8 *payload, uint8 len
         else
         {
             actual = air_comm_param_read(param);
-            FC_Loop_Init();
+            if(param->var != &bl3_screen_enable)
+            {
+                FC_Loop_Init();
+            }
         }
     }
 
@@ -1898,6 +1922,9 @@ void air_comm_air_init(void)
     bl3_pos_alpha = 0;
     bl3_vel_alpha = 0;
     bl3_stream_mode = 0;
+    bl3_screen_enable = 0;
+    bl3_horizon_enable = 0;
+    c1_horizon_enable = 1;
     bl3_lamp_width = 0;
     bl3_narrow_width = 0;
     bl3_narrow_elong = 0;
@@ -2130,6 +2157,8 @@ void air_comm_air_init(void)
     {
         s_air_comm_registration_ok = 0U;
     }
+    AIR_COMM_REGISTER_C1_INT32(c1_horizon_enable, c1_horizon_enable, 0, 1,
+                               IPC_REMOTE_PARAM_ID_C1_HORIZON_ENABLE);
     AIR_COMM_REGISTER_C1_INT32(c1_beacon_min, c1_beacon_min, 0, 22560,
                                IPC_REMOTE_PARAM_ID_C1_BEACON_MIN);
     AIR_COMM_REGISTER_C1_INT32(c1_edge_min, c1_edge_min, 0, 22560,
@@ -2227,6 +2256,8 @@ void air_comm_air_init(void)
                                 IPC_REMOTE_PARAM_ID_BL3_POS_ALPHA);
     AIR_COMM_REGISTER_BL3_FLOAT(bl3_vel_alpha, bl3_vel_alpha, 0.0f, 1.0f,
                                 IPC_REMOTE_PARAM_ID_BL3_VEL_ALPHA);
+    AIR_COMM_REGISTER_INT32(bl3_screen_enable, bl3_screen_enable, 0, 1);
+    AIR_COMM_REGISTER_INT32(bl3_horizon_enable, bl3_horizon_enable, 0, 1);
     AIR_COMM_REGISTER_BL3_INT32(bl3_stream_mode, bl3_stream_mode, 0, 3,
                                 IPC_REMOTE_PARAM_ID_BL3_STREAM_MODE);
     AIR_COMM_REGISTER_BL3_FLOAT(bl3_lamp_width, bl3_lamp_width, 0.0f, 224.0f,

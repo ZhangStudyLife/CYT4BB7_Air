@@ -29,11 +29,16 @@
 #define CAMERA_SPI_TRANSFER_TIMEOUT_POLLS   (100000U)
 #define CAMERA_SPI_IMAGE_STALE_TIME_US      (50000U)
 #define CAMERA_SPI_LINK_STALE_TIME_US       (100000U)
+#define CAMERA_SPI_SCREEN_LINK_STALE_TIME_US (350000U) /* 开屏初始化期间的链路失效时间。 */
 #define CAMERA_SPI_IMAGE_STALE_CYCLES \
     ((CAMERA_SPI_IMAGE_STALE_TIME_US + CAMERA_SPI_UPDATE_PERIOD_US - 1U) / \
      CAMERA_SPI_UPDATE_PERIOD_US)
 #define CAMERA_SPI_LINK_STALE_CYCLES \
     ((CAMERA_SPI_LINK_STALE_TIME_US + CAMERA_SPI_UPDATE_PERIOD_US - 1U) / \
+     CAMERA_SPI_UPDATE_PERIOD_US)
+/* 开屏链路失效时间对应的调度周期数。 */
+#define CAMERA_SPI_SCREEN_LINK_STALE_CYCLES \
+    ((CAMERA_SPI_SCREEN_LINK_STALE_TIME_US + CAMERA_SPI_UPDATE_PERIOD_US - 1U) / \
      CAMERA_SPI_UPDATE_PERIOD_US)
 #define CAMERA_SPI_ALL_BOARD_MASK           ((1U << CAMERA_SPI_BOARD_COUNT) - 1U)
 #define CAMERA_SPI_DWT_UNLOCK_KEY           (0xC5ACCE55UL)
@@ -55,9 +60,14 @@
 #define CAMERA_SPI_PARAM_ACK_MAGIC          (0x3CU)
 #define CAMERA_SPI_PARAM_VERSION            (1U)
 #define CAMERA_SPI_PARAM_TIMEOUT_US         (120000U)
+#define CAMERA_SPI_SCREEN_PARAM_TIMEOUT_US  (350000U) /* 开屏时普通参数单阶段超时时间。 */
 #define CAMERA_SPI_PARAM_EXP_TIMEOUT_US     (800000U)
 #define CAMERA_SPI_PARAM_MAX_CYCLES \
     ((CAMERA_SPI_PARAM_TIMEOUT_US + CAMERA_SPI_UPDATE_PERIOD_US - 1U) / \
+     CAMERA_SPI_UPDATE_PERIOD_US)
+/* 开屏参数超时对应的调度周期数。 */
+#define CAMERA_SPI_SCREEN_PARAM_MAX_CYCLES \
+    ((CAMERA_SPI_SCREEN_PARAM_TIMEOUT_US + CAMERA_SPI_UPDATE_PERIOD_US - 1U) / \
      CAMERA_SPI_UPDATE_PERIOD_US)
 #define CAMERA_SPI_PARAM_EXP_MAX_CYCLES \
     ((CAMERA_SPI_PARAM_EXP_TIMEOUT_US + CAMERA_SPI_UPDATE_PERIOD_US - 1U) / \
@@ -79,6 +89,9 @@
 #define CAMERA_SPI_ATTITUDE_HEIGHT_OFFSET    (38U)
 #define CAMERA_SPI_ATTITUDE_FLAGS_OFFSET     (42U)
 #define CAMERA_SPI_ATTITUDE_HEIGHT_VALID     (0x01U)
+#define CAMERA_SPI_OUTPUT_WIFI_TCP_ENABLE     (0x01U) /* 下行输出控制的WiFi TCP使能位。 */
+#define CAMERA_SPI_OUTPUT_SCREEN_ENABLE       (0x02U) /* 下行输出控制的本地屏幕使能位。 */
+#define CAMERA_SPI_OUTPUT_HORIZON_ENABLE      (0x04U) /* 下行输出控制的前后摄地平线使能位。 */
 
 #define CAMERA_SPI_IMAGE_VERSION_OFFSET        (0U)
 #define CAMERA_SPI_IMAGE_BEACON_COUNT_OFFSET   (1U)
@@ -197,6 +210,8 @@ static uint8 s_flight_state;
 static uint8 s_param_write_locked;
 /* 核0同步过来的 2BL3 图传发送模式 */
 static uint8 s_image_send_enable;
+static uint8 s_bl3_screen_enable; /* 核0下发的前后摄屏幕使能状态。 */
+static uint8 s_bl3_horizon_enable; /* 核0下发的前后摄地平线使能状态。 */
 static uint8 s_ready_mask;
 static uint8 s_cycle_active;
 static uint8 s_cycle_pending_mask;
@@ -319,14 +334,27 @@ static uint16 camera_spi_build_downlink_app(uint8 board_id, uint8 *app)
     uint8 board_mask = (uint8)(1U << board_id);
     uint32 transaction;
     uint32 value_bits;
+    uint8 output_control = 0U;
 
     memset(app, 0, CAMERA_SPI_APP_DATA_CAPACITY);
     app[0] = CAMERA_SPI_DOWNLINK_MAGIC;
     app[1] = board_id;
     camera_spi_write_u32_le(&app[2], board->tx_counter++);
     app[6] = s_flight_state;
-    app[7] = ((s_image_send_enable == 2U) ||
-              ((s_image_send_enable == 1U) && (s_flight_state == 0U))) ? 1U : 0U;
+    if((s_image_send_enable == 2U) ||
+       ((s_image_send_enable == 1U) && (s_flight_state == 0U)))
+    {
+        output_control |= CAMERA_SPI_OUTPUT_WIFI_TCP_ENABLE;
+    }
+    if(s_bl3_screen_enable != 0U)
+    {
+        output_control |= CAMERA_SPI_OUTPUT_SCREEN_ENABLE;
+    }
+    if(s_bl3_horizon_enable != 0U)
+    {
+        output_control |= CAMERA_SPI_OUTPUT_HORIZON_ENABLE;
+    }
+    app[7] = output_control;
     app[CAMERA_SPI_DOWNLINK_PARAM_WRITE_LOCK_OFFSET] = s_param_write_locked;
     app[CAMERA_SPI_ATTITUDE_MAGIC_OFFSET] = CAMERA_SPI_ATTITUDE_MAGIC;
     app[CAMERA_SPI_ATTITUDE_VERSION_OFFSET] = CAMERA_SPI_ATTITUDE_VERSION;
@@ -398,6 +426,8 @@ static void camera_spi_refresh_flight_state(void)
     uint8 board_id;
     uint8 flying = (ipc_core0_is_flying() != 0U) ? 1U : 0U;
     uint8 image_send_enable = ipc_core0_image_send_enable();
+    uint8 bl3_screen_enable = ipc_core0_bl3_screen_enable();
+    uint8 bl3_horizon_enable = ipc_core0_bl3_horizon_enable();
     uint8 param_write_locked =
         (ipc_core0_screen_refresh_enable() != 0U) ?
             CAMERA_SPI_PARAM_WRITE_ALLOWED : CAMERA_SPI_PARAM_WRITE_LOCKED;
@@ -409,6 +439,8 @@ static void camera_spi_refresh_flight_state(void)
 
     if((flying == s_flight_state) &&
        (image_send_enable == s_image_send_enable) &&
+       (bl3_screen_enable == s_bl3_screen_enable) &&
+       (bl3_horizon_enable == s_bl3_horizon_enable) &&
        (param_write_locked == s_param_write_locked))
     {
         return;
@@ -416,6 +448,8 @@ static void camera_spi_refresh_flight_state(void)
 
     s_flight_state = flying;
     s_image_send_enable = image_send_enable;
+    s_bl3_screen_enable = bl3_screen_enable;
+    s_bl3_horizon_enable = bl3_horizon_enable;
     s_param_write_locked = param_write_locked;
     for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
     {
@@ -495,6 +529,9 @@ static void camera_spi_invalidate_board_targets(camera_spi_board_state_t *board)
 static void camera_spi_update_freshness(void)
 {
     uint8 board_id;
+    uint8 link_stale_cycles = (s_bl3_screen_enable != 0U) ?
+                              CAMERA_SPI_SCREEN_LINK_STALE_CYCLES :
+                              CAMERA_SPI_LINK_STALE_CYCLES;
 
     for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
     {
@@ -519,7 +556,7 @@ static void camera_spi_update_freshness(void)
                                        (uint8)(1U << Back);
             }
         }
-        if(board->link_age_cycles == CAMERA_SPI_LINK_STALE_CYCLES)
+        if(board->link_age_cycles >= link_stale_cycles)
         {
             board->online = 0U;
             board->last_error = CAMERA_SPI_ERR_NOT_READY;
@@ -812,7 +849,9 @@ static void camera_spi_param_evaluate(void)
 
     required_mask = s_param_transaction.command_mask;
     max_cycles = (s_param_transaction.param_id == IPC_REMOTE_PARAM_ID_BL3_EXP_TIME) ?
-                 CAMERA_SPI_PARAM_EXP_MAX_CYCLES : CAMERA_SPI_PARAM_MAX_CYCLES;
+                 CAMERA_SPI_PARAM_EXP_MAX_CYCLES :
+                 ((s_bl3_screen_enable != 0U) ?
+                  CAMERA_SPI_SCREEN_PARAM_MAX_CYCLES : CAMERA_SPI_PARAM_MAX_CYCLES);
     for(board_id = 0U; board_id < CAMERA_SPI_BOARD_COUNT; board_id++)
     {
         uint8 board_mask = (uint8)(1U << board_id);
@@ -1284,6 +1323,8 @@ void CameraSpi_Init(void)
     {
         s_image_send_enable = 0U;
     }
+    s_bl3_screen_enable = ipc_core0_bl3_screen_enable();
+    s_bl3_horizon_enable = ipc_core0_bl3_horizon_enable();
     s_ready_mask = 0U;
     s_cycle_active = 0U;
     s_cycle_pending_mask = 0U;

@@ -3,6 +3,7 @@
 #include "Display/image_debug_screen.h"
 #include "Image/image_down_horizon.h"
 #include "Protocols/CameraSpi/camera_spi.h"
+#include "Protocols/AirComm/air_comm_air.h"
 
 #define IMAGE_PIT                          (PIT_CH10)
 #define IMAGE_TIME_PIT                     (PIT_CH11)
@@ -296,7 +297,8 @@ static uint8 Get_Image_data(uint8 *fresh_mask)
 
     if(image_frame_ready != 0U)
     {
-        if((attitude_valid != 0U) && (height_valid != 0U))
+        if((c1_horizon_enable != 0) &&
+           (attitude_valid != 0U) && (height_valid != 0U))
         {
             image_down_horizon_update(s_image_attitude.roll_deg,
                                       s_image_attitude.pitch_deg,

@@ -4,6 +4,7 @@
 #include "../code/Planner/beacon_lost_detector.h"
 #include "../code/Planner/car_plan_3.h"
 #include "../code/Estimation/Pos_Est/FlowGyroDecoupler_LC302.h"
+#include "../code/Protocols/AirComm/air_comm_air.h"
 
 volatile uint32 tick_1000us_cnt = 0U;
 volatile uint16 g_tick_1000HZ = 0U;
@@ -447,6 +448,8 @@ static void core0_update_ipc_state_100hz(void)
     static uint8 last_flying = 0xFFU;
     static uint8 last_image_send_enable = 0xFFU;
     static uint8 last_screen_refresh_enable = 0xFFU;
+    static uint8 last_bl3_screen_enable = 0xFFU;
+    static uint8 last_bl3_horizon_enable = 0xFFU;
     static uint8 flying_retry_div = 0U;
     static uint8 state_periodic_div = 0U;
     uint8 flying = (FC_START_CRSF_STATE_FLYING == FC_START_CRSF_Get_State()) ? 1U : 0U;
@@ -454,6 +457,9 @@ static void core0_update_ipc_state_100hz(void)
     uint8 screen_refresh_enable =
         ((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) &&
          (0U == FC_START_CRSF_Is_Armed())) ? 1U : 0U;
+    uint8 bl3_screen_allowed =
+        ((screen_refresh_enable != 0U) && (bl3_screen_enable != 0)) ? 1U : 0U;
+    uint8 bl3_horizon_allowed = (bl3_horizon_enable != 0) ? 1U : 0U;
 
     wifi_justfloat_SetStandbyContext(screen_refresh_enable);
 
@@ -465,17 +471,23 @@ static void core0_update_ipc_state_100hz(void)
     if ((flying != last_flying) ||
         (image_send_enable != last_image_send_enable) ||
         (screen_refresh_enable != last_screen_refresh_enable) ||
+        (bl3_screen_allowed != last_bl3_screen_enable) ||
+        (bl3_horizon_allowed != last_bl3_horizon_enable) ||
         (0U == state_periodic_div))
     {
         if (0U == flying_retry_div)
         {
             if (0U == ipc_flight_state_send(flying,
                                             image_send_enable,
-                                            screen_refresh_enable))
+                                            screen_refresh_enable,
+                                            bl3_screen_allowed,
+                                            bl3_horizon_allowed))
             {
                 last_flying = flying;
                 last_image_send_enable = image_send_enable;
                 last_screen_refresh_enable = screen_refresh_enable;
+                last_bl3_screen_enable = bl3_screen_allowed;
+                last_bl3_horizon_enable = bl3_horizon_allowed;
                 state_periodic_div = 100U;
                 flying_retry_div = 0U;
             }

@@ -155,6 +155,9 @@ extern int32 bl3_confirm;    /* 两颗2BL3目标初始化确认帧数镜像 */
 extern int32 bl3_misses;     /* 两颗2BL3信标最大连续丢失帧数镜像 */
 extern float bl3_pos_alpha;  /* 两颗2BL3位置滤波当前测量权重镜像 */
 extern float bl3_vel_alpha;  /* 两颗2BL3速度滤波当前测量权重镜像 */
+extern int32 bl3_screen_enable; /* 两颗2BL3本地屏幕使能，默认0关闭 */
+extern int32 bl3_horizon_enable; /* 两颗2BL3地平线算法使能，默认0关闭 */
+extern int32 c1_horizon_enable; /* 下摄地平线算法使能，默认1开启 */
 extern int32 bl3_stream_mode; /* 两颗2BL3图传内容模式镜像 */
 extern float bl3_lamp_width;
 extern float bl3_narrow_width;

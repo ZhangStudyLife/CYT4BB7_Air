@@ -46,6 +46,7 @@ extern "C" {
 #define IPC_REMOTE_PARAM_ID_C1_BEACON_THR      (0x0300U)
 #define IPC_REMOTE_PARAM_ID_C1_EXP_TIME        (0x0301U)
 #define IPC_REMOTE_PARAM_ID_C1_SCREEN_MODE     (0x0302U)
+#define IPC_REMOTE_PARAM_ID_C1_HORIZON_ENABLE  (0x0331U)
 #define IPC_REMOTE_PARAM_ID_C1_BEACON_MIN      (0x0303U)
 #define IPC_REMOTE_PARAM_ID_C1_EDGE_MIN        (0x0304U)
 #define IPC_REMOTE_PARAM_ID_C1_EDGE_THR        (0x0305U)
@@ -278,12 +279,30 @@ void ipc_attitude_publish(float roll_deg,
                           uint8 height_valid);
 void ipc_attitude_get(ipc_attitude_data_t *out);
 
+/**
+ * @brief 将核0飞行状态和图像输出控制发送给核1。
+ * @param flying 非0表示飞行中，0表示待机。
+ * @param image_send_enable 前后摄WiFi图传模式，范围0至2。
+ * @param screen_refresh_enable 非0表示允许核1本地屏幕刷新。
+ * @param bl3_screen_enable 非0表示允许前后摄本地屏幕显示。
+ * @return 0表示IPC数据发送成功，1表示发送失败。
+ */
 uint8 ipc_flight_state_send(uint8 flying,
                             uint8 image_send_enable,
-                            uint8 screen_refresh_enable);
+                            uint8 screen_refresh_enable,
+                            uint8 bl3_screen_enable,
+                            uint8 bl3_horizon_enable);
 uint8 ipc_core0_is_flying(void);
 uint8 ipc_core0_image_send_enable(void);
 uint8 ipc_core0_screen_refresh_enable(void);
+
+/**
+ * @brief 获取核0下发的前后摄本地屏幕使能状态。
+ * @param 无。
+ * @return 核1返回0表示关闭，1表示允许显示；其他核心固定返回0。
+ */
+uint8 ipc_core0_bl3_screen_enable(void);
+uint8 ipc_core0_bl3_horizon_enable(void);
 void ipc_camera_spi_log_publish(const ipc_camera_spi_log_t *log);
 void ipc_camera_spi_log_get(ipc_camera_spi_log_t *out);
 

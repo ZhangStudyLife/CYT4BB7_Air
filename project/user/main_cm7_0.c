@@ -433,8 +433,7 @@ static void core0_run_fast_loop_step(void)
 
     FC_Loop_1000Hz();
     air_comm_air_poll();
-    // car_plan_debug_200hz(); /* 临时关闭CarPlan3调试，改发Mode1/2/4/5控制数据。 */
-    mode1245_wifi_debug_200hz();
+    car_plan_debug_200hz();
 }
 
 /**

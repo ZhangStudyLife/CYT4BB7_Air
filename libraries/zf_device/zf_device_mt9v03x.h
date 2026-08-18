@@ -130,6 +130,8 @@ typedef enum
 extern vuint8   mt9v03x_finish_flag;                                            // 一场图像采集完成标志位
 extern uint8    mt9v03x_image[MT9V03X_H][MT9V03X_W];
 extern uint16   g_mt9v03x_exp_time;                                             // 运行时曝光时间，重新初始化摄像头后生效
+extern uint16   g_mt9v03x_fps;                                                  // 运行时目标帧率，重新初始化摄像头后生效
+extern uint16   g_mt9v03x_gain;                                                 // 运行时图像增益，重新初始化摄像头后生效
 extern volatile uint32 mt9v03x_frame_sequence;                                  // 最近完成采集的源帧序号
 
 uint8       mt9v03x_set_exposure_time   (uint16 light);

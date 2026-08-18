@@ -13,6 +13,9 @@
 #define BEACON_MAX_BEACON_COUNT 8
 #define BEACON_MAX_CAR_LAMP_COUNT IMAGE_MAX_CAR_LAMP_COUNT
 
+/* Core1实际地平线开关；Core0同名变量仅作为空地菜单镜像。 */
+int32 c1_horizon_enable = 1;
+
 typedef struct
 {
     beacon_circle_t circles[BEACON_MAX_CIRCLE_COUNT];
@@ -30,19 +33,8 @@ typedef struct
 #define LAMP_MASK_PAD                   7
 
 /* Core1图像算法运行时参数。 */
-int32 g_image_down_beacon_binary_threshold = 120;
-int32 g_image_down_beacon_min_area = 10;
-int32 g_image_down_side_edge_min_area = 10;
-int32 g_image_down_side_edge_threshold = 100;
 int32 g_image_down_car_lamp_binary_threshold = 200;
-int32 g_image_down_car_lamp_min_area = 24;
 int32 g_image_down_car_lamp_max_area = 1200;
-float g_image_down_car_lamp_min_elongation = 1.6f;
-float g_image_down_car_lamp_min_length = 8.0f;
-int32 g_image_down_near_lamp_pad = 8;
-int32 g_image_down_near_lamp_min_area = 45;
-int32 g_image_down_near_lamp_isolated_min_area = 18;
-int32 g_image_down_near_lamp_background_max = 40;
 float g_image_down_match_distance = 18.0f;
 float g_image_down_gate_distance = 24.0f;
 float g_image_down_new_target_distance = 36.0f;
@@ -50,6 +42,18 @@ int32 g_image_down_confirm_frames = 4;
 int32 g_image_down_max_misses = 6;
 float g_image_down_filter_pos_alpha = 0.408392f;
 float g_image_down_filter_vel_alpha = 0.163340f;
+float g_image_down_beacon_boundary_clearance = 9.0f;
+float g_image_down_gray_dedup_distance = 5.0f;
+int32 g_image_down_gray_edge_min_peak = 200;
+float g_image_down_gray_edge_max_occupancy = 0.25f;
+float g_image_down_gray_weak_peak_delta = 70.0f;
+int32 g_image_down_gray_weak_peak_floor = 140;
+int32 g_image_down_gray_weak_min_area = 3;
+int32 g_image_down_gray_weak_max_area = 20;
+float g_image_down_car_score_strong = 0.53f;
+float g_image_down_car_score_weak = 0.50f;
+float g_image_down_car_score_track = 0.47f;
+float g_image_down_car_score_margin = 0.02f;
 
 static uint8 s_mt9v03x_initialized;
 static uint32 s_image_down_latched_frame_sequence;                 /* 最近成功锁存并处理的摄像头来源帧号。 */
@@ -65,15 +69,15 @@ static uint32 s_image_down_latched_frame_sequence;                 /* 最近成�
 #define DOWN_GRAY_MAX_PEAKS             20U
 #define DOWN_GRAY_MAX_CANDIDATES        12U
 #define DOWN_OBJECT_BOUNDARY_MARGIN     3.0f
-#define DOWN_BEACON_BOUNDARY_CLEARANCE  9.0f
-#define DOWN_GRAY_DEDUP_DISTANCE_SQ     25.0f
+#define DOWN_BEACON_BOUNDARY_CLEARANCE  g_image_down_beacon_boundary_clearance
+#define DOWN_GRAY_DEDUP_DISTANCE_SQ     (g_image_down_gray_dedup_distance * g_image_down_gray_dedup_distance)
 #define DOWN_GRAY_PATCH_RADIUS          6
 #define DOWN_GRAY_BACKGROUND_INNER_SQ  49
 #define DOWN_GRAY_BACKGROUND_OUTER_SQ  100
 #define DOWN_BEACON_LEFT_EDGE_MARGIN    24
 #define DOWN_BEACON_RIGHT_EDGE_MARGIN   16
-#define DOWN_GRAY_EDGE_MIN_PEAK         200U
-#define DOWN_GRAY_EDGE_MAX_OCCUPANCY    0.25f
+#define DOWN_GRAY_EDGE_MIN_PEAK         g_image_down_gray_edge_min_peak
+#define DOWN_GRAY_EDGE_MAX_OCCUPANCY    g_image_down_gray_edge_max_occupancy
 #define DOWN_EDGE_SUPPORT_RADIUS        12
 #define DOWN_EDGE_SUPPORT_MAX_AREA      48
 #define DOWN_LOCAL_SHAPE_SIZE           (DOWN_EDGE_SUPPORT_RADIUS * 2 + 1)
@@ -82,10 +86,10 @@ static uint32 s_image_down_latched_frame_sequence;                 /* 最近成�
 #define DOWN_CAR_MAX_COMPONENTS         32U
 #define DOWN_CAR_ENVELOPE_MIN_PAD       4
 #define DOWN_CAR_ENVELOPE_PAD_SCALE     0.75f
-#define DOWN_CAR_STRONG_SCORE           0.53f
-#define DOWN_CAR_WEAK_SCORE             0.50f
-#define DOWN_CAR_TRACK_SCORE            0.47f
-#define DOWN_CAR_TRACK_SCORE_MARGIN     0.02f
+#define DOWN_CAR_STRONG_SCORE           g_image_down_car_score_strong
+#define DOWN_CAR_WEAK_SCORE             g_image_down_car_score_weak
+#define DOWN_CAR_TRACK_SCORE            g_image_down_car_score_track
+#define DOWN_CAR_TRACK_SCORE_MARGIN     g_image_down_car_score_margin
 #define DOWN_CAR_SCORE_ELONGATION_BASE  1.35f
 #define DOWN_CAR_SCORE_ELONGATION_RANGE 2.00f
 #define DOWN_CAR_SCORE_VARIANCE_RANGE   700.0f
@@ -2520,7 +2524,7 @@ static unsigned char down_gray_candidate_valid(
     const down_gray_features_t *features,
     unsigned char peak_clipped)
 {
-    int weak_peak = (int)(scene_mean + 70.0f);
+    int weak_peak = (int)(scene_mean + g_image_down_gray_weak_peak_delta);
     unsigned char weak;
     unsigned char normal;
     unsigned char medium;
@@ -2539,12 +2543,12 @@ static unsigned char down_gray_candidate_valid(
     {
         return 0U;
     }
-    if (weak_peak < 140)
+    if (weak_peak < g_image_down_gray_weak_peak_floor)
     {
-        weak_peak = 140;
+        weak_peak = g_image_down_gray_weak_peak_floor;
     }
-    weak = ((features->half_area >= 3U) &&
-            (features->half_area <= 20U) &&
+    weak = ((features->half_area >= (uint32)g_image_down_gray_weak_min_area) &&
+            (features->half_area <= (uint32)g_image_down_gray_weak_max_area) &&
             (features->peak >= weak_peak) &&
             (features->inner_contrast >= 42.0f) &&
             (features->radial_drop >= 38.0f) &&
@@ -3292,52 +3296,87 @@ static int32 image_down_param_bits_to_int32(uint32 bits)
     return value;
 }
 
-static uint8 image_down_exposure_param_execute(uint8 op,
-                                               uint32 requested_bits,
-                                               uint32 *actual_bits)
+static uint8 image_down_camera_param_execute(uint8 op,
+                                             uint32 requested_bits,
+                                             uint32 *actual_bits,
+                                             uint16 *parameter,
+                                             int32 minimum,
+                                             int32 maximum)
 {
     int32 value;
-    uint16 old_value = g_mt9v03x_exp_time;
+    uint16 old_value;
+
+    if((actual_bits == NULL) || (parameter == NULL))
+    {
+        return IPC_REMOTE_PARAM_STATUS_ERROR;
+    }
+    old_value = *parameter;
 
     if(op == IPC_REMOTE_PARAM_OP_SET)
     {
         value = image_down_param_bits_to_int32(requested_bits);
-        if((value < 0) || (value > 636))
+        if((value < minimum) || (value > maximum))
         {
-            *actual_bits = (uint32)g_mt9v03x_exp_time;
+            *actual_bits = (uint32)(*parameter);
             return IPC_REMOTE_PARAM_STATUS_OUT_OF_RANGE;
         }
         if(((uint16)value == old_value) && (s_mt9v03x_initialized != 0U))
         {
-            *actual_bits = (uint32)g_mt9v03x_exp_time;
+            *actual_bits = (uint32)(*parameter);
             return IPC_REMOTE_PARAM_STATUS_OK;
         }
 
-        g_mt9v03x_exp_time = (uint16)value;
+        *parameter = (uint16)value;
+        mt9v03x_finish_flag = 0U;
         s_mt9v03x_initialized = 0U;
-        if(mt9v03x_init() != 0U)
+        if((mt9v03x_init() != 0U) || ((int32)(*parameter) != value))
         {
-            g_mt9v03x_exp_time = old_value;
-            if(mt9v03x_init() != 0U)
+            *parameter = old_value;
+            mt9v03x_finish_flag = 0U;
+            if((mt9v03x_init() != 0U) || (*parameter != old_value))
             {
-                *actual_bits = (uint32)g_mt9v03x_exp_time;
+                *actual_bits = (uint32)(*parameter);
                 return IPC_REMOTE_PARAM_STATUS_ROLLBACK_FAIL;
             }
             s_mt9v03x_initialized = 1U;
-            *actual_bits = (uint32)g_mt9v03x_exp_time;
+            *actual_bits = (uint32)(*parameter);
             return IPC_REMOTE_PARAM_STATUS_ERROR;
         }
         s_mt9v03x_initialized = 1U;
     }
     else if(op != IPC_REMOTE_PARAM_OP_GET)
     {
-        *actual_bits = (uint32)g_mt9v03x_exp_time;
+        *actual_bits = (uint32)(*parameter);
         return IPC_REMOTE_PARAM_STATUS_ERROR;
     }
 
-    *actual_bits = (uint32)g_mt9v03x_exp_time;
+    *actual_bits = (uint32)(*parameter);
     return (s_mt9v03x_initialized != 0U) ?
            IPC_REMOTE_PARAM_STATUS_OK : IPC_REMOTE_PARAM_STATUS_ERROR;
+}
+
+static uint8 image_down_exposure_param_execute(uint8 op,
+                                               uint32 requested_bits,
+                                               uint32 *actual_bits)
+{
+    return image_down_camera_param_execute(op, requested_bits, actual_bits,
+                                           &g_mt9v03x_exp_time, 0, 636);
+}
+
+static uint8 image_down_fps_param_execute(uint8 op,
+                                          uint32 requested_bits,
+                                          uint32 *actual_bits)
+{
+    return image_down_camera_param_execute(op, requested_bits, actual_bits,
+                                           &g_mt9v03x_fps, 1, 200);
+}
+
+static uint8 image_down_gain_param_execute(uint8 op,
+                                           uint32 requested_bits,
+                                           uint32 *actual_bits)
+{
+    return image_down_camera_param_execute(op, requested_bits, actual_bits,
+                                           &g_mt9v03x_gain, 16, 64);
 }
 
 static uint8 image_down_screen_param_execute(uint8 op,
@@ -3369,36 +3408,48 @@ static uint8 image_down_screen_param_execute(uint8 op,
 
 static const image_down_param_descriptor_t s_image_down_params[] =
 {
-    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_BEACON_THR,
-                       g_image_down_beacon_binary_threshold, 0, 255),
     IMAGE_DOWN_PARAM_CUSTOM_I(IPC_REMOTE_PARAM_ID_C1_EXP_TIME,
                               image_down_exposure_param_execute),
+    IMAGE_DOWN_PARAM_CUSTOM_I(IPC_REMOTE_PARAM_ID_C1_FPS,
+                              image_down_fps_param_execute),
+    IMAGE_DOWN_PARAM_CUSTOM_I(IPC_REMOTE_PARAM_ID_C1_GAIN,
+                              image_down_gain_param_execute),
     IMAGE_DOWN_PARAM_CUSTOM_I(IPC_REMOTE_PARAM_ID_C1_SCREEN_MODE,
                               image_down_screen_param_execute),
-    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_BEACON_MIN,
-                       g_image_down_beacon_min_area, 0, 22560),
-    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_EDGE_MIN,
-                       g_image_down_side_edge_min_area, 0, 22560),
-    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_EDGE_THR,
-                       g_image_down_side_edge_threshold, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_HORIZON_ENABLE,
+                       c1_horizon_enable, 0, 1),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_HORIZON_HEIGHT_OFFSET,
+                       g_image_down_horizon_height_offset_mm, -300.0f, 300.0f),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_HORIZON_MARGIN_PX,
+                       g_image_down_horizon_margin_px, -30.0f, 30.0f),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_BEACON_BOUNDARY_PX,
+                       g_image_down_beacon_boundary_clearance, 0.0f, 30.0f),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_GRAY_DEDUP_DIST,
+                       g_image_down_gray_dedup_distance, 0.0f, 30.0f),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_EDGE_PEAK_MIN,
+                       g_image_down_gray_edge_min_peak, 0, 255),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_EDGE_OCCUPANCY_MAX,
+                       g_image_down_gray_edge_max_occupancy, 0.0f, 1.0f),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_GRAY_WEAK_PEAK_DELTA,
+                       g_image_down_gray_weak_peak_delta, 0.0f, 255.0f),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_GRAY_WEAK_PEAK_FLOOR,
+                       g_image_down_gray_weak_peak_floor, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_GRAY_WEAK_MIN_AREA,
+                       g_image_down_gray_weak_min_area, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_GRAY_WEAK_MAX_AREA,
+                       g_image_down_gray_weak_max_area, 0, 255),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_CAR_SCORE_STRONG,
+                       g_image_down_car_score_strong, 0.0f, 1.0f),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_CAR_SCORE_WEAK,
+                       g_image_down_car_score_weak, 0.0f, 1.0f),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_CAR_SCORE_TRACK,
+                       g_image_down_car_score_track, 0.0f, 1.0f),
+    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_CAR_SCORE_MARGIN,
+                       g_image_down_car_score_margin, 0.0f, 0.20f),
     IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_LAMP_THR,
                        g_image_down_car_lamp_binary_threshold, 0, 255),
-    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_LAMP_MIN,
-                       g_image_down_car_lamp_min_area, 0, 22560),
     IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_LAMP_MAX,
                        g_image_down_car_lamp_max_area, 0, 22560),
-    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_LAMP_ELONG,
-                       g_image_down_car_lamp_min_elongation, 0.0f, 224.0f),
-    IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_LAMP_LEN,
-                       g_image_down_car_lamp_min_length, 0.0f, 224.0f),
-    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_NEAR_PAD,
-                       g_image_down_near_lamp_pad, 0, 224),
-    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_NEAR_MIN,
-                       g_image_down_near_lamp_min_area, 0, 22560),
-    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_NEAR_ISO_MIN,
-                       g_image_down_near_lamp_isolated_min_area, 0, 22560),
-    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_NEAR_BG,
-                       g_image_down_near_lamp_background_max, 0, 255),
     IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_MATCH_DIST,
                        g_image_down_match_distance, 0.0f, 224.0f),
     IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_GATE_DIST,
@@ -3416,7 +3467,7 @@ static const image_down_param_descriptor_t s_image_down_params[] =
 };
 
 typedef char image_down_param_count_must_match[
-    (sizeof(s_image_down_params) / sizeof(s_image_down_params[0]) == 22U) ?
+    (sizeof(s_image_down_params) / sizeof(s_image_down_params[0]) == 28U) ?
     1 : -1];
 
 static const image_down_param_descriptor_t *image_down_find_param(uint16 id)
@@ -3461,8 +3512,12 @@ static uint8 image_down_param_values_valid(
         }
     }
 
-    return (g_image_down_car_lamp_min_area <=
-            g_image_down_car_lamp_max_area) ? 1U : 0U;
+    return ((g_image_down_gray_weak_min_area <=
+             g_image_down_gray_weak_max_area) &&
+            (g_image_down_car_score_strong >=
+             g_image_down_car_score_weak) &&
+            (g_image_down_car_score_weak >=
+             g_image_down_car_score_track)) ? 1U : 0U;
 }
 
 uint8 image_down_remote_param_execute(uint8 op,

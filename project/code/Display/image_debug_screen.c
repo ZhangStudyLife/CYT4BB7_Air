@@ -16,7 +16,7 @@
 #define IMAGE_SCREEN_DATA_PERIOD_TICKS (1U)
 #define IMAGE_SCREEN_SPI_SPEED         (20U * 1000U * 1000U)
 #define IMAGE_SCREEN_AUX_REFRESH_FRAMES (5U)
-#define IMAGE_SCREEN_FORCE_DISABLE     (1U) /* 三摄高帧率版本不初始化或刷新屏幕。 */
+#define IMAGE_SCREEN_FORCE_DISABLE     (0U) /* 仅安全待机时按核0许可初始化和刷新。 */
 #define IMAGE_SCREEN_LCD_X_OFFSET       (40U)
 #define IMAGE_SCREEN_LCD_Y_OFFSET       (52U)
 #define IMAGE_SCREEN_AUX_X              (190U)
@@ -662,8 +662,8 @@ static void ImageDebugScreen_CaptureAuxSnapshot(void)
     }
 
     ImageDebugScreen_SetAuxLine(0U, ImageDebugScreen_ModeName(s_screen_mode));
-    (void)snprintf(text, sizeof(text), "BT:%ld",
-                   (long)g_image_down_beacon_binary_threshold);
+    (void)snprintf(text, sizeof(text), "EP:%ld",
+                   (long)g_image_down_gray_edge_min_peak);
     ImageDebugScreen_SetAuxLine(1U, text);
     (void)snprintf(text, sizeof(text), "LT:%ld",
                    (long)g_image_down_car_lamp_binary_threshold);
@@ -869,18 +869,7 @@ void ImageDebugScreen_Init(void)
 #if (IMAGE_SCREEN_FORCE_DISABLE != 0U)
     return;
 #endif
-
-    ips114_set_dir(IPS114_PORTAIT);
-    ips114_init();
-    ImageDebugScreen_ConfigureSpi();
-    s_hw_initialized = 1U;
-    ips114_set_font(IPS114_8X16_FONT);
-    ips114_set_color(RGB565_BLACK, RGB565_WHITE);
-    ImageDebugScreen_RenderDataLayoutTop();
-    ImageDebugScreen_RenderDataLayoutBottom();
-
-    s_layout_dirty = 0U;
-    s_startup_layout_ready = 1U;
+    gpio_init(IPS114_BLK_PIN, GPO, GPIO_LOW, GPO_PUSH_PULL);
 }
 
 void ImageDebugScreen_Tick10ms(void)
@@ -914,6 +903,10 @@ void ImageDebugScreen_Update(uint8 image_frame_updated)
 
     if(ImageDebugScreen_RefreshAllowed() == 0U)
     {
+        if(s_hw_initialized != 0U)
+        {
+            IPS114_BLK(0);
+        }
         s_refresh_was_enabled = 0U;
         s_image_frame_pending = 0U;
         return;
@@ -925,12 +918,16 @@ void ImageDebugScreen_Update(uint8 image_frame_updated)
         ips114_init();
         ImageDebugScreen_ConfigureSpi();
         s_hw_initialized = 1U;
+        s_refresh_was_enabled = 1U;
         ImageDebugScreen_MarkLayoutDirty();
+        IPS114_BLK(1);
+        return;
     }
 
     if(s_refresh_was_enabled == 0U)
     {
         s_refresh_was_enabled = 1U;
+        IPS114_BLK(1);
         if((s_startup_layout_ready != 0U) &&
            (s_screen_mode == IMAGE_DEBUG_SCREEN_MODE_DATA) &&
            (s_layout_dirty == 0U))

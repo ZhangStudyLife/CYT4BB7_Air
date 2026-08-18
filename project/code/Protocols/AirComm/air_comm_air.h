@@ -102,23 +102,31 @@ extern float air_y_bias;    /* 信标 Y 方向偏差补偿（像素） */
  * 初始化模块，清零所有状态，注册默认参数，配置 UART_2。
  * 在系统启动时调用一次。
  */
-extern int32 c1_beacon_thr;  /* 核1信标二值化阈值的核0菜单镜像，不参与核0飞控计算 */
 extern int32 bl3_beacon_thr; /* 两颗2BL3信标二值化阈值的核0菜单镜像，不参与核0飞控计算 */
 extern int32 c1_exp_time;    /* 核1摄像头曝光时间的核0菜单镜像，不参与核0飞控计算 */
 extern int32 bl3_exp_time;   /* 两颗2BL3曝光时间的核0菜单镜像，不参与核0飞控计算 */
+extern int32 c1_fps;
+extern int32 c1_gain;
+extern int32 bl3_fps;
+extern int32 bl3_gain;
 extern int32 c1_screen_mode; /* 核1屏幕显示模式的核0菜单镜像，不参与核0飞控计算 */
-extern int32 c1_beacon_min;
-extern int32 c1_edge_min;
-extern int32 c1_edge_thr;
+extern int32 c1_horizon_enable;
+extern float c1_horizon_height_offset;
+extern float c1_horizon_margin_px;
+extern float c1_beacon_boundary_px;
+extern float c1_gray_dedup_dist;
+extern int32 c1_edge_peak_min;
+extern float c1_edge_occupancy_max;
+extern float c1_gray_weak_peak_delta;
+extern int32 c1_gray_weak_peak_floor;
+extern int32 c1_gray_weak_min_area;
+extern int32 c1_gray_weak_max_area;
+extern float c1_car_score_strong;
+extern float c1_car_score_weak;
+extern float c1_car_score_track;
+extern float c1_car_score_margin;
 extern int32 c1_lamp_thr;
-extern int32 c1_lamp_min;
 extern int32 c1_lamp_max;
-extern float c1_lamp_elong;
-extern float c1_lamp_len;
-extern int32 c1_near_pad;
-extern int32 c1_near_min;
-extern int32 c1_near_iso_min;
-extern int32 c1_near_bg;
 extern float c1_match_dist;
 extern float c1_gate_dist;
 extern float c1_new_dist;
@@ -156,6 +164,10 @@ extern int32 bl3_misses;     /* 两颗2BL3信标最大连续丢失帧数镜像 *
 extern float bl3_pos_alpha;  /* 两颗2BL3位置滤波当前测量权重镜像 */
 extern float bl3_vel_alpha;  /* 两颗2BL3速度滤波当前测量权重镜像 */
 extern int32 bl3_stream_mode; /* 两颗2BL3图传内容模式镜像 */
+extern int32 bl3_screen_enable;
+extern int32 bl3_horizon_enable;
+extern float bl3_horizon_height_offset;
+extern float bl3_horizon_margin_px;
 extern float bl3_lamp_width;
 extern float bl3_narrow_width;
 extern float bl3_narrow_elong;
@@ -181,6 +193,25 @@ extern int32 bl3_shape_fill;
 extern int32 bl3_shape_s_fill;
 extern float bl3_top_v_elong;
 extern int32 bl3_sat_t_gray;
+extern int32 bl3_gray_lamp_thr;
+extern int32 bl3_gray_lamp_min_area;
+extern int32 bl3_gray_lamp_max_area;
+extern float bl3_gray_lamp_min_len;
+extern float bl3_gray_lamp_max_len;
+extern float bl3_gray_lamp_min_width;
+extern float bl3_gray_lamp_min_elong;
+extern int32 bl3_gray_lamp_min_peak;
+extern float bl3_gray_lamp_min_mean;
+extern float bl3_gray_lamp_min_contrast;
+extern int32 bl3_gray_lamp_min_fill;
+extern int32 bl3_gray_lamp_strip_gray;
+extern int32 bl3_gray_lamp_strip_fill;
+extern int32 bl3_gray_beacon_min_peak;
+extern float bl3_gray_beacon_min_area;
+extern float bl3_gray_beacon_max_area;
+extern int32 bl3_gray_beacon_compact_peak;
+extern int32 bl3_car_edge_misses;
+extern int32 bl3_car_center_misses;
 
 void air_comm_air_init(void);
 

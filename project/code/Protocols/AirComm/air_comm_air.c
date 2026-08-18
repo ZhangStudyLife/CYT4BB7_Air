@@ -23,7 +23,7 @@
 #define AIR_COMM_TX_RUN_DATA_LIMIT           (3U)    /* RUN_DATA最多占用的发送帧槽数量 */
 #define AIR_COMM_TX_FIFO_LEVEL               (64U)   /* SCB4发送FIFO触发水位 */
 #define AIR_COMM_PARAM_TABLE_MAX             (384U)  /* 最多注册参数个数 */
-#define AIR_COMM_DEFAULT_PARAM_COUNT         (212U)
+#define AIR_COMM_DEFAULT_PARAM_COUNT         (243U)
 #define AIR_COMM_REMOTE_CANCEL_MS            (400U)
 #define AIR_COMM_REMOTE_TIMEOUT_MS           (700U)
 #define AIR_COMM_REMOTE_EXP_CANCEL_MS        (1800U)
@@ -228,28 +228,35 @@ static air_comm_air_tx_queue_t s_air_comm_tx_queue;     /* 发送帧队列 */
 static air_comm_air_stats_t s_air_comm_stats;           /* 统计计数器 */
 static air_comm_air_param_t s_air_comm_params[AIR_COMM_PARAM_TABLE_MAX]; /* 参数表 */
 /* 远端镜像统一从0开始，仅在目标端成功读回后更新为有效值。 */
-/* 核1阈值在核0的菜单镜像，仅在下游确认成功后更新。 */
-int32 c1_beacon_thr = 0;
 /* 两颗2BL3共同阈值在核0的菜单镜像，仅在两板确认一致后更新。 */
 int32 bl3_beacon_thr = 0;
 /* 核1摄像头曝光时间的核0菜单镜像，仅在下游确认成功后更新。 */
 int32 c1_exp_time = 0;
 /* 两颗2BL3共同曝光时间的核0菜单镜像，仅在两板确认一致后更新。 */
 int32 bl3_exp_time = 0;
+int32 c1_fps = 0;
+int32 c1_gain = 0;
+int32 bl3_fps = 0;
+int32 bl3_gain = 0;
 /* 核1屏幕显示模式的核0菜单镜像，仅在核1读回成功后更新。 */
 int32 c1_screen_mode = 0;
-int32 c1_beacon_min = 0;
-int32 c1_edge_min = 0;
-int32 c1_edge_thr = 0;
+int32 c1_horizon_enable = 1;
+float c1_horizon_height_offset = 0.0f;
+float c1_horizon_margin_px = -5.0f;
+float c1_beacon_boundary_px = 0;
+float c1_gray_dedup_dist = 0;
+int32 c1_edge_peak_min = 0;
+float c1_edge_occupancy_max = 0;
+float c1_gray_weak_peak_delta = 0;
+int32 c1_gray_weak_peak_floor = 0;
+int32 c1_gray_weak_min_area = 0;
+int32 c1_gray_weak_max_area = 0;
+float c1_car_score_strong = 0;
+float c1_car_score_weak = 0;
+float c1_car_score_track = 0;
+float c1_car_score_margin = 0;
 int32 c1_lamp_thr = 0;
-int32 c1_lamp_min = 0;
 int32 c1_lamp_max = 0;
-float c1_lamp_elong = 0;
-float c1_lamp_len = 0;
-int32 c1_near_pad = 0;
-int32 c1_near_min = 0;
-int32 c1_near_iso_min = 0;
-int32 c1_near_bg = 0;
 float c1_match_dist = 0;
 float c1_gate_dist = 0;
 float c1_new_dist = 0;
@@ -319,6 +326,10 @@ float bl3_pos_alpha = 0;
 float bl3_vel_alpha = 0;
 /* 两颗2BL3图传内容模式的核0菜单镜像：0原图，1车灯二值图，2信标二值图。 */
 int32 bl3_stream_mode = 0;
+int32 bl3_screen_enable = 0;
+int32 bl3_horizon_enable = 1;
+float bl3_horizon_height_offset = 0.0f;
+float bl3_horizon_margin_px = 8.0f;
 float bl3_lamp_width = 0;
 float bl3_narrow_width = 0;
 float bl3_narrow_elong = 0;
@@ -344,6 +355,25 @@ int32 bl3_shape_fill = 0;
 int32 bl3_shape_s_fill = 0;
 float bl3_top_v_elong = 0;
 int32 bl3_sat_t_gray = 0;
+int32 bl3_gray_lamp_thr = 0;
+int32 bl3_gray_lamp_min_area = 0;
+int32 bl3_gray_lamp_max_area = 0;
+float bl3_gray_lamp_min_len = 0;
+float bl3_gray_lamp_max_len = 0;
+float bl3_gray_lamp_min_width = 0;
+float bl3_gray_lamp_min_elong = 0;
+int32 bl3_gray_lamp_min_peak = 0;
+float bl3_gray_lamp_min_mean = 0;
+float bl3_gray_lamp_min_contrast = 0;
+int32 bl3_gray_lamp_min_fill = 0;
+int32 bl3_gray_lamp_strip_gray = 0;
+int32 bl3_gray_lamp_strip_fill = 0;
+int32 bl3_gray_beacon_min_peak = 0;
+float bl3_gray_beacon_min_area = 0;
+float bl3_gray_beacon_max_area = 0;
+int32 bl3_gray_beacon_compact_peak = 0;
+int32 bl3_car_edge_misses = 0;
+int32 bl3_car_center_misses = 0;
 
 static air_comm_run_data_fn s_air_comm_run_data_callback;
 static air_comm_air_command_t s_air_comm_commands[AIR_COMM_COMMAND_TABLE_MAX];
@@ -1042,9 +1072,13 @@ static void air_comm_remote_poll(void)
     }
 
     pending = s_air_comm_remote_pending;
-    /* 曝光与面积表持久化命令需要等待传感器或Flash操作，使用较长取消和硬超时。 */
+    /* 摄像头参数会触发重新初始化，统一使用较长取消和硬超时。 */
     slow_operation = ((pending.param->param_id == IPC_REMOTE_PARAM_ID_C1_EXP_TIME) ||
-                      (pending.param->param_id == IPC_REMOTE_PARAM_ID_BL3_EXP_TIME)) ? 1U : 0U;
+                      (pending.param->param_id == IPC_REMOTE_PARAM_ID_BL3_EXP_TIME) ||
+                      (pending.param->param_id == IPC_REMOTE_PARAM_ID_C1_FPS) ||
+                      (pending.param->param_id == IPC_REMOTE_PARAM_ID_C1_GAIN) ||
+                      (pending.param->param_id == IPC_REMOTE_PARAM_ID_BL3_FPS) ||
+                      (pending.param->param_id == IPC_REMOTE_PARAM_ID_BL3_GAIN)) ? 1U : 0U;
     cancel_ms = (slow_operation != 0U) ?
                 AIR_COMM_REMOTE_EXP_CANCEL_MS : AIR_COMM_REMOTE_CANCEL_MS;
     timeout_ms = (slow_operation != 0U) ?
@@ -1210,7 +1244,8 @@ static void air_comm_handle_set_param(uint8 seq, const uint8 *payload, uint8 len
     }
     else if(value < param->min)
     {
-        actual = param->min;
+        actual = (param->target == AIR_COMM_PARAM_TARGET_LOCAL) ?
+                 param->min : air_comm_param_read(param);
         if(param->target == AIR_COMM_PARAM_TARGET_LOCAL)
         {
             air_comm_param_write(param, actual);
@@ -1219,7 +1254,8 @@ static void air_comm_handle_set_param(uint8 seq, const uint8 *payload, uint8 len
     }
     else if(value > param->max)
     {
-        actual = param->max;
+        actual = (param->target == AIR_COMM_PARAM_TARGET_LOCAL) ?
+                 param->max : air_comm_param_read(param);
         if(param->target == AIR_COMM_PARAM_TARGET_LOCAL)
         {
             air_comm_param_write(param, actual);
@@ -1241,25 +1277,33 @@ static void air_comm_handle_set_param(uint8 seq, const uint8 *payload, uint8 len
     {
         if(param->target != AIR_COMM_PARAM_TARGET_LOCAL)
         {
-            if(air_comm_remote_start(AIR_COMM_MSG_SET_PARAM,
-                                     seq,
-                                     name,
-                                     name_len,
-                                     param,
-                                     IPC_REMOTE_PARAM_OP_SET,
-                                     actual,
-                                     status,
-                                     request_value_bits) != 0U)
+            if((status == AIR_COMM_AIR_STATUS_OK) &&
+               (air_comm_remote_start(AIR_COMM_MSG_SET_PARAM,
+                                      seq,
+                                      name,
+                                      name_len,
+                                      param,
+                                      IPC_REMOTE_PARAM_OP_SET,
+                                      actual,
+                                      status,
+                                      request_value_bits) != 0U))
             {
                 return;
             }
-            status = AIR_COMM_AIR_STATUS_BUSY;
-            actual = air_comm_param_read(param);
+            if(status == AIR_COMM_AIR_STATUS_OK)
+            {
+                status = AIR_COMM_AIR_STATUS_BUSY;
+                actual = air_comm_param_read(param);
+            }
         }
         else
         {
             actual = air_comm_param_read(param);
-            FC_Loop_Init();
+            if((param->var != &bl3_screen_enable) &&
+               (param->var != &bl3_horizon_enable))
+            {
+                FC_Loop_Init();
+            }
         }
     }
 
@@ -1788,23 +1832,31 @@ void air_comm_air_init(void)
     s_air_comm_last_done_valid = 0U;
     s_air_comm_last_done_seq = 0U;
     s_air_comm_registration_ok = 1U;
-    c1_beacon_thr = 0;
     bl3_beacon_thr = 0;
     c1_exp_time = 0;
     bl3_exp_time = 0;
+    c1_fps = 0;
+    c1_gain = 0;
+    bl3_fps = 0;
+    bl3_gain = 0;
     c1_screen_mode = 0;
-    c1_beacon_min = 0;
-    c1_edge_min = 0;
-    c1_edge_thr = 0;
+    c1_horizon_enable = 1;
+    c1_horizon_height_offset = 0.0f;
+    c1_horizon_margin_px = -5.0f;
+    c1_beacon_boundary_px = 0.0f;
+    c1_gray_dedup_dist = 0.0f;
+    c1_edge_peak_min = 0;
+    c1_edge_occupancy_max = 0.0f;
+    c1_gray_weak_peak_delta = 0.0f;
+    c1_gray_weak_peak_floor = 0;
+    c1_gray_weak_min_area = 0;
+    c1_gray_weak_max_area = 0;
+    c1_car_score_strong = 0.0f;
+    c1_car_score_weak = 0.0f;
+    c1_car_score_track = 0.0f;
+    c1_car_score_margin = 0.0f;
     c1_lamp_thr = 0;
-    c1_lamp_min = 0;
     c1_lamp_max = 0;
-    c1_lamp_elong = 0;
-    c1_lamp_len = 0;
-    c1_near_pad = 0;
-    c1_near_min = 0;
-    c1_near_iso_min = 0;
-    c1_near_bg = 0;
     c1_match_dist = 0;
     c1_gate_dist = 0;
     c1_new_dist = 0;
@@ -1842,6 +1894,10 @@ void air_comm_air_init(void)
     bl3_pos_alpha = 0;
     bl3_vel_alpha = 0;
     bl3_stream_mode = 0;
+    bl3_screen_enable = 0;
+    bl3_horizon_enable = 1;
+    bl3_horizon_height_offset = 0.0f;
+    bl3_horizon_margin_px = 8.0f;
     bl3_lamp_width = 0;
     bl3_narrow_width = 0;
     bl3_narrow_elong = 0;
@@ -1867,6 +1923,25 @@ void air_comm_air_init(void)
     bl3_shape_s_fill = 0;
     bl3_top_v_elong = 0;
     bl3_sat_t_gray = 0;
+    bl3_gray_lamp_thr = 0;
+    bl3_gray_lamp_min_area = 0;
+    bl3_gray_lamp_max_area = 0;
+    bl3_gray_lamp_min_len = 0.0f;
+    bl3_gray_lamp_max_len = 0.0f;
+    bl3_gray_lamp_min_width = 0.0f;
+    bl3_gray_lamp_min_elong = 0.0f;
+    bl3_gray_lamp_min_peak = 0;
+    bl3_gray_lamp_min_mean = 0.0f;
+    bl3_gray_lamp_min_contrast = 0.0f;
+    bl3_gray_lamp_min_fill = 0;
+    bl3_gray_lamp_strip_gray = 0;
+    bl3_gray_lamp_strip_fill = 0;
+    bl3_gray_beacon_min_peak = 0;
+    bl3_gray_beacon_min_area = 0.0f;
+    bl3_gray_beacon_max_area = 0.0f;
+    bl3_gray_beacon_compact_peak = 0;
+    bl3_car_edge_misses = 0;
+    bl3_car_center_misses = 0;
 
     AIR_COMM_REGISTER_FLOAT(gyro_dt, g_fc_params.gyro_dt, 0.0001f, 0.1f);
     AIR_COMM_REGISTER_FLOAT(angle_dt, g_fc_params.angle_dt, 0.0001f, 0.1f);
@@ -1970,80 +2045,61 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(mode8_vel_y_kff, g_fc_params.mode8_vel_y_kff, 0.0f, 3000.0f);
     AIR_COMM_REGISTER_FLOAT(mode8_vel_y_i_limit, g_fc_params.mode8_vel_y_i_limit, 0.0f, 5000.0f);
     AIR_COMM_REGISTER_FLOAT(mode8_vel_y_d_lpf, g_fc_params.mode8_vel_y_d_lpf, 0.0f, 500.0f);
-    if(air_comm_register_remote_param("c1_beacon_thr",
-                                      &c1_beacon_thr,
-                                      AIR_COMM_AIR_PARAM_TYPE_INT32,
-                                      0.0f,
-                                      255.0f,
-                                      IPC_REMOTE_PARAM_TARGET_CORE1,
-                                      IPC_REMOTE_PARAM_ID_C1_BEACON_THR) == 0U)
-    {
-        s_air_comm_registration_ok = 0U;
-    }
-    if(air_comm_register_remote_param("bl3_beacon_thr",
-                                      &bl3_beacon_thr,
-                                      AIR_COMM_AIR_PARAM_TYPE_INT32,
-                                      0.0f,
-                                      255.0f,
-                                      IPC_REMOTE_PARAM_TARGET_2BL3,
-                                      IPC_REMOTE_PARAM_ID_BL3_BEACON_THR) == 0U)
-    {
-        s_air_comm_registration_ok = 0U;
-    }
-    if(air_comm_register_remote_param("c1_exp_time",
-                                      &c1_exp_time,
-                                      AIR_COMM_AIR_PARAM_TYPE_INT32,
-                                      0.0f,
-                                      636.0f,
-                                      IPC_REMOTE_PARAM_TARGET_CORE1,
-                                      IPC_REMOTE_PARAM_ID_C1_EXP_TIME) == 0U)
-    {
-        s_air_comm_registration_ok = 0U;
-    }
-    if(air_comm_register_remote_param("bl3_exp_time",
-                                      &bl3_exp_time,
-                                      AIR_COMM_AIR_PARAM_TYPE_INT32,
-                                      0.0f,
-                                      636.0f,
-                                      IPC_REMOTE_PARAM_TARGET_2BL3,
-                                      IPC_REMOTE_PARAM_ID_BL3_EXP_TIME) == 0U)
-    {
-        s_air_comm_registration_ok = 0U;
-    }
-    if(air_comm_register_remote_param("c1_screen_mode",
-                                      &c1_screen_mode,
-                                      AIR_COMM_AIR_PARAM_TYPE_INT32,
-                                      0.0f,
-                                      4.0f,
-                                      IPC_REMOTE_PARAM_TARGET_CORE1,
-                                      IPC_REMOTE_PARAM_ID_C1_SCREEN_MODE) == 0U)
-    {
-        s_air_comm_registration_ok = 0U;
-    }
-    AIR_COMM_REGISTER_C1_INT32(c1_beacon_min, c1_beacon_min, 0, 22560,
-                               IPC_REMOTE_PARAM_ID_C1_BEACON_MIN);
-    AIR_COMM_REGISTER_C1_INT32(c1_edge_min, c1_edge_min, 0, 22560,
-                               IPC_REMOTE_PARAM_ID_C1_EDGE_MIN);
-    AIR_COMM_REGISTER_C1_INT32(c1_edge_thr, c1_edge_thr, 0, 255,
-                               IPC_REMOTE_PARAM_ID_C1_EDGE_THR);
+    AIR_COMM_REGISTER_C1_INT32(c1_exp_time, c1_exp_time, 0, 636,
+                               IPC_REMOTE_PARAM_ID_C1_EXP_TIME);
+    AIR_COMM_REGISTER_C1_INT32(c1_fps, c1_fps, 1, 200,
+                               IPC_REMOTE_PARAM_ID_C1_FPS);
+    AIR_COMM_REGISTER_C1_INT32(c1_gain, c1_gain, 16, 64,
+                               IPC_REMOTE_PARAM_ID_C1_GAIN);
+    AIR_COMM_REGISTER_C1_INT32(c1_screen_mode, c1_screen_mode, 0, 4,
+                               IPC_REMOTE_PARAM_ID_C1_SCREEN_MODE);
+    AIR_COMM_REGISTER_C1_INT32(c1_horizon_enable, c1_horizon_enable, 0, 1,
+                               IPC_REMOTE_PARAM_ID_C1_HORIZON_ENABLE);
+    AIR_COMM_REGISTER_C1_FLOAT(c1_horizon_height_offset, c1_horizon_height_offset,
+                               -300.0f, 300.0f,
+                               IPC_REMOTE_PARAM_ID_C1_HORIZON_HEIGHT_OFFSET);
+    AIR_COMM_REGISTER_C1_FLOAT(c1_horizon_margin_px, c1_horizon_margin_px,
+                               -30.0f, 30.0f,
+                               IPC_REMOTE_PARAM_ID_C1_HORIZON_MARGIN_PX);
+    AIR_COMM_REGISTER_C1_FLOAT(c1_beacon_boundary_px, c1_beacon_boundary_px,
+                               0.0f, 30.0f,
+                               IPC_REMOTE_PARAM_ID_C1_BEACON_BOUNDARY_PX);
+    AIR_COMM_REGISTER_C1_FLOAT(c1_gray_dedup_dist, c1_gray_dedup_dist,
+                               0.0f, 30.0f,
+                               IPC_REMOTE_PARAM_ID_C1_GRAY_DEDUP_DIST);
+    AIR_COMM_REGISTER_C1_INT32(c1_edge_peak_min, c1_edge_peak_min, 0, 255,
+                               IPC_REMOTE_PARAM_ID_C1_EDGE_PEAK_MIN);
+    AIR_COMM_REGISTER_C1_FLOAT(c1_edge_occupancy_max, c1_edge_occupancy_max,
+                               0.0f, 1.0f,
+                               IPC_REMOTE_PARAM_ID_C1_EDGE_OCCUPANCY_MAX);
+    AIR_COMM_REGISTER_C1_FLOAT(c1_gray_weak_peak_delta, c1_gray_weak_peak_delta,
+                               0.0f, 255.0f,
+                               IPC_REMOTE_PARAM_ID_C1_GRAY_WEAK_PEAK_DELTA);
+    AIR_COMM_REGISTER_C1_INT32(c1_gray_weak_peak_floor, c1_gray_weak_peak_floor,
+                               0, 255,
+                               IPC_REMOTE_PARAM_ID_C1_GRAY_WEAK_PEAK_FLOOR);
+    AIR_COMM_REGISTER_C1_INT32(c1_gray_weak_min_area, c1_gray_weak_min_area,
+                               0, 255,
+                               IPC_REMOTE_PARAM_ID_C1_GRAY_WEAK_MIN_AREA);
+    AIR_COMM_REGISTER_C1_INT32(c1_gray_weak_max_area, c1_gray_weak_max_area,
+                               0, 255,
+                               IPC_REMOTE_PARAM_ID_C1_GRAY_WEAK_MAX_AREA);
+    AIR_COMM_REGISTER_C1_FLOAT(c1_car_score_strong, c1_car_score_strong,
+                               0.0f, 1.0f,
+                               IPC_REMOTE_PARAM_ID_C1_CAR_SCORE_STRONG);
+    AIR_COMM_REGISTER_C1_FLOAT(c1_car_score_weak, c1_car_score_weak,
+                               0.0f, 1.0f,
+                               IPC_REMOTE_PARAM_ID_C1_CAR_SCORE_WEAK);
+    AIR_COMM_REGISTER_C1_FLOAT(c1_car_score_track, c1_car_score_track,
+                               0.0f, 1.0f,
+                               IPC_REMOTE_PARAM_ID_C1_CAR_SCORE_TRACK);
+    AIR_COMM_REGISTER_C1_FLOAT(c1_car_score_margin, c1_car_score_margin,
+                               0.0f, 0.20f,
+                               IPC_REMOTE_PARAM_ID_C1_CAR_SCORE_MARGIN);
     AIR_COMM_REGISTER_C1_INT32(c1_lamp_thr, c1_lamp_thr, 0, 255,
                                IPC_REMOTE_PARAM_ID_C1_LAMP_THR);
-    AIR_COMM_REGISTER_C1_INT32(c1_lamp_min, c1_lamp_min, 0, 22560,
-                               IPC_REMOTE_PARAM_ID_C1_LAMP_MIN);
     AIR_COMM_REGISTER_C1_INT32(c1_lamp_max, c1_lamp_max, 0, 22560,
                                IPC_REMOTE_PARAM_ID_C1_LAMP_MAX);
-    AIR_COMM_REGISTER_C1_FLOAT(c1_lamp_elong, c1_lamp_elong, 0.0f, 224.0f,
-                               IPC_REMOTE_PARAM_ID_C1_LAMP_ELONG);
-    AIR_COMM_REGISTER_C1_FLOAT(c1_lamp_len, c1_lamp_len, 0.0f, 224.0f,
-                               IPC_REMOTE_PARAM_ID_C1_LAMP_LEN);
-    AIR_COMM_REGISTER_C1_INT32(c1_near_pad, c1_near_pad, 0, 224,
-                               IPC_REMOTE_PARAM_ID_C1_NEAR_PAD);
-    AIR_COMM_REGISTER_C1_INT32(c1_near_min, c1_near_min, 0, 22560,
-                               IPC_REMOTE_PARAM_ID_C1_NEAR_MIN);
-    AIR_COMM_REGISTER_C1_INT32(c1_near_iso_min, c1_near_iso_min, 0, 22560,
-                               IPC_REMOTE_PARAM_ID_C1_NEAR_ISO_MIN);
-    AIR_COMM_REGISTER_C1_INT32(c1_near_bg, c1_near_bg, 0, 255,
-                               IPC_REMOTE_PARAM_ID_C1_NEAR_BG);
     AIR_COMM_REGISTER_C1_FLOAT(c1_match_dist, c1_match_dist, 0.0f, 224.0f,
                                IPC_REMOTE_PARAM_ID_C1_MATCH_DIST);
     AIR_COMM_REGISTER_C1_FLOAT(c1_gate_dist, c1_gate_dist, 0.0f, 224.0f,
@@ -2058,6 +2114,23 @@ void air_comm_air_init(void)
                                IPC_REMOTE_PARAM_ID_C1_POS_ALPHA);
     AIR_COMM_REGISTER_C1_FLOAT(c1_vel_alpha, c1_vel_alpha, 0.0f, 1.0f,
                                IPC_REMOTE_PARAM_ID_C1_VEL_ALPHA);
+
+    AIR_COMM_REGISTER_BL3_INT32(bl3_beacon_thr, bl3_beacon_thr, 0, 255,
+                                IPC_REMOTE_PARAM_ID_BL3_BEACON_THR);
+    AIR_COMM_REGISTER_BL3_INT32(bl3_exp_time, bl3_exp_time, 0, 636,
+                                IPC_REMOTE_PARAM_ID_BL3_EXP_TIME);
+    AIR_COMM_REGISTER_BL3_INT32(bl3_fps, bl3_fps, 1, 200,
+                                IPC_REMOTE_PARAM_ID_BL3_FPS);
+    AIR_COMM_REGISTER_BL3_INT32(bl3_gain, bl3_gain, 16, 64,
+                                IPC_REMOTE_PARAM_ID_BL3_GAIN);
+    AIR_COMM_REGISTER_INT32(bl3_screen_enable, bl3_screen_enable, 0, 1);
+    AIR_COMM_REGISTER_INT32(bl3_horizon_enable, bl3_horizon_enable, 0, 1);
+    AIR_COMM_REGISTER_BL3_FLOAT(bl3_horizon_height_offset,
+                                bl3_horizon_height_offset, -300.0f, 300.0f,
+                                IPC_REMOTE_PARAM_ID_BL3_HORIZON_HEIGHT_OFFSET);
+    AIR_COMM_REGISTER_BL3_FLOAT(bl3_horizon_margin_px, bl3_horizon_margin_px,
+                                -30.0f, 30.0f,
+                                IPC_REMOTE_PARAM_ID_BL3_HORIZON_MARGIN_PX);
 
     AIR_COMM_REGISTER_BL3_INT32(bl3_edge_thr, bl3_edge_thr, 0, 255,
                                 IPC_REMOTE_PARAM_ID_BL3_EDGE_THR);
@@ -2169,6 +2242,62 @@ void air_comm_air_init(void)
                                 IPC_REMOTE_PARAM_ID_BL3_TOP_V_ELONG);
     AIR_COMM_REGISTER_BL3_INT32(bl3_sat_t_gray, bl3_sat_t_gray, 0, 255,
                                 IPC_REMOTE_PARAM_ID_BL3_SAT_T_GRAY);
+    AIR_COMM_REGISTER_BL3_INT32(bl3_gray_lamp_thr, bl3_gray_lamp_thr, 0, 255,
+                                IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_THR);
+    AIR_COMM_REGISTER_BL3_INT32(bl3_gray_lamp_min_area, bl3_gray_lamp_min_area,
+                                0, 22560,
+                                IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_MIN_AREA);
+    AIR_COMM_REGISTER_BL3_INT32(bl3_gray_lamp_max_area, bl3_gray_lamp_max_area,
+                                0, 22560,
+                                IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_MAX_AREA);
+    AIR_COMM_REGISTER_BL3_FLOAT(bl3_gray_lamp_min_len, bl3_gray_lamp_min_len,
+                                0.0f, 224.0f,
+                                IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_MIN_LEN);
+    AIR_COMM_REGISTER_BL3_FLOAT(bl3_gray_lamp_max_len, bl3_gray_lamp_max_len,
+                                0.0f, 224.0f,
+                                IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_MAX_LEN);
+    AIR_COMM_REGISTER_BL3_FLOAT(bl3_gray_lamp_min_width,
+                                bl3_gray_lamp_min_width, 0.0f, 224.0f,
+                                IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_MIN_WIDTH);
+    AIR_COMM_REGISTER_BL3_FLOAT(bl3_gray_lamp_min_elong,
+                                bl3_gray_lamp_min_elong, 0.0f, 224.0f,
+                                IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_MIN_ELONG);
+    AIR_COMM_REGISTER_BL3_INT32(bl3_gray_lamp_min_peak,
+                                bl3_gray_lamp_min_peak, 0, 255,
+                                IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_MIN_PEAK);
+    AIR_COMM_REGISTER_BL3_FLOAT(bl3_gray_lamp_min_mean,
+                                bl3_gray_lamp_min_mean, 0.0f, 255.0f,
+                                IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_MIN_MEAN);
+    AIR_COMM_REGISTER_BL3_FLOAT(bl3_gray_lamp_min_contrast,
+                                bl3_gray_lamp_min_contrast, 0.0f, 255.0f,
+                                IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_MIN_CONTRAST);
+    AIR_COMM_REGISTER_BL3_INT32(bl3_gray_lamp_min_fill,
+                                bl3_gray_lamp_min_fill, 0, 100,
+                                IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_MIN_FILL);
+    AIR_COMM_REGISTER_BL3_INT32(bl3_gray_lamp_strip_gray,
+                                bl3_gray_lamp_strip_gray, 0, 255,
+                                IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_STRIP_GRAY);
+    AIR_COMM_REGISTER_BL3_INT32(bl3_gray_lamp_strip_fill,
+                                bl3_gray_lamp_strip_fill, 0, 100,
+                                IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_STRIP_FILL);
+    AIR_COMM_REGISTER_BL3_INT32(bl3_gray_beacon_min_peak,
+                                bl3_gray_beacon_min_peak, 0, 255,
+                                IPC_REMOTE_PARAM_ID_BL3_GRAY_BEACON_MIN_PEAK);
+    AIR_COMM_REGISTER_BL3_FLOAT(bl3_gray_beacon_min_area,
+                                bl3_gray_beacon_min_area, 0.0f, 22560.0f,
+                                IPC_REMOTE_PARAM_ID_BL3_GRAY_BEACON_MIN_AREA);
+    AIR_COMM_REGISTER_BL3_FLOAT(bl3_gray_beacon_max_area,
+                                bl3_gray_beacon_max_area, 0.0f, 22560.0f,
+                                IPC_REMOTE_PARAM_ID_BL3_GRAY_BEACON_MAX_AREA);
+    AIR_COMM_REGISTER_BL3_INT32(bl3_gray_beacon_compact_peak,
+                                bl3_gray_beacon_compact_peak, 0, 255,
+                                IPC_REMOTE_PARAM_ID_BL3_GRAY_BEACON_COMPACT_PEAK);
+    AIR_COMM_REGISTER_BL3_INT32(bl3_car_edge_misses, bl3_car_edge_misses,
+                                0, 255,
+                                IPC_REMOTE_PARAM_ID_BL3_CAR_EDGE_MISSES);
+    AIR_COMM_REGISTER_BL3_INT32(bl3_car_center_misses, bl3_car_center_misses,
+                                0, 255,
+                                IPC_REMOTE_PARAM_ID_BL3_CAR_CENTER_MISSES);
 
     AIR_COMM_REGISTER_FLOAT(mode1_img_kp, g_fc_params.mode1_img_kp, 0.0f, 1.0f);
     AIR_COMM_REGISTER_FLOAT(mode1_img_kd, g_fc_params.mode1_img_kd, 0.0f, 1.0f);

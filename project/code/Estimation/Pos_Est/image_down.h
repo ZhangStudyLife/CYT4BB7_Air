@@ -28,19 +28,8 @@ typedef struct
 } beacon_rect_t;
 
 /* 核1信标二值化运行时阈值，范围0..255，从下一帧图像开始生效。 */
-extern int32 g_image_down_beacon_binary_threshold;
-extern int32 g_image_down_beacon_min_area;
-extern int32 g_image_down_side_edge_min_area;
-extern int32 g_image_down_side_edge_threshold;
 extern int32 g_image_down_car_lamp_binary_threshold;
-extern int32 g_image_down_car_lamp_min_area;
 extern int32 g_image_down_car_lamp_max_area;
-extern float g_image_down_car_lamp_min_elongation;
-extern float g_image_down_car_lamp_min_length;
-extern int32 g_image_down_near_lamp_pad;
-extern int32 g_image_down_near_lamp_min_area;
-extern int32 g_image_down_near_lamp_isolated_min_area;
-extern int32 g_image_down_near_lamp_background_max;
 extern float g_image_down_match_distance;
 extern float g_image_down_gate_distance;
 extern float g_image_down_new_target_distance;
@@ -48,6 +37,18 @@ extern int32 g_image_down_confirm_frames;
 extern int32 g_image_down_max_misses;
 extern float g_image_down_filter_pos_alpha;
 extern float g_image_down_filter_vel_alpha;
+extern float g_image_down_beacon_boundary_clearance;
+extern float g_image_down_gray_dedup_distance;
+extern int32 g_image_down_gray_edge_min_peak;
+extern float g_image_down_gray_edge_max_occupancy;
+extern float g_image_down_gray_weak_peak_delta;
+extern int32 g_image_down_gray_weak_peak_floor;
+extern int32 g_image_down_gray_weak_min_area;
+extern int32 g_image_down_gray_weak_max_area;
+extern float g_image_down_car_score_strong;
+extern float g_image_down_car_score_weak;
+extern float g_image_down_car_score_track;
+extern float g_image_down_car_score_margin;
 
 /*
  * 函数功能: 初始化下摄图像算法、摄像头接口及5000帧性能统计窗口。

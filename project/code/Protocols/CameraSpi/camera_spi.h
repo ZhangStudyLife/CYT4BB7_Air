@@ -36,6 +36,9 @@ void CameraSpi_Update(void);
 uint8 CameraSpi_GetSnapshot(struct image_data camera[IMAGE_CAMERA_COUNT],
                             uint8 *fresh_mask);
 
+/* 两块图像板都已在线时返回1。 */
+uint8 CameraSpi_RemoteParamBoardsOnline(void);
+
 /* 启动一笔同时发往两颗2BL3的参数事务；持久化命令SET跳过预读，返回1表示已启动。 */
 uint8 CameraSpi_RemoteParamStart(uint8 op,
                                  uint8 type,

@@ -45,6 +45,7 @@ static car_plan_result_t s_air_run_car_plan;
 #define CAR_PLAN_DEBUG_PROTOCOL_VERSION   (3.0f) /* CarPlan3全局坐标调试协议版本。 */
 #define MODE1245_DEBUG_FLOAT_COUNT        (30U) /* Mode1/2/4/5飞机控制调试数据数量。 */
 #define CAMERA_MODEL_CALIBRATION_LOG_FLOAT_COUNT (63U) /* 相机模型标定日志用户float数量。 */
+#define SPEED_PLANNING_DEBUG_FLOAT_COUNT  (19U) /* 速度规划调试用户float数量。 */
 
 #if (MODE1245_DEBUG_FLOAT_COUNT > (WIFI_JUSTFLOAT_MAX_FLOAT_NUM - 1U))
 #error "Mode1/2/4/5 debug channels exceed JustFloat protocol capacity"
@@ -52,6 +53,10 @@ static car_plan_result_t s_air_run_car_plan;
 
 #if (CAMERA_MODEL_CALIBRATION_LOG_FLOAT_COUNT > (WIFI_JUSTFLOAT_MAX_FLOAT_NUM - 1U))
 #error "Camera model calibration log channels exceed JustFloat protocol capacity"
+#endif
+
+#if (SPEED_PLANNING_DEBUG_FLOAT_COUNT > (WIFI_JUSTFLOAT_MAX_FLOAT_NUM - 1U))
+#error "Speed planning debug channels exceed JustFloat protocol capacity"
 #endif
 
 typedef struct
@@ -281,6 +286,96 @@ static void camera_model_calibration_log_200hz(void)
     }
 
     (void)wifi_justfloat_Array(data, CAMERA_MODEL_CALIBRATION_LOG_FLOAT_COUNT);
+}
+
+/**
+ * @brief 速度规划调试200hz。
+ * @param 无。
+ * @return 无。
+ */
+static void speed_planning_debug_200hz(void)
+{
+    static uint32 last_tick_ms = 0U;
+    uint32 tick_now = tick_1000us_cnt;
+    FC_START_CRSF_flight_mode_e mode = FC_START_CRSF_Get_Flight_Mode();
+    car_plan_3_debug_t plan_debug;
+    car_plan_result_t plan_result;
+    float car_accel_x_mps2 = 0.0f;
+    float car_accel_y_mps2 = 0.0f;
+    float data[SPEED_PLANNING_DEBUG_FLOAT_COUNT];
+
+    if ((tick_now - last_tick_ms) < CAR_PLAN_DEBUG_PERIOD_MS)
+    {
+        return;
+    }
+    last_tick_ms = tick_now;
+
+    CarPlan_3_GetDebug(&plan_debug);
+    CarPlan_3_GetResult(&plan_result);
+
+    /* 读取当前飞行模式下已经计算好的车体系加速度。 */
+    switch (mode)
+    {
+        case FC_START_CRSF_FLIGHT_MODE_1:
+            car_accel_x_mps2 = g_mode1_car_body_accel_x_mps2;
+            car_accel_y_mps2 = g_mode1_car_body_accel_y_mps2;
+            break;
+        case FC_START_CRSF_FLIGHT_MODE_2:
+            car_accel_x_mps2 = g_mode2_car_body_accel_x_mps2;
+            car_accel_y_mps2 = g_mode2_car_body_accel_y_mps2;
+            break;
+        case FC_START_CRSF_FLIGHT_MODE_4:
+            car_accel_x_mps2 = g_mode4_car_body_accel_x_mps2;
+            car_accel_y_mps2 = g_mode4_car_body_accel_y_mps2;
+            break;
+        case FC_START_CRSF_FLIGHT_MODE_5:
+            car_accel_x_mps2 = g_mode5_car_body_accel_x_mps2;
+            car_accel_y_mps2 = g_mode5_car_body_accel_y_mps2;
+            break;
+        default:
+            break;
+    }
+
+    /* I1-I8：飞机当前/目标欧拉角和车模yaw/yawrate。 */
+    data[0] = g_euler.roll;
+    data[1] = g_euler.pitch;
+    data[2] = g_euler.yaw;
+    data[3] = roll_angle_target;
+    data[4] = pitch_angle_target;
+    data[5] = yaw_angle_target;
+    data[6] = g_car_yaw;
+    data[7] = g_car_yaw_rate_dps;
+
+    /* I9-I10：CarPlan3当前选中的目标信标坐标。 */
+    if ((plan_debug.selected_target_id >= 0) &&
+        (plan_debug.selected_target_id < (int8)CAR_PLAN_3_DEBUG_BEACON_COUNT) &&
+        (plan_debug.beacon[(uint8)plan_debug.selected_target_id].valid != 0U))
+    {
+        const car_plan_3_debug_beacon_t *target =
+            &plan_debug.beacon[(uint8)plan_debug.selected_target_id];
+        data[8] = target->center_x;
+        data[9] = target->center_y;
+    }
+    else
+    {
+        data[8] = IMAGE_DATA_INVALID_VALUE;
+        data[9] = IMAGE_DATA_INVALID_VALUE;
+    }
+
+    /* I11-I19：CarPlan3车模坐标、目标速度、加速度、CH8和实际速度。 */
+    data[10] = (plan_debug.car_lamp.valid != 0U) ?
+                   plan_debug.car_lamp.center_x : IMAGE_DATA_INVALID_VALUE;
+    data[11] = (plan_debug.car_lamp.valid != 0U) ?
+                   plan_debug.car_lamp.center_y : IMAGE_DATA_INVALID_VALUE;
+    data[12] = (plan_result.valid != 0U) ? plan_result.target_strafe_mps : 0.0f;
+    data[13] = (plan_result.valid != 0U) ? plan_result.target_forward_mps : 0.0f;
+    data[14] = car_accel_x_mps2;
+    data[15] = car_accel_y_mps2;
+    data[16] = (float)CRSF_STD[8];
+    data[17] = g_car_vel_x;
+    data[18] = g_car_vel_y;
+
+    (void)wifi_justfloat_Array(data, SPEED_PLANNING_DEBUG_FLOAT_COUNT);
 }
 
 /**
@@ -554,7 +649,8 @@ static void core0_run_fast_loop_step(void)
     air_comm_air_poll();
     // car_plan_debug_200hz(); /* 临时关闭原CarPlan3调试日志。 */
     // mode1245_wifi_debug_200hz(); /* 临时关闭Mode1/2/4/5调试，改发相机模型标定日志。 */
-    camera_model_calibration_log_200hz();
+    // camera_model_calibration_log_200hz(); /* 临时关闭相机模型标定日志，改发速度规划调试日志。 */
+    speed_planning_debug_200hz();
 }
 
 /**
@@ -715,9 +811,11 @@ static void core0_run_slow_slot(uint8 slot)
             div10 = 0U;
             FC_START_CRSF_Update();
 
-            if (g_euler.roll > 75.0f || g_euler.roll < -75.0f ||
-                g_euler.pitch > 75.0f || g_euler.pitch < -75.0f)
+            if ((FC_START_CRSF_Get_State() >= FC_START_CRSF_STATE_TAKEOFF) &&
+                (g_euler.roll > 75.0f || g_euler.roll < -75.0f ||
+                 g_euler.pitch > 75.0f || g_euler.pitch < -75.0f))
             {
+                Beep_Play(80U, 0.5f, 5U);
                 FC_START_CRSF_Trigger_Emergency_Stop();
             }
 

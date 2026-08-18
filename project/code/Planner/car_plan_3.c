@@ -2,9 +2,11 @@
 #include "Three_Camera.h"
 #include "../Estimation/Attitude/IMU_TOP.h"
 #include "../Estimation/Height_Est/Height_Est.h"
+#include "../Protocols/crsf/crsf.h"
 #include <math.h>
 
 #define CAR_PLAN_3_DEG_TO_RAD       (0.017453292519943295f) /* 角度转弧度系数。 */
+#define CAR_PLAN_3_FAST_SPEED_MPS    (3.0f) /* CH8按下时的临时规划速度。 */
 #define CAR_PLAN_3_MIN_DISTANCE_M   (0.20f) /* 可信车灯到信标的最小水平距离，单位 m。 */
 #define CAR_PLAN_3_MAX_DISTANCE_M   (6.00f) /* 可信车灯到信标的最大水平距离，单位 m。 */
 #define CAR_PLAN_3_NEAR_LAMP_DIST_PX (3.0f)  /* 信标与同摄车灯中心的近距离阈值，单位 px。 */
@@ -235,6 +237,7 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
     float angle_rad;
     float right_x;
     float right_y;
+    float plan_speed;
     float scale;
 
     CarPlan_3_ClearResult();
@@ -319,7 +322,8 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
         right_y = -right_y;
     }
 
-    scale = Car_Speed / distance;
+    plan_speed = (CRSF_STD[8] == 1) ? CAR_PLAN_3_FAST_SPEED_MPS : Car_Speed;
+    scale = plan_speed / distance;
     s_car_plan_3_result.valid = 1U;
     s_car_plan_3_result.target_strafe_mps =
         (dx * right_x + dy * right_y) * scale;

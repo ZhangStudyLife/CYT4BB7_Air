@@ -12,17 +12,17 @@
 #define BEEP_ALARM_LEGACY       (1U << 7)
 
 /* 运行状态 */
-static uint8  s_beep_active = 0U;
+static volatile uint8  s_beep_active = 0U;
 /* 当前占空比（0~100） */
-static uint8  s_beep_duty_percent = 0U;
+static volatile uint8  s_beep_duty_percent = 0U;
 /* 单个周期总tick数（cycle_time_s * 100Hz） */
-static uint32 s_beep_cycle_ticks = 0U;
+static volatile uint32 s_beep_cycle_ticks = 0U;
 /* 当前周期内已运行tick */
-static uint32 s_beep_tick_in_cycle = 0U;
+static volatile uint32 s_beep_tick_in_cycle = 0U;
 /* 目标播放周期数 */
-static uint16 s_beep_cycle_count = 0U;
+static volatile uint16 s_beep_cycle_count = 0U;
 /* 已完成周期数 */
-static uint16 s_beep_cycle_done = 0U;
+static volatile uint16 s_beep_cycle_done = 0U;
 /* 各持续报警源状态位，任一位置位时蜂鸣器保持高电平 */
 static volatile uint8 s_beep_alarm_mask = 0U;
 

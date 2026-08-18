@@ -8,7 +8,7 @@
 #define CRSF_UART_BAUDRATE     (420000)         /* CRSF 串口波特率，单位 bit/s。 */
 
 #define CRSF_TIMER_INDEX       (TC_TIME2_CH0)   /* CRSF 链路超时检测使用的定时器通道。 */
-#define CRSF_LINK_TIMEOUT_US   (100000)         /* CRSF 判定失联的超时时间，单位 us。 */
+#define CRSF_LINK_TIMEOUT_US   (500000)         /* CRSF 判定失联的超时时间，单位 us。 */
 
 #define CRSF_CH_MID            (992)            /* 居中类通道的默认中位值。 */
 #define CRSF_CH_LOW            (172)            /* 油门/开关类通道的默认低位值。 */

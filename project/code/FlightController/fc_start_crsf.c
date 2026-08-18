@@ -13,6 +13,10 @@
 #define FC_START_CRSF_TAKEOFF_HOLD_2500_MS (2000U)
 #define FC_START_CRSF_TAKEOFF_THR_STAGE1 (1500)
 #define FC_START_CRSF_TAKEOFF_THR_STAGE2 (2500)
+#define FC_START_CRSF_EMERGENCY_STOP_HOLD_MS (500U) /* CH7低位触发紧急停机所需持续时间，单位ms */
+#define FC_START_CRSF_EXIT_BEEP_DUTY (80U) /* 退出飞行时蜂鸣器响声占空比 */
+#define FC_START_CRSF_EXIT_BEEP_CYCLE_S (0.5f) /* 退出飞行时单次蜂鸣周期，单位s */
+#define FC_START_CRSF_EXIT_BEEP_COUNT (3U) /* 常规退出飞行时蜂鸣次数 */
 
 FC_START_CRSF_state_e s_fc_start_state = FC_START_CRSF_STATE_INIT;
 static FC_START_CRSF_flight_mode_e s_fc_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
@@ -46,19 +50,20 @@ static uint8_t FC_START_CRSF_IsUnlockStickCommand(void)
 static uint8_t FC_START_CRSF_IsEmergencyStopRequested(void)
 {
     static uint8_t zero_streak = 0U;
+    const uint8_t stop_ticks = (uint8_t)(FC_START_CRSF_EMERGENCY_STOP_HOLD_MS / FC_START_CRSF_TASK_PERIOD_MS);
 
     if (CRSF_STD[7] == 0)
     {
-        if (zero_streak < 8u)
+        if (zero_streak < stop_ticks)
         {
             zero_streak++;
         }
     }
     else
-    zero_streak = 0U;
     {
+        zero_streak = 0U;
     }
-    return (zero_streak >= 3U) ? 1U : 0U;
+    return (zero_streak >= stop_ticks) ? 1U : 0U;
 }
 
 
@@ -133,8 +138,28 @@ static void FC_START_CRSF_PrepareTakeoff(void)
 
 static void FC_START_CRSF_StateMachine_Update(void)
 {
-    if (CRSF_LINK_UP == 0U) { FC_START_CRSF_ForceStopToStandby(); return; }
-    if (FC_START_CRSF_IsEmergencyStopRequested() != 0U) { if (s_fc_start_state >= FC_START_CRSF_STATE_TAKEOFF) { Beep_Play(50, 2, 3); } FC_START_CRSF_ForceStopToStandby(); return; }
+    if (CRSF_LINK_UP == 0U)
+    {
+        if (s_fc_start_state >= FC_START_CRSF_STATE_TAKEOFF)
+        {
+            Beep_Play(FC_START_CRSF_EXIT_BEEP_DUTY,
+                      FC_START_CRSF_EXIT_BEEP_CYCLE_S,
+                      FC_START_CRSF_EXIT_BEEP_COUNT);
+        }
+        FC_START_CRSF_ForceStopToStandby();
+        return;
+    }
+    if (FC_START_CRSF_IsEmergencyStopRequested() != 0U)
+    {
+        if (s_fc_start_state >= FC_START_CRSF_STATE_TAKEOFF)
+        {
+            Beep_Play(FC_START_CRSF_EXIT_BEEP_DUTY,
+                      FC_START_CRSF_EXIT_BEEP_CYCLE_S,
+                      FC_START_CRSF_EXIT_BEEP_COUNT);
+        }
+        FC_START_CRSF_ForceStopToStandby();
+        return;
+    }
 
     switch (s_fc_start_state)
     {
@@ -199,6 +224,9 @@ static void FC_START_CRSF_StateMachine_Update(void)
         break;
 
     default:
+        Beep_Play(FC_START_CRSF_EXIT_BEEP_DUTY,
+                  FC_START_CRSF_EXIT_BEEP_CYCLE_S,
+                  FC_START_CRSF_EXIT_BEEP_COUNT);
         FC_START_CRSF_ForceStopToStandby();
         break;
     }

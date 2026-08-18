@@ -5,7 +5,7 @@
 #include <string.h>
 
 float Car_Speed = 2.0f; /* 车模常规规划速度，单位m/s，可由车机通过AirComm修改。 */
-float Car_Speed_Fast = 2.0f; /* 车模快速规划速度，单位m/s，可由车机通过AirComm修改。 */
+float Car_Speed_Fast = 3.0f; /* 车模快速规划速度，单位m/s，可由车机通过AirComm修改。 */
 int32 Car_Plan_Mode = 3; /* 下发车模的规划算法编号，范围1至3。 */
 
 static car_plan_result_t s_car_plan_results[CAR_PLAN_COUNT]; /* 三套算法的最近一次速度规划结果。 */

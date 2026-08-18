@@ -1779,6 +1779,12 @@
                 <name>$PROJ_DIR$\..\..\code\Planner\car_plan_3.h</name>
             </file>
             <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\speed_plan.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\..\code\Planner\speed_plan.h</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\..\..\code\Planner\CameraModel.c</name>
             </file>
             <file>

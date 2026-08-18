@@ -1,12 +1,12 @@
 #include "car_plan_3.h"
 #include "Three_Camera.h"
+#include "speed_plan.h"
 #include "../Estimation/Attitude/IMU_TOP.h"
 #include "../Estimation/Height_Est/Height_Est.h"
-#include "../Protocols/crsf/crsf.h"
 #include <math.h>
 
 #define CAR_PLAN_3_DEG_TO_RAD       (0.017453292519943295f) /* 角度转弧度系数。 */
-#define CAR_PLAN_3_FAST_SPEED_MPS    (3.0f) /* CH8按下时的临时规划速度。 */
+#define CAR_PLAN_3_RAD_TO_DEG       (57.29577951308232f) /* 弧度转角度系数。 */
 #define CAR_PLAN_3_MIN_DISTANCE_M   (0.20f) /* 可信车灯到信标的最小水平距离，单位 m。 */
 #define CAR_PLAN_3_MAX_DISTANCE_M   (6.00f) /* 可信车灯到信标的最大水平距离，单位 m。 */
 #define CAR_PLAN_3_NEAR_LAMP_DIST_PX (3.0f)  /* 信标与同摄车灯中心的近距离阈值，单位 px。 */
@@ -196,6 +196,7 @@ void CarPlan_3_Reset(void)
     uint8 i;
 
     CarPlan_3_ClearResult();
+    SpeedPlan_Reset();
     s_car_plan_3_camera.car_lamp.valid = 0U;
     s_car_plan_3_camera.beacon_count = 0U;
     for(i = 0U; i < THREE_CAMERA_MAX_BEACON_COUNT; i++)
@@ -237,8 +238,9 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
     float angle_rad;
     float right_x;
     float right_y;
+    float target_strafe;
+    float target_forward;
     float plan_speed;
-    float scale;
 
     CarPlan_3_ClearResult();
     CarPlan_3_FilterNearLamp(filtered);
@@ -251,6 +253,7 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
                            &s_car_plan_3_camera) == 0U ||
        s_car_plan_3_camera.car_lamp.valid == 0U)
     {
+        (void)SpeedPlan_Update(0U, 0.0f, 0.0f);
         if(result != 0)
         {
             *result = s_car_plan_3_result;
@@ -299,6 +302,7 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
        selected_distance_sq < CAR_PLAN_3_MIN_DISTANCE_M * CAR_PLAN_3_MIN_DISTANCE_M ||
        selected_distance_sq > CAR_PLAN_3_MAX_DISTANCE_M * CAR_PLAN_3_MAX_DISTANCE_M)
     {
+        (void)SpeedPlan_Update(0U, 0.0f, 0.0f);
         if(result != 0)
         {
             *result = s_car_plan_3_result;
@@ -322,13 +326,15 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
         right_y = -right_y;
     }
 
-    plan_speed = (CRSF_STD[8] == 1) ? CAR_PLAN_3_FAST_SPEED_MPS : Car_Speed;
-    scale = plan_speed / distance;
+    target_strafe = (dx * right_x + dy * right_y) / distance;
+    target_forward = (dx * right_y - dy * right_x) / distance;
+    plan_speed = SpeedPlan_Update(1U,
+                                  distance,
+                                  atan2f(fabsf(target_strafe), target_forward) *
+                                      CAR_PLAN_3_RAD_TO_DEG);
     s_car_plan_3_result.valid = 1U;
-    s_car_plan_3_result.target_strafe_mps =
-        (dx * right_x + dy * right_y) * scale;
-    s_car_plan_3_result.target_forward_mps =
-        (dx * right_y - dy * right_x) * scale;
+    s_car_plan_3_result.target_strafe_mps = target_strafe * plan_speed;
+    s_car_plan_3_result.target_forward_mps = target_forward * plan_speed;
     s_car_plan_3_selected = (int8)selected;
 
     if(result != 0)

@@ -67,10 +67,23 @@ static uint8_t s_mode0_angle_ff_active = 0U;
 #define FC_HOVER_LEARN_RATE_MAX 220.0f
 #define FC_THRUST_ACC_MPS2_PER_PWM 0.00360f
 #define FC_HEIGHT_VEL_KD_ACC 0.035f
-#define FC_HEIGHT_VEL_TARGET_LIMIT 0.60f
+#define FC_HEIGHT_POS_KP_DOWN 1.6f /* 高于目标高度时的位置环P增益。 */
+#define FC_HEIGHT_VEL_TARGET_MIN (-0.60f) /* 正常下降目标速度下限，单位m/s。 */
+#define FC_HEIGHT_VEL_TARGET_MAX 0.40f /* 正常上升目标速度上限，单位m/s。 */
+#define FC_HEIGHT_VEL_KP_NEGATIVE 650.0f /* 需要降低油门时的速度环P增益。 */
+#define FC_HEIGHT_VEL_I_MIN_PWM (-250.0f) /* 高度速度环负积分下限，单位PWM。 */
+#define FC_HEIGHT_VEL_I_MAX_PWM 220.0f /* 高度速度环正积分上限，单位PWM。 */
 #define FC_HEIGHT_VEL_OUT_MIN (-1000.0f)
-#define FC_HEIGHT_VEL_OUT_MAX 1000.0f
+#define FC_HEIGHT_VEL_OUT_MAX 650.0f
 #define FC_HEIGHT_VEL_KD_PWM (FC_HEIGHT_VEL_KD_ACC / FC_THRUST_ACC_MPS2_PER_PWM)
+#define FC_HEIGHT_CEILING_SOFT_MM 1150.0f
+#define FC_HEIGHT_CEILING_HARD_MM 1250.0f
+#define FC_HEIGHT_CEILING_EMERGENCY_MM 1320.0f
+#define FC_HEIGHT_CEILING_TARGET_VZ_MPS (-0.8f)
+#define FC_HEIGHT_CEILING_BRAKE_BASE_PWM 100.0f /* 软限高基础制动量，单位PWM。 */
+#define FC_HEIGHT_CEILING_BRAKE_VZ_GAIN 500.0f /* 软限高上升速度制动增益。 */
+#define FC_HEIGHT_CEILING_BRAKE_HEIGHT_GAIN 1500.0f /* 软限高超高制动增益。 */
+#define FC_HEIGHT_CEILING_EMERGENCY_THROTTLE 2800.0f
 static float s_hover_throttle = 3200.0f;
 static float s_hover_learn_step = 0.0f;
 /* 姿态角外环输出到角速度目标的限幅，单位 deg/s */
@@ -149,11 +162,33 @@ static float FC_Apply_Tilt_Throttle_Compensation(float throttle_raw)
         return 0.0f;
     }
 
+    if (g_tof_fused_height_mm >= FC_HEIGHT_CEILING_HARD_MM)
+    {
+        return throttle_raw;
+    }
+
     /* 直接使用当前原始姿态角，补偿相对重力方向的总倾斜损失 */
     cos_term = cosf(g_euler.roll * s_fc_deg_to_rad) * cosf(g_euler.pitch * s_fc_deg_to_rad);
     cos_term = fc_clampf(cos_term, s_fc_tilt_cos_min, 1.0f);
 
     return fc_clampf(throttle_raw / cos_term, 0.0f, s_fc_tilt_comp_throttle_max);
+}
+
+void FC_Loop_GetHeightDebug(fc_height_debug_t *debug)
+{
+    debug->target_height_m = g_fc_target_height_m;
+    debug->target_vz_mps = height_pos_out;
+    debug->pos_error_m = height_pos_pid.error;
+    debug->pos_p_mps = height_pos_pid.p_term;
+    debug->vel_error_mps = height_vel_pid.error;
+    debug->vel_p_pwm = height_vel_pid.p_term;
+    debug->vel_i_pwm = height_vel_pid.i_term;
+    debug->vel_d_pwm = height_vel_pid.d_term;
+    debug->vel_pid_output_pwm = height_vel_pid.output;
+    debug->height_control_output_pwm = height_vel_out;
+    debug->hover_throttle_pwm = s_hover_throttle;
+    debug->hover_learn_step_pwm = s_hover_learn_step;
+    debug->tilt_comp_hover_pwm = FC_Apply_Tilt_Throttle_Compensation(s_hover_throttle);
 }
 
 /*
@@ -268,8 +303,8 @@ void FC_Loop_Init(void)
     PID_Init(&height_vel_pid, g_fc_params.vel_z_kp, g_fc_params.vel_z_ki, FC_HEIGHT_VEL_KD_PWM, 0.0f,
              g_fc_params.vel_z_dt, g_fc_params.vel_z_i_limit, 12.0f);
     height_pos_pid.aw_enable = 1U;
-    height_pos_pid.output_min = -FC_HEIGHT_VEL_TARGET_LIMIT;
-    height_pos_pid.output_max = FC_HEIGHT_VEL_TARGET_LIMIT;
+    height_pos_pid.output_min = FC_HEIGHT_VEL_TARGET_MIN;
+    height_pos_pid.output_max = FC_HEIGHT_VEL_TARGET_MAX;
     height_vel_pid.aw_enable = 1U;
     height_vel_pid.output_min = FC_HEIGHT_VEL_OUT_MIN;
     height_vel_pid.output_max = FC_HEIGHT_VEL_OUT_MAX;
@@ -342,6 +377,8 @@ void FC_Loop_50Hz(void)
     uint32 tick_now = tick_1000us_cnt;
     uint32 diff = tick_now - tick_1000us_cnt_last;
     float dt = diff * 0.001f;
+    float target_height_m;
+    float height_meas_m;
     FC_START_CRSF_state_e fc_state = FC_START_CRSF_Get_State();
     // uint8 car_data_fresh;
 
@@ -355,13 +392,13 @@ void FC_Loop_50Hz(void)
         (0U != g_tof_fused_valid) &&
         (g_height_meas_health >= 0.25f))
     {
-        height_pos_pid.kp = g_fc_params.pos_z_kp;
-        height_pos_out = PID_Update(&height_pos_pid,
-                                    (fc_state == FC_START_CRSF_STATE_LANDING) ? FC_LANDING_TARGET_HEIGHT_M :
-                                    ((s_flight_mode == FC_START_CRSF_FLIGHT_MODE_3) ? FC_Mode3_Get_Target_Height_M() : g_fc_target_height_m),
-                                    g_tof_fused_height_mm * 0.001f,
-                                    dt);
-        height_pos_out = fc_clampf(height_pos_out, -FC_HEIGHT_VEL_TARGET_LIMIT, FC_HEIGHT_VEL_TARGET_LIMIT);
+        target_height_m = (fc_state == FC_START_CRSF_STATE_LANDING) ? FC_LANDING_TARGET_HEIGHT_M :
+                          ((s_flight_mode == FC_START_CRSF_FLIGHT_MODE_3) ? FC_Mode3_Get_Target_Height_M() : g_fc_target_height_m);
+        height_meas_m = g_tof_fused_height_mm * 0.001f;
+        /* 上升使用较小增益，下降使用较大增益，并限制正常目标速度。 */
+        height_pos_pid.kp = (target_height_m >= height_meas_m) ? g_fc_params.pos_z_kp : FC_HEIGHT_POS_KP_DOWN;
+        height_pos_out = PID_Update(&height_pos_pid, target_height_m, height_meas_m, dt);
+        height_pos_out = fc_clampf(height_pos_out, FC_HEIGHT_VEL_TARGET_MIN, FC_HEIGHT_VEL_TARGET_MAX);
     }
     else if ((fc_state == FC_START_CRSF_STATE_FLYING) &&
              (g_height_meas_health < 0.25f))
@@ -424,6 +461,9 @@ void FC_Loop_100Hz(void)
     uint32 tick_now = tick_1000us_cnt;
     uint32 diff = tick_now - tick_1000us_cnt_last;
     float dt = diff * 0.001f;
+    float height_vel_i_limited;
+    uint8 height_ceiling_soft_active;
+    uint8 height_ceiling_hard_active;
 
     tick_1000us_cnt_last = tick_now;
     if (dt < 0.0001f)
@@ -451,14 +491,50 @@ void FC_Loop_100Hz(void)
 
     if ((fc_state == FC_START_CRSF_STATE_FLYING) || (fc_state == FC_START_CRSF_STATE_LANDING))
     {
-        height_vel_pid.kp = g_fc_params.vel_z_kp;
-        height_vel_pid.ki = g_fc_params.vel_z_ki;
-        if ((0U == g_tof_fused_valid) || (g_height_meas_health < 0.25f))
+        height_ceiling_soft_active = ((g_tof_fused_height_mm >= FC_HEIGHT_CEILING_SOFT_MM) &&
+                                      (g_height_fused_vz_mps > 0.0f)) ? 1U : 0U;
+        height_ceiling_hard_active = (g_tof_fused_height_mm >= FC_HEIGHT_CEILING_HARD_MM) ? 1U : 0U;
+        if (height_ceiling_hard_active != 0U)
+        {
+            height_pos_out = FC_HEIGHT_CEILING_TARGET_VZ_MPS;
+            if (height_vel_pid.integral > 0.0f)
+            {
+                height_vel_pid.integral = 0.0f;
+                height_vel_pid.i_term = 0.0f;
+            }
+        }
+        else if ((0U == g_tof_fused_valid) || (g_height_meas_health < 0.25f))
         {
             height_pos_out = 0.0f;
         }
+        /* 增加油门使用较小P增益，降低油门使用较大P增益。 */
+        height_vel_pid.kp = (height_pos_out >= g_height_fused_vz_mps) ?
+                                g_fc_params.vel_z_kp : FC_HEIGHT_VEL_KP_NEGATIVE;
+        height_vel_pid.ki = ((height_ceiling_soft_active != 0U) &&
+                             (height_pos_out > g_height_fused_vz_mps)) ?
+                                0.0f : g_fc_params.vel_z_ki;
         height_vel_out = PID_Update(&height_vel_pid, height_pos_out, g_height_fused_vz_mps, dt);
+        /* 对正负积分分别限幅，并基于限幅后的分项重算速度环输出。 */
+        height_vel_i_limited = fc_clampf(height_vel_pid.i_term,
+                                         FC_HEIGHT_VEL_I_MIN_PWM,
+                                         FC_HEIGHT_VEL_I_MAX_PWM);
+        height_vel_pid.integral = height_vel_i_limited;
+        height_vel_pid.i_term = height_vel_i_limited;
+        height_vel_out = height_vel_pid.p_term + height_vel_pid.i_term +
+                         height_vel_pid.d_term + height_vel_pid.ff_term;
+        if ((height_ceiling_hard_active != 0U) && (height_vel_pid.i_term > 0.0f))
+        {
+            height_vel_out -= height_vel_pid.i_term;
+            height_vel_pid.integral = 0.0f;
+            height_vel_pid.i_term = 0.0f;
+        }
+        if ((height_ceiling_soft_active != 0U) && (height_vel_pid.d_term > 0.0f))
+        {
+            height_vel_out -= height_vel_pid.d_term;
+            height_vel_pid.d_term = 0.0f;
+        }
         height_vel_out = fc_clampf(height_vel_out, FC_HEIGHT_VEL_OUT_MIN, FC_HEIGHT_VEL_OUT_MAX);
+        height_vel_pid.output = height_vel_out;
     }
     else
     {
@@ -676,6 +752,7 @@ void FC_Loop_1000Hz(void)
         int32_t pitch_ctrl = (int32_t)fc_clampf(PID_Update(&pitch_gyro_pid, pitch_gyro_target, pitch_gyro_meas, dt), -limit, limit);
         int32_t yaw_ctrl = (int32_t)fc_clampf(PID_Update(&yaw_gyro_pid, yaw_gyro_target, yaw_gyro_meas, dt),
                                               -s_fc_yaw_out_limit, s_fc_yaw_out_limit);
+        float throttle = FC_Apply_Tilt_Throttle_Compensation(s_hover_throttle) + height_vel_out;
         /* 角速度环调试切换到 Pitch：目标、原始陀螺、滤波后陀螺、控制输出和 PID 分项 */
         //                         pitch_gyro_raw,这两个CSV文件是我离线标定的数据
         //                         pitch_gyro_meas,
@@ -685,9 +762,20 @@ void FC_Loop_1000Hz(void)
         //                         pitch_gyro_pid.d_term,
         //                         pitch_gyro_pid.error,
         //                         8u);
-        g_motor_cmd.throttle = (int32_t)fc_clampf(
-            FC_Apply_Tilt_Throttle_Compensation(s_hover_throttle) + height_vel_out,
-            1700.0f, 10000.0f);
+        if ((g_tof_fused_height_mm >= FC_HEIGHT_CEILING_SOFT_MM) &&
+            (g_height_fused_vz_mps > 0.0f))
+        {
+            float height_m = g_tof_fused_height_mm * 0.001f;
+            float brake_pwm = FC_HEIGHT_CEILING_BRAKE_BASE_PWM +
+                              FC_HEIGHT_CEILING_BRAKE_VZ_GAIN * g_height_fused_vz_mps +
+                              FC_HEIGHT_CEILING_BRAKE_HEIGHT_GAIN * (height_m - 1.15f);
+            throttle = fminf(throttle, s_hover_throttle - brake_pwm);
+        }
+        if (g_tof_fused_height_mm >= FC_HEIGHT_CEILING_EMERGENCY_MM)
+        {
+            throttle = fminf(throttle, FC_HEIGHT_CEILING_EMERGENCY_THROTTLE);
+        }
+        g_motor_cmd.throttle = (int32_t)fc_clampf(throttle, 1700.0f, 10000.0f);
         g_motor_cmd.roll = roll_ctrl;
         g_motor_cmd.pitch = -pitch_ctrl;
         g_motor_cmd.yaw = yaw_ctrl;

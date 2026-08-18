@@ -22,6 +22,23 @@ extern float angle_target_max;
 /* 正常飞行目标高度，单位 m */
 extern float g_fc_target_height_m;
 
+typedef struct
+{
+    float target_height_m;
+    float target_vz_mps;
+    float pos_error_m;
+    float pos_p_mps;
+    float vel_error_mps;
+    float vel_p_pwm;
+    float vel_i_pwm;
+    float vel_d_pwm;
+    float vel_pid_output_pwm;
+    float height_control_output_pwm;
+    float hover_throttle_pwm;
+    float hover_learn_step_pwm;
+    float tilt_comp_hover_pwm;
+} fc_height_debug_t;
+
 /*
  * 主要是PID循环控制函数的声明，分别对应不同频率的控制环
  */
@@ -31,5 +48,6 @@ void FC_Loop_50Hz(void);  /* 50Hz */
 void FC_Loop_100Hz(void);  /* 100Hz*/
 void FC_Loop_500Hz(void); /* 500Hz角度外环，输出角速度目标 */
 void FC_Loop_1000Hz(void);  /* 1kHz主循环，处理陀螺仪数据和角速度控制 */
+void FC_Loop_GetHeightDebug(fc_height_debug_t *debug);
 
 #endif /* FC_LOOP_H */

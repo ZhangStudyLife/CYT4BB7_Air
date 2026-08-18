@@ -3,6 +3,7 @@
 #include "../code/Image/image_data.h"
 #include "../code/Planner/beacon_lost_detector.h"
 #include "../code/Planner/car_plan_3.h"
+#include "../code/Estimation/Height_Est/Height_Est.h"
 #include "../code/Estimation/Pos_Est/FlowGyroDecoupler_LC302.h"
 
 volatile uint32 tick_1000us_cnt = 0U;
@@ -46,6 +47,7 @@ static car_plan_result_t s_air_run_car_plan;
 #define MODE1245_DEBUG_FLOAT_COUNT        (30U) /* Mode1/2/4/5飞机控制调试数据数量。 */
 #define CAMERA_MODEL_CALIBRATION_LOG_FLOAT_COUNT (63U) /* 相机模型标定日志用户float数量。 */
 #define SPEED_PLANNING_DEBUG_FLOAT_COUNT  (19U) /* 速度规划调试用户float数量。 */
+#define HEIGHT_CONTROL_DEBUG_FLOAT_COUNT  (42U) /* 高度控制调试用户float数量。 */
 
 #if (MODE1245_DEBUG_FLOAT_COUNT > (WIFI_JUSTFLOAT_MAX_FLOAT_NUM - 1U))
 #error "Mode1/2/4/5 debug channels exceed JustFloat protocol capacity"
@@ -57,6 +59,10 @@ static car_plan_result_t s_air_run_car_plan;
 
 #if (SPEED_PLANNING_DEBUG_FLOAT_COUNT > (WIFI_JUSTFLOAT_MAX_FLOAT_NUM - 1U))
 #error "Speed planning debug channels exceed JustFloat protocol capacity"
+#endif
+
+#if (HEIGHT_CONTROL_DEBUG_FLOAT_COUNT > (WIFI_JUSTFLOAT_MAX_FLOAT_NUM - 1U))
+#error "Height control debug channels exceed JustFloat protocol capacity"
 #endif
 
 typedef struct
@@ -379,6 +385,89 @@ static void speed_planning_debug_200hz(void)
 }
 
 /**
+ * @brief 以200Hz发送Mode4高度控制调试数据。
+ * @param 无。
+ * @return 无。
+ */
+static void height_control_debug_200hz(void)
+{
+    static uint32 last_tick_ms = 0U;
+    uint32 tick_now = tick_1000us_cnt;
+    const VL53L1X_data_struct *tof;
+    fc_height_debug_t height_debug;
+    float data[HEIGHT_CONTROL_DEBUG_FLOAT_COUNT];
+
+    if ((FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING) ||
+        (FC_START_CRSF_Get_Flight_Mode() != FC_START_CRSF_FLIGHT_MODE_4))
+    {
+        last_tick_ms = tick_now;
+        return;
+    }
+    if ((tick_now - last_tick_ms) < CAR_PLAN_DEBUG_PERIOD_MS)
+    {
+        return;
+    }
+    last_tick_ms = tick_now;
+
+    tof = VL53L1X_GetData();
+    FC_Loop_GetHeightDebug(&height_debug);
+
+    /* I1-I12: 目标/实际欧拉角和目标/实际角速度。 */
+    data[0] = roll_angle_target;
+    data[1] = pitch_angle_target;
+    data[2] = yaw_angle_target;
+    data[3] = g_euler.roll;
+    data[4] = g_euler.pitch;
+    data[5] = g_euler.yaw;
+    data[6] = roll_gyro_target;
+    data[7] = pitch_gyro_target;
+    data[8] = yaw_gyro_target;
+    data[9] = g_imufilter_1000hz.gyrox;
+    data[10] = g_imufilter_1000hz.gyroy;
+    data[11] = g_imufilter_1000hz.gyroz;
+
+    /* I13-I20: 四路TOF原始距离和姿态解耦高度，单位mm。 */
+    data[12] = (float)tof->distance_mm[0];
+    data[13] = (float)tof->distance_mm[1];
+    data[14] = (float)tof->distance_mm[2];
+    data[15] = (float)tof->distance_mm[3];
+    data[16] = g_tof1_height_mm;
+    data[17] = g_tof2_height_mm;
+    data[18] = g_tof3_height_mm;
+    data[19] = g_tof4_height_mm;
+
+    /* I21-I27: 高度估计、垂向加速度、目标和测量质量。 */
+    data[20] = g_tof_fused_height_mm;
+    data[21] = g_height_fused_vz_mps;
+    data[22] = g_height_acc_up_mps2;
+    data[23] = height_debug.target_height_m;
+    data[24] = height_debug.target_vz_mps;
+    data[25] = (float)g_tof_fused_valid;
+    data[26] = g_height_meas_health;
+
+    /* I28-I35: 高度位置环和速度环必要分量。 */
+    data[27] = height_debug.pos_error_m;
+    data[28] = height_debug.pos_p_mps;
+    data[29] = height_debug.vel_error_mps;
+    data[30] = height_debug.vel_p_pwm;
+    data[31] = height_debug.vel_i_pwm;
+    data[32] = height_debug.vel_d_pwm;
+    data[33] = height_debug.vel_pid_output_pwm;
+    data[34] = height_debug.height_control_output_pwm;
+
+    /* I36-I42: 悬停油门学习、倾角补偿和送入混控的四项输入。 */
+    data[35] = height_debug.hover_throttle_pwm;
+    data[36] = height_debug.hover_learn_step_pwm;
+    data[37] = height_debug.tilt_comp_hover_pwm;
+    data[38] = (float)g_motor_cmd.throttle;
+    data[39] = (float)g_motor_cmd.pitch;
+    data[40] = (float)g_motor_cmd.roll;
+    data[41] = (float)g_motor_cmd.yaw;
+
+    (void)wifi_justfloat_Array(data, HEIGHT_CONTROL_DEBUG_FLOAT_COUNT);
+}
+
+/**
  * @brief 以200Hz发送当前Mode1/2/4/5无人机控制调试数据。
  * @param 无。
  * @return 无。
@@ -650,7 +739,8 @@ static void core0_run_fast_loop_step(void)
     // car_plan_debug_200hz(); /* 临时关闭原CarPlan3调试日志。 */
     // mode1245_wifi_debug_200hz(); /* 临时关闭Mode1/2/4/5调试，改发相机模型标定日志。 */
     // camera_model_calibration_log_200hz(); /* 临时关闭相机模型标定日志，改发速度规划调试日志。 */
-    speed_planning_debug_200hz();
+    // speed_planning_debug_200hz(); /* 临时关闭速度规划日志，改发Mode4高度控制日志。 */
+    height_control_debug_200hz();
 }
 
 /**

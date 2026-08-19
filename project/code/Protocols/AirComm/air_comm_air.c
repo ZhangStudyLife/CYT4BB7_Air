@@ -23,7 +23,7 @@
 #define AIR_COMM_TX_RUN_DATA_LIMIT           (3U)    /* RUN_DATA最多占用的发送帧槽数量 */
 #define AIR_COMM_TX_FIFO_LEVEL               (64U)   /* SCB4发送FIFO触发水位 */
 #define AIR_COMM_PARAM_TABLE_MAX             (384U)  /* 最多注册参数个数 */
-#define AIR_COMM_DEFAULT_PARAM_COUNT         (243U)
+#define AIR_COMM_DEFAULT_PARAM_COUNT         (256U)
 #define AIR_COMM_REMOTE_CANCEL_MS            (400U)
 #define AIR_COMM_REMOTE_TIMEOUT_MS           (700U)
 #define AIR_COMM_REMOTE_EXP_CANCEL_MS        (1800U)
@@ -247,6 +247,18 @@ float c1_beacon_boundary_px = 0;
 float c1_gray_dedup_dist = 0;
 int32 c1_edge_peak_min = 0;
 float c1_edge_occupancy_max = 0;
+int32 c1_beacon_scan_delta = 0; /* 核1信标扫描阈值场景增量的菜单镜像。 */
+int32 c1_beacon_scan_floor = 0; /* 核1信标扫描阈值下限的菜单镜像。 */
+int32 c1_beacon_response_min = 0; /* 核1信标最低灰度响应的菜单镜像。 */
+int32 c1_beacon_normal_peak = 0; /* 核1普通信标最低峰值的菜单镜像。 */
+int32 c1_beacon_normal_min_area = 0; /* 核1普通信标最小面积的菜单镜像。 */
+int32 c1_beacon_normal_max_area = 0; /* 核1普通信标最大面积的菜单镜像。 */
+int32 c1_beacon_medium_peak = 0; /* 核1中等信标最低峰值的菜单镜像。 */
+int32 c1_beacon_medium_min_area = 0; /* 核1中等信标最小面积的菜单镜像。 */
+int32 c1_beacon_medium_max_area = 0; /* 核1中等信标最大面积的菜单镜像。 */
+int32 c1_beacon_large_peak = 0; /* 核1大信标最低峰值的菜单镜像。 */
+int32 c1_beacon_large_min_area = 0; /* 核1大信标最小面积的菜单镜像。 */
+int32 c1_beacon_large_max_area = 0; /* 核1大信标最大面积的菜单镜像。 */
 float c1_gray_weak_peak_delta = 0;
 int32 c1_gray_weak_peak_floor = 0;
 int32 c1_gray_weak_min_area = 0;
@@ -262,6 +274,7 @@ float c1_gate_dist = 0;
 float c1_new_dist = 0;
 int32 c1_confirm = 0;
 int32 c1_misses = 0;
+int32 c1_beacon_coast_frames = 0; /* 核1信标丢失保留帧数的菜单镜像。 */
 float c1_pos_alpha = 0;
 float c1_vel_alpha = 0;
 /* 两颗2BL3边缘区域二值化阈值的核0菜单镜像。 */
@@ -1847,6 +1860,18 @@ void air_comm_air_init(void)
     c1_gray_dedup_dist = 0.0f;
     c1_edge_peak_min = 0;
     c1_edge_occupancy_max = 0.0f;
+    c1_beacon_scan_delta = 0;
+    c1_beacon_scan_floor = 0;
+    c1_beacon_response_min = 0;
+    c1_beacon_normal_peak = 0;
+    c1_beacon_normal_min_area = 0;
+    c1_beacon_normal_max_area = 0;
+    c1_beacon_medium_peak = 0;
+    c1_beacon_medium_min_area = 0;
+    c1_beacon_medium_max_area = 0;
+    c1_beacon_large_peak = 0;
+    c1_beacon_large_min_area = 0;
+    c1_beacon_large_max_area = 0;
     c1_gray_weak_peak_delta = 0.0f;
     c1_gray_weak_peak_floor = 0;
     c1_gray_weak_min_area = 0;
@@ -1862,6 +1887,7 @@ void air_comm_air_init(void)
     c1_new_dist = 0;
     c1_confirm = 0;
     c1_misses = 0;
+    c1_beacon_coast_frames = 0;
     c1_pos_alpha = 0;
     c1_vel_alpha = 0;
     bl3_edge_thr = 0;
@@ -2072,6 +2098,42 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_C1_FLOAT(c1_edge_occupancy_max, c1_edge_occupancy_max,
                                0.0f, 1.0f,
                                IPC_REMOTE_PARAM_ID_C1_EDGE_OCCUPANCY_MAX);
+    AIR_COMM_REGISTER_C1_INT32(c1_beacon_scan_delta, c1_beacon_scan_delta,
+                               0, 255,
+                               IPC_REMOTE_PARAM_ID_C1_BEACON_SCAN_DELTA);
+    AIR_COMM_REGISTER_C1_INT32(c1_beacon_scan_floor, c1_beacon_scan_floor,
+                               0, 255,
+                               IPC_REMOTE_PARAM_ID_C1_BEACON_SCAN_FLOOR);
+    AIR_COMM_REGISTER_C1_INT32(c1_beacon_response_min, c1_beacon_response_min,
+                               0, 32767,
+                               IPC_REMOTE_PARAM_ID_C1_BEACON_RESPONSE_MIN);
+    AIR_COMM_REGISTER_C1_INT32(c1_beacon_normal_peak, c1_beacon_normal_peak,
+                               0, 255,
+                               IPC_REMOTE_PARAM_ID_C1_BEACON_NORMAL_PEAK);
+    AIR_COMM_REGISTER_C1_INT32(c1_beacon_normal_min_area,
+                               c1_beacon_normal_min_area, 0, 255,
+                               IPC_REMOTE_PARAM_ID_C1_BEACON_NORMAL_MIN_AREA);
+    AIR_COMM_REGISTER_C1_INT32(c1_beacon_normal_max_area,
+                               c1_beacon_normal_max_area, 0, 255,
+                               IPC_REMOTE_PARAM_ID_C1_BEACON_NORMAL_MAX_AREA);
+    AIR_COMM_REGISTER_C1_INT32(c1_beacon_medium_peak, c1_beacon_medium_peak,
+                               0, 255,
+                               IPC_REMOTE_PARAM_ID_C1_BEACON_MEDIUM_PEAK);
+    AIR_COMM_REGISTER_C1_INT32(c1_beacon_medium_min_area,
+                               c1_beacon_medium_min_area, 0, 255,
+                               IPC_REMOTE_PARAM_ID_C1_BEACON_MEDIUM_MIN_AREA);
+    AIR_COMM_REGISTER_C1_INT32(c1_beacon_medium_max_area,
+                               c1_beacon_medium_max_area, 0, 255,
+                               IPC_REMOTE_PARAM_ID_C1_BEACON_MEDIUM_MAX_AREA);
+    AIR_COMM_REGISTER_C1_INT32(c1_beacon_large_peak, c1_beacon_large_peak,
+                               0, 255,
+                               IPC_REMOTE_PARAM_ID_C1_BEACON_LARGE_PEAK);
+    AIR_COMM_REGISTER_C1_INT32(c1_beacon_large_min_area,
+                               c1_beacon_large_min_area, 0, 255,
+                               IPC_REMOTE_PARAM_ID_C1_BEACON_LARGE_MIN_AREA);
+    AIR_COMM_REGISTER_C1_INT32(c1_beacon_large_max_area,
+                               c1_beacon_large_max_area, 0, 255,
+                               IPC_REMOTE_PARAM_ID_C1_BEACON_LARGE_MAX_AREA);
     AIR_COMM_REGISTER_C1_FLOAT(c1_gray_weak_peak_delta, c1_gray_weak_peak_delta,
                                0.0f, 255.0f,
                                IPC_REMOTE_PARAM_ID_C1_GRAY_WEAK_PEAK_DELTA);
@@ -2110,6 +2172,9 @@ void air_comm_air_init(void)
                                IPC_REMOTE_PARAM_ID_C1_CONFIRM);
     AIR_COMM_REGISTER_C1_INT32(c1_misses, c1_misses, 0, 255,
                                IPC_REMOTE_PARAM_ID_C1_MISSES);
+    AIR_COMM_REGISTER_C1_INT32(c1_beacon_coast_frames,
+                               c1_beacon_coast_frames, 0, 255,
+                               IPC_REMOTE_PARAM_ID_C1_BEACON_COAST_FRAMES);
     AIR_COMM_REGISTER_C1_FLOAT(c1_pos_alpha, c1_pos_alpha, 0.0f, 1.0f,
                                IPC_REMOTE_PARAM_ID_C1_POS_ALPHA);
     AIR_COMM_REGISTER_C1_FLOAT(c1_vel_alpha, c1_vel_alpha, 0.0f, 1.0f,

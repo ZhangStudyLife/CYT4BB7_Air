@@ -40,12 +40,25 @@ float g_image_down_gate_distance = 24.0f;
 float g_image_down_new_target_distance = 36.0f;
 int32 g_image_down_confirm_frames = 4;
 int32 g_image_down_max_misses = 6;
+int32 g_image_down_beacon_coast_frames = 4; /* 信标短暂丢失后的最大保留帧数。 */
 float g_image_down_filter_pos_alpha = 0.408392f;
 float g_image_down_filter_vel_alpha = 0.163340f;
 float g_image_down_beacon_boundary_clearance = 9.0f;
 float g_image_down_gray_dedup_distance = 5.0f;
 int32 g_image_down_gray_edge_min_peak = 200;
 float g_image_down_gray_edge_max_occupancy = 0.25f;
+int32 g_image_down_beacon_scan_delta = 25; /* 信标扫描阈值相对场景均值的增量。 */
+int32 g_image_down_beacon_scan_floor = 90; /* 信标扫描阈值的最低灰度。 */
+int32 g_image_down_beacon_response_min = 0; /* 信标候选的最低灰度响应。 */
+int32 g_image_down_beacon_normal_peak = 200; /* 普通信标的最低峰值灰度。 */
+int32 g_image_down_beacon_normal_min_area = 4; /* 普通信标的最小半峰面积。 */
+int32 g_image_down_beacon_normal_max_area = 32; /* 普通信标的最大半峰面积。 */
+int32 g_image_down_beacon_medium_peak = 235; /* 中等信标的最低峰值灰度。 */
+int32 g_image_down_beacon_medium_min_area = 15; /* 中等信标的最小半峰面积。 */
+int32 g_image_down_beacon_medium_max_area = 42; /* 中等信标的最大半峰面积。 */
+int32 g_image_down_beacon_large_peak = 248; /* 大信标的最低峰值灰度。 */
+int32 g_image_down_beacon_large_min_area = 24; /* 大信标的最小半峰面积。 */
+int32 g_image_down_beacon_large_max_area = 84; /* 大信标的最大半峰面积。 */
 float g_image_down_gray_weak_peak_delta = 70.0f;
 int32 g_image_down_gray_weak_peak_floor = 140;
 int32 g_image_down_gray_weak_min_area = 3;
@@ -65,7 +78,6 @@ static uint32 s_image_down_latched_frame_sequence;                 /* 最近成�
 
 #define IMAGE_QUEUE_SIZE                (BEACON_IMAGE_W * BEACON_IMAGE_H)
 #define PI_F                            3.1415926f
-#define DOWN_BEACON_COAST_FRAMES        4U
 #define DOWN_GRAY_MAX_PEAKS             20U
 #define DOWN_GRAY_MAX_CANDIDATES        12U
 #define DOWN_OBJECT_BOUNDARY_MARGIN     3.0f
@@ -1767,7 +1779,7 @@ static void down_gray_insert_peak(
     int position;
     int last;
 
-    if (count == 0 || response <= 0)
+    if (count == 0 || response <= g_image_down_beacon_response_min)
     {
         return;
     }
@@ -1812,12 +1824,13 @@ static void down_gray_collect_response_row(
     down_gray_peak_t peaks[DOWN_GRAY_MAX_PEAKS],
     unsigned char *count)
 {
-    int minimum_peak = (int)(scene_mean + 25.0f);
+    int minimum_peak =
+        (int)(scene_mean + (float)g_image_down_beacon_scan_delta);
     int x;
 
-    if (minimum_peak < 90)
+    if (minimum_peak < g_image_down_beacon_scan_floor)
     {
-        minimum_peak = 90;
+        minimum_peak = g_image_down_beacon_scan_floor;
     }
     if (row_valid[center_y] == 0U)
     {
@@ -1843,7 +1856,8 @@ static void down_gray_collect_response_row(
         }
 #endif
 
-        if (response <= 0 || image[center_y][x] < minimum_peak ||
+        if (response <= g_image_down_beacon_response_min ||
+            image[center_y][x] < minimum_peak ||
             center_y < minimum_y[x] || center_y > maximum_y[x])
         {
             continue;
@@ -2556,27 +2570,36 @@ static unsigned char down_gray_candidate_valid(
             (features->elongation <= 1.75f) &&
             (features->offset <= 1.70f) &&
             (features->outer_occupancy <= 0.42f)) ? 1U : 0U;
-    normal = ((features->half_area >= 4U) &&
-              (features->half_area <= 32U) &&
-              (features->peak >= 200U) &&
+    normal = ((features->half_area >=
+               (uint32)g_image_down_beacon_normal_min_area) &&
+              (features->half_area <=
+               (uint32)g_image_down_beacon_normal_max_area) &&
+              (features->peak >=
+               (uint32)g_image_down_beacon_normal_peak) &&
               (features->inner_contrast >= 80.0f) &&
               (features->radial_drop >= 65.0f) &&
               (features->concentration >= 0.42f) &&
               (features->elongation <= 1.90f) &&
               (features->offset <= 2.00f) &&
               (features->outer_occupancy <= 0.50f)) ? 1U : 0U;
-    medium = ((features->half_area >= 15U) &&
-              (features->half_area <= 42U) &&
-              (features->peak >= 235U) &&
+    medium = ((features->half_area >=
+               (uint32)g_image_down_beacon_medium_min_area) &&
+              (features->half_area <=
+               (uint32)g_image_down_beacon_medium_max_area) &&
+              (features->peak >=
+               (uint32)g_image_down_beacon_medium_peak) &&
               (features->inner_contrast >= 105.0f) &&
               (features->radial_drop >= 58.0f) &&
               (features->concentration >= 0.36f) &&
               (features->elongation <= 1.90f) &&
               (features->offset <= 2.10f) &&
               (features->outer_occupancy <= 0.56f)) ? 1U : 0U;
-    large = ((features->half_area >= 24U) &&
-             (features->half_area <= 84U) &&
-             (features->peak >= 248U) &&
+    large = ((features->half_area >=
+              (uint32)g_image_down_beacon_large_min_area) &&
+             (features->half_area <=
+              (uint32)g_image_down_beacon_large_max_area) &&
+             (features->peak >=
+              (uint32)g_image_down_beacon_large_peak) &&
              (features->inner_contrast >= 135.0f) &&
              (features->radial_drop >= 38.0f) &&
               (features->concentration >= 0.18f) &&
@@ -3052,7 +3075,8 @@ static unsigned char update_temporal_car(beacon_result_t *result)
 
 static void apply_temporal_beacon(beacon_result_t *result)
 {
-    unsigned char max_misses = DOWN_BEACON_COAST_FRAMES;
+    unsigned char max_misses =
+        (unsigned char)g_image_down_beacon_coast_frames;
 
     if (result->beacon_count > 0U)
     {
@@ -3430,6 +3454,30 @@ static const image_down_param_descriptor_t s_image_down_params[] =
                        g_image_down_gray_edge_min_peak, 0, 255),
     IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_EDGE_OCCUPANCY_MAX,
                        g_image_down_gray_edge_max_occupancy, 0.0f, 1.0f),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_BEACON_SCAN_DELTA,
+                       g_image_down_beacon_scan_delta, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_BEACON_SCAN_FLOOR,
+                       g_image_down_beacon_scan_floor, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_BEACON_RESPONSE_MIN,
+                       g_image_down_beacon_response_min, 0, 32767),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_BEACON_NORMAL_PEAK,
+                       g_image_down_beacon_normal_peak, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_BEACON_NORMAL_MIN_AREA,
+                       g_image_down_beacon_normal_min_area, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_BEACON_NORMAL_MAX_AREA,
+                       g_image_down_beacon_normal_max_area, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_BEACON_MEDIUM_PEAK,
+                       g_image_down_beacon_medium_peak, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_BEACON_MEDIUM_MIN_AREA,
+                       g_image_down_beacon_medium_min_area, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_BEACON_MEDIUM_MAX_AREA,
+                       g_image_down_beacon_medium_max_area, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_BEACON_LARGE_PEAK,
+                       g_image_down_beacon_large_peak, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_BEACON_LARGE_MIN_AREA,
+                       g_image_down_beacon_large_min_area, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_BEACON_LARGE_MAX_AREA,
+                       g_image_down_beacon_large_max_area, 0, 255),
     IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_GRAY_WEAK_PEAK_DELTA,
                        g_image_down_gray_weak_peak_delta, 0.0f, 255.0f),
     IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_GRAY_WEAK_PEAK_FLOOR,
@@ -3460,6 +3508,8 @@ static const image_down_param_descriptor_t s_image_down_params[] =
                        g_image_down_confirm_frames, 1, 255),
     IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_MISSES,
                        g_image_down_max_misses, 0, 255),
+    IMAGE_DOWN_PARAM_I(IPC_REMOTE_PARAM_ID_C1_BEACON_COAST_FRAMES,
+                       g_image_down_beacon_coast_frames, 0, 255),
     IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_POS_ALPHA,
                        g_image_down_filter_pos_alpha, 0.0f, 1.0f),
     IMAGE_DOWN_PARAM_F(IPC_REMOTE_PARAM_ID_C1_VEL_ALPHA,
@@ -3467,7 +3517,7 @@ static const image_down_param_descriptor_t s_image_down_params[] =
 };
 
 typedef char image_down_param_count_must_match[
-    (sizeof(s_image_down_params) / sizeof(s_image_down_params[0]) == 28U) ?
+    (sizeof(s_image_down_params) / sizeof(s_image_down_params[0]) == 41U) ?
     1 : -1];
 
 static const image_down_param_descriptor_t *image_down_find_param(uint16 id)
@@ -3512,7 +3562,13 @@ static uint8 image_down_param_values_valid(
         }
     }
 
-    return ((g_image_down_gray_weak_min_area <=
+    return ((g_image_down_beacon_normal_min_area <=
+             g_image_down_beacon_normal_max_area) &&
+            (g_image_down_beacon_medium_min_area <=
+             g_image_down_beacon_medium_max_area) &&
+            (g_image_down_beacon_large_min_area <=
+             g_image_down_beacon_large_max_area) &&
+            (g_image_down_gray_weak_min_area <=
              g_image_down_gray_weak_max_area) &&
             (g_image_down_car_score_strong >=
              g_image_down_car_score_weak) &&

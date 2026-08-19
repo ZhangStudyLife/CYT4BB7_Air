@@ -117,6 +117,18 @@ extern float c1_beacon_boundary_px;
 extern float c1_gray_dedup_dist;
 extern int32 c1_edge_peak_min;
 extern float c1_edge_occupancy_max;
+extern int32 c1_beacon_scan_delta; /* 核1信标扫描阈值场景增量的菜单镜像。 */
+extern int32 c1_beacon_scan_floor; /* 核1信标扫描阈值下限的菜单镜像。 */
+extern int32 c1_beacon_response_min; /* 核1信标最低灰度响应的菜单镜像。 */
+extern int32 c1_beacon_normal_peak; /* 核1普通信标最低峰值的菜单镜像。 */
+extern int32 c1_beacon_normal_min_area; /* 核1普通信标最小面积的菜单镜像。 */
+extern int32 c1_beacon_normal_max_area; /* 核1普通信标最大面积的菜单镜像。 */
+extern int32 c1_beacon_medium_peak; /* 核1中等信标最低峰值的菜单镜像。 */
+extern int32 c1_beacon_medium_min_area; /* 核1中等信标最小面积的菜单镜像。 */
+extern int32 c1_beacon_medium_max_area; /* 核1中等信标最大面积的菜单镜像。 */
+extern int32 c1_beacon_large_peak; /* 核1大信标最低峰值的菜单镜像。 */
+extern int32 c1_beacon_large_min_area; /* 核1大信标最小面积的菜单镜像。 */
+extern int32 c1_beacon_large_max_area; /* 核1大信标最大面积的菜单镜像。 */
 extern float c1_gray_weak_peak_delta;
 extern int32 c1_gray_weak_peak_floor;
 extern int32 c1_gray_weak_min_area;
@@ -132,6 +144,7 @@ extern float c1_gate_dist;
 extern float c1_new_dist;
 extern int32 c1_confirm;
 extern int32 c1_misses;
+extern int32 c1_beacon_coast_frames; /* 核1信标丢失保留帧数的菜单镜像。 */
 extern float c1_pos_alpha;
 extern float c1_vel_alpha;
 extern int32 bl3_edge_thr;   /* 两颗2BL3边缘区域二值化阈值镜像 */

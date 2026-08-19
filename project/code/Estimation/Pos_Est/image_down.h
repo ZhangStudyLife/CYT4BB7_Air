@@ -28,26 +28,40 @@ typedef struct
 } beacon_rect_t;
 
 /* 核1信标二值化运行时阈值，范围0..255，从下一帧图像开始生效。 */
-extern int32 g_image_down_beacon_binary_threshold;
-extern int32 g_image_down_beacon_min_area;
-extern int32 g_image_down_side_edge_min_area;
-extern int32 g_image_down_side_edge_threshold;
 extern int32 g_image_down_car_lamp_binary_threshold;
-extern int32 g_image_down_car_lamp_min_area;
 extern int32 g_image_down_car_lamp_max_area;
-extern float g_image_down_car_lamp_min_elongation;
-extern float g_image_down_car_lamp_min_length;
-extern int32 g_image_down_near_lamp_pad;
-extern int32 g_image_down_near_lamp_min_area;
-extern int32 g_image_down_near_lamp_isolated_min_area;
-extern int32 g_image_down_near_lamp_background_max;
 extern float g_image_down_match_distance;
 extern float g_image_down_gate_distance;
 extern float g_image_down_new_target_distance;
 extern int32 g_image_down_confirm_frames;
 extern int32 g_image_down_max_misses;
+extern int32 g_image_down_beacon_coast_frames; /* 信标短暂丢失后的最大保留帧数。 */
 extern float g_image_down_filter_pos_alpha;
 extern float g_image_down_filter_vel_alpha;
+extern float g_image_down_beacon_boundary_clearance;
+extern float g_image_down_gray_dedup_distance;
+extern int32 g_image_down_gray_edge_min_peak;
+extern float g_image_down_gray_edge_max_occupancy;
+extern int32 g_image_down_beacon_scan_delta; /* 信标扫描阈值相对场景均值的增量。 */
+extern int32 g_image_down_beacon_scan_floor; /* 信标扫描阈值的最低灰度。 */
+extern int32 g_image_down_beacon_response_min; /* 信标候选的最低灰度响应。 */
+extern int32 g_image_down_beacon_normal_peak; /* 普通信标的最低峰值灰度。 */
+extern int32 g_image_down_beacon_normal_min_area; /* 普通信标的最小半峰面积。 */
+extern int32 g_image_down_beacon_normal_max_area; /* 普通信标的最大半峰面积。 */
+extern int32 g_image_down_beacon_medium_peak; /* 中等信标的最低峰值灰度。 */
+extern int32 g_image_down_beacon_medium_min_area; /* 中等信标的最小半峰面积。 */
+extern int32 g_image_down_beacon_medium_max_area; /* 中等信标的最大半峰面积。 */
+extern int32 g_image_down_beacon_large_peak; /* 大信标的最低峰值灰度。 */
+extern int32 g_image_down_beacon_large_min_area; /* 大信标的最小半峰面积。 */
+extern int32 g_image_down_beacon_large_max_area; /* 大信标的最大半峰面积。 */
+extern float g_image_down_gray_weak_peak_delta;
+extern int32 g_image_down_gray_weak_peak_floor;
+extern int32 g_image_down_gray_weak_min_area;
+extern int32 g_image_down_gray_weak_max_area;
+extern float g_image_down_car_score_strong;
+extern float g_image_down_car_score_weak;
+extern float g_image_down_car_score_track;
+extern float g_image_down_car_score_margin;
 
 /*
  * 函数功能: 初始化下摄图像算法、摄像头接口及5000帧性能统计窗口。

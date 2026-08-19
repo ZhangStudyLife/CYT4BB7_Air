@@ -292,7 +292,11 @@ static uint8 Get_Image_data(uint8 *fresh_mask)
         (((s_image_attitude.flags & IPC_ATTITUDE_FLAG_HEIGHT_VALID) != 0U) &&
          (attitude_valid != 0U)) ? 1U : 0U;
 
-    if(image_frame_ready != 0U)
+    if(c1_horizon_enable == 0)
+    {
+        image_down_horizon_invalidate();
+    }
+    else if(image_frame_ready != 0U)
     {
         if((attitude_valid != 0U) && (height_valid != 0U))
         {

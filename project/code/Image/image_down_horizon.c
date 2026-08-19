@@ -51,6 +51,8 @@ float g_image_down_horizon_bottom_y[IMAGE_DOWN_HORIZON_WIDTH];
 uint8 g_image_down_horizon_column_valid[IMAGE_DOWN_HORIZON_WIDTH];
 uint8 g_image_down_horizon_valid;
 uint8 g_image_down_horizon_extrapolated;
+float g_image_down_horizon_height_offset_mm;
+float g_image_down_horizon_margin_px = -5.0f;
 
 static float s_normalized_x[IMAGE_DOWN_HORIZON_WIDTH];
 static float s_normalized_y[IMAGE_DOWN_HORIZON_HEIGHT];
@@ -76,6 +78,61 @@ static float down_horizon_abs(float value)
 static float down_horizon_max(float first, float second)
 {
     return (first > second) ? first : second;
+}
+
+static float down_horizon_clamp_y(float value)
+{
+    if (value < 0.0f)
+    {
+        return 0.0f;
+    }
+    if (value > (float)(IMAGE_DOWN_HORIZON_HEIGHT - 1U))
+    {
+        return (float)(IMAGE_DOWN_HORIZON_HEIGHT - 1U);
+    }
+    return value;
+}
+
+static void down_horizon_apply_margin(void)
+{
+    uint16 x;
+
+    for (x = 0U; x < IMAGE_DOWN_HORIZON_WIDTH; x++)
+    {
+        float top_y;
+        float bottom_y;
+
+        if (s_column_state[x] == DOWN_HORIZON_COLUMN_OUTSIDE)
+        {
+            continue;
+        }
+        top_y = down_horizon_clamp_y(
+            g_image_down_horizon_top_y[x] - g_image_down_horizon_margin_px);
+        bottom_y = down_horizon_clamp_y(
+            g_image_down_horizon_bottom_y[x] + g_image_down_horizon_margin_px);
+        if (top_y > bottom_y)
+        {
+            g_image_down_horizon_top_y[x] = 0.0f;
+            g_image_down_horizon_bottom_y[x] = 0.0f;
+            g_image_down_horizon_column_valid[x] = 0U;
+            s_column_state[x] = DOWN_HORIZON_COLUMN_OUTSIDE;
+            s_column_root_count[x] = 0U;
+            continue;
+        }
+        g_image_down_horizon_top_y[x] = top_y;
+        g_image_down_horizon_bottom_y[x] = bottom_y;
+        if ((top_y <= 0.0f) &&
+            (bottom_y >= (float)(IMAGE_DOWN_HORIZON_HEIGHT - 1U)))
+        {
+            g_image_down_horizon_column_valid[x] = 0U;
+            s_column_state[x] = DOWN_HORIZON_COLUMN_INSIDE;
+        }
+        else
+        {
+            g_image_down_horizon_column_valid[x] = 1U;
+            s_column_state[x] = DOWN_HORIZON_COLUMN_PARTIAL;
+        }
+    }
 }
 
 static float down_horizon_theta(float radius, float radius2)
@@ -875,6 +932,7 @@ void image_down_horizon_update(float roll_deg,
     float cos_pitch;
     float gravity_camera[3];
     float cone_cos;
+    float effective_height_mm;
     uint8 row;
 
     if (s_initialized == 0U)
@@ -887,7 +945,8 @@ void image_down_horizon_update(float roll_deg,
         image_down_horizon_invalidate();
         return;
     }
-    s_last_height = height_mm + DOWN_HORIZON_HEIGHT_BIAS_MM;
+    effective_height_mm = height_mm + g_image_down_horizon_height_offset_mm;
+    s_last_height = effective_height_mm + DOWN_HORIZON_HEIGHT_BIAS_MM;
     if (s_last_height <= 0.0f)
     {
         image_down_horizon_invalidate();
@@ -899,8 +958,8 @@ void image_down_horizon_update(float roll_deg,
          roll_deg > DOWN_HORIZON_ROLL_MAX_DEG ||
          pitch_deg < DOWN_HORIZON_PITCH_MIN_DEG ||
          pitch_deg > DOWN_HORIZON_PITCH_MAX_DEG ||
-         height_mm < DOWN_HORIZON_HEIGHT_MIN_MM ||
-         height_mm > DOWN_HORIZON_HEIGHT_MAX_MM) ? 1U : 0U;
+         effective_height_mm < DOWN_HORIZON_HEIGHT_MIN_MM ||
+         effective_height_mm > DOWN_HORIZON_HEIGHT_MAX_MM) ? 1U : 0U;
 
     roll = roll_deg * DOWN_HORIZON_DEG_TO_RAD;
     pitch = pitch_deg * DOWN_HORIZON_DEG_TO_RAD;
@@ -926,6 +985,7 @@ void image_down_horizon_update(float roll_deg,
                sqrtf(s_last_height * s_last_height +
                      DOWN_HORIZON_RANGE_MM * DOWN_HORIZON_RANGE_MM);
     down_horizon_build_columns(gravity_camera, cone_cos);
+    down_horizon_apply_margin();
     s_points_valid = 0U;
     g_image_down_horizon_valid = 1U;
 }

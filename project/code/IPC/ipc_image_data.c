@@ -40,6 +40,9 @@ volatile uint32 g_image_data_rx_fresh_mask;                                     
 #define IPC_FLIGHT_STATE_MASK    (0xFFFF0000UL)
 #define IPC_FLIGHT_STATE_FLYING  (0x00000001UL)
 #define IPC_FLIGHT_STATE_SCREEN_REFRESH_ENABLE (0x00000002UL)
+#define IPC_FLIGHT_STATE_BL3_SCREEN_ENABLE (0x00000004UL)
+#define IPC_FLIGHT_STATE_BL3_HORIZON_ENABLE (0x00000008UL)
+#define IPC_FLIGHT_STATE_PARAM_WRITE_ENABLE (0x00000010UL)
 /* 图传发送模式在 IPC 数据低 16 位中的偏移 */
 #define IPC_IMAGE_SEND_SHIFT     (8U)
 /* 图传发送模式在 IPC 数据低 16 位中的掩码 */
@@ -91,6 +94,9 @@ static volatile uint8 s_core0_flying = 0U;
 static volatile uint8 s_core0_image_send_enable = 0U;
 /* 核1上电默认禁止刷屏，收到核0明确许可后才初始化IPS114。 */
 static volatile uint8 s_core0_screen_refresh_enable = 0U;
+static volatile uint8 s_core0_param_write_enable = 0U;
+static volatile uint8 s_core0_bl3_screen_enable = 0U;
+static volatile uint8 s_core0_bl3_horizon_enable = 0U;
 static volatile uint8 s_remote_param_hint = 0U;
 static uint32 s_remote_param_last_transaction = 0U;
 static uint32 s_remote_param_last_checksum = 0U;
@@ -281,7 +287,7 @@ static uint8 ipc_remote_param_is_cancel_terminal(
             (response->status == IPC_REMOTE_PARAM_STATUS_ROLLBACK_FAIL)) ? 1U : 0U;
 }
 
-/* 硬超时后保留取消标记；新事务启动前仅在核1已返回终态时释放邮箱。 */
+/* SET硬超时保留取消标记；GET可立即释放，迟到事务由核1在新请求到达时清理。 */
 static void ipc_remote_param_core0_reap_cancelled(void)
 {
     ipc_remote_param_mailbox_t response;
@@ -345,7 +351,10 @@ static void ipc_remote_param_publish_response(const ipc_remote_param_mailbox_t *
 
 uint8 ipc_flight_state_send(uint8 flying,
                             uint8 image_send_enable,
-                            uint8 screen_refresh_enable)
+                            uint8 screen_refresh_enable,
+                            uint8 param_write_enable,
+                            uint8 bl3_screen_enable,
+                            uint8 bl3_horizon_enable)
 {
 #if defined(CY_CORE_CM7_0)
     uint32 ipc_data = IPC_FLIGHT_STATE_MAGIC;
@@ -363,6 +372,18 @@ uint8 ipc_flight_state_send(uint8 flying,
     {
         ipc_data |= IPC_FLIGHT_STATE_SCREEN_REFRESH_ENABLE;
     }
+    if(0U != param_write_enable)
+    {
+        ipc_data |= IPC_FLIGHT_STATE_PARAM_WRITE_ENABLE;
+    }
+    if(0U != bl3_screen_enable)
+    {
+        ipc_data |= IPC_FLIGHT_STATE_BL3_SCREEN_ENABLE;
+    }
+    if(0U != bl3_horizon_enable)
+    {
+        ipc_data |= IPC_FLIGHT_STATE_BL3_HORIZON_ENABLE;
+    }
     ipc_data |= (((uint32)image_send_enable << IPC_IMAGE_SEND_SHIFT) & IPC_IMAGE_SEND_MASK);
 
     return ipc_try_send_data(ipc_data);
@@ -370,6 +391,9 @@ uint8 ipc_flight_state_send(uint8 flying,
     (void)flying;
     (void)image_send_enable;
     (void)screen_refresh_enable;
+    (void)param_write_enable;
+    (void)bl3_screen_enable;
+    (void)bl3_horizon_enable;
     return 1U;
 #endif
 }
@@ -396,6 +420,33 @@ uint8 ipc_core0_screen_refresh_enable(void)
 {
 #if defined(CY_CORE_CM7_1)
     return s_core0_screen_refresh_enable;
+#else
+    return 0U;
+#endif
+}
+
+uint8 ipc_core0_param_write_enable(void)
+{
+#if defined(CY_CORE_CM7_1)
+    return s_core0_param_write_enable;
+#else
+    return 0U;
+#endif
+}
+
+uint8 ipc_core0_bl3_screen_enable(void)
+{
+#if defined(CY_CORE_CM7_1)
+    return s_core0_bl3_screen_enable;
+#else
+    return 0U;
+#endif
+}
+
+uint8 ipc_core0_bl3_horizon_enable(void)
+{
+#if defined(CY_CORE_CM7_1)
+    return s_core0_bl3_horizon_enable;
 #else
     return 0U;
 #endif
@@ -571,7 +622,7 @@ uint8 ipc_remote_param_core0_request_cancel(uint32 transaction)
 #endif
 }
 
-/* 核0硬超时后保留取消标记和邮箱占用，直到核1返回终态。 */
+/* GET硬超时立即释放Core0；SET继续占用邮箱，等待核1完成回滚。 */
 void ipc_remote_param_core0_cancel(uint32 transaction)
 {
 #if defined(CY_CORE_CM7_0)
@@ -579,6 +630,10 @@ void ipc_remote_param_core0_cancel(uint32 transaction)
        (s_remote_param_core0_transaction == transaction))
     {
         (void)ipc_remote_param_core0_request_cancel(transaction);
+        if(s_remote_param_core0_request.op == IPC_REMOTE_PARAM_OP_GET)
+        {
+            s_remote_param_core0_active = 0U;
+        }
         s_remote_param_hint = 0U;
     }
 #else
@@ -629,37 +684,50 @@ void ipc_remote_param_core1_poll(void)
                                      sizeof(g_ipc_remote_param_request));
         memcpy(&request, (const void *)&g_ipc_remote_param_request, sizeof(request));
         if((ipc_remote_param_mailbox_valid(&request) != 0U) &&
-           (request.transaction == s_remote_param_2bl3_request.transaction) &&
-           (request.status != IPC_REMOTE_PARAM_STATUS_OK))
+           (request.transaction != s_remote_param_2bl3_request.transaction) &&
+           (s_remote_param_2bl3_request.op == IPC_REMOTE_PARAM_OP_GET))
         {
-            s_remote_param_last_transaction = request.transaction;
-            s_remote_param_last_checksum = request.checksum;
-            if(s_remote_param_2bl3_cancel_requested == 0U)
-            {
-                s_remote_param_2bl3_cancel_requested = 1U;
-                (void)CameraSpi_RemoteParamCancel(request.transaction);
-            }
-        }
-
-        if(CameraSpi_RemoteParamTakeResult(&result) != 0U)
-        {
-            status = result.status;
-            actual_bits = result.actual_bits;
-            if(s_remote_param_2bl3_cancel_requested != 0U)
-            {
-                if(status != IPC_REMOTE_PARAM_STATUS_ROLLBACK_FAIL)
-                {
-                    status = IPC_REMOTE_PARAM_STATUS_TIMEOUT;
-                    actual_bits = s_remote_param_2bl3_request.previous_bits;
-                }
-            }
-            ipc_remote_param_publish_response(&s_remote_param_2bl3_request,
-                                              status,
-                                              actual_bits);
+            (void)CameraSpi_RemoteParamCancel(
+                s_remote_param_2bl3_request.transaction);
+            (void)CameraSpi_RemoteParamTakeResult(&result);
             s_remote_param_2bl3_active = 0U;
             s_remote_param_2bl3_cancel_requested = 0U;
         }
-        return;
+        else
+        {
+            if((ipc_remote_param_mailbox_valid(&request) != 0U) &&
+               (request.transaction == s_remote_param_2bl3_request.transaction) &&
+               (request.status != IPC_REMOTE_PARAM_STATUS_OK))
+            {
+                s_remote_param_last_transaction = request.transaction;
+                s_remote_param_last_checksum = request.checksum;
+                if(s_remote_param_2bl3_cancel_requested == 0U)
+                {
+                    s_remote_param_2bl3_cancel_requested = 1U;
+                    (void)CameraSpi_RemoteParamCancel(request.transaction);
+                }
+            }
+
+            if(CameraSpi_RemoteParamTakeResult(&result) != 0U)
+            {
+                status = result.status;
+                actual_bits = result.actual_bits;
+                if(s_remote_param_2bl3_cancel_requested != 0U)
+                {
+                    if(status != IPC_REMOTE_PARAM_STATUS_ROLLBACK_FAIL)
+                    {
+                        status = IPC_REMOTE_PARAM_STATUS_TIMEOUT;
+                        actual_bits = s_remote_param_2bl3_request.previous_bits;
+                    }
+                }
+                ipc_remote_param_publish_response(&s_remote_param_2bl3_request,
+                                                  status,
+                                                  actual_bits);
+                s_remote_param_2bl3_active = 0U;
+                s_remote_param_2bl3_cancel_requested = 0U;
+            }
+            return;
+        }
     }
 
     SCB_InvalidateDCache_by_Addr((volatile void *)&g_ipc_remote_param_request,
@@ -773,7 +841,13 @@ void ipc_remote_param_core1_poll(void)
         }
         else if(request.target == IPC_REMOTE_PARAM_TARGET_2BL3)
         {
-            if(CameraSpi_RemoteParamStart(request.op,
+            if(CameraSpi_RemoteParamBoardsOnline() == 0U)
+            {
+                ipc_remote_param_publish_response(&request,
+                                                  IPC_REMOTE_PARAM_STATUS_TIMEOUT,
+                                                  request.previous_bits);
+            }
+            else if(CameraSpi_RemoteParamStart(request.op,
                                           request.type,
                                           request.param_id,
                                           request.transaction,
@@ -822,6 +896,12 @@ void ipc_image_callback(uint32 ipc_data)
         s_core0_flying = (0U != (ipc_data & IPC_FLIGHT_STATE_FLYING)) ? 1U : 0U;
         s_core0_screen_refresh_enable =
             (0U != (ipc_data & IPC_FLIGHT_STATE_SCREEN_REFRESH_ENABLE)) ? 1U : 0U;
+        s_core0_param_write_enable =
+            (0U != (ipc_data & IPC_FLIGHT_STATE_PARAM_WRITE_ENABLE)) ? 1U : 0U;
+        s_core0_bl3_screen_enable =
+            (0U != (ipc_data & IPC_FLIGHT_STATE_BL3_SCREEN_ENABLE)) ? 1U : 0U;
+        s_core0_bl3_horizon_enable =
+            (0U != (ipc_data & IPC_FLIGHT_STATE_BL3_HORIZON_ENABLE)) ? 1U : 0U;
         s_core0_image_send_enable = (uint8)((ipc_data & IPC_IMAGE_SEND_MASK) >> IPC_IMAGE_SEND_SHIFT);
         if(s_core0_image_send_enable > 2U)
         {

@@ -18,6 +18,8 @@ extern float g_image_down_horizon_bottom_y[IMAGE_DOWN_HORIZON_WIDTH];
 extern uint8 g_image_down_horizon_column_valid[IMAGE_DOWN_HORIZON_WIDTH];
 extern uint8 g_image_down_horizon_valid;
 extern uint8 g_image_down_horizon_extrapolated;
+extern float g_image_down_horizon_height_offset_mm;
+extern float g_image_down_horizon_margin_px;
 
 void image_down_horizon_init(void);
 void image_down_horizon_invalidate(void);

@@ -63,8 +63,38 @@ extern "C" {
 #define IPC_REMOTE_PARAM_ID_C1_NEW_DIST        (0x0311U)
 #define IPC_REMOTE_PARAM_ID_C1_CONFIRM         (0x0312U)
 #define IPC_REMOTE_PARAM_ID_C1_MISSES          (0x0313U)
+#define IPC_REMOTE_PARAM_ID_C1_BEACON_COAST_FRAMES (0x032AU) /* 信标丢失保留帧数 */
 #define IPC_REMOTE_PARAM_ID_C1_POS_ALPHA       (0x0314U)
 #define IPC_REMOTE_PARAM_ID_C1_VEL_ALPHA       (0x0315U)
+#define IPC_REMOTE_PARAM_ID_C1_HORIZON_ENABLE  (0x0331U)
+#define IPC_REMOTE_PARAM_ID_C1_HORIZON_HEIGHT_OFFSET (0x0332U)
+#define IPC_REMOTE_PARAM_ID_C1_HORIZON_MARGIN_PX (0x0333U)
+#define IPC_REMOTE_PARAM_ID_C1_FPS             (0x0334U)
+#define IPC_REMOTE_PARAM_ID_C1_GAIN            (0x0335U)
+#define IPC_REMOTE_PARAM_ID_C1_BEACON_BOUNDARY_PX (0x0336U)
+#define IPC_REMOTE_PARAM_ID_C1_GRAY_DEDUP_DIST (0x0337U)
+#define IPC_REMOTE_PARAM_ID_C1_EDGE_PEAK_MIN   (0x0338U)
+#define IPC_REMOTE_PARAM_ID_C1_EDGE_OCCUPANCY_MAX (0x0339U)
+#define IPC_REMOTE_PARAM_ID_C1_GRAY_WEAK_PEAK_DELTA (0x033AU)
+#define IPC_REMOTE_PARAM_ID_C1_GRAY_WEAK_PEAK_FLOOR (0x033BU)
+#define IPC_REMOTE_PARAM_ID_C1_GRAY_WEAK_MIN_AREA (0x033CU)
+#define IPC_REMOTE_PARAM_ID_C1_GRAY_WEAK_MAX_AREA (0x033DU)
+#define IPC_REMOTE_PARAM_ID_C1_CAR_SCORE_STRONG (0x033EU)
+#define IPC_REMOTE_PARAM_ID_C1_CAR_SCORE_WEAK  (0x033FU)
+#define IPC_REMOTE_PARAM_ID_C1_CAR_SCORE_TRACK (0x0340U)
+#define IPC_REMOTE_PARAM_ID_C1_CAR_SCORE_MARGIN (0x0341U)
+#define IPC_REMOTE_PARAM_ID_C1_BEACON_SCAN_DELTA (0x0342U) /* 扫描阈值场景增量 */
+#define IPC_REMOTE_PARAM_ID_C1_BEACON_SCAN_FLOOR (0x0343U) /* 扫描阈值最低灰度 */
+#define IPC_REMOTE_PARAM_ID_C1_BEACON_RESPONSE_MIN (0x0344U) /* 最低灰度响应 */
+#define IPC_REMOTE_PARAM_ID_C1_BEACON_NORMAL_PEAK (0x0345U) /* 普通信标最低峰值 */
+#define IPC_REMOTE_PARAM_ID_C1_BEACON_NORMAL_MIN_AREA (0x0346U) /* 普通信标最小面积 */
+#define IPC_REMOTE_PARAM_ID_C1_BEACON_NORMAL_MAX_AREA (0x0347U) /* 普通信标最大面积 */
+#define IPC_REMOTE_PARAM_ID_C1_BEACON_MEDIUM_PEAK (0x0348U) /* 中等信标最低峰值 */
+#define IPC_REMOTE_PARAM_ID_C1_BEACON_MEDIUM_MIN_AREA (0x0349U) /* 中等信标最小面积 */
+#define IPC_REMOTE_PARAM_ID_C1_BEACON_MEDIUM_MAX_AREA (0x034AU) /* 中等信标最大面积 */
+#define IPC_REMOTE_PARAM_ID_C1_BEACON_LARGE_PEAK (0x034BU) /* 大信标最低峰值 */
+#define IPC_REMOTE_PARAM_ID_C1_BEACON_LARGE_MIN_AREA (0x034CU) /* 大信标最小面积 */
+#define IPC_REMOTE_PARAM_ID_C1_BEACON_LARGE_MAX_AREA (0x034DU) /* 大信标最大面积 */
 
 /* 两颗2BL3信标算法标量参数固定 ID。 */
 #define IPC_REMOTE_PARAM_ID_BL3_EDGE_THR        (0x0100U) /* 边缘区域二值化阈值 */
@@ -124,6 +154,29 @@ extern "C" {
 #define IPC_REMOTE_PARAM_ID_BL3_SAT_T_GRAY      (0x0140U)
 #define IPC_REMOTE_PARAM_ID_BL3_BEACON_THR      (0x0141U)
 #define IPC_REMOTE_PARAM_ID_BL3_EXP_TIME        (0x0142U)
+#define IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_THR   (0x0143U)
+#define IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_MIN_AREA (0x0144U)
+#define IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_MAX_AREA (0x0145U)
+#define IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_MIN_LEN (0x0146U)
+#define IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_MAX_LEN (0x0147U)
+#define IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_MIN_WIDTH (0x0148U)
+#define IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_MIN_ELONG (0x0149U)
+#define IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_MIN_PEAK (0x014AU)
+#define IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_MIN_MEAN (0x014BU)
+#define IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_MIN_CONTRAST (0x014CU)
+#define IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_MIN_FILL (0x014DU)
+#define IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_STRIP_GRAY (0x014EU)
+#define IPC_REMOTE_PARAM_ID_BL3_GRAY_LAMP_STRIP_FILL (0x014FU)
+#define IPC_REMOTE_PARAM_ID_BL3_GRAY_BEACON_MIN_PEAK (0x0150U)
+#define IPC_REMOTE_PARAM_ID_BL3_GRAY_BEACON_MIN_AREA (0x0151U)
+#define IPC_REMOTE_PARAM_ID_BL3_GRAY_BEACON_MAX_AREA (0x0152U)
+#define IPC_REMOTE_PARAM_ID_BL3_GRAY_BEACON_COMPACT_PEAK (0x0153U)
+#define IPC_REMOTE_PARAM_ID_BL3_CAR_EDGE_MISSES (0x0154U)
+#define IPC_REMOTE_PARAM_ID_BL3_CAR_CENTER_MISSES (0x0155U)
+#define IPC_REMOTE_PARAM_ID_BL3_HORIZON_HEIGHT_OFFSET (0x0160U)
+#define IPC_REMOTE_PARAM_ID_BL3_HORIZON_MARGIN_PX (0x0161U)
+#define IPC_REMOTE_PARAM_ID_BL3_FPS             (0x0162U)
+#define IPC_REMOTE_PARAM_ID_BL3_GAIN            (0x0163U)
 
 /* 两颗2BL3位置面积表动态参数及持久化命令 ID。 */
 /* 固定64字节共享邮箱，reserved用于后续兼容扩展。 */
@@ -226,10 +279,16 @@ void ipc_attitude_get(ipc_attitude_data_t *out);
 
 uint8 ipc_flight_state_send(uint8 flying,
                             uint8 image_send_enable,
-                            uint8 screen_refresh_enable);
+                            uint8 screen_refresh_enable,
+                            uint8 param_write_enable,
+                            uint8 bl3_screen_enable,
+                            uint8 bl3_horizon_enable);
 uint8 ipc_core0_is_flying(void);
 uint8 ipc_core0_image_send_enable(void);
 uint8 ipc_core0_screen_refresh_enable(void);
+uint8 ipc_core0_param_write_enable(void);
+uint8 ipc_core0_bl3_screen_enable(void);
+uint8 ipc_core0_bl3_horizon_enable(void);
 void ipc_camera_spi_log_publish(const ipc_camera_spi_log_t *log);
 void ipc_camera_spi_log_get(ipc_camera_spi_log_t *out);
 
@@ -251,7 +310,7 @@ uint8 ipc_remote_param_core0_poll(ipc_remote_param_mailbox_t *response);
 /* 核0发布取消标记但保持事务活动，等待核1返回最终取消结果。 */
 uint8 ipc_remote_param_core0_request_cancel(uint32 transaction);
 
-/* 核0硬超时后保留取消标记，核1返回终态前禁止新事务覆盖邮箱。 */
+/* 核0硬超时：GET释放邮箱供后续请求覆盖，SET等待核1完成回滚。 */
 void ipc_remote_param_core0_cancel(uint32 transaction);
 
 /* 查询核0IPC参数邮箱是否仍被活动事务或取消墓碑占用。 */

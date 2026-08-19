@@ -755,7 +755,7 @@ static void core0_run_fast_loop_step(void)
 }
 
 /**
- * @brief 在100Hz槽位维护核1飞行状态、图传发送模式和屏幕刷新状态。
+ * @brief 在100Hz槽位维护图像输出、屏幕刷新和参数写许可。
  * @param 无。
  * @return 无。
  */
@@ -764,15 +764,22 @@ static void core0_update_ipc_state_100hz(void)
     static uint8 last_flying = 0xFFU;
     static uint8 last_image_send_enable = 0xFFU;
     static uint8 last_screen_refresh_enable = 0xFFU;
+    static uint8 last_param_write_enable = 0xFFU;
+    static uint8 last_bl3_screen_enable = 0xFFU;
+    static uint8 last_bl3_horizon_enable = 0xFFU;
     static uint8 flying_retry_div = 0U;
     static uint8 state_periodic_div = 0U;
     uint8 flying = (FC_START_CRSF_STATE_FLYING == FC_START_CRSF_Get_State()) ? 1U : 0U;
     uint8 image_send_enable = g_2bl3_image_send_enable;
-    uint8 screen_refresh_enable =
+    uint8 standby_context =
         ((FC_START_CRSF_STATE_STANDBY == FC_START_CRSF_Get_State()) &&
          (0U == FC_START_CRSF_Is_Armed())) ? 1U : 0U;
+    uint8 screen_refresh_enable = standby_context;
+    uint8 bl3_screen_allowed =
+        ((standby_context != 0U) && (bl3_screen_enable != 0)) ? 1U : 0U;
+    uint8 bl3_horizon_allowed = (bl3_horizon_enable != 0) ? 1U : 0U;
 
-    wifi_justfloat_SetStandbyContext(screen_refresh_enable);
+    wifi_justfloat_SetStandbyContext(standby_context);
 
     if(image_send_enable > 2U)
     {
@@ -782,17 +789,26 @@ static void core0_update_ipc_state_100hz(void)
     if ((flying != last_flying) ||
         (image_send_enable != last_image_send_enable) ||
         (screen_refresh_enable != last_screen_refresh_enable) ||
+        (standby_context != last_param_write_enable) ||
+        (bl3_screen_allowed != last_bl3_screen_enable) ||
+        (bl3_horizon_allowed != last_bl3_horizon_enable) ||
         (0U == state_periodic_div))
     {
         if (0U == flying_retry_div)
         {
             if (0U == ipc_flight_state_send(flying,
                                             image_send_enable,
-                                            screen_refresh_enable))
+                                            screen_refresh_enable,
+                                            standby_context,
+                                            bl3_screen_allowed,
+                                            bl3_horizon_allowed))
             {
                 last_flying = flying;
                 last_image_send_enable = image_send_enable;
                 last_screen_refresh_enable = screen_refresh_enable;
+                last_param_write_enable = standby_context;
+                last_bl3_screen_enable = bl3_screen_allowed;
+                last_bl3_horizon_enable = bl3_horizon_allowed;
                 state_periodic_div = 100U;
                 flying_retry_div = 0U;
             }

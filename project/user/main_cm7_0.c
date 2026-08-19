@@ -1,4 +1,5 @@
 #include "zf_common_headfile.h"
+#include "../code/FlightController/auto_landing.h"
 #include "../code/FlightController/fc_mode.h"
 #include "../code/Image/image_data.h"
 #include "../code/Planner/beacon_lost_detector.h"
@@ -10,7 +11,7 @@ volatile uint32 tick_1000us_cnt = 0U;
 volatile uint16 g_tick_1000HZ = 0U;
 static uint16 s_air_comm_beep_tick = 200U; /* 空地串口断联蜂鸣器的100Hz节拍计数 */
 
-#define AIR_RUN_DATA_CRITICAL_COUNT       (16U) /* 飞行期间下发的关键数据数量 */
+#define AIR_RUN_DATA_CRITICAL_COUNT       (17U) /* 飞行期间下发的关键数据数量 */
 #define AIR_RUN_DATA_DIAGNOSTIC_COUNT     (52U) /* 常态下发的完整诊断数据数量 */
 #define AIR_RUN_CRITICAL_STATE            (0U)  /* 飞机运行状态 */
 #define AIR_RUN_CRITICAL_CRSF_CH0         (1U)  /* CRSF标准化通道0 */
@@ -28,6 +29,7 @@ static uint16 s_air_comm_beep_tick = 200U; /* 空地串口断联蜂鸣器的100H
 #define AIR_RUN_CRITICAL_PLAN_FORWARD     (13U) /* 车模规划前进速度，单位m/s */
 #define AIR_RUN_CRITICAL_BEACON_LOST      (14U) /* 信标丢失标志 */
 #define AIR_RUN_CRITICAL_SYNC_TIME        (15U) /* 飞机同步时间，单位ms */
+#define AIR_RUN_CRITICAL_VACUUM_ENABLE    (16U) /* 飞机允许车模开启负压的标志 */
 
 float g_car_vel_x = 0.0f; // 这个是车的速度 这个变量大于0 , 车往右
 float g_car_vel_y = 0.0f; // 这个是车的速度 这个变量大于0 , 车往前
@@ -622,9 +624,16 @@ static void send_air_run_data_200hz(void)
 {
     FC_START_CRSF_state_e state = FC_START_CRSF_Get_State();
     uint8 car_plan_send_valid = s_air_run_car_plan.valid;
-    float plan_strafe_mps = (car_plan_send_valid != 0U) ? s_air_run_car_plan.target_strafe_mps : 0.0f;
-    float plan_forward_mps = (car_plan_send_valid != 0U) ? s_air_run_car_plan.target_forward_mps : 0.0f;
+    float plan_strafe_mps;
+    float plan_forward_mps;
     float beacon_lost = (float)BeaconLostDetector_GetFlag();
+
+    if(AutoLanding_IsTriggered() != 0U)
+    {
+        car_plan_send_valid = 0U;
+    }
+    plan_strafe_mps = (car_plan_send_valid != 0U) ? s_air_run_car_plan.target_strafe_mps : 0.0f;
+    plan_forward_mps = (car_plan_send_valid != 0U) ? s_air_run_car_plan.target_forward_mps : 0.0f;
 
     if ((state == FC_START_CRSF_STATE_TAKEOFF) ||
         (state == FC_START_CRSF_STATE_FLYING) ||
@@ -648,6 +657,8 @@ static void send_air_run_data_200hz(void)
         air_data[AIR_RUN_CRITICAL_PLAN_FORWARD] = plan_forward_mps;
         air_data[AIR_RUN_CRITICAL_BEACON_LOST] = beacon_lost;
         air_data[AIR_RUN_CRITICAL_SYNC_TIME] = (float)tick_1000us_cnt;
+        air_data[AIR_RUN_CRITICAL_VACUUM_ENABLE] =
+            (state == FC_START_CRSF_STATE_FLYING) ? 1.0f : 0.0f;
         (void)air_comm_send_run_data(air_data, AIR_RUN_DATA_CRITICAL_COUNT);
         return;
     }
@@ -811,6 +822,7 @@ static void core0_plan_update_100hz(void)
 {
     (void)BeaconLostDetector_Update();
     CarPlanEntry_Update(&s_air_run_car_plan);
+    AutoLanding_Update100Hz();
     if(g_tof_fused_height_mm <= 500.0f)
     {
         s_air_run_car_plan.valid = 0U;

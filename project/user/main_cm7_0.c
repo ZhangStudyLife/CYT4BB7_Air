@@ -903,12 +903,12 @@ static void core0_run_fast_loop_step(void)
 
     FC_Loop_1000Hz();
     air_comm_air_poll();
-    // car_plan_debug_200hz(); /* 临时关闭原CarPlan3调试日志。 */
+    car_plan_debug_200hz(); /* 临时关闭原CarPlan3调试日志。 */
     // mode1245_wifi_debug_200hz(); /* 临时关闭Mode1/2/4/5调试，改发相机模型标定日志。 */
     // camera_model_calibration_log_200hz(); /* 临时关闭相机模型标定日志，改发速度规划调试日志。 */
     // speed_planning_debug_200hz(); /* 临时关闭速度规划日志，改发Mode4高度控制日志。 */
     // height_control_debug_200hz(); /* 临时关闭Mode4高度控制日志，改发航向搜索和自动降落日志。 */
-    yaw_auto_landing_debug_200hz();
+    // yaw_auto_landing_debug_200hz();
 }
 
 /**

@@ -48,6 +48,7 @@ extern volatile uint32 tick_1000us_cnt;
 /* Yaw 角度目标是否已经对齐当前机头方向 */
 static uint8_t s_yaw_target_inited = 0U;
 #define FC_LANDING_TARGET_HEIGHT_M -0.5f
+#define FC_LANDING_HEIGHT_POS_KP_SCALE 0.5f
 /* 100Hz 锁存的飞行模式，50Hz 控制只消费该锁存值 */
 static FC_START_CRSF_flight_mode_e s_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
 /* 上一次锁存的飞行模式，用于检测模式切换边沿 */
@@ -375,7 +376,9 @@ void FC_Loop_50Hz(void)
         target_height_m = (fc_state == FC_START_CRSF_STATE_LANDING) ? FC_LANDING_TARGET_HEIGHT_M :
                           ((s_flight_mode == FC_START_CRSF_FLIGHT_MODE_3) ? FC_Mode3_Get_Target_Height_M() : g_fc_target_height_m);
         height_meas_m = g_tof_fused_height_mm * 0.001f;
-        height_pos_pid.kp = g_fc_params.pos_z_kp;
+        height_pos_pid.kp = (fc_state == FC_START_CRSF_STATE_LANDING) ?
+                            (FC_LANDING_HEIGHT_POS_KP_SCALE * g_fc_params.pos_z_kp) :
+                            g_fc_params.pos_z_kp;
         height_pos_out = PID_Update(&height_pos_pid, target_height_m, height_meas_m, dt);
         height_pos_out = fc_clampf(height_pos_out,
                                    -FC_HEIGHT_VEL_TARGET_LIMIT,

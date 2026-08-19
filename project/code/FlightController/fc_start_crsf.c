@@ -6,7 +6,8 @@
 #define FC_START_CRSF_LANDING_HOLD_TICKS_100HZ (20U)
 #define FC_START_CRSF_LANDING_REQUEST_HOLD_TICKS_100HZ (50U) /* CRSF_STD[3]低位触发降落所需连续周期数 */
 #define FC_START_CRSF_LANDING_CH3_LOW_THR (-333) /* CRSF_STD[3]标准范围底部三分之一阈值 */
-#define FC_START_CRSF_LANDING_STOP_HEIGHT_MM (180.0f)
+#define FC_START_CRSF_LANDING_STOP_HEIGHT_MM (220.0f)
+#define FC_START_CRSF_LANDING_RESET_HEIGHT_MM (350.0f)
 #define FC_START_CRSF_TAKEOFF_PAIR1_RAMP_MS (800U)
 #define FC_START_CRSF_TAKEOFF_PAIR2_RAMP_MS (800U)
 #define FC_START_CRSF_TAKEOFF_TO_2500_RAMP_MS (800U)
@@ -271,7 +272,15 @@ void FC_START_CRSF_UpdateLandingButton100Hz(void)
 
     if (s_fc_start_state == FC_START_CRSF_STATE_LANDING)
     {
-        if ((0U != g_tof_fused_valid) && (g_tof_fused_height_mm < FC_START_CRSF_LANDING_STOP_HEIGHT_MM))
+        if (0U == g_tof_fused_valid)
+        {
+            s_landing_low_tick = 0U;
+        }
+        else if (g_tof_fused_height_mm > FC_START_CRSF_LANDING_RESET_HEIGHT_MM)
+        {
+            s_landing_low_tick = 0U;
+        }
+        else if (g_tof_fused_height_mm < FC_START_CRSF_LANDING_STOP_HEIGHT_MM)
         {
             if (s_landing_low_tick < FC_START_CRSF_LANDING_HOLD_TICKS_100HZ)
             {
@@ -281,10 +290,6 @@ void FC_START_CRSF_UpdateLandingButton100Hz(void)
             {
                 FC_START_CRSF_ForceStopToStandby();
             }
-        }
-        else
-        {
-            s_landing_low_tick = 0U;
         }
     }
 }

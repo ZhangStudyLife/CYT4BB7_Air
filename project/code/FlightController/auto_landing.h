@@ -6,9 +6,9 @@
 typedef struct
 {
     uint16 initial_wait_ticks; /* 自动降落前置等待计数，单位10ms。 */
-    uint16 no_beacon_ticks; /* 连续无信标计数，单位10ms。 */
-    uint8 beacon_visible; /* 当前是否发现合格信标。 */
-    uint8 rotation_ready; /* 本轮实际定向搜索是否达到360度。 */
+    uint16 no_target_ticks; /* 无有效规划目标累计计数，单位10ms。 */
+    uint8 target_valid; /* plan_result.valid 是否已连续有效200ms。 */
+    uint8 rotation_ready; /* 实际定向搜索是否达到360度，仅用于观测。 */
     uint8 triggered; /* 自动降落触发锁存标志。 */
 } auto_landing_debug_t;
 

@@ -1,5 +1,6 @@
 #include "fc_loop.h"
 #include "fc_mode.h"
+#include "yaw_align.h"
 #include <math.h>
 #include "../Estimation/Attitude/IMU_TOP.h"
 #include "../Estimation/Height_Est/Height_Est.h"
@@ -56,21 +57,18 @@ static FC_START_CRSF_state_e s_prev_fc_state = FC_START_CRSF_STATE_INIT;
 /* Mode0 手动姿态前馈是否已完成目标对齐 */
 static uint8_t s_mode0_angle_ff_active = 0U;
 /* 悬停油门在线学习（借鉴 ArduPilot MOT_THST_HOVER） */
-#define FC_HOVER_THR_TC 4.0f
-#define FC_HOVER_LEARN_MIN_DELTA (-700.0f)
-#define FC_HOVER_LEARN_MAX_DELTA 900.0f
+#define FC_HOVER_THR_TC 2.0f /* 悬停油门I项转移时间常数，单位s。 */
+#define FC_HOVER_LEARN_MIN_DELTA (-300.0f) /* 悬停油门相对基准的最小学习量，单位PWM。 */
+#define FC_HOVER_LEARN_MAX_DELTA 700.0f /* 悬停油门相对基准的最大学习量，单位PWM。 */
 #define FC_HOVER_LEARN_VZ_MAX 0.18f
 #define FC_HOVER_LEARN_POS_MAX 0.08f
 #define FC_HOVER_LEARN_TILT_MAX 7.0f
 #define FC_HOVER_LEARN_ACC_MAX 0.20f
 #define FC_HOVER_LEARN_TOF_SPREAD_MAX 250.0f
-#define FC_HOVER_LEARN_RATE_MAX 220.0f
-#define FC_THRUST_ACC_MPS2_PER_PWM 0.00360f
-#define FC_HEIGHT_VEL_KD_ACC 0.035f
+#define FC_HOVER_LEARN_RATE_MAX 60.0f /* 悬停油门I项最大转移速度，单位PWM/s。 */
 #define FC_HEIGHT_VEL_TARGET_LIMIT 2.0f /* 垂直速度目标限幅，单位m/s。 */
 #define FC_HEIGHT_VEL_OUT_MIN (-1000.0f)
 #define FC_HEIGHT_VEL_OUT_MAX 1000.0f
-#define FC_HEIGHT_VEL_KD_PWM (FC_HEIGHT_VEL_KD_ACC / FC_THRUST_ACC_MPS2_PER_PWM)
 static float s_hover_throttle = 3200.0f;
 static float s_hover_learn_step = 0.0f;
 /* 姿态角外环输出到角速度目标的限幅，单位 deg/s */
@@ -282,8 +280,8 @@ void FC_Loop_Init(void)
              g_fc_params.yaw_gyro_i_limit, g_fc_params.yaw_gyro_d_lpf);
     PID_Init(&height_pos_pid, g_fc_params.pos_z_kp, 0.0f, 0.0f, 0.0f,
              g_fc_params.pos_z_dt, 0.0f, 0.0f);
-    PID_Init(&height_vel_pid, g_fc_params.vel_z_kp, g_fc_params.vel_z_ki, FC_HEIGHT_VEL_KD_PWM, 0.0f,
-             g_fc_params.vel_z_dt, g_fc_params.vel_z_i_limit, 12.0f);
+    PID_Init(&height_vel_pid, g_fc_params.vel_z_kp, g_fc_params.vel_z_ki, 0.0f, 0.0f,
+             g_fc_params.vel_z_dt, g_fc_params.vel_z_i_limit, 0.0f);
     height_pos_pid.aw_enable = 1U;
     height_pos_pid.output_min = -FC_HEIGHT_VEL_TARGET_LIMIT;
     height_pos_pid.output_max = FC_HEIGHT_VEL_TARGET_LIMIT;
@@ -489,6 +487,7 @@ void FC_Loop_100Hz(void)
     /* 悬停油门在线学习：仅在接近稳态悬停时更新 */
     s_hover_learn_step = 0.0f;
     if ((fc_state == FC_START_CRSF_STATE_FLYING) &&
+        (g_height_pollution_active == 0U) &&
         (g_height_meas_health > 0.65f) &&
         (g_height_fused_vz_mps > -FC_HOVER_LEARN_VZ_MAX) && (g_height_fused_vz_mps < FC_HOVER_LEARN_VZ_MAX) &&
         (height_pos_out > -FC_HOVER_LEARN_POS_MAX) && (height_pos_out < FC_HOVER_LEARN_POS_MAX) &&
@@ -498,13 +497,17 @@ void FC_Loop_100Hz(void)
         ((fmaxf(fmaxf(g_tof1_height_mm, g_tof2_height_mm), fmaxf(g_tof3_height_mm, g_tof4_height_mm)) -
           fminf(fminf(g_tof1_height_mm, g_tof2_height_mm), fminf(g_tof3_height_mm, g_tof4_height_mm))) < FC_HOVER_LEARN_TOF_SPREAD_MAX))
     {
-        s_hover_learn_step = fc_clampf((dt / (dt + FC_HOVER_THR_TC)) * height_vel_out,
+        s_hover_learn_step = fc_clampf((dt / (dt + FC_HOVER_THR_TC)) * height_vel_pid.i_term,
                                        -FC_HOVER_LEARN_RATE_MAX * dt, FC_HOVER_LEARN_RATE_MAX * dt);
         s_hover_learn_step = fc_clampf(s_hover_throttle + s_hover_learn_step,
                                        (float)g_fc_params.base_throttle + FC_HOVER_LEARN_MIN_DELTA,
                                        (float)g_fc_params.base_throttle + FC_HOVER_LEARN_MAX_DELTA) -
                              s_hover_throttle;
+        /* 将速度环I项偏置等量转入悬停油门，保持送入混控的总油门连续。 */
         s_hover_throttle += s_hover_learn_step;
+        height_vel_pid.integral -= s_hover_learn_step;
+        height_vel_pid.i_term -= s_hover_learn_step;
+        height_vel_pid.output -= s_hover_learn_step;
         height_vel_out -= s_hover_learn_step;
     }
 
@@ -651,9 +654,13 @@ void FC_Loop_500Hz(void)
 
         roll_gyro_target = roll_ctrl;
         pitch_gyro_target = pitch_ctrl;
-        yaw_gyro_target = fc_clampf(PID_Update(&yaw_angle_pid, yaw_error_deg, 0.0f, dt),
-                                    -s_fc_yaw_hold_rate_limit_dps,
-                                    s_fc_yaw_hold_rate_limit_dps);
+        yaw_gyro_target = PID_Update(&yaw_angle_pid, yaw_error_deg, 0.0f, dt);
+        if(YawAlign_IsSearchActive() == 0U)
+        {
+            yaw_gyro_target = fc_clampf(yaw_gyro_target,
+                                        -s_fc_yaw_hold_rate_limit_dps,
+                                        s_fc_yaw_hold_rate_limit_dps);
+        }
     }
     else
     {

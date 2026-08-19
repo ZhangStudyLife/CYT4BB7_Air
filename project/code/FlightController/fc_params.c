@@ -89,7 +89,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pitch_angle_d_lpf = 15.0f;
 
     /* ===== Yaw 轴角度环参数 ===== */
-    params->yaw_angle_kp = 5.4f;
+    params->yaw_angle_kp = 3.0f;
     params->yaw_angle_ki = 0.0f;
     params->yaw_angle_kd = 0.0f;
     params->yaw_angle_kff = 0.0f;

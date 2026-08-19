@@ -18,7 +18,8 @@ typedef struct
     uint8 candidate_frames;
     uint8 lost_frames;
     uint8 action;
-    uint8 beacon_visible; /* 当前是否发现合格信标。 */
+    uint8 beacon_visible; /* plan_result.valid 是否已连续有效100ms。 */
+    uint8 plan_valid; /* 当前 plan_result.valid 原始状态。 */
     uint8 search_active; /* 当前是否正在执行无信标旋转搜索。 */
     int8 search_direction; /* 搜索方向，1为yaw正方向，-1为yaw负方向。 */
     float yaw_delta_deg;
@@ -52,6 +53,13 @@ void YawAlign_Reset(void);
  * @return 无。
  */
 void YawAlign_Update(float yaw_change_mode);
+
+/**
+ * @brief 查询mode=2是否正在执行旋转搜索。
+ * @param 无。
+ * @return 1表示正在搜索，0表示未搜索。
+ */
+uint8 YawAlign_IsSearchActive(void);
 
 /**
  * @brief 获取航向对准和搜索状态的只读调试快照。

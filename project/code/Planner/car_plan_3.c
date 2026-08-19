@@ -15,6 +15,35 @@
 #define CAR_PLAN_3_HISTORY_TICKS     (30U)   /* 100Hz 下保留约 300ms 的远距离历史。 */
 #define CAR_PLAN_3_GAP_TICKS         (2U)    /* 100Hz 下允许约 20ms 的短暂丢失。 */
 #define CAR_PLAN_3_CONFIRM_TICKS     (3U)    /* 连续匹配三次后确认信标轨迹。 */
+#define CAR_PLAN_3_EDGE_MARGIN_PX    (20.0f) /* 进入惯导保持前的图像边缘余量，单位 px。 */
+#define CAR_PLAN_3_ATTITUDE_GATE_DEG (12.0f) /* 允许进入惯导保持的 Roll/Pitch 模长，单位 deg。 */
+#define CAR_PLAN_3_COAST_HOLD_MS     (150U)  /* COAST 阶段保持原速度的时间，单位 ms。 */
+#define CAR_PLAN_3_COAST_MAX_MS      (500U)  /* COAST 阶段惯导保持最长时间，单位 ms。 */
+#define CAR_PLAN_3_FAR_DISTANCE_M    (1.20f) /* 远距离 COAST 准入和强信任速度保持边界，单位 m。 */
+#define CAR_PLAN_3_FAR_COAST_HOLD_MS (450U)  /* 远距离 COAST 保持原速度的时间，单位 ms。 */
+#define CAR_PLAN_3_FAR_COAST_MAX_MS  (650U)  /* 远距离 COAST 惯导保持最长时间，单位 ms。 */
+#define CAR_PLAN_3_AGGRESSIVE_DISTANCE_M (2.00f) /* 强信任 COAST 的起始距离，单位 m。 */
+#define CAR_PLAN_3_AGGRESSIVE_COAST_MAX_MS (1200U) /* 强信任 COAST 最长盲航时间，单位 ms。 */
+#define CAR_PLAN_3_COAST_STOP_DISTANCE_M (0.60f) /* COAST 预测距离到该值时立即退出，单位 m。 */
+#define CAR_PLAN_3_CAR_DATA_WARN_MS  (50U)   /* 车数据超过该年龄后不再扩展惯导时间，单位 ms。 */
+#define CAR_PLAN_3_CAR_DATA_STOP_MS  (100U)  /* 车数据超过该年龄后停止惯导，单位 ms。 */
+#define CAR_PLAN_3_IMAGE_TIMEOUT_MS   (50U)   /* 目标来源相机超过该时间未更新时按丢失处理，单位 ms。 */
+#define CAR_PLAN_3_NO_VISION_TICKS   (2U)    /* 连续两次规划周期没有新图像后进入丢失判断。 */
+#define CAR_PLAN_3_INNOVATION_BASE_M (0.35f) /* 世界相对向量基础创新门限，单位 m。 */
+#define CAR_PLAN_3_INNOVATION_GAIN_S (0.80f) /* 车速传播造成的创新门限增益，单位 s。 */
+#define CAR_PLAN_3_INNOVATION_MAX_M  (1.20f) /* 世界相对向量最大创新门限，单位 m。 */
+#define CAR_PLAN_3_REACQUIRE_DIST_M  (0.50f) /* 重捕获连续观测之间的最大距离，单位 m。 */
+#define CAR_PLAN_3_AMBIGUITY_MARGIN_M (0.15f) /* 最佳与次佳创新小于该差值时拒绝歧义候选，单位 m。 */
+#define CAR_PLAN_3_LAMP_ANGLE_GATE_DEG (30.0f) /* 车灯长轴相对惯导预测的最大创新，单位 deg。 */
+#define CAR_PLAN_3_DIRECTION_COS_SQ  (0.8213938f) /* 相对方向创新 25deg 对应的最小余弦平方。 */
+#define CAR_PLAN_3_OUTPUT_COS_MIN     (0.8660254f) /* 重捕获速度方向最大变化 30deg 对应的最小余弦。 */
+
+#define CAR_PLAN_3_STATE_SEARCH       (0U)    /* 没有确认目标。 */
+#define CAR_PLAN_3_STATE_TRACK        (1U)    /* 有新图像确认目标。 */
+#define CAR_PLAN_3_STATE_COAST        (2U)    /* 图像短时丢失，使用车模惯导。 */
+#define CAR_PLAN_3_COAST_LEVEL_NEAR  (0U)    /* 近距离保守 COAST。 */
+#define CAR_PLAN_3_COAST_LEVEL_FAR   (1U)    /* 远距离 COAST。 */
+#define CAR_PLAN_3_COAST_LEVEL_AGGRESSIVE (2U) /* 2m 以上强信任 COAST。 */
 
 typedef struct
 {
@@ -27,10 +56,39 @@ typedef struct
     float y;
 } car_plan_3_beacon_track_t;
 
-extern float g_car_yaw;
+extern float g_car_yaw; /* 车模世界 yaw，单位 deg。 */
+extern float g_car_vel_x; /* 车体右向实际速度，单位 m/s。 */
+extern float g_car_vel_y; /* 车体前向实际速度，单位 m/s。 */
+extern float g_car_sync_time_ms; /* 最近一次车端同步时间戳，单位 ms。 */
+extern uint32 g_car_last_update_time_ms; /* 最近一次车端数据的本机接收时刻，单位 ms。 */
+extern volatile uint32 tick_1000us_cnt; /* 本机毫秒时基。 */
+extern volatile uint32 g_image_camera_rx_seq[IMAGE_CAMERA_COUNT]; /* 三路相机真实结果接收序号。 */
 static car_plan_result_t s_car_plan_3_result;
 static three_camera_result_t s_car_plan_3_camera;
 static int8 s_car_plan_3_selected = -1;
+static uint8 s_car_plan_3_state = CAR_PLAN_3_STATE_SEARCH; /* 目标跟踪状态。 */
+static uint8 s_car_plan_3_confirm_count = 0U; /* 搜索阶段连续确认的新图像数。 */
+static uint8 s_car_plan_3_reacquire_count = 0U; /* COAST 阶段三帧窗口内的重捕获命中数。 */
+static uint8 s_car_plan_3_reacquire_age = 0U; /* COAST 阶段重捕获确认窗口年龄，单位新图像。 */
+static uint8 s_car_plan_3_no_vision_ticks = 0U; /* 未收到可信新观测的连续规划周期数。 */
+static uint8 s_car_plan_3_coast_level = CAR_PLAN_3_COAST_LEVEL_NEAR; /* 当前 COAST 策略等级。 */
+static uint8 s_car_plan_3_track_camera_mask = 0U; /* 最近可信目标的来源相机位掩码。 */
+static uint32 s_car_plan_3_last_update_tick = 0U; /* 上次惯导传播的系统时刻，单位 ms。 */
+static uint32 s_car_plan_3_last_accept_tick = 0U; /* 上次接纳图像观测的系统时刻，单位 ms。 */
+static uint32 s_car_plan_3_last_camera_tick = 0U; /* 目标来源相机最近一次真实更新时刻，单位 ms。 */
+static uint32 s_car_plan_3_camera_seq[IMAGE_CAMERA_COUNT]; /* 规划器已处理的各相机真实结果序号。 */
+static uint32 s_car_plan_3_filter_camera_seq[IMAGE_CAMERA_COUNT]; /* 近车灯过滤器已处理的各相机序号。 */
+static float s_car_plan_3_track_dx_m = 0.0f; /* 当前车灯到锁定信标的世界 X 相对量，单位 m。 */
+static float s_car_plan_3_track_dy_m = 0.0f; /* 当前车灯到锁定信标的世界 Y 相对量，单位 m。 */
+static float s_car_plan_3_track_lamp_angle_deg = 0.0f; /* 最近可信车灯世界长轴角，单位 deg。 */
+static float s_car_plan_3_track_car_yaw_deg = 0.0f; /* 最近可信观测对应的车模世界 yaw，单位 deg。 */
+static float s_car_plan_3_track_speed_mps = 0.0f; /* 最近可信规划速度模长，单位 m/s。 */
+static float s_car_plan_3_pending_dx_m = 0.0f; /* 待确认信标的世界 X 相对量，单位 m。 */
+static float s_car_plan_3_pending_dy_m = 0.0f; /* 待确认信标的世界 Y 相对量，单位 m。 */
+static float s_car_plan_3_pending_lamp_angle_deg = 0.0f; /* 待确认车灯世界长轴角，单位 deg。 */
+static float s_car_plan_3_pending_car_yaw_deg = 0.0f; /* 待确认观测对应的车模世界 yaw，单位 deg。 */
+static float s_car_plan_3_last_edge_margin_px = 1000.0f; /* 最近可信观测的最小图像边缘余量，单位 px。 */
+static struct image_data s_car_plan_3_filtered[IMAGE_CAMERA_COUNT]; /* 各相机最近一次真实新图像的过滤结果。 */
 static car_plan_3_beacon_track_t
     s_car_plan_3_track[IMAGE_CAMERA_COUNT][IMAGE_MAX_BEACON_COUNT]; /* 三摄原始信标短时轨迹。 */
 
@@ -51,6 +109,12 @@ static void CarPlan_3_FilterNearLamp(
         const car_lamp_data *lamp = &image_data[camera].car_lamp_data[0];
         uint8 lamp_valid = image_data_car_lamp_valid(lamp);
 
+        if(g_image_camera_rx_seq[camera] == s_car_plan_3_filter_camera_seq[camera])
+        {
+            filtered[camera] = s_car_plan_3_filtered[camera];
+            continue;
+        }
+        s_car_plan_3_filter_camera_seq[camera] = g_image_camera_rx_seq[camera];
         filtered[camera] = image_data[camera];
         for(index = 0U; index < IMAGE_MAX_BEACON_COUNT; index++)
         {
@@ -179,7 +243,441 @@ static void CarPlan_3_FilterNearLamp(
                 track->suspect_age_ticks = CAR_PLAN_3_HISTORY_TICKS + 1U;
             }
         }
+        s_car_plan_3_filtered[camera] = filtered[camera];
     }
+}
+
+/**
+ * @brief 获取本规划周期内真正更新的相机位掩码，并记录已处理序号。
+ * @param 无。
+ * @return 位 0-2 分别表示 Front、Center、Back 是否产生了真实新图像。
+ */
+static uint8 CarPlan_3_GetNewCameraMask(void)
+{
+    uint8 camera;
+    uint8 mask = 0U;
+
+    for(camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
+    {
+        if(g_image_camera_rx_seq[camera] != s_car_plan_3_camera_seq[camera])
+        {
+            s_car_plan_3_camera_seq[camera] = g_image_camera_rx_seq[camera];
+            mask |= (uint8)(1U << camera);
+        }
+    }
+    return mask;
+}
+
+/**
+ * @brief 计算指定来源相机内已过滤信标到 188x120 图像边界的最小余量。
+ * @param camera_mask 需要检查的来源相机位掩码。
+ * @return 有效信标的最小边缘余量，单位 px；无有效信标时返回 1000。
+ */
+static float CarPlan_3_GetEdgeMarginPx(uint8 camera_mask)
+{
+    uint8 camera;
+    uint8 index;
+    float margin = 1000.0f;
+
+    for(camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
+    {
+        if((camera_mask & (uint8)(1U << camera)) == 0U)
+        {
+            continue;
+        }
+        for(index = 0U; index < IMAGE_MAX_BEACON_COUNT; index++)
+        {
+            const beacon_data *beacon =
+                &s_car_plan_3_filtered[camera].beacon_data[index];
+            float x_margin;
+            float y_margin;
+            float current;
+
+            if(image_data_beacon_valid(beacon) == 0U)
+            {
+                continue;
+            }
+            x_margin = 94.0f - fabsf(beacon->x);
+            y_margin = 60.0f - fabsf(beacon->y);
+            current = (x_margin < y_margin) ? x_margin : y_margin;
+            if(current < margin)
+            {
+                margin = current;
+            }
+        }
+    }
+    return margin;
+}
+
+/**
+ * @brief 判断车模速度与航向数据是否在指定时间内保持新鲜。
+ * @param max_age_ms 允许的最大未更新时间，单位 ms。
+ * @return 数据有效且未超时时返回 1，否则返回 0。
+ */
+static uint8 CarPlan_3_CarDataFresh(uint32 max_age_ms)
+{
+    return ((g_car_sync_time_ms > 0.0f) &&
+            ((tick_1000us_cnt - g_car_last_update_time_ms) <= max_age_ms) &&
+            isfinite(g_car_vel_x) && isfinite(g_car_vel_y) &&
+            isfinite(g_car_yaw)) ? 1U : 0U;
+}
+
+/**
+ * @brief 使用车体右向和前向速度传播车灯到静止信标的世界相对向量。
+ * @param dt_s 本次传播时间，单位 s，范围 0-0.05。
+ * @return 无。
+ */
+static void CarPlan_3_Propagate(float dt_s)
+{
+    float yaw_rad;
+    float velocity_x;
+    float velocity_y;
+
+    yaw_rad = g_car_yaw * CAR_PLAN_3_DEG_TO_RAD;
+    velocity_x = g_car_vel_y * cosf(yaw_rad) - g_car_vel_x * sinf(yaw_rad);
+    velocity_y = g_car_vel_y * sinf(yaw_rad) + g_car_vel_x * cosf(yaw_rad);
+    if(s_car_plan_3_state != CAR_PLAN_3_STATE_SEARCH)
+    {
+        s_car_plan_3_track_dx_m -= velocity_x * dt_s;
+        s_car_plan_3_track_dy_m -= velocity_y * dt_s;
+    }
+    if((s_car_plan_3_confirm_count != 0U) ||
+       (s_car_plan_3_reacquire_count != 0U))
+    {
+        s_car_plan_3_pending_dx_m -= velocity_x * dt_s;
+        s_car_plan_3_pending_dy_m -= velocity_y * dt_s;
+    }
+}
+
+/**
+ * @brief 使用车模 yaw 变化传播车灯的世界长轴角。
+ * @param angle_deg 参考车灯世界长轴角，单位 deg。
+ * @param yaw_deg 参考观测对应的车模世界 yaw，单位 deg。
+ * @return 传播到当前车模 yaw 的车灯世界长轴角，单位 deg。
+ */
+static float CarPlan_3_PredictLampAngle(float angle_deg, float yaw_deg)
+{
+    float yaw_delta = g_car_yaw - yaw_deg;
+
+    while(yaw_delta > 180.0f)
+    {
+        yaw_delta -= 360.0f;
+    }
+    while(yaw_delta < -180.0f)
+    {
+        yaw_delta += 360.0f;
+    }
+    return angle_deg + yaw_delta;
+}
+
+/**
+ * @brief 检查候选车灯长轴是否符合车模 yaw 传播后的无向角预测。
+ * @param candidate_deg 候选车灯世界长轴角，单位 deg。
+ * @return 角度创新不超过门限时返回 1，否则返回 0。
+ */
+static uint8 CarPlan_3_LampAngleConsistent(float candidate_deg)
+{
+    float reference_angle = (s_car_plan_3_state == CAR_PLAN_3_STATE_SEARCH)
+                                ? s_car_plan_3_pending_lamp_angle_deg
+                                : s_car_plan_3_track_lamp_angle_deg;
+    float reference_yaw = (s_car_plan_3_state == CAR_PLAN_3_STATE_SEARCH)
+                              ? s_car_plan_3_pending_car_yaw_deg
+                              : s_car_plan_3_track_car_yaw_deg;
+    float error = candidate_deg -
+                  CarPlan_3_PredictLampAngle(reference_angle, reference_yaw);
+
+    while(error > 90.0f)
+    {
+        error -= 180.0f;
+    }
+    while(error < -90.0f)
+    {
+        error += 180.0f;
+    }
+    return (fabsf(error) <= CAR_PLAN_3_LAMP_ANGLE_GATE_DEG) ? 1U : 0U;
+}
+
+/**
+ * @brief 在本次真实新图像中选择满足距离和连续性约束的候选信标。
+ * @param new_camera_mask 本周期真实更新的相机位掩码。
+ * @param use_reference 非零时按参考世界相对向量选择，否则按车灯距离选择。
+ * @param reference_x_m 参考世界 X 相对量，单位 m。
+ * @param reference_y_m 参考世界 Y 相对量，单位 m。
+ * @param gate_m 使用参考向量时的最大创新距离，单位 m。
+ * @param selected 输出候选槽位，不得为空。
+ * @param best_innovation_m 输出最佳候选创新距离，单位 m；不得为空。
+ * @param second_innovation_m 输出次佳候选创新距离，单位 m；不得为空。
+ * @return 找到可信候选返回 1，否则返回 0。
+ */
+static uint8 CarPlan_3_SelectCandidate(uint8 new_camera_mask,
+                                       uint8 use_reference,
+                                       float reference_x_m,
+                                       float reference_y_m,
+                                       float gate_m,
+                                       uint8 *selected,
+                                       float *best_innovation_m,
+                                       float *second_innovation_m)
+{
+    uint8 i;
+    uint8 best_same_camera = 0U;
+    uint8 second_available = 0U;
+    float best_score_sq = 0.0f;
+    float second_score_sq = 0.0f;
+    float reference_sq = reference_x_m * reference_x_m +
+                         reference_y_m * reference_y_m;
+    float gate_sq = gate_m * gate_m;
+
+    *selected = 0xFFU;
+    *best_innovation_m = 1000.0f;
+    *second_innovation_m = 1000.0f;
+
+    for(i = 0U; i < s_car_plan_3_camera.beacon_count; i++)
+    {
+        const three_camera_beacon_t *beacon = &s_car_plan_3_camera.beacon[i];
+        uint8 same_camera = (beacon->pair_same_camera != 0U) ? 1U : 0U;
+        float dx = beacon->pair_dx_m;
+        float dy = beacon->pair_dy_m;
+        float distance_sq;
+        float score_sq;
+
+        if((beacon->valid == 0U) || (beacon->pair_valid == 0U) ||
+           ((beacon->camera_mask & new_camera_mask) == 0U) ||
+           (isfinite(dx) == 0) || (isfinite(dy) == 0) ||
+           (isfinite(beacon->pair_lamp_angle_deg) == 0))
+        {
+            continue;
+        }
+        distance_sq = dx * dx + dy * dy;
+        if((distance_sq < CAR_PLAN_3_MIN_DISTANCE_M * CAR_PLAN_3_MIN_DISTANCE_M) ||
+           (distance_sq > CAR_PLAN_3_MAX_DISTANCE_M * CAR_PLAN_3_MAX_DISTANCE_M))
+        {
+            continue;
+        }
+        if(use_reference != 0U)
+        {
+            float direction_dot = dx * reference_x_m + dy * reference_y_m;
+
+            if(CarPlan_3_LampAngleConsistent(beacon->pair_lamp_angle_deg) == 0U)
+            {
+                continue;
+            }
+            if((direction_dot <= 0.0f) ||
+               (direction_dot * direction_dot <
+                CAR_PLAN_3_DIRECTION_COS_SQ * distance_sq * reference_sq))
+            {
+                continue;
+            }
+            dx -= reference_x_m;
+            dy -= reference_y_m;
+            score_sq = dx * dx + dy * dy;
+            if(score_sq > gate_sq)
+            {
+                continue;
+            }
+        }
+        else
+        {
+            score_sq = distance_sq;
+        }
+        if((use_reference == 0U) && (*selected != 0xFFU) &&
+           (best_same_camera != same_camera))
+        {
+            if(best_same_camera != 0U)
+            {
+                continue;
+            }
+            *selected = 0xFFU;
+            second_available = 0U;
+        }
+        if((*selected == 0xFFU) || (score_sq < best_score_sq))
+        {
+            if(*selected != 0xFFU)
+            {
+                second_score_sq = best_score_sq;
+                second_available = 1U;
+            }
+            best_score_sq = score_sq;
+            *selected = i;
+            best_same_camera = same_camera;
+        }
+        else if((second_available == 0U) || (score_sq < second_score_sq))
+        {
+            second_score_sq = score_sq;
+            second_available = 1U;
+        }
+    }
+
+    if(*selected == 0xFFU)
+    {
+        return 0U;
+    }
+    if(use_reference != 0U)
+    {
+        *best_innovation_m = sqrtf(best_score_sq);
+        if(second_available != 0U)
+        {
+            *second_innovation_m = sqrtf(second_score_sq);
+        }
+    }
+    return 1U;
+}
+
+/**
+ * @brief 将世界相对向量转换为车体系单位速度方向。
+ * @param dx_m 车灯到信标的世界 X 相对量，单位 m。
+ * @param dy_m 车灯到信标的世界 Y 相对量，单位 m。
+ * @param lamp_angle_deg 车灯横轴在世界坐标系中的无向角，单位 deg。
+ * @param target_strafe 输出车体右向单位分量，不得为空。
+ * @param target_forward 输出车体前向单位分量，不得为空。
+ * @param distance_m 输出车灯到信标距离，单位 m；不得为空。
+ * @return 相对向量在有效距离内返回 1，否则返回 0。
+ */
+static uint8 CarPlan_3_GetDirection(float dx_m,
+                                    float dy_m,
+                                    float lamp_angle_deg,
+                                    float *target_strafe,
+                                    float *target_forward,
+                                    float *distance_m)
+{
+    float angle_rad;
+    float right_x;
+    float right_y;
+
+    if((isfinite(dx_m) == 0) || (isfinite(dy_m) == 0) ||
+       (isfinite(lamp_angle_deg) == 0) || (isfinite(g_car_yaw) == 0))
+    {
+        return 0U;
+    }
+    *distance_m = sqrtf(dx_m * dx_m + dy_m * dy_m);
+    if((*distance_m < CAR_PLAN_3_MIN_DISTANCE_M) ||
+       (*distance_m > CAR_PLAN_3_MAX_DISTANCE_M))
+    {
+        return 0U;
+    }
+    angle_rad = lamp_angle_deg * CAR_PLAN_3_DEG_TO_RAD;
+    right_x = cosf(angle_rad);
+    right_y = sinf(angle_rad);
+    if(cosf((lamp_angle_deg - g_car_yaw - 90.0f) *
+            CAR_PLAN_3_DEG_TO_RAD) < 0.0f)
+    {
+        right_x = -right_x;
+        right_y = -right_y;
+    }
+    *target_strafe = (dx_m * right_x + dy_m * right_y) / *distance_m;
+    *target_forward = (dx_m * right_y - dy_m * right_x) / *distance_m;
+    if((isfinite(*target_strafe) == 0) || (isfinite(*target_forward) == 0))
+    {
+        return 0U;
+    }
+    return 1U;
+}
+
+/**
+ * @brief 接纳一个通过连续性检查的图像候选并更新规划输出。
+ * @param selected 三摄融合信标槽位，范围 0 至 beacon_count-1。
+ * @param tick_now 当前系统时刻，单位 ms。
+ * @return 候选方向有效时返回 1，否则返回 0。
+ */
+static uint8 CarPlan_3_AcceptCandidate(uint8 selected, uint32 tick_now)
+{
+    const three_camera_beacon_t *beacon = &s_car_plan_3_camera.beacon[selected];
+    float target_strafe;
+    float target_forward;
+    float distance;
+    float plan_speed;
+
+    if(CarPlan_3_GetDirection(beacon->pair_dx_m,
+                              beacon->pair_dy_m,
+                              beacon->pair_lamp_angle_deg,
+                              &target_strafe,
+                              &target_forward,
+                              &distance) == 0U)
+    {
+        return 0U;
+    }
+    if(s_car_plan_3_state != CAR_PLAN_3_STATE_SEARCH)
+    {
+        float predicted_strafe;
+        float predicted_forward;
+        float predicted_distance;
+
+        if((CarPlan_3_GetDirection(s_car_plan_3_track_dx_m,
+                                   s_car_plan_3_track_dy_m,
+                                   CarPlan_3_PredictLampAngle(
+                                       s_car_plan_3_track_lamp_angle_deg,
+                                       s_car_plan_3_track_car_yaw_deg),
+                                   &predicted_strafe,
+                                   &predicted_forward,
+                                   &predicted_distance) == 0U) ||
+           ((target_strafe * predicted_strafe +
+             target_forward * predicted_forward) < CAR_PLAN_3_OUTPUT_COS_MIN))
+        {
+            return 0U;
+        }
+    }
+    plan_speed = SpeedPlan_Update(1U,
+                                  distance,
+                                  atan2f(fabsf(target_strafe), target_forward) *
+                                      CAR_PLAN_3_RAD_TO_DEG);
+    s_car_plan_3_track_dx_m = beacon->pair_dx_m;
+    s_car_plan_3_track_dy_m = beacon->pair_dy_m;
+    s_car_plan_3_track_lamp_angle_deg = beacon->pair_lamp_angle_deg;
+    s_car_plan_3_track_car_yaw_deg = g_car_yaw;
+    s_car_plan_3_track_speed_mps = plan_speed;
+    s_car_plan_3_track_camera_mask = beacon->camera_mask;
+    s_car_plan_3_last_edge_margin_px =
+        CarPlan_3_GetEdgeMarginPx(s_car_plan_3_track_camera_mask);
+    s_car_plan_3_last_accept_tick = tick_now;
+    s_car_plan_3_last_camera_tick = tick_now;
+    s_car_plan_3_state = CAR_PLAN_3_STATE_TRACK;
+    s_car_plan_3_coast_level = CAR_PLAN_3_COAST_LEVEL_NEAR;
+    s_car_plan_3_confirm_count = 0U;
+    s_car_plan_3_reacquire_count = 0U;
+    s_car_plan_3_reacquire_age = 0U;
+    s_car_plan_3_no_vision_ticks = 0U;
+    s_car_plan_3_result.valid = 1U;
+    s_car_plan_3_result.target_strafe_mps = target_strafe * plan_speed;
+    s_car_plan_3_result.target_forward_mps = target_forward * plan_speed;
+    s_car_plan_3_selected = (int8)selected;
+    return 1U;
+}
+
+/**
+ * @brief 使用当前惯导相对向量生成保持或平滑退出阶段的速度输出。
+ * @param speed_scale 最近可信速度的缩放比例，范围 0-1。
+ * @return 预测方向有效且缩放比例大于零时返回 1，否则返回 0。
+ */
+static uint8 CarPlan_3_OutputPrediction(float speed_scale)
+{
+    float target_strafe;
+    float target_forward;
+    float distance;
+
+    distance = sqrtf(s_car_plan_3_track_dx_m * s_car_plan_3_track_dx_m +
+                     s_car_plan_3_track_dy_m * s_car_plan_3_track_dy_m);
+    if(distance <= CAR_PLAN_3_COAST_STOP_DISTANCE_M)
+    {
+        return 0U;
+    }
+    if((speed_scale <= 0.0f) ||
+       (CarPlan_3_GetDirection(s_car_plan_3_track_dx_m,
+                               s_car_plan_3_track_dy_m,
+                               CarPlan_3_PredictLampAngle(
+                                   s_car_plan_3_track_lamp_angle_deg,
+                                   s_car_plan_3_track_car_yaw_deg),
+                               &target_strafe,
+                               &target_forward,
+                               &distance) == 0U))
+    {
+        return 0U;
+    }
+    s_car_plan_3_result.valid = 1U;
+    s_car_plan_3_result.target_strafe_mps =
+        target_strafe * s_car_plan_3_track_speed_mps * speed_scale;
+    s_car_plan_3_result.target_forward_mps =
+        target_forward * s_car_plan_3_track_speed_mps * speed_scale;
+    s_car_plan_3_selected = -1;
+    return 1U;
 }
 
 static void CarPlan_3_ClearResult(void)
@@ -190,6 +688,26 @@ static void CarPlan_3_ClearResult(void)
     s_car_plan_3_selected = -1;
 }
 
+/**
+ * @brief 放弃当前目标并回到搜索状态，同时清空速度输出。
+ * @param 无。
+ * @return 无。
+ */
+static void CarPlan_3_DropTarget(void)
+{
+    s_car_plan_3_state = CAR_PLAN_3_STATE_SEARCH;
+    s_car_plan_3_confirm_count = 0U;
+    s_car_plan_3_reacquire_count = 0U;
+    s_car_plan_3_reacquire_age = 0U;
+    s_car_plan_3_no_vision_ticks = 0U;
+    s_car_plan_3_coast_level = CAR_PLAN_3_COAST_LEVEL_NEAR;
+    s_car_plan_3_track_camera_mask = 0U;
+    s_car_plan_3_last_accept_tick = 0U;
+    s_car_plan_3_last_camera_tick = 0U;
+    (void)SpeedPlan_Update(0U, 0.0f, 0.0f);
+    CarPlan_3_ClearResult();
+}
+
 void CarPlan_3_Reset(void)
 {
     uint8 camera;
@@ -197,6 +715,26 @@ void CarPlan_3_Reset(void)
 
     CarPlan_3_ClearResult();
     SpeedPlan_Reset();
+    s_car_plan_3_state = CAR_PLAN_3_STATE_SEARCH;
+    s_car_plan_3_confirm_count = 0U;
+    s_car_plan_3_reacquire_count = 0U;
+    s_car_plan_3_reacquire_age = 0U;
+    s_car_plan_3_no_vision_ticks = 0U;
+    s_car_plan_3_coast_level = CAR_PLAN_3_COAST_LEVEL_NEAR;
+    s_car_plan_3_track_camera_mask = 0U;
+    s_car_plan_3_last_update_tick = tick_1000us_cnt;
+    s_car_plan_3_last_accept_tick = 0U;
+    s_car_plan_3_last_camera_tick = 0U;
+    s_car_plan_3_track_dx_m = 0.0f;
+    s_car_plan_3_track_dy_m = 0.0f;
+    s_car_plan_3_track_lamp_angle_deg = 0.0f;
+    s_car_plan_3_track_car_yaw_deg = 0.0f;
+    s_car_plan_3_track_speed_mps = 0.0f;
+    s_car_plan_3_pending_dx_m = 0.0f;
+    s_car_plan_3_pending_dy_m = 0.0f;
+    s_car_plan_3_pending_lamp_angle_deg = 0.0f;
+    s_car_plan_3_pending_car_yaw_deg = 0.0f;
+    s_car_plan_3_last_edge_margin_px = 1000.0f;
     s_car_plan_3_camera.car_lamp.valid = 0U;
     s_car_plan_3_camera.beacon_count = 0U;
     for(i = 0U; i < THREE_CAMERA_MAX_BEACON_COUNT; i++)
@@ -205,6 +743,9 @@ void CarPlan_3_Reset(void)
     }
     for(camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
     {
+        s_car_plan_3_camera_seq[camera] = 0U;
+        s_car_plan_3_filter_camera_seq[camera] = 0U;
+        image_data_clear(&s_car_plan_3_filtered[camera]);
         for(i = 0U; i < IMAGE_MAX_BEACON_COUNT; i++)
         {
             s_car_plan_3_track[camera][i].valid = 0U;
@@ -221,127 +762,381 @@ void CarPlan_3_Reset(void)
 }
 
 /**
- * @brief 使用三摄 Double Sphere 几何计算最近信标的车体系目标速度，同摄组合优先于跨摄组合。
+ * @brief 使用三摄世界相对向量锁定信标，并在边缘姿态丢失时短时惯导保持车速。
  * @param result 输出车体系横向和前向目标速度；允许传入空指针。
- * @return 成功得到 0.20-6.00 m 内可信目标方向时返回 1，否则清空输出并返回 0。
+ * @return TRACK 或 COAST 仍有有效目标速度时返回 1，否则返回 0。
  */
 uint8 CarPlan_3_Update(car_plan_result_t *result)
 {
     struct image_data filtered[IMAGE_CAMERA_COUNT];
-    uint8 i;
+    uint32 tick_now = tick_1000us_cnt;
+    uint32 delta_ms = tick_now - s_car_plan_3_last_update_tick;
+    uint32 lost_age_ms;
+    uint8 new_camera_mask;
+    uint8 camera_valid;
     uint8 selected = 0xFFU;
-    uint8 same_pair_available = 0U;
-    float selected_distance_sq = 0.0f;
-    float dx;
-    float dy;
-    float distance;
-    float angle_rad;
-    float right_x;
-    float right_y;
-    float target_strafe;
-    float target_forward;
-    float plan_speed;
+    uint8 candidate_valid = 0U;
+    float dt_s;
+    float car_speed;
+    float innovation_gate;
+    float best_innovation;
+    float second_innovation;
+    float attitude;
+    float track_distance;
+    float distance_scale;
+    float speed_scale;
 
+    if(delta_ms > 50U)
+    {
+        delta_ms = 50U;
+    }
+    dt_s = (float)delta_ms * 0.001f;
+    s_car_plan_3_last_update_tick = tick_now;
     CarPlan_3_ClearResult();
     CarPlan_3_FilterNearLamp(filtered);
-    if(Three_Camera_Update(filtered,
-                           g_euler.roll,
-                           g_euler.pitch,
-                           g_euler.yaw,
-                           g_tof_fused_height_mm,
-                           g_tof_fused_valid,
-                           &s_car_plan_3_camera) == 0U ||
-       s_car_plan_3_camera.car_lamp.valid == 0U)
+    new_camera_mask = CarPlan_3_GetNewCameraMask();
+    camera_valid = Three_Camera_Update(filtered,
+                                       g_euler.roll,
+                                       g_euler.pitch,
+                                       g_euler.yaw,
+                                       g_tof_fused_height_mm,
+                                       g_tof_fused_valid,
+                                       &s_car_plan_3_camera);
+    if(s_car_plan_3_camera.car_lamp.valid == 0U)
     {
-        (void)SpeedPlan_Update(0U, 0.0f, 0.0f);
+        camera_valid = 0U;
+    }
+    if(CarPlan_3_CarDataFresh(CAR_PLAN_3_CAR_DATA_STOP_MS) == 0U)
+    {
+        CarPlan_3_DropTarget();
         if(result != 0)
         {
             *result = s_car_plan_3_result;
         }
         return 0U;
     }
+    CarPlan_3_Propagate(dt_s);
 
-    /* 只要存在同摄组合，本帧就不使用跨摄组合。 */
-    for(i = 0U; i < s_car_plan_3_camera.beacon_count; i++)
-    {
-        if((s_car_plan_3_camera.beacon[i].valid != 0U) &&
-           (s_car_plan_3_camera.beacon[i].pair_valid != 0U) &&
-           (s_car_plan_3_camera.beacon[i].pair_same_camera != 0U))
-        {
-            same_pair_available = 1U;
-            break;
-        }
-    }
-
-    /* 在允许的同摄或跨摄组合中选择水平距离最近的物理信标。 */
-    for(i = 0U; i < s_car_plan_3_camera.beacon_count; i++)
-    {
-        float candidate_dx;
-        float candidate_dy;
-        float candidate_distance_sq;
-
-        if((s_car_plan_3_camera.beacon[i].valid == 0U) ||
-           (s_car_plan_3_camera.beacon[i].pair_valid == 0U) ||
-           ((same_pair_available != 0U) &&
-            (s_car_plan_3_camera.beacon[i].pair_same_camera == 0U)))
-        {
-            continue;
-        }
-        candidate_dx = s_car_plan_3_camera.beacon[i].pair_dx_m;
-        candidate_dy = s_car_plan_3_camera.beacon[i].pair_dy_m;
-        candidate_distance_sq = candidate_dx * candidate_dx +
-                                candidate_dy * candidate_dy;
-        if(selected == 0xFFU || candidate_distance_sq < selected_distance_sq)
-        {
-            selected = i;
-            selected_distance_sq = candidate_distance_sq;
-        }
-    }
-
-    if(selected == 0xFFU ||
-       selected_distance_sq < CAR_PLAN_3_MIN_DISTANCE_M * CAR_PLAN_3_MIN_DISTANCE_M ||
-       selected_distance_sq > CAR_PLAN_3_MAX_DISTANCE_M * CAR_PLAN_3_MAX_DISTANCE_M)
+    /* 搜索阶段只按真实新图像累计三次连续确认，防止缓存或单帧假点启动车模。 */
+    if(s_car_plan_3_state == CAR_PLAN_3_STATE_SEARCH)
     {
         (void)SpeedPlan_Update(0U, 0.0f, 0.0f);
+        if(new_camera_mask != 0U)
+        {
+            if(camera_valid == 0U)
+            {
+                candidate_valid = 0U;
+            }
+            else if(s_car_plan_3_confirm_count == 0U)
+            {
+                candidate_valid = CarPlan_3_SelectCandidate(new_camera_mask,
+                                                             0U,
+                                                             0.0f,
+                                                             0.0f,
+                                                             0.0f,
+                                                             &selected,
+                                                             &best_innovation,
+                                                             &second_innovation);
+            }
+            else
+            {
+                candidate_valid = CarPlan_3_SelectCandidate(new_camera_mask,
+                                                             1U,
+                                                             s_car_plan_3_pending_dx_m,
+                                                             s_car_plan_3_pending_dy_m,
+                                                             CAR_PLAN_3_REACQUIRE_DIST_M,
+                                                             &selected,
+                                                             &best_innovation,
+                                                             &second_innovation);
+                if((candidate_valid != 0U) &&
+                   ((second_innovation - best_innovation) <
+                    CAR_PLAN_3_AMBIGUITY_MARGIN_M))
+                {
+                    candidate_valid = 0U;
+                }
+            }
+            if(candidate_valid != 0U)
+            {
+                s_car_plan_3_pending_dx_m =
+                    s_car_plan_3_camera.beacon[selected].pair_dx_m;
+                s_car_plan_3_pending_dy_m =
+                    s_car_plan_3_camera.beacon[selected].pair_dy_m;
+                s_car_plan_3_pending_lamp_angle_deg =
+                    s_car_plan_3_camera.beacon[selected].pair_lamp_angle_deg;
+                s_car_plan_3_pending_car_yaw_deg = g_car_yaw;
+                s_car_plan_3_last_camera_tick = tick_now;
+                if(s_car_plan_3_confirm_count < 0xFFU)
+                {
+                    s_car_plan_3_confirm_count++;
+                }
+                if(s_car_plan_3_confirm_count >= CAR_PLAN_3_CONFIRM_TICKS)
+                {
+                    if(CarPlan_3_AcceptCandidate(selected, tick_now) == 0U)
+                    {
+                        s_car_plan_3_confirm_count = 0U;
+                    }
+                }
+            }
+            else
+            {
+                s_car_plan_3_confirm_count = 0U;
+            }
+        }
+        else if((s_car_plan_3_confirm_count != 0U) &&
+                ((tick_now - s_car_plan_3_last_camera_tick) >=
+                 CAR_PLAN_3_IMAGE_TIMEOUT_MS))
+        {
+            s_car_plan_3_confirm_count = 0U;
+        }
         if(result != 0)
         {
             *result = s_car_plan_3_result;
         }
-        return 0U;
+        return s_car_plan_3_result.valid;
     }
 
-    dx = s_car_plan_3_camera.beacon[selected].pair_dx_m;
-    dy = s_car_plan_3_camera.beacon[selected].pair_dy_m;
-    distance = sqrtf(selected_distance_sq);
-    angle_rad = s_car_plan_3_camera.beacon[selected].pair_lamp_angle_deg *
-                CAR_PLAN_3_DEG_TO_RAD;
-    right_x = cosf(angle_rad);
-    right_y = sinf(angle_rad);
-    /* 车灯长轴是车体横轴；yaw只用于将无向长轴统一到车体右向。 */
-    if(cosf((s_car_plan_3_camera.beacon[selected].pair_lamp_angle_deg -
-             g_car_yaw - 90.0f) *
-            CAR_PLAN_3_DEG_TO_RAD) < 0.0f)
+    lost_age_ms = tick_now - s_car_plan_3_last_accept_tick;
+    car_speed = sqrtf(g_car_vel_x * g_car_vel_x + g_car_vel_y * g_car_vel_y);
+    innovation_gate = CAR_PLAN_3_INNOVATION_BASE_M +
+                      CAR_PLAN_3_INNOVATION_GAIN_S * car_speed *
+                          ((float)lost_age_ms * 0.001f);
+    if(innovation_gate > CAR_PLAN_3_INNOVATION_MAX_M)
     {
-        right_x = -right_x;
-        right_y = -right_y;
+        innovation_gate = CAR_PLAN_3_INNOVATION_MAX_M;
+    }
+    if((new_camera_mask != 0U) && (camera_valid != 0U))
+    {
+        candidate_valid = CarPlan_3_SelectCandidate(new_camera_mask,
+                                                     1U,
+                                                     s_car_plan_3_track_dx_m,
+                                                     s_car_plan_3_track_dy_m,
+                                                     innovation_gate,
+                                                     &selected,
+                                                     &best_innovation,
+                                                     &second_innovation);
+        if((candidate_valid != 0U) &&
+           ((second_innovation - best_innovation) <
+            CAR_PLAN_3_AMBIGUITY_MARGIN_M))
+        {
+            candidate_valid = 0U;
+        }
     }
 
-    target_strafe = (dx * right_x + dy * right_y) / distance;
-    target_forward = (dx * right_y - dy * right_x) / distance;
-    plan_speed = SpeedPlan_Update(1U,
-                                  distance,
-                                  atan2f(fabsf(target_strafe), target_forward) *
-                                      CAR_PLAN_3_RAD_TO_DEG);
-    s_car_plan_3_result.valid = 1U;
-    s_car_plan_3_result.target_strafe_mps = target_strafe * plan_speed;
-    s_car_plan_3_result.target_forward_mps = target_forward * plan_speed;
-    s_car_plan_3_selected = (int8)selected;
+    /* TRACK 中直接接纳连续观测；单次坏观测只短时使用预测，不立即改变路径。 */
+    if(s_car_plan_3_state == CAR_PLAN_3_STATE_TRACK)
+    {
+        if(candidate_valid != 0U)
+        {
+            if(CarPlan_3_AcceptCandidate(selected, tick_now) != 0U)
+            {
+                if(result != 0)
+                {
+                    *result = s_car_plan_3_result;
+                }
+                return 1U;
+            }
+        }
+        if((new_camera_mask & s_car_plan_3_track_camera_mask) != 0U)
+        {
+            s_car_plan_3_last_camera_tick = tick_now;
+            if(s_car_plan_3_no_vision_ticks < 0xFFU)
+            {
+                s_car_plan_3_no_vision_ticks++;
+            }
+        }
+        else if((tick_now - s_car_plan_3_last_camera_tick) >=
+                CAR_PLAN_3_IMAGE_TIMEOUT_MS)
+        {
+            s_car_plan_3_no_vision_ticks = CAR_PLAN_3_NO_VISION_TICKS;
+        }
+        if(s_car_plan_3_no_vision_ticks < CAR_PLAN_3_NO_VISION_TICKS)
+        {
+            if(CarPlan_3_OutputPrediction(1.0f) == 0U)
+            {
+                CarPlan_3_DropTarget();
+            }
+            if(result != 0)
+            {
+                *result = s_car_plan_3_result;
+            }
+            return s_car_plan_3_result.valid;
+        }
+
+        attitude = sqrtf(g_euler.roll * g_euler.roll +
+                         g_euler.pitch * g_euler.pitch);
+        track_distance = sqrtf(s_car_plan_3_track_dx_m * s_car_plan_3_track_dx_m +
+                               s_car_plan_3_track_dy_m * s_car_plan_3_track_dy_m);
+        if((track_distance >= CAR_PLAN_3_FAR_DISTANCE_M) &&
+           ((s_car_plan_3_last_edge_margin_px <= CAR_PLAN_3_EDGE_MARGIN_PX) ||
+            (attitude >= CAR_PLAN_3_ATTITUDE_GATE_DEG)) &&
+           (CarPlan_3_CarDataFresh(CAR_PLAN_3_CAR_DATA_WARN_MS) != 0U))
+        {
+            s_car_plan_3_state = CAR_PLAN_3_STATE_COAST;
+            s_car_plan_3_coast_level =
+                (track_distance >= CAR_PLAN_3_AGGRESSIVE_DISTANCE_M)
+                    ? CAR_PLAN_3_COAST_LEVEL_AGGRESSIVE
+                    : CAR_PLAN_3_COAST_LEVEL_FAR;
+            s_car_plan_3_reacquire_count = 0U;
+            s_car_plan_3_reacquire_age = 0U;
+            (void)SpeedPlan_Update(0U, 0.0f, 0.0f);
+        }
+        else if((s_car_plan_3_last_edge_margin_px <= CAR_PLAN_3_EDGE_MARGIN_PX) &&
+                (attitude >= CAR_PLAN_3_ATTITUDE_GATE_DEG) &&
+                (CarPlan_3_CarDataFresh(CAR_PLAN_3_CAR_DATA_WARN_MS) != 0U))
+        {
+            s_car_plan_3_state = CAR_PLAN_3_STATE_COAST;
+            s_car_plan_3_coast_level = CAR_PLAN_3_COAST_LEVEL_NEAR;
+            s_car_plan_3_reacquire_count = 0U;
+            s_car_plan_3_reacquire_age = 0U;
+            (void)SpeedPlan_Update(0U, 0.0f, 0.0f);
+        }
+        else
+        {
+            CarPlan_3_DropTarget();
+            if(result != 0)
+            {
+                *result = s_car_plan_3_result;
+            }
+            return 0U;
+        }
+    }
+
+    /* COAST 只接纳创新门内且三帧窗口至少命中两次的重现目标。 */
+    lost_age_ms = tick_now - s_car_plan_3_last_accept_tick;
+    track_distance = sqrtf(s_car_plan_3_track_dx_m * s_car_plan_3_track_dx_m +
+                           s_car_plan_3_track_dy_m * s_car_plan_3_track_dy_m);
+    if(((s_car_plan_3_coast_level == CAR_PLAN_3_COAST_LEVEL_AGGRESSIVE) &&
+        (lost_age_ms >= CAR_PLAN_3_AGGRESSIVE_COAST_MAX_MS)) ||
+       ((s_car_plan_3_coast_level == CAR_PLAN_3_COAST_LEVEL_FAR) &&
+        (lost_age_ms >= CAR_PLAN_3_FAR_COAST_MAX_MS)) ||
+       ((s_car_plan_3_coast_level == CAR_PLAN_3_COAST_LEVEL_NEAR) &&
+        (lost_age_ms >= CAR_PLAN_3_COAST_MAX_MS)))
+    {
+        CarPlan_3_DropTarget();
+    }
+    else
+    {
+        if((new_camera_mask != 0U) && (candidate_valid != 0U))
+        {
+            if(s_car_plan_3_reacquire_count == 0U)
+            {
+                s_car_plan_3_reacquire_count = 1U;
+                s_car_plan_3_reacquire_age = 1U;
+            }
+            else
+            {
+                float pending_dx =
+                    s_car_plan_3_camera.beacon[selected].pair_dx_m -
+                    s_car_plan_3_pending_dx_m;
+                float pending_dy =
+                    s_car_plan_3_camera.beacon[selected].pair_dy_m -
+                    s_car_plan_3_pending_dy_m;
+
+                if((pending_dx * pending_dx + pending_dy * pending_dy) <=
+                   CAR_PLAN_3_REACQUIRE_DIST_M * CAR_PLAN_3_REACQUIRE_DIST_M)
+                {
+                    s_car_plan_3_reacquire_count++;
+                    s_car_plan_3_reacquire_age++;
+                }
+                else
+                {
+                    s_car_plan_3_reacquire_count = 1U;
+                    s_car_plan_3_reacquire_age = 1U;
+                }
+            }
+            s_car_plan_3_pending_dx_m =
+                s_car_plan_3_camera.beacon[selected].pair_dx_m;
+            s_car_plan_3_pending_dy_m =
+                s_car_plan_3_camera.beacon[selected].pair_dy_m;
+            s_car_plan_3_last_camera_tick = tick_now;
+            if(s_car_plan_3_reacquire_count >= 2U)
+            {
+                (void)CarPlan_3_AcceptCandidate(selected, tick_now);
+            }
+        }
+        else if(s_car_plan_3_reacquire_count != 0U)
+        {
+            if(new_camera_mask != 0U)
+            {
+                s_car_plan_3_reacquire_age++;
+            }
+            if((s_car_plan_3_reacquire_age >= 3U) ||
+               ((tick_now - s_car_plan_3_last_camera_tick) >=
+                CAR_PLAN_3_IMAGE_TIMEOUT_MS))
+            {
+                s_car_plan_3_reacquire_count = 0U;
+                s_car_plan_3_reacquire_age = 0U;
+            }
+        }
+
+        if(s_car_plan_3_state != CAR_PLAN_3_STATE_TRACK)
+        {
+            if(s_car_plan_3_coast_level == CAR_PLAN_3_COAST_LEVEL_AGGRESSIVE)
+            {
+                s_car_plan_3_state = CAR_PLAN_3_STATE_COAST;
+                if(track_distance >= CAR_PLAN_3_FAR_DISTANCE_M)
+                {
+                    speed_scale = 1.0f;
+                }
+                else
+                {
+                    distance_scale =
+                        (track_distance - CAR_PLAN_3_COAST_STOP_DISTANCE_M) /
+                        (CAR_PLAN_3_FAR_DISTANCE_M -
+                         CAR_PLAN_3_COAST_STOP_DISTANCE_M);
+                    speed_scale = (distance_scale > 0.0f) ? distance_scale : 0.0f;
+                }
+            }
+            else if(s_car_plan_3_coast_level == CAR_PLAN_3_COAST_LEVEL_FAR)
+            {
+                s_car_plan_3_state = CAR_PLAN_3_STATE_COAST;
+                if(lost_age_ms <= CAR_PLAN_3_FAR_COAST_HOLD_MS)
+                {
+                    speed_scale = 1.0f;
+                }
+                else
+                {
+                    speed_scale =
+                        (float)(CAR_PLAN_3_FAR_COAST_MAX_MS - lost_age_ms) /
+                        (float)(CAR_PLAN_3_FAR_COAST_MAX_MS -
+                                CAR_PLAN_3_FAR_COAST_HOLD_MS);
+                }
+                if(track_distance < CAR_PLAN_3_FAR_DISTANCE_M)
+                {
+                    distance_scale =
+                        (track_distance - CAR_PLAN_3_COAST_STOP_DISTANCE_M) /
+                        (CAR_PLAN_3_FAR_DISTANCE_M -
+                         CAR_PLAN_3_COAST_STOP_DISTANCE_M);
+                    if(distance_scale < speed_scale)
+                    {
+                        speed_scale = distance_scale;
+                    }
+                }
+            }
+            else if(lost_age_ms <= CAR_PLAN_3_COAST_HOLD_MS)
+            {
+                s_car_plan_3_state = CAR_PLAN_3_STATE_COAST;
+                speed_scale = 1.0f;
+            }
+            else
+            {
+                s_car_plan_3_state = CAR_PLAN_3_STATE_COAST;
+                speed_scale =
+                    (float)(CAR_PLAN_3_COAST_MAX_MS - lost_age_ms) /
+                    (float)(CAR_PLAN_3_COAST_MAX_MS - CAR_PLAN_3_COAST_HOLD_MS);
+            }
+            if(CarPlan_3_OutputPrediction(speed_scale) == 0U)
+            {
+                CarPlan_3_DropTarget();
+            }
+        }
+    }
 
     if(result != 0)
     {
         *result = s_car_plan_3_result;
     }
-    return 1U;
+    return s_car_plan_3_result.valid;
 }
 
 void CarPlan_3_GetResult(car_plan_result_t *result)

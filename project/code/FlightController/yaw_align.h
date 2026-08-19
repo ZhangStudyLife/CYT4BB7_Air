@@ -18,7 +18,12 @@ typedef struct
     uint8 candidate_frames;
     uint8 lost_frames;
     uint8 action;
+    uint8 beacon_visible; /* 当前是否发现合格信标。 */
+    uint8 search_active; /* 当前是否正在执行无信标旋转搜索。 */
+    int8 search_direction; /* 搜索方向，1为yaw正方向，-1为yaw负方向。 */
     float yaw_delta_deg;
+    float search_rotation_deg; /* 本轮实际定向搜索角，单位度。 */
+    float cable_twist_deg; /* 飞机相对车辆的累计线缆扭转角，单位度。 */
     yaw_align_debug_beacon_t active_beacon;
     yaw_align_debug_beacon_t locked_beacon;
     yaw_align_debug_beacon_t candidate_beacon;
@@ -35,14 +40,24 @@ typedef enum
     YAW_ALIGN_ACTION_SEARCH
 } yaw_align_action_e;
 
+/**
+ * @brief 清空航向对准、搜索和线缆扭转跟踪状态。
+ * @param 无。
+ * @return 无。
+ */
 void YawAlign_Reset(void);
-/*
- * 函数功能: 根据航向控制模式更新 yaw 目标
- * 输入参数:
- *   yaw_change_mode - 航向控制模式，0=固定0度，1=信标对准，2=步进搜索
- * 输出参数或返回值: 无
+/**
+ * @brief 根据航向控制模式更新yaw目标和搜索状态。
+ * @param yaw_change_mode 航向控制模式，0=固定0度，1=信标对准，2=步进搜索。
+ * @return 无。
  */
 void YawAlign_Update(float yaw_change_mode);
+
+/**
+ * @brief 获取航向对准和搜索状态的只读调试快照。
+ * @param out 调试快照输出地址，不可为空。
+ * @return 无。
+ */
 void YawAlign_GetDebug(yaw_align_debug_t *out);
 
 #endif /* YAW_ALIGN_H */

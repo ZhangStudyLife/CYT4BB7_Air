@@ -1,16 +1,15 @@
 #include "auto_landing.h"
 #include "fc_params.h"
 #include "fc_start_crsf.h"
-#include "../Planner/car_plan_3.h"
+#include "yaw_align.h"
 #include "../Protocols/crsf/crsf.h"
 
 #define AUTO_LANDING_INITIAL_WAIT_TICKS (500U) /* 前置等待5s，对应100Hz调用500次。 */
-#define AUTO_LANDING_NO_TARGET_TICKS    (500U) /* 连续无可信目标5s后触发降落。 */
-#define AUTO_LANDING_VALID_TICKS        (20U)  /* CarPlan3连续有效200ms才确认目标。 */
+#define AUTO_LANDING_NO_BEACON_TICKS    (500U) /* 连续无信标5s后允许触发降落。 */
+#define AUTO_LANDING_SEARCH_ROTATION_DEG (360.0f) /* 降落前要求的实际定向搜索角，单位度。 */
 
 static uint16 s_initial_wait_ticks = 0U; /* 自动降落前置等待计数。 */
-static uint16 s_no_target_ticks = 0U; /* 连续无可信目标计数。 */
-static uint16 s_valid_target_ticks = 0U; /* CarPlan3连续有效计数。 */
+static uint16 s_no_beacon_ticks = 0U; /* 连续无信标计数。 */
 static uint8 s_auto_landing_triggered = 0U; /* 自动降落触发锁存标志。 */
 
 /*
@@ -21,7 +20,7 @@ static uint8 s_auto_landing_triggered = 0U; /* 自动降落触发锁存标志。
 void AutoLanding_Update100Hz(void)
 {
     FC_START_CRSF_state_e state = FC_START_CRSF_Get_State();
-    car_plan_result_t plan3_result;
+    yaw_align_debug_t yaw_debug;
 
     if(s_auto_landing_triggered != 0U)
     {
@@ -29,8 +28,7 @@ void AutoLanding_Update100Hz(void)
            (state == FC_START_CRSF_STATE_INIT))
         {
             s_initial_wait_ticks = 0U;
-            s_no_target_ticks = 0U;
-            s_valid_target_ticks = 0U;
+            s_no_beacon_ticks = 0U;
             s_auto_landing_triggered = 0U;
         }
         return;
@@ -42,8 +40,7 @@ void AutoLanding_Update100Hz(void)
        (CRSF_STD[4] != 1))
     {
         s_initial_wait_ticks = 0U;
-        s_no_target_ticks = 0U;
-        s_valid_target_ticks = 0U;
+        s_no_beacon_ticks = 0U;
         return;
     }
 
@@ -53,29 +50,20 @@ void AutoLanding_Update100Hz(void)
         return;
     }
 
-    CarPlan_3_GetResult(&plan3_result);
-    if(plan3_result.valid != 0U)
+    YawAlign_GetDebug(&yaw_debug);
+    if(yaw_debug.beacon_visible != 0U)
     {
-        if(s_valid_target_ticks < AUTO_LANDING_VALID_TICKS)
-        {
-            s_valid_target_ticks++;
-        }
-        if(s_valid_target_ticks >= AUTO_LANDING_VALID_TICKS)
-        {
-            s_no_target_ticks = 0U;
-            return;
-        }
-    }
-    else
-    {
-        s_valid_target_ticks = 0U;
+        s_no_beacon_ticks = 0U;
+        return;
     }
 
-    if(s_no_target_ticks < AUTO_LANDING_NO_TARGET_TICKS)
+    if(s_no_beacon_ticks < AUTO_LANDING_NO_BEACON_TICKS)
     {
-        s_no_target_ticks++;
+        s_no_beacon_ticks++;
     }
-    if(s_no_target_ticks >= AUTO_LANDING_NO_TARGET_TICKS)
+
+    if((s_no_beacon_ticks >= AUTO_LANDING_NO_BEACON_TICKS) &&
+       (yaw_debug.search_rotation_deg >= AUTO_LANDING_SEARCH_ROTATION_DEG))
     {
         s_auto_landing_triggered = 1U;
         FC_START_CRSF_Request_Landing();
@@ -90,4 +78,22 @@ void AutoLanding_Update100Hz(void)
 uint8 AutoLanding_IsTriggered(void)
 {
     return s_auto_landing_triggered;
+}
+
+/*
+ * 函数功能: 获取自动降落检测的只读调试快照
+ * 输入参数: debug - 调试快照输出地址，不可为空
+ * 输出参数或返回值: 无
+ */
+void AutoLanding_GetDebug(auto_landing_debug_t *debug)
+{
+    yaw_align_debug_t yaw_debug;
+
+    YawAlign_GetDebug(&yaw_debug);
+    debug->initial_wait_ticks = s_initial_wait_ticks;
+    debug->no_beacon_ticks = s_no_beacon_ticks;
+    debug->beacon_visible = yaw_debug.beacon_visible;
+    debug->rotation_ready = (yaw_debug.search_rotation_deg >=
+                             AUTO_LANDING_SEARCH_ROTATION_DEG) ? 1U : 0U;
+    debug->triggered = s_auto_landing_triggered;
 }

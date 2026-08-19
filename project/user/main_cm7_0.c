@@ -1,6 +1,8 @@
 #include "zf_common_headfile.h"
 #include "../code/FlightController/auto_landing.h"
 #include "../code/FlightController/fc_mode.h"
+#include "../code/FlightController/fc_params.h"
+#include "../code/FlightController/yaw_align.h"
 #include "../code/Image/image_data.h"
 #include "../code/Planner/beacon_lost_detector.h"
 #include "../code/Planner/car_plan_3.h"
@@ -49,7 +51,8 @@ static car_plan_result_t s_air_run_car_plan;
 #define MODE1245_DEBUG_FLOAT_COUNT        (30U) /* Mode1/2/4/5飞机控制调试数据数量。 */
 #define CAMERA_MODEL_CALIBRATION_LOG_FLOAT_COUNT (63U) /* 相机模型标定日志用户float数量。 */
 #define SPEED_PLANNING_DEBUG_FLOAT_COUNT  (19U) /* 速度规划调试用户float数量。 */
-#define HEIGHT_CONTROL_DEBUG_FLOAT_COUNT  (42U) /* 高度控制调试用户float数量。 */
+#define HEIGHT_CONTROL_DEBUG_FLOAT_COUNT  (64U) /* 高度控制调试用户float数量。 */
+#define YAW_AUTO_LANDING_DEBUG_FLOAT_COUNT (72U) /* 航向搜索和自动降落调试用户float数量。 */
 
 #if (MODE1245_DEBUG_FLOAT_COUNT > (WIFI_JUSTFLOAT_MAX_FLOAT_NUM - 1U))
 #error "Mode1/2/4/5 debug channels exceed JustFloat protocol capacity"
@@ -65,6 +68,10 @@ static car_plan_result_t s_air_run_car_plan;
 
 #if (HEIGHT_CONTROL_DEBUG_FLOAT_COUNT > (WIFI_JUSTFLOAT_MAX_FLOAT_NUM - 1U))
 #error "Height control debug channels exceed JustFloat protocol capacity"
+#endif
+
+#if (YAW_AUTO_LANDING_DEBUG_FLOAT_COUNT > (WIFI_JUSTFLOAT_MAX_FLOAT_NUM - 1U))
+#error "Yaw and auto landing debug channels exceed JustFloat protocol capacity"
 #endif
 
 typedef struct
@@ -399,8 +406,7 @@ static void height_control_debug_200hz(void)
     fc_height_debug_t height_debug;
     float data[HEIGHT_CONTROL_DEBUG_FLOAT_COUNT];
 
-    if ((FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING) ||
-        (FC_START_CRSF_Get_Flight_Mode() != FC_START_CRSF_FLIGHT_MODE_4))
+    if (FC_START_CRSF_Get_State() != FC_START_CRSF_STATE_FLYING)
     {
         last_tick_ms = tick_now;
         return;
@@ -465,6 +471,30 @@ static void height_control_debug_200hz(void)
     data[39] = (float)g_motor_cmd.pitch;
     data[40] = (float)g_motor_cmd.roll;
     data[41] = (float)g_motor_cmd.yaw;
+
+    /* I43-I58: 高度估计器输入快照和内部诊断状态。 */
+    data[42] = (float)g_height_tof_sample_seq; /* I43: 最近消费的TOF快照序号。 */
+    data[43] = (float)g_height_tof_fresh_mask; /* I44: 最近消费快照的新鲜通道掩码。 */
+    data[44] = (float)g_height_tof_valid_mask; /* I45: 最近消费快照的驱动有效通道掩码。 */
+    data[45] = (float)g_height_meas_valid; /* I46: 本次观测是否通过健康度门限。 */
+    data[46] = (float)g_height_inlier_count; /* I47: 本次融合内点数量。 */
+    data[47] = g_height_meas_mm; /* I48: 实际观测高度，单位mm。 */
+    data[48] = g_height_residual_m; /* I49: TOF观测相对估计高度残差，单位m。 */
+    data[49] = g_height_measurement_dt_s; /* I50: 两次有效TOF观测间隔，单位s。 */
+    data[50] = g_height_inst_v_mps; /* I51: TOF修正产生的瞬时垂向速度，单位m/s。 */
+    data[51] = g_height_acc_lpf_mps2; /* I52: 估计器内部低通垂向加速度，单位m/s^2。 */
+    data[52] = g_height_observer_v_mps; /* I53: 速度低通前的观察器速度，单位m/s。 */
+    data[53] = (float)g_height_miss_count; /* I54: 连续无有效观测计数。 */
+    data[54] = g_height_measurement_age_ms; /* I55: 最近有效TOF观测年龄，单位ms。 */
+    data[55] = g_height_tof_alpha; /* I56: 本次TOF高度修正权重。 */
+    data[56] = (float)tof->fresh_mask; /* I57: 驱动缓存当前新鲜掩码，用于和I44对照。 */
+    data[57] = (float)tof->sample_seq; /* I58: 驱动最新快照序号，用于和I43对照。 */
+    data[58] = g_height_safe_upper_mm; /* I59: 独立安全上界，单位mm。 */
+    data[59] = g_height_safe_lower_mm; /* I60: 独立安全下界，单位mm。 */
+    data[60] = g_height_safe_brake_distance_mm; /* I61: 上升动态制动距离，单位mm。 */
+    data[61] = (float)g_height_dropout_mode; /* I62: 掉测状态，0正常/1禁止爬升/2受控下降。 */
+    data[62] = (float)g_height_pollution_active; /* I63: 线缆污染锁存状态。 */
+    data[63] = (float)g_height_safety_valid; /* I64: 安全输出是否已初始化。 */
 
     (void)wifi_justfloat_Array(data, HEIGHT_CONTROL_DEBUG_FLOAT_COUNT);
 }
@@ -586,6 +616,132 @@ static void mode1245_wifi_debug_200hz(void)
     data[29] = car_dt_ms;
 
     (void)wifi_justfloat_Array(data, MODE1245_DEBUG_FLOAT_COUNT);
+}
+
+/**
+ * @brief 以200Hz发送航向搜索、CarPlan3和自动降落调试数据。
+ * @param 无。
+ * @return 无。
+ */
+static void yaw_auto_landing_debug_200hz(void)
+{
+    static uint32 last_tick_ms = 0U;
+    FC_START_CRSF_flight_mode_e mode = FC_START_CRSF_Get_Flight_Mode();
+    uint32 tick_now = tick_1000us_cnt;
+    car_plan_3_debug_t plan_debug;
+    car_plan_result_t plan_result;
+    yaw_align_debug_t yaw_debug;
+    auto_landing_debug_t landing_debug;
+    float yaw_mode = 0.0f;
+    float data[YAW_AUTO_LANDING_DEBUG_FLOAT_COUNT];
+    uint8 beacon;
+    uint8 index = 0U;
+
+    if ((tick_now - last_tick_ms) < CAR_PLAN_DEBUG_PERIOD_MS)
+    {
+        return;
+    }
+    last_tick_ms = tick_now;
+
+    if (mode == FC_START_CRSF_FLIGHT_MODE_1)
+    {
+        yaw_mode = g_fc_params.yaw_change_mode1;
+    }
+    else if (mode == FC_START_CRSF_FLIGHT_MODE_2)
+    {
+        yaw_mode = g_fc_params.yaw_change_mode2;
+    }
+    else if (mode == FC_START_CRSF_FLIGHT_MODE_4)
+    {
+        yaw_mode = g_fc_params.yaw_change_mode4;
+    }
+    else if (mode == FC_START_CRSF_FLIGHT_MODE_5)
+    {
+        yaw_mode = g_fc_params.yaw_change_mode5;
+    }
+    else if (mode == FC_START_CRSF_FLIGHT_MODE_8)
+    {
+        yaw_mode = g_fc_params.yaw_change_mode8;
+    }
+
+    CarPlan_3_GetDebug(&plan_debug);
+    CarPlan_3_GetResult(&plan_result);
+    YawAlign_GetDebug(&yaw_debug);
+    AutoLanding_GetDebug(&landing_debug);
+
+    /* I1-I13: 飞行状态、航向控制量和车端航向数据。 */
+    data[index++] = (float)FC_START_CRSF_Get_State();
+    data[index++] = (float)mode;
+    data[index++] = yaw_mode;
+    data[index++] = (float)CRSF_STD[4];
+    data[index++] = (float)tick_now;
+    data[index++] = g_euler.yaw;
+    data[index++] = g_imufilter_1000hz.gyroz;
+    data[index++] = yaw_angle_target;
+    data[index++] = yaw_gyro_target;
+    data[index++] = g_car_yaw;
+    data[index++] = g_car_yaw_rate_dps;
+    data[index++] = g_car_sync_time_ms;
+    data[index++] = (float)(tick_now - g_car_last_update_time_ms);
+
+    /* I14-I22: CarPlan3结果、选中目标和融合车灯。 */
+    data[index++] = (float)plan_result.valid;
+    data[index++] = plan_result.target_strafe_mps;
+    data[index++] = plan_result.target_forward_mps;
+    data[index++] = (float)plan_debug.selected_target_id;
+    data[index++] = (float)plan_debug.car_lamp.valid;
+    data[index++] = plan_debug.car_lamp.center_x;
+    data[index++] = plan_debug.car_lamp.center_y;
+    data[index++] = plan_debug.car_lamp.angle_deg;
+    data[index++] = (float)plan_debug.car_lamp.camera_mask;
+
+    /* I23-I42: 四个CarPlan3融合信标的有效性、坐标、面积和相机掩码。 */
+    for (beacon = 0U; beacon < CAR_PLAN_3_DEBUG_BEACON_COUNT; beacon++)
+    {
+        data[index++] = (float)plan_debug.beacon[beacon].valid;
+        data[index++] = plan_debug.beacon[beacon].center_x;
+        data[index++] = plan_debug.beacon[beacon].center_y;
+        data[index++] = plan_debug.beacon[beacon].area;
+        data[index++] = (float)plan_debug.beacon[beacon].camera_mask;
+    }
+
+    /* I43-I62: YawAlign状态及当前、锁定、候选信标。 */
+    data[index++] = (float)yaw_debug.locked;
+    data[index++] = (float)yaw_debug.candidate_frames;
+    data[index++] = (float)yaw_debug.lost_frames;
+    data[index++] = (float)yaw_debug.action;
+    data[index++] = yaw_debug.yaw_delta_deg;
+    data[index++] = (float)yaw_debug.active_beacon.valid;
+    data[index++] = (float)yaw_debug.active_beacon.camera;
+    data[index++] = yaw_debug.active_beacon.x;
+    data[index++] = yaw_debug.active_beacon.y;
+    data[index++] = yaw_debug.active_beacon.area;
+    data[index++] = (float)yaw_debug.locked_beacon.valid;
+    data[index++] = (float)yaw_debug.locked_beacon.camera;
+    data[index++] = yaw_debug.locked_beacon.x;
+    data[index++] = yaw_debug.locked_beacon.y;
+    data[index++] = yaw_debug.locked_beacon.area;
+    data[index++] = (float)yaw_debug.candidate_beacon.valid;
+    data[index++] = (float)yaw_debug.candidate_beacon.camera;
+    data[index++] = yaw_debug.candidate_beacon.x;
+    data[index++] = yaw_debug.candidate_beacon.y;
+    data[index++] = yaw_debug.candidate_beacon.area;
+
+    /* I63-I67: 自动降落等待、无信标、信标状态、旋转门限和触发状态。 */
+    data[index++] = (float)landing_debug.initial_wait_ticks;
+    data[index++] = (float)landing_debug.no_beacon_ticks;
+    data[index++] = (float)landing_debug.beacon_visible;
+    data[index++] = (float)landing_debug.rotation_ready;
+    data[index++] = (float)landing_debug.triggered;
+
+    /* I68-I72: 搜索状态、方向、实际旋转角、线缆扭转角和当前yaw角度环Kp。 */
+    data[index++] = (float)yaw_debug.search_active;
+    data[index++] = (float)yaw_debug.search_direction;
+    data[index++] = yaw_debug.search_rotation_deg;
+    data[index++] = yaw_debug.cable_twist_deg;
+    data[index++] = yaw_angle_pid.kp;
+
+    (void)wifi_justfloat_Array(data, YAW_AUTO_LANDING_DEBUG_FLOAT_COUNT);
 }
 
 /**
@@ -751,7 +907,8 @@ static void core0_run_fast_loop_step(void)
     // mode1245_wifi_debug_200hz(); /* 临时关闭Mode1/2/4/5调试，改发相机模型标定日志。 */
     // camera_model_calibration_log_200hz(); /* 临时关闭相机模型标定日志，改发速度规划调试日志。 */
     // speed_planning_debug_200hz(); /* 临时关闭速度规划日志，改发Mode4高度控制日志。 */
-    height_control_debug_200hz();
+    height_control_debug_200hz(); /* 临时关闭Mode4高度控制日志，改发航向搜索和自动降落日志。 */
+    // yaw_auto_landing_debug_200hz();
 }
 
 /**

@@ -2,6 +2,7 @@
 #include "fc_loop.h"
 #include "../Estimation/Attitude/IMU_TOP.h"
 #include "../Image/image_data.h"
+#include "../Protocols/crsf/crsf.h"
 #include <math.h>
 
 typedef struct
@@ -29,9 +30,12 @@ static const float s_yaw_align_lamp_gate_min_dy_px = -5.0f;
 static const uint8 s_yaw_align_stable_frames = 5U;
 static const uint8 s_yaw_align_lost_reset_frames = 20U;
 
-#define YAW_ALIGN_SEARCH_HOLD_TICKS (50U) /* 每个搜索航向保持500ms，对应100Hz调用50次 */
-#define YAW_ALIGN_SEARCH_STEP_COUNT (8U) /* 360度范围内的45度搜索目标数量 */
+#define YAW_ALIGN_SEARCH_HOLD_TICKS (75U) /* 每个搜索航向保持750ms，对应100Hz调用75次 */
 #define YAW_ALIGN_SEARCH_STEP_DEG (45.0f) /* 相邻搜索目标的航向间隔，单位度 */
+#define YAW_ALIGN_SEARCH_COMPLETE_DEG (360.0f) /* 单轮信标搜索完成角度，单位度 */
+
+extern float g_car_yaw; /* 车端当前航向角，单位度。 */
+extern float g_car_yaw_rate_dps; /* 车端当前航向角速度，单位度每秒。 */
 
 static yaw_align_beacon_t s_locked_beacon;
 static yaw_align_beacon_t s_candidate_beacon;
@@ -46,7 +50,15 @@ static yaw_align_beacon_t s_active_beacon;
 static float s_yaw_delta_deg = 0.0f;
 static uint8 s_action = YAW_ALIGN_ACTION_IDLE;
 static uint8 s_control_mode = 0U; /* 上次选择的航向控制模式，范围0至2 */
-static uint8 s_search_step = 0U; /* mode=2当前搜索步号，范围0至7 */
+static uint8 s_beacon_visible = 0U; /* mode=2当前是否发现合格信标。 */
+static uint8 s_search_active = 0U; /* mode=2是否正在执行无信标旋转搜索。 */
+static int8 s_search_direction = 1; /* mode=2搜索方向，1为yaw正方向，-1为yaw负方向。 */
+static float s_search_target_yaw = 0.0f; /* mode=2当前搜索航向目标，单位度。 */
+static float s_search_rotation_deg = 0.0f; /* 本轮无信标期间实际定向旋转角，单位度。 */
+static float s_cable_twist_deg = 0.0f; /* 飞机相对车辆的累计线缆扭转角，单位度。 */
+static float s_previous_air_yaw = 0.0f; /* 上次飞机航向角，单位度。 */
+static float s_previous_car_yaw = 0.0f; /* 上次车辆航向角，单位度。 */
+static uint8 s_yaw_history_valid = 0U; /* 飞机和车辆历史航向是否已经初始化。 */
 
 static float YawAlign_Clamp(float value, float min_value, float max_value)
 {
@@ -280,6 +292,11 @@ static void YawAlign_UpdateCandidate(const yaw_align_beacon_t *beacon)
     }
 }
 
+/*
+ * 函数功能: 清空航向对准、搜索和线缆扭转跟踪状态
+ * 输入参数: 无
+ * 输出参数或返回值: 无
+ */
 void YawAlign_Reset(void)
 {
     s_locked_beacon.valid = 0U;
@@ -294,7 +311,16 @@ void YawAlign_Reset(void)
     s_active_beacon.valid = 0U;
     s_yaw_delta_deg = 0.0f;
     s_action = YAW_ALIGN_ACTION_IDLE;
-    s_search_step = 0U;
+    s_beacon_visible = 0U;
+    s_search_active = 0U;
+    s_search_direction = 1;
+    s_search_target_yaw = 0.0f;
+    s_search_rotation_deg = 0.0f;
+    s_cable_twist_deg = 0.0f;
+    s_previous_air_yaw = 0.0f;
+    s_previous_car_yaw = 0.0f;
+    s_yaw_history_valid = 0U;
+    yaw_angle_pid.kp = g_fc_params.yaw_angle_kp;
 }
 
 static void YawAlign_FillDebugBeacon(const yaw_align_beacon_t *src,
@@ -307,6 +333,11 @@ static void YawAlign_FillDebugBeacon(const yaw_align_beacon_t *src,
     dst->area = src->area;
 }
 
+/*
+ * 函数功能: 获取航向对准和搜索状态的只读调试快照
+ * 输入参数: out - 调试快照输出地址，不可为空
+ * 输出参数或返回值: 无
+ */
 void YawAlign_GetDebug(yaw_align_debug_t *out)
 {
     if(out == 0)
@@ -318,7 +349,12 @@ void YawAlign_GetDebug(yaw_align_debug_t *out)
     out->candidate_frames = s_candidate_frames;
     out->lost_frames = s_lost_frames;
     out->action = s_action;
+    out->beacon_visible = s_beacon_visible;
+    out->search_active = s_search_active;
+    out->search_direction = s_search_direction;
     out->yaw_delta_deg = s_yaw_delta_deg;
+    out->search_rotation_deg = s_search_rotation_deg;
+    out->cable_twist_deg = s_cable_twist_deg;
     YawAlign_FillDebugBeacon(&s_active_beacon, &out->active_beacon);
     YawAlign_FillDebugBeacon(&s_locked_beacon, &out->locked_beacon);
     YawAlign_FillDebugBeacon(&s_candidate_beacon, &out->candidate_beacon);
@@ -429,12 +465,14 @@ static uint8 YawAlign_UpdateBeacon(void)
 
 /*
  * 函数功能: 在三路摄像头未发现合格信标时按45度间隔循环搜索
- * 输入参数: 无
+ * 输入参数: aircraft_yaw_delta_deg - 本次飞机实际航向增量，单位度
  * 输出参数或返回值: 无
  */
-static void YawAlign_UpdateSearch(void)
+static void YawAlign_UpdateSearch(float aircraft_yaw_delta_deg)
 {
     yaw_align_beacon_t beacon;
+    uint8 was_beacon_visible = s_beacon_visible;
+    float previous_search_rotation_deg = s_search_rotation_deg;
 
     beacon.valid = 0U;
     s_active_beacon.valid = 0U;
@@ -445,37 +483,107 @@ static void YawAlign_UpdateSearch(void)
        (YawAlign_FindLargestCenterBeacon(&beacon) != 0U))
     {
         s_active_beacon = beacon;
+        s_beacon_visible = 1U;
+        s_search_active = 0U;
         s_lost_frames = 0U;
+        s_search_rotation_deg = 0.0f;
+        yaw_angle_pid.kp = g_fc_params.yaw_angle_kp;
+        if(was_beacon_visible == 0U)
+        {
+            s_search_target_yaw = g_euler.yaw;
+            PID_Reset(&yaw_angle_pid);
+            PID_Reset(&yaw_gyro_pid);
+        }
     }
     else
     {
-        /* 连续500ms未见信标后前进45度，八个方向循环搜索。 */
-        if(s_lost_frames < YAW_ALIGN_SEARCH_HOLD_TICKS)
+        s_beacon_visible = 0U;
+        yaw_angle_pid.kp = 2.0f * g_fc_params.yaw_angle_kp;
+
+        /* 新一轮信标搜索选择减小线缆扭转的固定方向，并立即给出首个45度目标。 */
+        if(s_search_active == 0U)
         {
-            s_lost_frames++;
-        }
-        if(s_lost_frames >= YAW_ALIGN_SEARCH_HOLD_TICKS)
-        {
+            s_search_active = 1U;
             s_lost_frames = 0U;
-            s_search_step = (uint8)((s_search_step + 1U) %
-                                    YAW_ALIGN_SEARCH_STEP_COUNT);
+            s_search_rotation_deg = 0.0f;
+            if(s_cable_twist_deg > 0.0f)
+            {
+                s_search_direction = -1;
+            }
+            else if(s_cable_twist_deg < 0.0f)
+            {
+                s_search_direction = 1;
+            }
+            else if(g_car_yaw_rate_dps > 0.0f)
+            {
+                s_search_direction = 1;
+            }
+            else if(g_car_yaw_rate_dps < 0.0f)
+            {
+                s_search_direction = -1;
+            }
+            else
+            {
+                s_search_direction = (int8)(-s_search_direction);
+            }
+            s_search_target_yaw = YawAlign_Wrap180Deg(
+                g_euler.yaw + (float)s_search_direction * YAW_ALIGN_SEARCH_STEP_DEG);
+        }
+        else
+        {
+            if(s_search_rotation_deg < YAW_ALIGN_SEARCH_COMPLETE_DEG)
+            {
+                s_search_rotation_deg += (float)s_search_direction * aircraft_yaw_delta_deg;
+                if(s_search_rotation_deg < 0.0f)
+                {
+                    s_search_rotation_deg = 0.0f;
+                }
+            }
+
+            /* 实际完成360度后锁住当前航向，避免等待降落期间继续绕线。 */
+            if(s_search_rotation_deg >= YAW_ALIGN_SEARCH_COMPLETE_DEG)
+            {
+                if(previous_search_rotation_deg < YAW_ALIGN_SEARCH_COMPLETE_DEG)
+                {
+                    s_search_target_yaw = g_euler.yaw;
+                    s_lost_frames = 0U;
+                    PID_Reset(&yaw_angle_pid);
+                    PID_Reset(&yaw_gyro_pid);
+                }
+                yaw_angle_pid.kp = g_fc_params.yaw_angle_kp;
+            }
+            else
+            {
+                /* 无论飞机是否完全到位，搜索目标固定每750ms沿本轮方向增加45度。 */
+                if(s_lost_frames < YAW_ALIGN_SEARCH_HOLD_TICKS)
+                {
+                    s_lost_frames++;
+                }
+                if(s_lost_frames >= YAW_ALIGN_SEARCH_HOLD_TICKS)
+                {
+                    s_lost_frames = 0U;
+                    s_search_target_yaw = YawAlign_Wrap180Deg(
+                        s_search_target_yaw +
+                        (float)s_search_direction * YAW_ALIGN_SEARCH_STEP_DEG);
+                }
+            }
         }
     }
 
-    yaw_angle_target = YawAlign_Wrap180Deg((float)s_search_step *
-                                           YAW_ALIGN_SEARCH_STEP_DEG);
+    yaw_angle_target = s_search_target_yaw;
     s_yaw_delta_deg = YawAlign_Wrap180Deg(yaw_angle_target - g_euler.yaw);
 }
 
 /*
- * 函数功能: 根据航向控制模式更新 yaw 目标
- * 输入参数:
- *   yaw_change_mode - 航向控制模式，0=固定0度，1=信标对准，2=步进搜索
+ * 函数功能: 根据航向控制模式更新yaw目标和搜索状态
+ * 输入参数: yaw_change_mode - 航向控制模式，0=固定0度，1=信标对准，2=步进搜索
  * 输出参数或返回值: 无
  */
 void YawAlign_Update(float yaw_change_mode)
 {
     uint8 control_mode;
+    float aircraft_yaw_delta_deg = 0.0f;
+    float car_yaw_delta_deg = 0.0f;
 
     if(yaw_change_mode < 0.5f)
     {
@@ -490,6 +598,15 @@ void YawAlign_Update(float yaw_change_mode)
         control_mode = 2U;
     }
 
+    /* 车端开关未使能时保持零航向目标，并禁止旋转搜索。 */
+    if(CRSF_STD[4] != 1)
+    {
+        YawAlign_Reset();
+        s_control_mode = 0U;
+        yaw_angle_target = 0.0f;
+        return;
+    }
+
     /* 模式改变时清空旧信标锁定和搜索进度，再进入新模式。 */
     if(control_mode != s_control_mode)
     {
@@ -497,16 +614,35 @@ void YawAlign_Update(float yaw_change_mode)
         s_control_mode = control_mode;
     }
 
+    /* 展开飞机和车辆航向，持续估计供搜索方向选择使用的线缆扭转。 */
+    if(s_yaw_history_valid != 0U)
+    {
+        aircraft_yaw_delta_deg = YawAlign_Wrap180Deg(g_euler.yaw -
+                                                      s_previous_air_yaw);
+        car_yaw_delta_deg = YawAlign_Wrap180Deg(g_car_yaw -
+                                                 s_previous_car_yaw);
+        s_cable_twist_deg += aircraft_yaw_delta_deg - car_yaw_delta_deg;
+    }
+    else
+    {
+        s_cable_twist_deg = YawAlign_Wrap180Deg(g_euler.yaw - g_car_yaw);
+        s_yaw_history_valid = 1U;
+    }
+    s_previous_air_yaw = g_euler.yaw;
+    s_previous_car_yaw = g_car_yaw;
+
     if(control_mode == 0U)
     {
+        yaw_angle_pid.kp = g_fc_params.yaw_angle_kp;
         yaw_angle_target = 0.0f;
     }
     else if(control_mode == 1U)
     {
+        yaw_angle_pid.kp = g_fc_params.yaw_angle_kp;
         (void)YawAlign_UpdateBeacon();
     }
     else
     {
-        YawAlign_UpdateSearch();
+        YawAlign_UpdateSearch(aircraft_yaw_delta_deg);
     }
 }

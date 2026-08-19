@@ -201,10 +201,10 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode8_kp_car_x = 50.0f;
     params->mode8_kp_car_y = 65.0f;
 
-    /* ===== 各模式航向对准开关 ===== */
+    /* ===== 各模式航向控制 ===== */
     params->yaw_change_mode1 = 0.0f;
     params->yaw_change_mode2 = 0.0f;
-    params->yaw_change_mode4 = 0.0f;
+    params->yaw_change_mode4 = 2.0f;
     params->yaw_change_mode5 = 0.0f;
     params->yaw_change_mode8 = 0.0f;
 

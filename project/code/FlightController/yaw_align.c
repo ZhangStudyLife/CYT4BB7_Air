@@ -29,6 +29,10 @@ static const float s_yaw_align_lamp_gate_min_dy_px = -5.0f;
 static const uint8 s_yaw_align_stable_frames = 5U;
 static const uint8 s_yaw_align_lost_reset_frames = 20U;
 
+#define YAW_ALIGN_SEARCH_HOLD_TICKS (50U) /* 每个搜索航向保持500ms，对应100Hz调用50次 */
+#define YAW_ALIGN_SEARCH_STEP_COUNT (8U) /* 360度范围内的45度搜索目标数量 */
+#define YAW_ALIGN_SEARCH_STEP_DEG (45.0f) /* 相邻搜索目标的航向间隔，单位度 */
+
 static yaw_align_beacon_t s_locked_beacon;
 static yaw_align_beacon_t s_candidate_beacon;
 static float s_locked_yaw = 0.0f;
@@ -41,6 +45,8 @@ static float s_center_turn_target_yaw = 0.0f;
 static yaw_align_beacon_t s_active_beacon;
 static float s_yaw_delta_deg = 0.0f;
 static uint8 s_action = YAW_ALIGN_ACTION_IDLE;
+static uint8 s_control_mode = 0U; /* 上次选择的航向控制模式，范围0至2 */
+static uint8 s_search_step = 0U; /* mode=2当前搜索步号，范围0至7 */
 
 static float YawAlign_Clamp(float value, float min_value, float max_value)
 {
@@ -288,6 +294,7 @@ void YawAlign_Reset(void)
     s_active_beacon.valid = 0U;
     s_yaw_delta_deg = 0.0f;
     s_action = YAW_ALIGN_ACTION_IDLE;
+    s_search_step = 0U;
 }
 
 static void YawAlign_FillDebugBeacon(const yaw_align_beacon_t *src,
@@ -333,7 +340,12 @@ static float YawAlign_GetYawDelta(const yaw_align_beacon_t *beacon)
                           max_delta_deg);
 }
 
-uint8 YawAlign_Update(void)
+/*
+ * 函数功能: 执行现有的信标航向对准逻辑
+ * 输入参数: 无
+ * 输出参数或返回值: 1表示已锁定并使用有效信标，0表示尚未完成锁定
+ */
+static uint8 YawAlign_UpdateBeacon(void)
 {
     yaw_align_beacon_t beacon;
     float yaw_delta;
@@ -413,4 +425,88 @@ uint8 YawAlign_Update(void)
     s_yaw_delta_deg = yaw_delta;
     yaw_angle_target = g_euler.yaw + yaw_delta;
     return 1U;
+}
+
+/*
+ * 函数功能: 在三路摄像头未发现合格信标时按45度间隔循环搜索
+ * 输入参数: 无
+ * 输出参数或返回值: 无
+ */
+static void YawAlign_UpdateSearch(void)
+{
+    yaw_align_beacon_t beacon;
+
+    beacon.valid = 0U;
+    s_active_beacon.valid = 0U;
+    s_action = YAW_ALIGN_ACTION_SEARCH;
+
+    /* 任一路出现合格信标时锁住当前搜索目标，并重新开始丢失计时。 */
+    if((YawAlign_FindLargestBeacon(&beacon) != 0U) ||
+       (YawAlign_FindLargestCenterBeacon(&beacon) != 0U))
+    {
+        s_active_beacon = beacon;
+        s_lost_frames = 0U;
+    }
+    else
+    {
+        /* 连续500ms未见信标后前进45度，八个方向循环搜索。 */
+        if(s_lost_frames < YAW_ALIGN_SEARCH_HOLD_TICKS)
+        {
+            s_lost_frames++;
+        }
+        if(s_lost_frames >= YAW_ALIGN_SEARCH_HOLD_TICKS)
+        {
+            s_lost_frames = 0U;
+            s_search_step = (uint8)((s_search_step + 1U) %
+                                    YAW_ALIGN_SEARCH_STEP_COUNT);
+        }
+    }
+
+    yaw_angle_target = YawAlign_Wrap180Deg((float)s_search_step *
+                                           YAW_ALIGN_SEARCH_STEP_DEG);
+    s_yaw_delta_deg = YawAlign_Wrap180Deg(yaw_angle_target - g_euler.yaw);
+}
+
+/*
+ * 函数功能: 根据航向控制模式更新 yaw 目标
+ * 输入参数:
+ *   yaw_change_mode - 航向控制模式，0=固定0度，1=信标对准，2=步进搜索
+ * 输出参数或返回值: 无
+ */
+void YawAlign_Update(float yaw_change_mode)
+{
+    uint8 control_mode;
+
+    if(yaw_change_mode < 0.5f)
+    {
+        control_mode = 0U;
+    }
+    else if(yaw_change_mode < 1.5f)
+    {
+        control_mode = 1U;
+    }
+    else
+    {
+        control_mode = 2U;
+    }
+
+    /* 模式改变时清空旧信标锁定和搜索进度，再进入新模式。 */
+    if(control_mode != s_control_mode)
+    {
+        YawAlign_Reset();
+        s_control_mode = control_mode;
+    }
+
+    if(control_mode == 0U)
+    {
+        yaw_angle_target = 0.0f;
+    }
+    else if(control_mode == 1U)
+    {
+        (void)YawAlign_UpdateBeacon();
+    }
+    else
+    {
+        YawAlign_UpdateSearch();
+    }
 }

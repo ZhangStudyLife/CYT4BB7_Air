@@ -91,16 +91,15 @@ void FC_Mode1_Reset(void)
 
 /*
  * 函数名: FC_Mode1_100Hz
- * 功能: 根据模式1独立航向开关更新航向对准目标
+ * 功能: 根据模式1独立航向控制模式更新 yaw 目标
  * 输入参数: 无
  * 返回值: 无
  */
 void FC_Mode1_100Hz(void)
 {
-    if((FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING) &&
-       (g_fc_params.yaw_change_mode1 >= 0.5f))
+    if(FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
     {
-        (void)YawAlign_Update();
+        YawAlign_Update(g_fc_params.yaw_change_mode1);
     }
     else
     {

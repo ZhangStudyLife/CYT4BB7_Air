@@ -79,10 +79,9 @@ void FC_Mode2_Reset(void)
 
 void FC_Mode2_100Hz(void)
 {
-    if((FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING) &&
-       (g_fc_params.yaw_change_mode2 >= 0.5f))
+    if(FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
     {
-        (void)YawAlign_Update();
+        YawAlign_Update(g_fc_params.yaw_change_mode2);
     }
     else
     {

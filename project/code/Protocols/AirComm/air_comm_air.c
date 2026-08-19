@@ -2203,11 +2203,11 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(mode4_car_turn_accel_ff, g_fc_params.mode4_car_turn_accel_ff, 0.0f, 15.0f);
     AIR_COMM_REGISTER_FLOAT(mode4_car_turn_accel_lpf_hz, g_fc_params.mode4_car_turn_accel_lpf_hz, 0.1f, 20.0f);
 
-    AIR_COMM_REGISTER_FLOAT(yaw_change_mode1, g_fc_params.yaw_change_mode1, 0.0f, 1.0f);
-    AIR_COMM_REGISTER_FLOAT(yaw_change_mode2, g_fc_params.yaw_change_mode2, 0.0f, 1.0f);
-    AIR_COMM_REGISTER_FLOAT(yaw_change_mode4, g_fc_params.yaw_change_mode4, 0.0f, 1.0f);
-    AIR_COMM_REGISTER_FLOAT(yaw_change_mode5, g_fc_params.yaw_change_mode5, 0.0f, 1.0f);
-    AIR_COMM_REGISTER_FLOAT(yaw_change_mode8, g_fc_params.yaw_change_mode8, 0.0f, 1.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_change_mode1, g_fc_params.yaw_change_mode1, 0.0f, 2.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_change_mode2, g_fc_params.yaw_change_mode2, 0.0f, 2.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_change_mode4, g_fc_params.yaw_change_mode4, 0.0f, 2.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_change_mode5, g_fc_params.yaw_change_mode5, 0.0f, 2.0f);
+    AIR_COMM_REGISTER_FLOAT(yaw_change_mode8, g_fc_params.yaw_change_mode8, 0.0f, 2.0f);
 
     if((s_air_comm_param_count != AIR_COMM_DEFAULT_PARAM_COUNT) ||
        (air_comm_register_default_commands() == 0U))

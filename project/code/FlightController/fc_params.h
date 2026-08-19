@@ -181,7 +181,7 @@ typedef struct
     float mode7_vel_y_kff;
     float mode7_vel_y_i_limit;
     float mode7_vel_y_d_lpf;
-    /* ===== 各模式航向对准开关：0=关闭，1=开启 ===== */
+    /* ===== 各模式航向控制：0=固定0度，1=信标对准，2=步进搜索 ===== */
     float yaw_change_mode1;
     float yaw_change_mode2;
     float yaw_change_mode4;

@@ -72,7 +72,7 @@ void FC_Mode8_Reset(void)
     YawAlign_Reset();
     roll_angle_target = FC_Mode_Get_Roll_Mech_Trim_Deg();
     pitch_angle_target = FC_Mode_Get_Pitch_Mech_Trim_Deg();
-    yaw_angle_target = (g_fc_params.yaw_change_mode8 >= 0.5f) ? g_euler.yaw : 0.0f;
+    yaw_angle_target = 0.0f;
 }
 
 void FC_Mode8_100Hz(void)
@@ -132,15 +132,7 @@ void FC_Mode8_Control100Hz(float dt)
         return;
     }
 
-    if (g_fc_params.yaw_change_mode8 >= 0.5f)
-    {
-        YawAlign_Update();
-    }
-    else
-    {
-        YawAlign_Reset();
-        yaw_angle_target = 0.0f;
-    }
+    YawAlign_Update(g_fc_params.yaw_change_mode8);
 
     fused_lamp_valid = g_car_lamp_fused_distance_projectioncenter_2.valid;
 

@@ -37,10 +37,17 @@
 #define CAR_PLAN_3_LAMP_ANGLE_GATE_DEG (30.0f) /* 车灯长轴相对惯导预测的最大创新，单位 deg。 */
 #define CAR_PLAN_3_DIRECTION_COS_SQ  (0.8213938f) /* 相对方向创新 25deg 对应的最小余弦平方。 */
 #define CAR_PLAN_3_OUTPUT_COS_MIN     (0.8660254f) /* 重捕获速度方向最大变化 30deg 对应的最小余弦。 */
+#define CAR_PLAN_3_SEARCH_FORWARD_MIN (0.20f) /* 搜索阶段优先选择车体前方约 78deg 内的信标。 */
+#define CAR_PLAN_3_ROUTE_NEARER_MARGIN_M (0.35f) /* 新前向候选必须至少近于旧目标的距离，单位 m。 */
+#define CAR_PLAN_3_ROUTE_NEARER_RATIO (0.80f) /* 或者新候选距离不超过旧目标的 80%。 */
+#define CAR_PLAN_3_ROUTE_STRONG_RATIO (0.60f) /* 强优势路线候选相对当前目标的最大距离比例。 */
+#define CAR_PLAN_3_ROUTE_TURN_MARGIN_DEG (25.0f) /* 普通抢占允许增加的最大转向角，单位 deg。 */
+#define CAR_PLAN_3_ROUTE_CONFIRM_TICKS (2U) /* 新路线候选连续两次观测后才允许抢占。 */
 
 #define CAR_PLAN_3_STATE_SEARCH       (0U)    /* 没有确认目标。 */
 #define CAR_PLAN_3_STATE_TRACK        (1U)    /* 有新图像确认目标。 */
 #define CAR_PLAN_3_STATE_COAST        (2U)    /* 图像短时丢失，使用车模惯导。 */
+#define CAR_PLAN_3_ROUTE_PENDING_HOLD (2U)    /* 后方旧目标等待前向路线二次确认时直行保持。 */
 #define CAR_PLAN_3_COAST_LEVEL_NEAR  (0U)    /* 近距离保守 COAST。 */
 #define CAR_PLAN_3_COAST_LEVEL_FAR   (1U)    /* 远距离 COAST。 */
 #define CAR_PLAN_3_COAST_LEVEL_AGGRESSIVE (2U) /* 2m 以上强信任 COAST。 */
@@ -87,6 +94,11 @@ static float s_car_plan_3_pending_dx_m = 0.0f; /* 待确认信标的世界 X 相
 static float s_car_plan_3_pending_dy_m = 0.0f; /* 待确认信标的世界 Y 相对量，单位 m。 */
 static float s_car_plan_3_pending_lamp_angle_deg = 0.0f; /* 待确认车灯世界长轴角，单位 deg。 */
 static float s_car_plan_3_pending_car_yaw_deg = 0.0f; /* 待确认观测对应的车模世界 yaw，单位 deg。 */
+static uint8 s_car_plan_3_route_challenge_count = 0U; /* 新近灯路线候选的连续观测数。 */
+static uint8 s_car_plan_3_route_challenge_hold = 0U; /* 后方旧目标等待前向候选确认时的直行保持标志。 */
+static uint32 s_car_plan_3_route_challenge_tick = 0U; /* 新近灯路线候选最近观测时刻，单位 ms。 */
+static float s_car_plan_3_route_challenge_dx_m = 0.0f; /* 新近灯路线候选的世界 X 相对量，单位 m。 */
+static float s_car_plan_3_route_challenge_dy_m = 0.0f; /* 新近灯路线候选的世界 Y 相对量，单位 m。 */
 static float s_car_plan_3_last_edge_margin_px = 1000.0f; /* 最近可信观测的最小图像边缘余量，单位 px。 */
 static struct image_data s_car_plan_3_filtered[IMAGE_CAMERA_COUNT]; /* 各相机最近一次真实新图像的过滤结果。 */
 static car_plan_3_beacon_track_t
@@ -347,6 +359,11 @@ static void CarPlan_3_Propagate(float dt_s)
         s_car_plan_3_pending_dx_m -= velocity_x * dt_s;
         s_car_plan_3_pending_dy_m -= velocity_y * dt_s;
     }
+    if(s_car_plan_3_route_challenge_count != 0U)
+    {
+        s_car_plan_3_route_challenge_dx_m -= velocity_x * dt_s;
+        s_car_plan_3_route_challenge_dy_m -= velocity_y * dt_s;
+    }
 }
 
 /**
@@ -368,6 +385,147 @@ static float CarPlan_3_PredictLampAngle(float angle_deg, float yaw_deg)
         yaw_delta += 360.0f;
     }
     return angle_deg + yaw_delta;
+}
+
+/**
+ * @brief 将世界相对向量转换为车体系单位速度方向。
+ * @param dx_m 车灯到信标的世界 X 相对量，单位 m。
+ * @param dy_m 车灯到信标的世界 Y 相对量，单位 m。
+ * @param lamp_angle_deg 车灯横轴在世界坐标系中的无向角，单位 deg。
+ * @param target_strafe 输出车体右向单位分量，不得为空。
+ * @param target_forward 输出车体前向单位分量，不得为空。
+ * @param distance_m 输出车灯到信标距离，单位 m；不得为空。
+ * @return 相对向量在有效距离内返回 1，否则返回 0。
+ */
+static uint8 CarPlan_3_GetDirection(float dx_m,
+                                    float dy_m,
+                                    float lamp_angle_deg,
+                                    float *target_strafe,
+                                    float *target_forward,
+                                    float *distance_m);
+
+/**
+ * @brief 检查候选车灯长轴是否符合车模 yaw 传播后的无向角预测。
+ * @param candidate_deg 候选车灯世界长轴角，单位 deg。
+ * @return 角度创新不超过门限时返回 1，否则返回 0。
+ */
+static uint8 CarPlan_3_LampAngleConsistent(float candidate_deg);
+
+/**
+ * @brief 更新新近灯路线候选的连续确认，并返回是否可抢占当前目标。
+ * @param new_camera_mask 本周期真实更新的相机位掩码。
+ * @param current_distance_m 当前目标惯导预测距离，单位 m。
+ * @param tick_now 当前系统时刻，单位 ms。
+ * @param selected 输出本周期候选槽位，不得为空。
+ * @return 确认可抢占返回 1；后方旧目标等待直行保持返回 2；否则返回 0。
+ */
+static uint8 CarPlan_3_UpdateRouteChallenge(uint8 new_camera_mask,
+                                            float current_distance_m,
+                                            uint32 tick_now,
+                                            uint8 *selected)
+{
+    uint8 i;
+    uint8 challenger = 0xFFU;
+    uint8 current_behind = 0U;
+    float dx;
+    float dy;
+    float target_strafe;
+    float target_forward;
+    float distance;
+    float best_distance = 1000.0f;
+    float current_turn_deg = 180.0f;
+
+    if(CarPlan_3_GetDirection(s_car_plan_3_track_dx_m,
+                              s_car_plan_3_track_dy_m,
+                              CarPlan_3_PredictLampAngle(
+                                  s_car_plan_3_track_lamp_angle_deg,
+                                  s_car_plan_3_track_car_yaw_deg),
+                              &target_strafe,
+                              &target_forward,
+                              &distance) != 0U)
+    {
+        current_behind = (target_forward < 0.0f) ? 1U : 0U;
+        current_turn_deg = atan2f(fabsf(target_strafe), target_forward) *
+                           CAR_PLAN_3_RAD_TO_DEG;
+    }
+
+    /* 路线层只考虑稳定前向且明显更近的候选；旧目标在车后时直接选前向最近。 */
+    for(i = 0U; i < s_car_plan_3_camera.beacon_count; i++)
+    {
+        const three_camera_beacon_t *beacon = &s_car_plan_3_camera.beacon[i];
+        uint8 strong_advantage;
+        float candidate_turn_deg;
+
+        if((beacon->valid == 0U) || (beacon->pair_valid == 0U) ||
+           ((beacon->camera_mask & new_camera_mask) == 0U) ||
+           (CarPlan_3_LampAngleConsistent(
+                beacon->pair_lamp_angle_deg) == 0U) ||
+           (CarPlan_3_GetDirection(beacon->pair_dx_m,
+                                   beacon->pair_dy_m,
+                                   beacon->pair_lamp_angle_deg,
+                                   &target_strafe,
+                                   &target_forward,
+                                   &distance) == 0U) ||
+           (target_forward < CAR_PLAN_3_SEARCH_FORWARD_MIN) ||
+           (distance < CAR_PLAN_3_COAST_STOP_DISTANCE_M))
+        {
+            continue;
+        }
+        strong_advantage =
+            (distance <= current_distance_m * CAR_PLAN_3_ROUTE_STRONG_RATIO)
+                ? 1U
+                : 0U;
+        candidate_turn_deg = atan2f(fabsf(target_strafe), target_forward) *
+                             CAR_PLAN_3_RAD_TO_DEG;
+        if(((current_behind == 0U) && (strong_advantage == 0U) &&
+            (distance + CAR_PLAN_3_ROUTE_NEARER_MARGIN_M >
+             current_distance_m) &&
+            (distance > current_distance_m * CAR_PLAN_3_ROUTE_NEARER_RATIO)) ||
+           ((strong_advantage == 0U) &&
+            (candidate_turn_deg > current_turn_deg +
+                                      CAR_PLAN_3_ROUTE_TURN_MARGIN_DEG)))
+        {
+            continue;
+        }
+        if(distance < best_distance)
+        {
+            challenger = i;
+            best_distance = distance;
+        }
+    }
+    if(challenger == 0xFFU)
+    {
+        s_car_plan_3_route_challenge_count = 0U;
+        s_car_plan_3_route_challenge_hold = 0U;
+        *selected = 0xFFU;
+        return 0U;
+    }
+    dx = s_car_plan_3_camera.beacon[challenger].pair_dx_m;
+    dy = s_car_plan_3_camera.beacon[challenger].pair_dy_m;
+    s_car_plan_3_route_challenge_count =
+        ((s_car_plan_3_route_challenge_count != 0U) &&
+         ((tick_now - s_car_plan_3_route_challenge_tick) <
+          CAR_PLAN_3_IMAGE_TIMEOUT_MS) &&
+         (((dx - s_car_plan_3_route_challenge_dx_m) *
+           (dx - s_car_plan_3_route_challenge_dx_m) +
+           (dy - s_car_plan_3_route_challenge_dy_m) *
+           (dy - s_car_plan_3_route_challenge_dy_m)) <=
+          CAR_PLAN_3_REACQUIRE_DIST_M * CAR_PLAN_3_REACQUIRE_DIST_M))
+            ? CAR_PLAN_3_ROUTE_CONFIRM_TICKS
+            : 1U;
+    s_car_plan_3_route_challenge_dx_m = dx;
+    s_car_plan_3_route_challenge_dy_m = dy;
+    s_car_plan_3_route_challenge_tick = tick_now;
+    s_car_plan_3_route_challenge_hold =
+        ((current_behind != 0U) &&
+         (s_car_plan_3_route_challenge_count <
+          CAR_PLAN_3_ROUTE_CONFIRM_TICKS)) ? 1U : 0U;
+    *selected = challenger;
+    if(s_car_plan_3_route_challenge_count >= CAR_PLAN_3_ROUTE_CONFIRM_TICKS)
+    {
+        return 1U;
+    }
+    return (current_behind != 0U) ? CAR_PLAN_3_ROUTE_PENDING_HOLD : 0U;
 }
 
 /**
@@ -420,6 +578,7 @@ static uint8 CarPlan_3_SelectCandidate(uint8 new_camera_mask,
 {
     uint8 i;
     uint8 best_same_camera = 0U;
+    uint8 best_forward = 0U;
     uint8 second_available = 0U;
     float best_score_sq = 0.0f;
     float second_score_sq = 0.0f;
@@ -435,6 +594,7 @@ static uint8 CarPlan_3_SelectCandidate(uint8 new_camera_mask,
     {
         const three_camera_beacon_t *beacon = &s_car_plan_3_camera.beacon[i];
         uint8 same_camera = (beacon->pair_same_camera != 0U) ? 1U : 0U;
+        uint8 candidate_forward = 0U;
         float dx = beacon->pair_dx_m;
         float dy = beacon->pair_dy_m;
         float distance_sq;
@@ -477,7 +637,32 @@ static uint8 CarPlan_3_SelectCandidate(uint8 new_camera_mask,
         }
         else
         {
+            float target_strafe;
+            float target_forward;
+            float distance;
+
+            if(CarPlan_3_GetDirection(beacon->pair_dx_m,
+                                      beacon->pair_dy_m,
+                                      beacon->pair_lamp_angle_deg,
+                                      &target_strafe,
+                                      &target_forward,
+                                      &distance) == 0U)
+            {
+                continue;
+            }
+            candidate_forward =
+                (target_forward >= CAR_PLAN_3_SEARCH_FORWARD_MIN) ? 1U : 0U;
             score_sq = distance_sq;
+        }
+        if((use_reference == 0U) && (*selected != 0xFFU) &&
+           (best_forward != candidate_forward))
+        {
+            if(best_forward != 0U)
+            {
+                continue;
+            }
+            *selected = 0xFFU;
+            second_available = 0U;
         }
         if((use_reference == 0U) && (*selected != 0xFFU) &&
            (best_same_camera != same_camera))
@@ -499,6 +684,7 @@ static uint8 CarPlan_3_SelectCandidate(uint8 new_camera_mask,
             best_score_sq = score_sq;
             *selected = i;
             best_same_camera = same_camera;
+            best_forward = candidate_forward;
         }
         else if((second_available == 0U) || (score_sq < second_score_sq))
         {
@@ -576,9 +762,12 @@ static uint8 CarPlan_3_GetDirection(float dx_m,
  * @brief 接纳一个通过连续性检查的图像候选并更新规划输出。
  * @param selected 三摄融合信标槽位，范围 0 至 beacon_count-1。
  * @param tick_now 当前系统时刻，单位 ms。
+ * @param route_switch 非零表示候选已经通过路线抢占的连续确认。
  * @return 候选方向有效时返回 1，否则返回 0。
  */
-static uint8 CarPlan_3_AcceptCandidate(uint8 selected, uint32 tick_now)
+static uint8 CarPlan_3_AcceptCandidate(uint8 selected,
+                                       uint32 tick_now,
+                                       uint8 route_switch)
 {
     const three_camera_beacon_t *beacon = &s_car_plan_3_camera.beacon[selected];
     float target_strafe;
@@ -601,16 +790,22 @@ static uint8 CarPlan_3_AcceptCandidate(uint8 selected, uint32 tick_now)
         float predicted_forward;
         float predicted_distance;
 
-        if((CarPlan_3_GetDirection(s_car_plan_3_track_dx_m,
-                                   s_car_plan_3_track_dy_m,
-                                   CarPlan_3_PredictLampAngle(
-                                       s_car_plan_3_track_lamp_angle_deg,
-                                       s_car_plan_3_track_car_yaw_deg),
-                                   &predicted_strafe,
-                                   &predicted_forward,
-                                   &predicted_distance) == 0U) ||
-           ((target_strafe * predicted_strafe +
-             target_forward * predicted_forward) < CAR_PLAN_3_OUTPUT_COS_MIN))
+        if(CarPlan_3_GetDirection(s_car_plan_3_track_dx_m,
+                                  s_car_plan_3_track_dy_m,
+                                  CarPlan_3_PredictLampAngle(
+                                      s_car_plan_3_track_lamp_angle_deg,
+                                      s_car_plan_3_track_car_yaw_deg),
+                                  &predicted_strafe,
+                                  &predicted_forward,
+                                  &predicted_distance) == 0U)
+        {
+            return 0U;
+        }
+        if(((target_strafe * predicted_strafe +
+             target_forward * predicted_forward) < CAR_PLAN_3_OUTPUT_COS_MIN) &&
+           ((route_switch == 0U) ||
+            ((predicted_forward >= 0.0f) &&
+             (distance > predicted_distance * CAR_PLAN_3_ROUTE_STRONG_RATIO))))
         {
             return 0U;
         }
@@ -702,6 +897,9 @@ static void CarPlan_3_DropTarget(void)
     s_car_plan_3_no_vision_ticks = 0U;
     s_car_plan_3_coast_level = CAR_PLAN_3_COAST_LEVEL_NEAR;
     s_car_plan_3_track_camera_mask = 0U;
+    s_car_plan_3_route_challenge_count = 0U;
+    s_car_plan_3_route_challenge_hold = 0U;
+    s_car_plan_3_route_challenge_tick = 0U;
     s_car_plan_3_last_accept_tick = 0U;
     s_car_plan_3_last_camera_tick = 0U;
     (void)SpeedPlan_Update(0U, 0.0f, 0.0f);
@@ -734,6 +932,9 @@ void CarPlan_3_Reset(void)
     s_car_plan_3_pending_dy_m = 0.0f;
     s_car_plan_3_pending_lamp_angle_deg = 0.0f;
     s_car_plan_3_pending_car_yaw_deg = 0.0f;
+    s_car_plan_3_route_challenge_count = 0U;
+    s_car_plan_3_route_challenge_hold = 0U;
+    s_car_plan_3_route_challenge_tick = 0U;
     s_car_plan_3_last_edge_margin_px = 1000.0f;
     s_car_plan_3_camera.car_lamp.valid = 0U;
     s_car_plan_3_camera.beacon_count = 0U;
@@ -775,7 +976,9 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
     uint8 new_camera_mask;
     uint8 camera_valid;
     uint8 selected = 0xFFU;
+    uint8 route_selected = 0xFFU;
     uint8 candidate_valid = 0U;
+    uint8 route_ready = 0U;
     float dt_s;
     float car_speed;
     float innovation_gate;
@@ -871,7 +1074,9 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
                 }
                 if(s_car_plan_3_confirm_count >= CAR_PLAN_3_CONFIRM_TICKS)
                 {
-                    if(CarPlan_3_AcceptCandidate(selected, tick_now) == 0U)
+                    if(CarPlan_3_AcceptCandidate(selected,
+                                                 tick_now,
+                                                 0U) == 0U)
                     {
                         s_car_plan_3_confirm_count = 0U;
                     }
@@ -904,6 +1109,28 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
     {
         innovation_gate = CAR_PLAN_3_INNOVATION_MAX_M;
     }
+    track_distance = sqrtf(s_car_plan_3_track_dx_m * s_car_plan_3_track_dx_m +
+                           s_car_plan_3_track_dy_m * s_car_plan_3_track_dy_m);
+    if((new_camera_mask != 0U) && (camera_valid != 0U))
+    {
+        route_ready = CarPlan_3_UpdateRouteChallenge(new_camera_mask,
+                                                      track_distance,
+                                                      tick_now,
+                                                      &route_selected);
+    }
+    if((route_ready == 0U) && (s_car_plan_3_route_challenge_hold != 0U))
+    {
+        if((tick_now - s_car_plan_3_route_challenge_tick) <
+           CAR_PLAN_3_IMAGE_TIMEOUT_MS)
+        {
+            route_ready = CAR_PLAN_3_ROUTE_PENDING_HOLD;
+        }
+        else
+        {
+            s_car_plan_3_route_challenge_count = 0U;
+            s_car_plan_3_route_challenge_hold = 0U;
+        }
+    }
     if((new_camera_mask != 0U) && (camera_valid != 0U))
     {
         candidate_valid = CarPlan_3_SelectCandidate(new_camera_mask,
@@ -921,13 +1148,39 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
             candidate_valid = 0U;
         }
     }
+    if(route_ready == CAR_PLAN_3_ROUTE_PENDING_HOLD)
+    {
+        /* 前向候选尚未二次确认时只保持直行，不让后方旧目标触发反向转向。 */
+        s_car_plan_3_result.valid = 1U;
+        s_car_plan_3_result.target_strafe_mps = 0.0f;
+        s_car_plan_3_result.target_forward_mps = s_car_plan_3_track_speed_mps;
+        if(result != 0)
+        {
+            *result = s_car_plan_3_result;
+        }
+        return 1U;
+    }
+    if((route_ready == 1U) && (route_selected != 0xFFU))
+    {
+        route_ready = CarPlan_3_AcceptCandidate(route_selected, tick_now, 1U);
+        s_car_plan_3_route_challenge_count = 0U;
+        s_car_plan_3_route_challenge_hold = 0U;
+        if(route_ready != 0U)
+        {
+            if(result != 0)
+            {
+                *result = s_car_plan_3_result;
+            }
+            return 1U;
+        }
+    }
 
     /* TRACK 中直接接纳连续观测；单次坏观测只短时使用预测，不立即改变路径。 */
     if(s_car_plan_3_state == CAR_PLAN_3_STATE_TRACK)
     {
         if(candidate_valid != 0U)
         {
-            if(CarPlan_3_AcceptCandidate(selected, tick_now) != 0U)
+            if(CarPlan_3_AcceptCandidate(selected, tick_now, 0U) != 0U)
             {
                 if(result != 0)
                 {
@@ -1051,7 +1304,7 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
             s_car_plan_3_last_camera_tick = tick_now;
             if(s_car_plan_3_reacquire_count >= 2U)
             {
-                (void)CarPlan_3_AcceptCandidate(selected, tick_now);
+                (void)CarPlan_3_AcceptCandidate(selected, tick_now, 0U);
             }
         }
         else if(s_car_plan_3_reacquire_count != 0U)

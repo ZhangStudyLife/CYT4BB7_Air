@@ -5,13 +5,14 @@
 #include "yaw_align.h"
 #include "../Estimation/Attitude/IMU_TOP.h"
 #include "../Planner/car_plan_3.h"
+#include "../Planner/car_plan_4.h"
 #include "../Planner/car_plan_entry.h"
 #include "../Protocols/crsf/crsf.h"
 #include <math.h>
 
 #define AUTO_LANDING_INITIAL_WAIT_TICKS (500U) /* 使能后前置等待5s，对应100Hz调用500次。 */
 #define AUTO_LANDING_NO_TARGET_TICKS    (500U) /* 最近5s无速度下发判定降落。 */
-#define AUTO_LANDING_VALID_TICKS        (20U)  /* CarPlan3速度下发需连续有效200ms才确认。 */
+#define AUTO_LANDING_VALID_TICKS        (20U)  /* CarPlan3/4速度下发需连续有效200ms才确认。 */
 #define AUTO_LANDING_ROTATE_DEG         (360.0f) /* 飞机与车模各自旋转一圈的完成角，单位度。 */
 #define AUTO_LANDING_ROTATE_RATE_DPS    (60.0f)  /* 车模旋转指令的航向推进速率，单位deg/s。 */
 #define AUTO_LANDING_ROTATE_SPEED_MPS   (0.3f)   /* 车模旋转指令的平移速度，单位m/s。 */
@@ -211,7 +212,7 @@ void AutoLanding_Update100Hz(void)
         (mode != FC_START_CRSF_FLIGHT_MODE_4) ||
         (g_fc_params.yaw_change_mode4 >= 0.5f) || /* 仅yawmode0自动降落，任务期间yaw目标保持0度。 */
         (CRSF_STD[4] != 1) ||
-        (Car_Plan_Mode != 3) ||
+        ((Car_Plan_Mode != 3) && (Car_Plan_Mode != 4)) ||
         (car_started == 0U))
     {
         AutoLanding_ResetAll();
@@ -229,7 +230,15 @@ void AutoLanding_Update100Hz(void)
         return;
     }
 
-    CarPlan_3_GetResult(&plan3_result);
+    /* 按当前选中的CarPlan读取速度下发结果，判定最近是否有可信目标。 */
+    if (Car_Plan_Mode == 3)
+    {
+        CarPlan_3_GetResult(&plan3_result);
+    }
+    else
+    {
+        CarPlan_4_GetResult(&plan3_result);
+    }
     if (plan3_result.valid != 0U)
     {
         if (s_valid_target_ticks < AUTO_LANDING_VALID_TICKS)

@@ -110,12 +110,10 @@ static car_plan_4_beacon_track_t
 #define CAR_PLAN_4_SPEED_MIN_FORWARD_MPS    (0.5f)
 #define CAR_PLAN_4_SPEED_ENTER_TTC_S        (0.50f)
 #define CAR_PLAN_4_SPEED_ENTER_ANGLE_DEG    (24.0f)
-#define CAR_PLAN_4_SPEED_ENTER_YAWRATE_DPS  (60.0f)
-#define CAR_PLAN_4_SPEED_ENTER_ATTITUDE_DEG (20.0f)
-#define CAR_PLAN_4_SPEED_EXIT_TTC_S         (0.20f)
+#define CAR_PLAN_4_SPEED_ENTER_YAWRATE_DPS  (140.0f)
+#define CAR_PLAN_4_SPEED_EXIT_TTC_S         (0.40f)
 #define CAR_PLAN_4_SPEED_EXIT_ANGLE_DEG     (30.0f)
 #define CAR_PLAN_4_SPEED_EXIT_YAWRATE_DPS   (100.0f)
-#define CAR_PLAN_4_SPEED_EXIT_ATTITUDE_DEG  (30.0f)
 #define CAR_PLAN_4_SPEED_CONFIRM_TICKS      (6U) /* 100Hz下连续约60ms。 */
 #define CAR_PLAN_4_DUAL_ANGLE_DEG           (35.0f) /* 双灯同线目标速度向量最大夹角，单位 deg。 */
 #define CAR_PLAN_4_DUAL_TARGET_ANGLE_DEG    (24.0f) /* 双灯同线目标灯最大方向角，单位 deg。 */
@@ -251,8 +249,6 @@ static float CarPlan_4_SpeedPlanUpdate(uint8 target_valid,
                                        uint8 dual_line_fast)
 {
     float forward_speed;
-    float yaw_error;
-    float attitude_error;
     float ttc;
     uint8 condition_met;
 
@@ -264,20 +260,6 @@ static float CarPlan_4_SpeedPlanUpdate(uint8 target_valid,
 
     forward_speed = (g_car_vel_y > CAR_PLAN_4_SPEED_MIN_FORWARD_MPS) ?
                         g_car_vel_y : CAR_PLAN_4_SPEED_MIN_FORWARD_MPS;
-    yaw_error = g_euler.yaw - yaw_angle_target;
-    if(yaw_error > 180.0f)
-    {
-        yaw_error -= 360.0f;
-    }
-    else if(yaw_error < -180.0f)
-    {
-        yaw_error += 360.0f;
-    }
-    attitude_error = sqrtf((g_euler.roll - roll_angle_target) *
-                               (g_euler.roll - roll_angle_target) +
-                           (g_euler.pitch - pitch_angle_target) *
-                               (g_euler.pitch - pitch_angle_target) +
-                           yaw_error * yaw_error);
     ttc = target_distance_m / forward_speed;
 
     if(s_car_plan_4_speed_fast == 0U)
@@ -291,15 +273,13 @@ static float CarPlan_4_SpeedPlanUpdate(uint8 target_valid,
         }
         condition_met = ((ttc > CAR_PLAN_4_SPEED_ENTER_TTC_S) &&
                          (target_angle_deg < CAR_PLAN_4_SPEED_ENTER_ANGLE_DEG) &&
-                         (fabsf(g_car_yaw_rate_dps) < CAR_PLAN_4_SPEED_ENTER_YAWRATE_DPS) &&
-                         (attitude_error < CAR_PLAN_4_SPEED_ENTER_ATTITUDE_DEG)) ? 1U : 0U;
+                         (fabsf(g_car_yaw_rate_dps) < CAR_PLAN_4_SPEED_ENTER_YAWRATE_DPS)) ? 1U : 0U;
     }
     else
     {
         condition_met = ((ttc < CAR_PLAN_4_SPEED_EXIT_TTC_S) ||
                          (target_angle_deg > CAR_PLAN_4_SPEED_EXIT_ANGLE_DEG) ||
-                         (fabsf(g_car_yaw_rate_dps) > CAR_PLAN_4_SPEED_EXIT_YAWRATE_DPS) ||
-                         (attitude_error > CAR_PLAN_4_SPEED_EXIT_ATTITUDE_DEG)) ? 1U : 0U;
+                         (fabsf(g_car_yaw_rate_dps) > CAR_PLAN_4_SPEED_EXIT_YAWRATE_DPS)) ? 1U : 0U;
     }
 
     if(condition_met != 0U)

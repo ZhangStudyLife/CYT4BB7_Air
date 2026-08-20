@@ -376,9 +376,16 @@ void FC_Loop_50Hz(void)
         target_height_m = (fc_state == FC_START_CRSF_STATE_LANDING) ? FC_LANDING_TARGET_HEIGHT_M :
                           ((s_flight_mode == FC_START_CRSF_FLIGHT_MODE_3) ? FC_Mode3_Get_Target_Height_M() : g_fc_target_height_m);
         height_meas_m = g_tof_fused_height_mm * 0.001f;
-        height_pos_pid.kp = (fc_state == FC_START_CRSF_STATE_LANDING) ?
-                            (FC_LANDING_HEIGHT_POS_KP_SCALE * g_fc_params.pos_z_kp) :
-                            g_fc_params.pos_z_kp;
+        if (fc_state == FC_START_CRSF_STATE_LANDING)
+        {
+            height_pos_pid.kp = FC_LANDING_HEIGHT_POS_KP_SCALE * g_fc_params.pos_z_kp;
+        }
+        else
+        {
+            /* 非对称高度环：未到目标(需上升)用基准 kp，超过目标(需下降)加快 1.5 倍 */
+            height_pos_pid.kp = (height_meas_m > target_height_m) ?
+                                (1.5f * g_fc_params.pos_z_kp) : g_fc_params.pos_z_kp;
+        }
         height_pos_out = PID_Update(&height_pos_pid, target_height_m, height_meas_m, dt);
         height_pos_out = fc_clampf(height_pos_out,
                                    -FC_HEIGHT_VEL_TARGET_LIMIT,

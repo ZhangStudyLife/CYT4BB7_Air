@@ -59,6 +59,7 @@ static uint8 s_plan_confirmed = 0U; /* 规划结果是否已连续有效100ms。
 static uint8 s_plan_valid_ticks = 0U; /* 规划结果连续有效计数，单位10ms。 */
 static uint8 s_plan_invalid_ticks = 0U; /* 规划结果连续无效计数，单位10ms。 */
 static uint8 s_search_active = 0U; /* mode=2是否正在执行无信标旋转搜索。 */
+static uint8 s_search_forced = 0U; /* 强制持续旋转搜索，供自动降落双旋转阶段使用。 */
 static int8 s_search_direction = 1; /* mode=2搜索方向，1为yaw正方向，-1为yaw负方向。 */
 static float s_search_target_yaw = 0.0f; /* mode=2当前搜索航向目标，单位度。 */
 static float s_search_rotation_deg = 0.0f; /* 本轮无信标期间实际定向旋转角，单位度。 */
@@ -355,6 +356,7 @@ void YawAlign_Reset(void)
     s_previous_car_yaw = 0.0f;
     s_yaw_history_valid = 0U;
     s_mode4_target_sent = 0U;
+    s_search_forced = 0U;
     yaw_angle_pid.kp = g_fc_params.yaw_angle_kp;
 }
 
@@ -521,7 +523,8 @@ static void YawAlign_UpdateSearch(float aircraft_yaw_delta_deg)
 
     /* Mode4刚进入且车尚未收到过目标速度时，等待信标系统启动，不旋转。 */
     if((FC_START_CRSF_Get_Flight_Mode() == FC_START_CRSF_FLIGHT_MODE_4) &&
-       (s_mode4_target_sent == 0U))
+       (s_mode4_target_sent == 0U) &&
+       (s_search_forced == 0U))
     {
         s_search_active = 0U;
         s_search_rotation_deg = 0.0f;
@@ -577,7 +580,7 @@ static void YawAlign_UpdateSearch(float aircraft_yaw_delta_deg)
         }
     }
 
-    if(s_plan_confirmed != 0U)
+    if((s_plan_confirmed != 0U) && (s_search_forced == 0U))
     {
         s_search_active = 0U;
         s_lost_frames = 0U;
@@ -673,6 +676,12 @@ void YawAlign_Update(float yaw_change_mode)
         control_mode = 2U;
     }
 
+    /* 自动降落双旋转阶段强制按步进搜索旋转，无视yawmode参数。 */
+    if(s_search_forced != 0U)
+    {
+        control_mode = 2U;
+    }
+
     if(flight_mode != FC_START_CRSF_FLIGHT_MODE_4)
     {
         s_mode4_target_sent = 0U;
@@ -687,10 +696,13 @@ void YawAlign_Update(float yaw_change_mode)
         return;
     }
 
-    /* 模式改变时清空旧信标锁定和搜索进度，再进入新模式。 */
+    /* 模式改变时清空旧信标锁定和搜索进度，再进入新模式；强制搜索除外。 */
     if(control_mode != s_control_mode)
     {
-        YawAlign_Reset();
+        if(s_search_forced == 0U)
+        {
+            YawAlign_Reset();
+        }
         s_control_mode = control_mode;
     }
 
@@ -734,4 +746,14 @@ void YawAlign_Update(float yaw_change_mode)
 uint8 YawAlign_IsSearchActive(void)
 {
     return s_search_active;
+}
+
+/*
+ * 函数功能: 设置强制搜索，供自动降落双旋转阶段使用
+ * 输入参数: forced - 1为强制持续旋转搜索，0为恢复正常搜索
+ * 输出参数或返回值: 无
+ */
+void YawAlign_SetSearchForced(uint8 forced)
+{
+    s_search_forced = (forced != 0U) ? 1U : 0U;
 }

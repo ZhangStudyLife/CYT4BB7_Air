@@ -52,7 +52,7 @@ static car_plan_result_t s_air_run_car_plan;
 #define CAMERA_MODEL_CALIBRATION_LOG_FLOAT_COUNT (63U) /* 相机模型标定日志用户float数量。 */
 #define SPEED_PLANNING_DEBUG_FLOAT_COUNT  (19U) /* 速度规划调试用户float数量。 */
 #define HEIGHT_CONTROL_DEBUG_FLOAT_COUNT  (64U) /* 高度控制调试用户float数量。 */
-#define YAW_AUTO_LANDING_DEBUG_FLOAT_COUNT (72U) /* 航向搜索和自动降落调试用户float数量。 */
+#define YAW_AUTO_LANDING_DEBUG_FLOAT_COUNT (79U) /* 航向搜索和自动降落调试用户float数量。 */
 
 #if (MODE1245_DEBUG_FLOAT_COUNT > (WIFI_JUSTFLOAT_MAX_FLOAT_NUM - 1U))
 #error "Mode1/2/4/5 debug channels exceed JustFloat protocol capacity"
@@ -727,14 +727,21 @@ static void yaw_auto_landing_debug_200hz(void)
     data[index++] = yaw_debug.candidate_beacon.y;
     data[index++] = yaw_debug.candidate_beacon.area;
 
-    /* I63-I67: 自动降落等待、无目标、规划结果200ms确认、旋转观测和触发状态。 */
-    data[index++] = (float)landing_debug.initial_wait_ticks;
-    data[index++] = (float)landing_debug.no_target_ticks;
-    data[index++] = (float)landing_debug.target_valid;
-    data[index++] = (float)landing_debug.rotation_ready;
-    data[index++] = (float)landing_debug.triggered;
+    /* I63-I74: 自动降落状态机、入口条件与双旋转阶段。 */
+    data[index++] = (float)landing_debug.initial_wait_ticks; /* I63 前置等待计数。 */
+    data[index++] = (float)landing_debug.no_target_ticks; /* I64 无速度下发计数。 */
+    data[index++] = (float)landing_debug.valid_target_ticks; /* I65 连续有效计数。 */
+    data[index++] = (float)landing_debug.target_valid; /* I66 连续有效200ms确认。 */
+    data[index++] = (float)landing_debug.rotation_ready; /* I67 搜索达到360度观测。 */
+    data[index++] = (float)landing_debug.triggered; /* I68 降落已触发。 */
+    data[index++] = (float)landing_debug.state; /* I69 状态机0=IDLE 1=DETECT 2=ROTATE 3=TRIGGERED。 */
+    data[index++] = (float)landing_debug.car_started; /* I70 车模启动判定。 */
+    data[index++] = (float)Car_Plan_Mode; /* I71 当前规划算法编号。 */
+    data[index++] = (float)landing_debug.rotate_active; /* I72 双旋转阶段进行中。 */
+    data[index++] = landing_debug.rotate_air_deg; /* I73 飞机累计旋转角。 */
+    data[index++] = landing_debug.rotate_car_deg; /* I74 车模累计旋转角。 */
 
-    /* I68-I72: 搜索状态、方向、实际旋转角、线缆扭转角和当前yaw角度环Kp。 */
+    /* I75-I79: 搜索状态、方向、实际旋转角、线缆扭转角和当前yaw角度环Kp。 */
     data[index++] = (float)yaw_debug.search_active;
     data[index++] = (float)yaw_debug.search_direction;
     data[index++] = yaw_debug.search_rotation_deg;
@@ -790,6 +797,12 @@ static void send_air_run_data_200hz(void)
     }
     plan_strafe_mps = (car_plan_send_valid != 0U) ? s_air_run_car_plan.target_strafe_mps : 0.0f;
     plan_forward_mps = (car_plan_send_valid != 0U) ? s_air_run_car_plan.target_forward_mps : 0.0f;
+    if(AutoLanding_IsRotationActive() != 0U)
+    {
+        /* 自动降落双旋转阶段：覆盖下发速度为旋转指令，车模随之旋转一圈。 */
+        AutoLanding_GetRotateCommand(&plan_strafe_mps, &plan_forward_mps);
+        car_plan_send_valid = 1U;
+    }
 
     if ((state == FC_START_CRSF_STATE_TAKEOFF) ||
         (state == FC_START_CRSF_STATE_FLYING) ||
@@ -814,7 +827,8 @@ static void send_air_run_data_200hz(void)
         air_data[AIR_RUN_CRITICAL_BEACON_LOST] = beacon_lost;
         air_data[AIR_RUN_CRITICAL_SYNC_TIME] = (float)tick_1000us_cnt;
         air_data[AIR_RUN_CRITICAL_VACUUM_ENABLE] =
-            (state == FC_START_CRSF_STATE_FLYING) ? 1.0f : 0.0f;
+            ((state == FC_START_CRSF_STATE_FLYING) &&
+             (AutoLanding_IsRotationActive() == 0U)) ? 1.0f : 0.0f;
         (void)air_comm_send_run_data(air_data, AIR_RUN_DATA_CRITICAL_COUNT);
         return;
     }
@@ -903,6 +917,7 @@ static void core0_run_fast_loop_step(void)
 
     FC_Loop_1000Hz();
     air_comm_air_poll();
+    // yaw_auto_landing_debug_200hz(); /* 自动降落诊断日志，临时替代CarPlan3日志。 */
     car_plan_debug_200hz(); /* 临时关闭原CarPlan3调试日志。 */
     // mode1245_wifi_debug_200hz(); /* 临时关闭Mode1/2/4/5调试，改发相机模型标定日志。 */
     // camera_model_calibration_log_200hz(); /* 临时关闭相机模型标定日志，改发速度规划调试日志。 */

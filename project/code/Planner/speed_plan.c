@@ -5,15 +5,15 @@
 #include <math.h>
 
 #define SPEED_PLAN_MIN_FORWARD_MPS       (0.5f)
-#define SPEED_PLAN_ENTER_TTC_S           (0.70f)
-#define SPEED_PLAN_ENTER_ANGLE_DEG       (12.0f)
-#define SPEED_PLAN_ENTER_YAWRATE_DPS     (40.0f)
+#define SPEED_PLAN_ENTER_TTC_S           (0.50f)
+#define SPEED_PLAN_ENTER_ANGLE_DEG       (24.0f)
+#define SPEED_PLAN_ENTER_YAWRATE_DPS     (60.0f)
 #define SPEED_PLAN_ENTER_ATTITUDE_DEG    (20.0f)
-#define SPEED_PLAN_EXIT_TTC_S            (0.30f)
-#define SPEED_PLAN_EXIT_ANGLE_DEG        (25.0f)
+#define SPEED_PLAN_EXIT_TTC_S            (0.20f)
+#define SPEED_PLAN_EXIT_ANGLE_DEG        (30.0f)
 #define SPEED_PLAN_EXIT_YAWRATE_DPS      (100.0f)
 #define SPEED_PLAN_EXIT_ATTITUDE_DEG     (30.0f)
-#define SPEED_PLAN_CONFIRM_TICKS         (8U) /* 100Hz下连续约80ms。 */
+#define SPEED_PLAN_CONFIRM_TICKS         (6U) /* 100Hz下连续约60ms。 */
 
 extern float g_car_vel_y;
 extern float g_car_yaw_rate_dps;

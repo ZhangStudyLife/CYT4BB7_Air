@@ -62,6 +62,14 @@ void YawAlign_Update(float yaw_change_mode);
 uint8 YawAlign_IsSearchActive(void);
 
 /**
+ * @brief 设置强制搜索，供自动降落双旋转阶段使用。
+ * @param forced 1为强制持续旋转搜索，0为恢复正常搜索。
+ * @return 无。
+ * @note 强制期间忽略plan确认对搜索的停止，并跳过首个目标速度等待。
+ */
+void YawAlign_SetSearchForced(uint8 forced);
+
+/**
  * @brief 获取航向对准和搜索状态的只读调试快照。
  * @param out 调试快照输出地址，不可为空。
  * @return 无。

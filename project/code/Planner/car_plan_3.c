@@ -14,16 +14,14 @@
 #define CAR_PLAN_3_FAR_LAMP_DIST_PX  (10.0f) /* 允许信标靠近车灯前必须到达的历史距离，单位 px。 */
 #define CAR_PLAN_3_HISTORY_TICKS     (30U)   /* 100Hz 下保留约 300ms 的远距离历史。 */
 #define CAR_PLAN_3_GAP_TICKS         (2U)    /* 100Hz 下允许约 20ms 的短暂丢失。 */
-#define CAR_PLAN_3_CONFIRM_TICKS     (3U)    /* 连续匹配三次后确认信标轨迹。 */
+#define CAR_PLAN_3_CONFIRM_TICKS     (2U)    /* 连续匹配两次后确认信标轨迹。 */
 #define CAR_PLAN_3_EDGE_MARGIN_PX    (20.0f) /* 进入惯导保持前的图像边缘余量，单位 px。 */
 #define CAR_PLAN_3_ATTITUDE_GATE_DEG (12.0f) /* 允许进入惯导保持的 Roll/Pitch 模长，单位 deg。 */
-#define CAR_PLAN_3_COAST_HOLD_MS     (150U)  /* COAST 阶段保持原速度的时间，单位 ms。 */
-#define CAR_PLAN_3_COAST_MAX_MS      (500U)  /* COAST 阶段惯导保持最长时间，单位 ms。 */
-#define CAR_PLAN_3_FAR_DISTANCE_M    (1.20f) /* 远距离 COAST 准入和强信任速度保持边界，单位 m。 */
-#define CAR_PLAN_3_FAR_COAST_HOLD_MS (450U)  /* 远距离 COAST 保持原速度的时间，单位 ms。 */
-#define CAR_PLAN_3_FAR_COAST_MAX_MS  (650U)  /* 远距离 COAST 惯导保持最长时间，单位 ms。 */
+#define CAR_PLAN_3_COAST_MAX_MS      (400U)  /* COAST 阶段惯导保持最长时间，单位 ms。 */
+#define CAR_PLAN_3_FAR_DISTANCE_M    (1.20f) /* 远距离 COAST 准入边界，单位 m。 */
+#define CAR_PLAN_3_FAR_COAST_MAX_MS  (520U)  /* 远距离 COAST 惯导保持最长时间，单位 ms。 */
 #define CAR_PLAN_3_AGGRESSIVE_DISTANCE_M (2.00f) /* 强信任 COAST 的起始距离，单位 m。 */
-#define CAR_PLAN_3_AGGRESSIVE_COAST_MAX_MS (1200U) /* 强信任 COAST 最长盲航时间，单位 ms。 */
+#define CAR_PLAN_3_AGGRESSIVE_COAST_MAX_MS (960U) /* 强信任 COAST 最长盲航时间，单位 ms。 */
 #define CAR_PLAN_3_COAST_STOP_DISTANCE_M (0.60f) /* COAST 预测距离到该值时立即退出，单位 m。 */
 #define CAR_PLAN_3_CAR_DATA_WARN_MS  (50U)   /* 车数据超过该年龄后不再扩展惯导时间，单位 ms。 */
 #define CAR_PLAN_3_CAR_DATA_STOP_MS  (100U)  /* 车数据超过该年龄后停止惯导，单位 ms。 */
@@ -37,7 +35,7 @@
 #define CAR_PLAN_3_LAMP_ANGLE_GATE_DEG (30.0f) /* 车灯长轴相对惯导预测的最大创新，单位 deg。 */
 #define CAR_PLAN_3_DIRECTION_COS_SQ  (0.8213938f) /* 相对方向创新 25deg 对应的最小余弦平方。 */
 #define CAR_PLAN_3_OUTPUT_COS_MIN     (0.8660254f) /* 重捕获速度方向最大变化 30deg 对应的最小余弦。 */
-#define CAR_PLAN_3_SEARCH_FORWARD_MIN (0.20f) /* 搜索阶段优先选择车体前方约 78deg 内的信标。 */
+#define CAR_PLAN_3_SEARCH_FORWARD_MIN (0.20f) /* 路线抢占只考虑车体前方约 78deg 内的信标。 */
 #define CAR_PLAN_3_ROUTE_NEARER_MARGIN_M (0.35f) /* 新前向候选必须至少近于旧目标的距离，单位 m。 */
 #define CAR_PLAN_3_ROUTE_NEARER_RATIO (0.80f) /* 或者新候选距离不超过旧目标的 80%。 */
 #define CAR_PLAN_3_ROUTE_STRONG_RATIO (0.60f) /* 强优势路线候选相对当前目标的最大距离比例。 */
@@ -578,7 +576,6 @@ static uint8 CarPlan_3_SelectCandidate(uint8 new_camera_mask,
 {
     uint8 i;
     uint8 best_same_camera = 0U;
-    uint8 best_forward = 0U;
     uint8 second_available = 0U;
     float best_score_sq = 0.0f;
     float second_score_sq = 0.0f;
@@ -594,7 +591,6 @@ static uint8 CarPlan_3_SelectCandidate(uint8 new_camera_mask,
     {
         const three_camera_beacon_t *beacon = &s_car_plan_3_camera.beacon[i];
         uint8 same_camera = (beacon->pair_same_camera != 0U) ? 1U : 0U;
-        uint8 candidate_forward = 0U;
         float dx = beacon->pair_dx_m;
         float dy = beacon->pair_dy_m;
         float distance_sq;
@@ -637,32 +633,7 @@ static uint8 CarPlan_3_SelectCandidate(uint8 new_camera_mask,
         }
         else
         {
-            float target_strafe;
-            float target_forward;
-            float distance;
-
-            if(CarPlan_3_GetDirection(beacon->pair_dx_m,
-                                      beacon->pair_dy_m,
-                                      beacon->pair_lamp_angle_deg,
-                                      &target_strafe,
-                                      &target_forward,
-                                      &distance) == 0U)
-            {
-                continue;
-            }
-            candidate_forward =
-                (target_forward >= CAR_PLAN_3_SEARCH_FORWARD_MIN) ? 1U : 0U;
             score_sq = distance_sq;
-        }
-        if((use_reference == 0U) && (*selected != 0xFFU) &&
-           (best_forward != candidate_forward))
-        {
-            if(best_forward != 0U)
-            {
-                continue;
-            }
-            *selected = 0xFFU;
-            second_available = 0U;
         }
         if((use_reference == 0U) && (*selected != 0xFFU) &&
            (best_same_camera != same_camera))
@@ -684,7 +655,6 @@ static uint8 CarPlan_3_SelectCandidate(uint8 new_camera_mask,
             best_score_sq = score_sq;
             *selected = i;
             best_same_camera = same_camera;
-            best_forward = candidate_forward;
         }
         else if((second_available == 0U) || (score_sq < second_score_sq))
         {
@@ -986,8 +956,6 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
     float second_innovation;
     float attitude;
     float track_distance;
-    float distance_scale;
-    float speed_scale;
 
     if(delta_ms > 50U)
     {
@@ -1214,6 +1182,16 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
             }
             return s_car_plan_3_result.valid;
         }
+        if((new_camera_mask & s_car_plan_3_track_camera_mask) != 0U)
+        {
+            /* 目标相机有新图却无匹配候选：目标已灭或消失，立即放弃，不再惯导盲航。 */
+            CarPlan_3_DropTarget();
+            if(result != 0)
+            {
+                *result = s_car_plan_3_result;
+            }
+            return s_car_plan_3_result.valid;
+        }
 
         attitude = sqrtf(g_euler.roll * g_euler.roll +
                          g_euler.pitch * g_euler.pitch);
@@ -1256,8 +1234,6 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
 
     /* COAST 只接纳创新门内且三帧窗口至少命中两次的重现目标。 */
     lost_age_ms = tick_now - s_car_plan_3_last_accept_tick;
-    track_distance = sqrtf(s_car_plan_3_track_dx_m * s_car_plan_3_track_dx_m +
-                           s_car_plan_3_track_dy_m * s_car_plan_3_track_dy_m);
     if(((s_car_plan_3_coast_level == CAR_PLAN_3_COAST_LEVEL_AGGRESSIVE) &&
         (lost_age_ms >= CAR_PLAN_3_AGGRESSIVE_COAST_MAX_MS)) ||
        ((s_car_plan_3_coast_level == CAR_PLAN_3_COAST_LEVEL_FAR) &&
@@ -1321,64 +1297,21 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
                 s_car_plan_3_reacquire_age = 0U;
             }
         }
+        else if(new_camera_mask != 0U)
+        {
+            /* 视觉已恢复但重捕获窗口内无候选：目标已消失，停止盲航回到搜索。 */
+            CarPlan_3_DropTarget();
+            if(result != 0)
+            {
+                *result = s_car_plan_3_result;
+            }
+            return 0U;
+        }
 
         if(s_car_plan_3_state != CAR_PLAN_3_STATE_TRACK)
         {
-            if(s_car_plan_3_coast_level == CAR_PLAN_3_COAST_LEVEL_AGGRESSIVE)
-            {
-                s_car_plan_3_state = CAR_PLAN_3_STATE_COAST;
-                if(track_distance >= CAR_PLAN_3_FAR_DISTANCE_M)
-                {
-                    speed_scale = 1.0f;
-                }
-                else
-                {
-                    distance_scale =
-                        (track_distance - CAR_PLAN_3_COAST_STOP_DISTANCE_M) /
-                        (CAR_PLAN_3_FAR_DISTANCE_M -
-                         CAR_PLAN_3_COAST_STOP_DISTANCE_M);
-                    speed_scale = (distance_scale > 0.0f) ? distance_scale : 0.0f;
-                }
-            }
-            else if(s_car_plan_3_coast_level == CAR_PLAN_3_COAST_LEVEL_FAR)
-            {
-                s_car_plan_3_state = CAR_PLAN_3_STATE_COAST;
-                if(lost_age_ms <= CAR_PLAN_3_FAR_COAST_HOLD_MS)
-                {
-                    speed_scale = 1.0f;
-                }
-                else
-                {
-                    speed_scale =
-                        (float)(CAR_PLAN_3_FAR_COAST_MAX_MS - lost_age_ms) /
-                        (float)(CAR_PLAN_3_FAR_COAST_MAX_MS -
-                                CAR_PLAN_3_FAR_COAST_HOLD_MS);
-                }
-                if(track_distance < CAR_PLAN_3_FAR_DISTANCE_M)
-                {
-                    distance_scale =
-                        (track_distance - CAR_PLAN_3_COAST_STOP_DISTANCE_M) /
-                        (CAR_PLAN_3_FAR_DISTANCE_M -
-                         CAR_PLAN_3_COAST_STOP_DISTANCE_M);
-                    if(distance_scale < speed_scale)
-                    {
-                        speed_scale = distance_scale;
-                    }
-                }
-            }
-            else if(lost_age_ms <= CAR_PLAN_3_COAST_HOLD_MS)
-            {
-                s_car_plan_3_state = CAR_PLAN_3_STATE_COAST;
-                speed_scale = 1.0f;
-            }
-            else
-            {
-                s_car_plan_3_state = CAR_PLAN_3_STATE_COAST;
-                speed_scale =
-                    (float)(CAR_PLAN_3_COAST_MAX_MS - lost_age_ms) /
-                    (float)(CAR_PLAN_3_COAST_MAX_MS - CAR_PLAN_3_COAST_HOLD_MS);
-            }
-            if(CarPlan_3_OutputPrediction(speed_scale) == 0U)
+            s_car_plan_3_state = CAR_PLAN_3_STATE_COAST;
+            if(CarPlan_3_OutputPrediction(1.0f) == 0U)
             {
                 CarPlan_3_DropTarget();
             }

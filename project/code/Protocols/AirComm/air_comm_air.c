@@ -2385,7 +2385,7 @@ void air_comm_air_init(void)
     AIR_COMM_REGISTER_FLOAT(mode2_car_turn_accel_lpf_hz, g_fc_params.mode2_car_turn_accel_lpf_hz, 0.1f, 20.0f);
     AIR_COMM_REGISTER_FLOAT(Car_Speed, Car_Speed, 0.1f, 3.0f);
     AIR_COMM_REGISTER_FLOAT(Car_Speed_Fast, Car_Speed_Fast, 0.1f, 3.0f);
-    AIR_COMM_REGISTER_INT32(Car_Plan_Mode, Car_Plan_Mode, 1, 3);
+    AIR_COMM_REGISTER_INT32(Car_Plan_Mode, Car_Plan_Mode, 1, 4);
 
     AIR_COMM_REGISTER_FLOAT(mode4_img_kp, g_fc_params.mode4_img_kp, 0.0f, 1.0f);
     AIR_COMM_REGISTER_FLOAT(mode4_img_kd, g_fc_params.mode4_img_kd, 0.0f, 1.0f);

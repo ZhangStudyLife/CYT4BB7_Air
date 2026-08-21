@@ -57,7 +57,7 @@
 
 vuint8 mt9v03x_finish_flag = 0;                                                 // 一场图像采集完成标志位
 uint8 mt9v03x_image[MT9V03X_H][MT9V03X_W];     
-uint16 g_mt9v03x_exp_time = 400U;                                                // 运行时曝光时间
+uint16 g_mt9v03x_exp_time = 240U;                                                // 运行时曝光时间
 uint16 g_mt9v03x_fps = MT9V03X_FPS_DEF;                                         // 运行时目标帧率
 uint16 g_mt9v03x_gain = MT9V03X_GAIN_DEF;                                       // 运行时图像增益
 volatile uint32 mt9v03x_frame_sequence = 0U;                                    // 最近完成采集的源帧序号

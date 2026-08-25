@@ -1,5 +1,0 @@
-﻿model,sqrt_per_point,division_per_point,trig_per_point,newton_iterations,cycles_15_points,time_us_250mhz,period_percent_100hz
-pinhole_k1,0,3,0,0,1605,6.42,0.0642
-double_sphere,2,5,0,0,3120,12.48,0.1248
-kb8,1,9,2,6,7650,30.6,0.30600000000000005
-double_sphere_lut,3,5,5,0,11580,46.32,0.4632

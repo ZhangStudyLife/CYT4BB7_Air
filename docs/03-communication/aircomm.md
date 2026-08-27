@@ -61,10 +61,10 @@ flowchart LR
 
 飞机和车模两边用的是同一种思路，只是 UART 实例和引脚不同：
 
-| 端 | UART | 底层 SCB | TX | RX | 波特率 | TX FIFO 触发水位 |
-| --- | --- | --- | --- | --- | ---: | ---: |
-| Air | `UART_2` | `SCB4` | `P10_1` | `P10_0` | `1152000` | `64 Byte` |
-| Car | `UART_3` | `SCB3` | `P17_2` | `P17_1` | `1152000` | `32 Byte` |
+| 端  | UART       | 底层 SCB | TX        | RX        |      波特率 | TX FIFO 触发水位 |
+| --- | ---------- | -------- | --------- | --------- | ----------: | ---------------: |
+| Air | `UART_2` | `SCB4` | `P10_1` | `P10_0` | `1152000` |      `64 Byte` |
+| Car | `UART_3` | `SCB3` | `P17_2` | `P17_1` | `1152000` |      `32 Byte` |
 
 Air 端在 [`air_comm_air_init()`](../../project/code/Protocols/AirComm/air_comm_air.c) 中初始化 `UART_2`，打开 RX 中断，并先关闭暂时用不到的 TX trigger。Car 端则在 [`air_comm_car_init()`](../../../CYT4bb7_Car/project/code/Protocols/AirComm/air_comm_car.c) 中完成对应初始化。
 
@@ -186,12 +186,12 @@ UART 设为 `1152000 bit/s`。按常见的 `8N1` 算法，一个字节在线上�
 
 当前几种主要实时包可以直接算出线速占用：
 
-| 数据 | 单帧总长 | 200 Hz 每秒字节数 | 单帧线传输时间 | 单向线速占用 |
-| --- | ---: | ---: | ---: | ---: |
-| Air 飞行关键包，17 个 float | `78 Byte` | `15600 Byte/s` | 约 `0.677 ms` | 约 `13.54%` |
-| Air 待机诊断包，52 个 float | `218 Byte` | `43600 Byte/s` | 约 `1.892 ms` | 约 `37.85%` |
-| Car 上行包，11 个 float | `54 Byte` | `10800 Byte/s` | 约 `0.469 ms` | 约 `9.38%` |
-| 单个心跳包 | `15 Byte` | `75 Byte/s` | 约 `0.130 ms` | 约 `0.07%` |
+| 数据                        |     单帧总长 | 200 Hz 每秒字节数 | 单帧线传输时间 | 单向线速占用 |
+| --------------------------- | -----------: | ----------------: | -------------: | -----------: |
+| Air 飞行关键包，17 个 float |  `78 Byte` |  `15600 Byte/s` | 约`0.677 ms` | 约`13.54%` |
+| Air 待机诊断包，52 个 float | `218 Byte` |  `43600 Byte/s` | 约`1.892 ms` | 约`37.85%` |
+| Car 上行包，11 个 float     |  `54 Byte` |  `10800 Byte/s` | 约`0.469 ms` |  约`9.38%` |
+| 单个心跳包                  |  `15 Byte` |     `75 Byte/s` | 约`0.130 ms` |  约`0.07%` |
 
 串口是全双工，Air 下发和 Car 上行分别占各自方向的线，不需要把两个方向简单相加后再和一条单向带宽比较。即使 Air 在待机时发完整的 52 项诊断包，单向仍然还有比较充足的余量。
 
@@ -203,14 +203,14 @@ UART 设为 `1152000 bit/s`。按常见的 `8N1` 算法，一个字节在线上�
 
 所有心跳、遥测、参数和命令都使用同一种帧外壳：
 
-| 字段 | 长度 | 说明 |
-| --- | ---: | --- |
-| Header | 4 Byte | 固定为 `AA AA 55 55` |
-| Type | 1 Byte | 消息类型 |
-| Seq | 1 Byte | 序列号 |
-| Len | 1 Byte | payload 长度，最大 `250` |
-| Payload | 0～250 Byte | 各类消息自己的内容 |
-| CRC | 2 Byte | `CRC-16/CCITT-FALSE`，低字节先发 |
+| 字段    |        长度 | 说明                               |
+| ------- | ----------: | ---------------------------------- |
+| Header  |      4 Byte | 固定为`AA AA 55 55`              |
+| Type    |      1 Byte | 消息类型                           |
+| Seq     |      1 Byte | 序列号                             |
+| Len     |      1 Byte | payload 长度，最大`250`          |
+| Payload | 0～250 Byte | 各类消息自己的内容                 |
+| CRC     |      2 Byte | `CRC-16/CCITT-FALSE`，低字节先发 |
 
 因此固定开销是 `4 + 1 + 1 + 1 + 2 = 9 Byte`。8 位 `seq` 在帧成功放进 TX 队列后递增，超过 `255` 后自然回到 `0`。对于高频遥测，它主要用于观察丢帧；对于参数和命令，它还会参与 ACK 对应和重传去重。
 
@@ -244,16 +244,16 @@ RX 队列中的字节不会假设“一次进来的刚好就是一整帧”，�
 
 ## 消息类型一览
 
-| Type | 名称 | 方向 | 用途 |
-| ---: | --- | --- | --- |
-| `0x01` | `SET_PARAM` | Car → Air | 请求修改一个参数 |
-| `0x02` | `ACK_PARAM` | Air → Car | 返回修改状态和实际值 |
-| `0x03` | `EXEC_COMMAND` | Car → Air | 请求执行远程命令 |
-| `0x04` | `ACK_COMMAND` | Air → Car | 返回命令执行结果文本 |
-| `0x05` | `HEARTBEAT` | 双向 | 维持在线状态和携带本端 tick |
-| `0x06` | `RUN_DATA` | 双向 | 高频浮点遥测/控制相关数据 |
-| `0x07` | `GET_PARAM` | Car → Air | 请求读取一个参数 |
-| `0x08` | `ACK_GET_PARAM` | Air → Car | 返回读取状态和实际值 |
+|     Type | 名称              | 方向       | 用途                        |
+| -------: | ----------------- | ---------- | --------------------------- |
+| `0x01` | `SET_PARAM`     | Car → Air | 请求修改一个参数            |
+| `0x02` | `ACK_PARAM`     | Air → Car | 返回修改状态和实际值        |
+| `0x03` | `EXEC_COMMAND`  | Car → Air | 请求执行远程命令            |
+| `0x04` | `ACK_COMMAND`   | Air → Car | 返回命令执行结果文本        |
+| `0x05` | `HEARTBEAT`     | 双向       | 维持在线状态和携带本端 tick |
+| `0x06` | `RUN_DATA`      | 双向       | 高频浮点遥测/控制相关数据   |
+| `0x07` | `GET_PARAM`     | Car → Air | 请求读取一个参数            |
+| `0x08` | `ACK_GET_PARAM` | Air → Car | 返回读取状态和实际值        |
 
 把所有功能放在统一帧里有一个很现实的好处：物理串口、队列、CRC 和解析状态机只写一套。后续加业务时只需要定义新的 type 和 payload，不需要再复制一套串口驱动。
 
@@ -269,10 +269,10 @@ Air 和 Car 都每 `200 ms` 主动发一次心跳，也就是理论上每秒 5 �
 
 在线状态不是简单的 true/false，而是三种：
 
-| 状态 | 含义 |
-| ---: | --- |
-| `0` | 上电后从来没有建立过通信 |
-| `1` | 当前在线 |
+|  状态 | 含义                       |
+| ----: | -------------------------- |
+| `0` | 上电后从来没有建立过通信   |
+| `1` | 当前在线                   |
 | `2` | 之前在线过，但现在已经超时 |
 
 Air 端还有一个比较宽松的处理：只要收到任意一帧 CRC 正确的数据，也会调用在线标记逻辑刷新 Car 活跃时间。所以哪怕某一帧心跳刚好丢了，只要实时数据还在正常到达，就不会机械地把 Car 判成离线。
@@ -297,17 +297,17 @@ Air 端还有一个比较宽松的处理：只要收到任意一帧 CRC 正确�
 
 飞机处于 `TAKEOFF`、`FLYING` 或 `LANDING` 时，当前会以 `200 Hz` 下发 17 个 float。飞行时只发控制真正关心的数据，可以减少中断和链路占用：
 
-| 索引 | 含义 |
-| ---: | --- |
-| 0 | Air 当前状态 |
+| 索引 | 含义                     |
+| ---: | ------------------------ |
+|    0 | Air 当前状态             |
 | 1～9 | CRSF 标准化后的 CH0～CH8 |
-| 10 | yaw 目标角 |
-| 11 | CarPlan 是否有效 |
-| 12 | CarPlan 横移目标速度 |
-| 13 | CarPlan 前进目标速度 |
-| 14 | 信标是否丢失 |
-| 15 | Air 的 tick 同步时间 |
-| 16 | 是否允许开启负压 |
+|   10 | yaw 目标角               |
+|   11 | CarPlan 是否有效         |
+|   12 | CarPlan 横移目标速度     |
+|   13 | CarPlan 前进目标速度     |
+|   14 | 信标是否丢失             |
+|   15 | Air 的 tick 同步时间     |
+|   16 | 是否允许开启负压         |
 
 这里的 CRSF 数据就是遥控器数据在 Air 端解析、归一化后的结果。也就是说，车模不需要再接一套遥控接收机，飞机可以把自己已经拿到的通道状态通过空地串口同步给 Car。真正使用时仍然要看数据新鲜度，不能在断联后无限沿用最后一帧油门或开关状态。
 
@@ -315,30 +315,30 @@ Air 端还有一个比较宽松的处理：只要收到任意一帧 CRC 正确�
 
 待机时更适合观察系统，所以当前发送完整的 52 个 float：
 
-| 索引 | 含义 |
-| ---: | --- |
-| 0 | 融合高度 |
-| 1～3 | roll、pitch、yaw |
-| 4～5 | 位置估计速度 |
-| 6 | Air 当前状态 |
-| 7～14 | CRSF CH0～CH7 |
-| 15 | yaw 目标角 |
-| 16 | Air tick |
-| 17 | CarPlan 是否有效 |
-| 18～19 | CarPlan 横移、前进目标速度 |
-| 20～22 | 当前保留为 0 |
-| 23 | 信标是否丢失 |
-| 24 | CRSF CH8 |
-| 25～28 | 四路 TOF 数据 |
-| 29～30 | 光流原始积分 |
-| 31～32 | 陀螺仪解耦后的光流 |
-| 33～35 | 原始 gyro 三轴 |
-| 36～38 | 原始 accel 三轴 |
-| 39～41 | 滤波后 gyro 三轴 |
-| 42～44 | 滤波后 accel 三轴 |
+|   索引 | 含义                           |
+| -----: | ------------------------------ |
+|      0 | 融合高度                       |
+|   1～3 | roll、pitch、yaw               |
+|   4～5 | 位置估计速度                   |
+|      6 | Air 当前状态                   |
+|  7～14 | CRSF CH0～CH7                  |
+|     15 | yaw 目标角                     |
+|     16 | Air tick                       |
+|     17 | CarPlan 是否有效               |
+| 18～19 | CarPlan 横移、前进目标速度     |
+| 20～22 | 当前保留为 0                   |
+|     23 | 信标是否丢失                   |
+|     24 | CRSF CH8                       |
+| 25～28 | 四路 TOF 数据                  |
+| 29～30 | 光流原始积分                   |
+| 31～32 | 陀螺仪解耦后的光流             |
+| 33～35 | 原始 gyro 三轴                 |
+| 36～38 | 原始 accel 三轴                |
+| 39～41 | 滤波后 gyro 三轴               |
+| 42～44 | 滤波后 accel 三轴              |
 | 45～46 | 两块相机板的在线/GPIO 组合状态 |
-| 47 | 两块相机板的错误码组合 |
-| 48～51 | 两块相机板最后收到的帧头字节 |
+|     47 | 两块相机板的错误码组合         |
+| 48～51 | 两块相机板最后收到的帧头字节   |
 
 诊断包不是为了让控制器依赖 52 个量，而是让我在待机调试时能从地面侧一次看到飞控、遥控、TOF、光流、IMU 和相机板通信状态。进入飞行状态后切换成 17 项关键包，就是在“可观察性”和“实时性”之间做区分。
 
@@ -347,14 +347,14 @@ Air 端还有一个比较宽松的处理：只要收到任意一帧 CRC 正确�
 主车工程当前每帧上传 11 个 float：
 
 | 索引 | `CYT4bb7_Car` 当前发送内容 |
-| ---: | --- |
-| 0 | 车体速度 X |
-| 1 | 车体速度 Y |
-| 2 | 是否压到信标 |
-| 3 | Car yaw |
-| 4 | 低通后的 yaw rate |
-| 5～9 | 当前保留为 0 |
-| 10 | Car tick |
+| ---: | ---------------------------- |
+|    0 | 车体速度 X                   |
+|    1 | 车体速度 Y                   |
+|    2 | 是否压到信标                 |
+|    3 | Car yaw                      |
+|    4 | 低通后的 yaw rate            |
+| 5～9 | 当前保留为 0                 |
+|   10 | Car tick                     |
 
 Air 收到后会保存 Car 的速度、yaw、yaw rate、目标量和大转弯状态，并用索引 10 的 Car tick 判断是不是真的来了一帧新数据。只有这个同步时间发生变化，`g_car_last_update_time_ms` 才刷新，避免一份旧数据被重复处理后看起来仍然“很新”。
 
@@ -457,17 +457,17 @@ SET 远端参数不是发完就算成功，而是执行后再 GET 读回：
 
 远端状态码如下：
 
-| 状态码 | 名称 | 含义 |
-| ---: | --- | --- |
-| 0 | `OK` | 执行成功，读回一致 |
-| 1 | `NOT_FOUND` | 参数 ID 不存在 |
-| 2 | `OUT_OF_RANGE` | 数值超出允许范围 |
-| 3 | `ERROR` | 参数或执行状态错误 |
-| 4 | `BUSY` | 已有另一笔远端事务 |
-| 5 | `TIMEOUT` | 远端没有按时完成 |
-| 6 | `MISMATCH` | SET 后读回值不一致 |
-| 7 | `PARTIAL` | 只有部分目标成功，已完成回滚 |
-| 8 | `ROLLBACK_FAIL` | 部分成功后连回滚也失败 |
+| 状态码 | 名称              | 含义                         |
+| -----: | ----------------- | ---------------------------- |
+|      0 | `OK`            | 执行成功，读回一致           |
+|      1 | `NOT_FOUND`     | 参数 ID 不存在               |
+|      2 | `OUT_OF_RANGE`  | 数值超出允许范围             |
+|      3 | `ERROR`         | 参数或执行状态错误           |
+|      4 | `BUSY`          | 已有另一笔远端事务           |
+|      5 | `TIMEOUT`       | 远端没有按时完成             |
+|      6 | `MISMATCH`      | SET 后读回值不一致           |
+|      7 | `PARTIAL`       | 只有部分目标成功，已完成回滚 |
+|      8 | `ROLLBACK_FAIL` | 部分成功后连回滚也失败       |
 
 普通远端事务大约在 `400 ms` 请求取消，`700 ms` 进入硬超时。曝光、FPS、增益这类相机慢操作留的时间更长，大约 `1800 ms` 请求取消、`2600 ms` 硬超时。远端事务进行期间，`air_comm_air_remote_param_busy()` 会让解锁流程知道“参数还没有完全落地”，从而避免半修改状态下起飞。
 
@@ -504,12 +504,12 @@ ACK_ERROR 4 busy
 
 AirComm 自己没有另起一个会抢占飞控的任务，而是挂在现有节拍上：
 
-| 调用 | 频率/位置 | 做什么 |
-| --- | --- | --- |
-| `air_comm_air_tick_1MS()` | PIT 1 ms ISR | 只增加模块毫秒 tick |
-| `air_comm_air_poll()` | 1 kHz 快速任务末尾 | 消费 RX 队列、推进解析状态机和远端事务 |
-| `air_comm_air_update_200HZ()` | 每 5 ms | 维护心跳、在线状态和远程命令 |
-| `send_air_run_data_200hz()` | 每 5 ms | 根据飞行/待机状态发送关键包或诊断包 |
+| 调用                            | 频率/位置          | 做什么                                 |
+| ------------------------------- | ------------------ | -------------------------------------- |
+| `air_comm_air_tick_1MS()`     | PIT 1 ms ISR       | 只增加模块毫秒 tick                    |
+| `air_comm_air_poll()`         | 1 kHz 快速任务末尾 | 消费 RX 队列、推进解析状态机和远端事务 |
+| `air_comm_air_update_200HZ()` | 每 5 ms            | 维护心跳、在线状态和远程命令           |
+| `send_air_run_data_200hz()`   | 每 5 ms            | 根据飞行/待机状态发送关键包或诊断包    |
 
 Air 的实际调用入口在 [`main_cm7_0.c`](../../project/user/main_cm7_0.c)，1 ms tick 和 UART ISR 在 [`cm7_0_isr.c`](../../project/user/cm7_0_isr.c)。其中 `air_comm_air_poll()` 放在 IMU、位置估计和飞控快速更新之后，也说明优先级很明确：先完成本周期真正的飞控工作，再处理通信队列。
 
@@ -546,15 +546,15 @@ Car 端还会统计 ACK 成功、超时和重试次数，并暴露当前 pending
 
 内部细节很多，但上层真正需要碰的接口并不乱。Air 端可以按用途分成下面几组：
 
-| 用途 | 主要接口 |
-| --- | --- |
-| 初始化与调度 | `air_comm_air_init()`、`air_comm_air_tick_1MS()`、`air_comm_air_poll()`、`air_comm_air_update_200HZ()` |
-| UART ISR 对接 | `air_comm_air_rx_byte()`、`air_comm_air_uart_tx_isr()` |
-| 在线与安全判断 | `air_comm_air_is_car_online()`、`air_comm_air_is_run_data_fresh()`、`air_comm_air_remote_param_busy()` |
-| 参数注册 | `air_comm_air_register_param()`，默认参数则在初始化过程中统一注册 |
+| 用途           | 主要接口                                                                                                                           |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 初始化与调度   | `air_comm_air_init()`、`air_comm_air_tick_1MS()`、`air_comm_air_poll()`、`air_comm_air_update_200HZ()`                     |
+| UART ISR 对接  | `air_comm_air_rx_byte()`、`air_comm_air_uart_tx_isr()`                                                                         |
+| 在线与安全判断 | `air_comm_air_is_car_online()`、`air_comm_air_is_run_data_fresh()`、`air_comm_air_remote_param_busy()`                       |
+| 参数注册       | `air_comm_air_register_param()`，默认参数则在初始化过程中统一注册                                                                |
 | 命令注册与回执 | `air_comm_air_register_polling_command()`、`air_comm_air_register_instant_command()`、`air_comm_air_send_command_ack_text()` |
-| 实时数据 | `air_comm_send_run_data()`、`air_comm_set_run_data_callback()`、`air_comm_get_last_run_data()` |
-| 诊断 | `air_comm_air_get_stats()` |
+| 实时数据       | `air_comm_send_run_data()`、`air_comm_set_run_data_callback()`、`air_comm_get_last_run_data()`                               |
+| 诊断           | `air_comm_air_get_stats()`                                                                                                       |
 
 Car 端则多了事务发起和 ACK 查询：`air_comm_car_set_param()`、`air_comm_car_get_param()`、`air_comm_car_exec_command()` 负责发请求；带 `_with_timeout` 的接口用于相机这类慢参数；`air_comm_car_has_pending_ack()`、`air_comm_car_get_last_ack()` 和几个 value/name/text getter 用来让菜单知道请求还在等、成功了还是超时了；三个 `cancel_pending` 接口用于退出菜单或飞行状态切换时主动取消旧事务。完整声明都在 [`air_comm_car.h`](../../../CYT4bb7_Car/project/code/Protocols/AirComm/air_comm_car.h) 中。
 
@@ -600,6 +600,5 @@ Car 端则多了事务发起和 ACK 查询：`air_comm_car_set_param()`、`air_c
 5. [`ipc_image_data.h`](../../project/code/IPC/ipc_image_data.h) 和 [`ipc_image_data.c`](../../project/code/IPC/ipc_image_data.c)：看 Core1/2BL3 参数如何异步执行、读回、超时和回滚。
 6. [`air_comm_car.h`](../../../CYT4bb7_Car/project/code/Protocols/AirComm/air_comm_car.h) 和 [`air_comm_car.c`](../../../CYT4bb7_Car/project/code/Protocols/AirComm/air_comm_car.c)：对照 Car 的 ACK 等待、重试、接收解析和统计。
 7. [`car_loop.c`](../../../CYT4bb7_Car/project/code/Controller/car_loop.c)：最后确认 Car 实际发送/接收的 RUN_DATA 字段，以及断联后上层怎么处理。
-
 
 [返回总览](../../README.md)

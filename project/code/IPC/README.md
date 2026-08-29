@@ -51,3 +51,5 @@ column: 0..8
 ```
 
 The table commands are `0x2100=save`, `0x2101=reload`, and `0x2102=restore defaults`. They accept only `SET int32 1`. Camera SPI sends them to both 2BL3 boards without parameter preflight or rollback; success requires two valid ACKs. Ordinary scalar and cell writes retain dual-board preflight, readback verification, and rollback.
+
+[返回 Air 总文档](../../../README.md) · [返回母仓库 README](../../../../README.md)

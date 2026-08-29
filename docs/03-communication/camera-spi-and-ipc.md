@@ -22,7 +22,7 @@ ipc通信拿到了什么?
 
 对于我的飞控的核心0,所有的图像数据 都封装在一个结构体里面
 
-![1787812704379](image/camera-spi-and-ipc/1787812704379.png)
+![三路摄像头 image_data 数据结构](image/camera-spi-and-ipc/image-data-structure.png)
 
 这些数据都是负责图像的队友进行视觉识别的 , 后续的车灯融合也好 , 相机模型去畸变 , 路径规划 都是我来进行的
 
@@ -30,4 +30,4 @@ ipc通信拿到了什么?
 
 
 
-[返回总览](../../README.md)
+[返回 Air 总文档](../../README.md) · [返回母仓库 README](../../../README.md)

@@ -96,7 +96,7 @@ WiFi SPI 的基本用法可以参考[《WiFi SPI 调试》](../03-communication/
 
 脚本会在没有可执行文件时先构建，再启动程序。具体构建选项和当前支持的日志格式，可以看 [`BeaconImageAnalyzer/README.md`](../../../BeaconImageAnalyzer/README.md)。启动界面大概是这样：
 
-![CarPlan3 调试上位机](image/car-plan3-debug-workflow/1788020776762.png)
+![CarPlan3 调试上位机](image/car-plan3-debug-workflow/car-plan3-monitor.png)
 
 飞机端只需要插上 WiFi SPI 模块，烧录好启用了 `car_plan_debug_200hz()` 的程序；电脑端启动上位机并监听默认 UDP 端口，就能看到实时数据。WiFi 模块、UDP 和 JustFloat 的初始化与轮询都在飞控的 WiFi 协议目录里，遇到“程序开了但没有数据”时，先看[《WiFi SPI 调试》](../03-communication/wifi-spi-debugging.md)，不要先怀疑 CarPlan3。
 
@@ -165,4 +165,4 @@ WiFi SPI 的基本用法可以参考[《WiFi SPI 调试》](../03-communication/
 
 我自己的决赛表现确实很差，这个没什么好美化的；但从工程角度看，这套“记录中间量、离线回放、再决定是否改代码”的方法，才是我觉得最值得留下来的东西。后续无论是继续优化 CarPlan3，还是换一套路径规划算法，都可以沿着同一个调试闭环继续做下去。
 
-[返回总览](../../README.md)
+[返回 Air 总文档](../../README.md) · [返回母仓库 README](../../../README.md)

@@ -1,8 +1,18 @@
 # CYT4BB7 Air 飞控
 
-本仓库为第二十一届全国大学生智能汽车竞赛“飞越雷区”项目的空中控制端代码。
+> 这是第 21 届全国大学生智能汽车竞赛“飞跃雷区”项目的空中控制端子仓库。
 
-> 文档状态：目录框架已初始化，技术正文将按实际代码、实验记录和比赛经验逐步补充。
+> **仓库关系先说清楚：**本仓库的母仓库是 [HDUASC-SmartCar-21st-FlyOverMinefield](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield)。总仓库固定的 Air 版本可以从母仓库进入；想看 Air 子仓库自己的最新文档和提交，请以本仓库当前分支为准。
+
+PCB 源文件、板卡照片和硬件迭代记录不在这里维护，请直接前往母仓库的[硬件 PCB 总文档](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/hardware/README.md)。这里最多保留硬件引脚和软件使用方式，不复制一份 PCB 文件。
+
+## 先看这里
+
+- [待填写：Air 飞控或比赛系统演示视频]
+- [母仓库总 README](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/README.md)
+- [CarPlan3 上位机调试视频](https://www.bilibili.com/video/BV1Rm4m6fEMv/)
+
+如果第一次接触这个项目，建议先看母仓库的比赛背景和整体方案，再回到这里按下面的阅读路线理解 Air。不要一上来就从某个 `.c` 文件开始看，很容易只看见局部实现，却不知道它在空地协同系统里负责什么。
 
 ## 按目标阅读
 
@@ -10,37 +20,58 @@
 | --- | --- |
 | 硬件、引脚和外设 | [硬件与引脚分配](docs/01-hardware/hardware-and-pinout.md) |
 | 编译和烧录工程 | [编译与烧录](docs/01-hardware/build-and-flash.md) |
-| 双核飞控软件如何运行 | [软件架构](docs/02-flight-control/software-architecture.md) |
+| 双核飞控如何运行 | [软件架构](docs/02-flight-control/software-architecture.md) |
 | IMU、姿态解算和滤波 | [IMU 与姿态估计](docs/02-flight-control/imu-and-attitude.md) |
 | 四路 TOF 定高 | [高度估计与控制](docs/02-flight-control/height-estimation-and-control.md) |
-| 遥控器和飞行模式 | [遥控器与飞行模式](docs/02-flight-control/rc-and-flight-modes.md) |
-| Air、Image、Car 如何通信 | [通信总览](docs/03-communication/communication-overview.md) |
-| WiFi SPI 如何调试 | [WiFi SPI 调试](docs/03-communication/wifi-spi-debugging.md) |
-| 多摄像头和相机模型 | [多摄像头系统](docs/04-competition/multi-camera-system.md) |
+| 遥控器和 CRSF 飞行模式 | [遥控器与飞行模式](docs/02-flight-control/rc-and-flight-modes.md) |
+| Air 和 Car 怎么通信 | [AirComm 空地通信](docs/03-communication/aircomm.md) |
+| 图像板和双核 IPC | [Camera SPI 与双核 IPC](docs/03-communication/camera-spi-and-ipc.md) |
+| WiFi SPI 怎么发日志 | [WiFi SPI 调试](docs/03-communication/wifi-spi-debugging.md) |
+| 多摄像头和相机模型 | [相机模型标定](docs/04-competition/camera-model-calibration.md) |
 | CarPlan3 和上位机联调 | [CarPlan3 调试流程](docs/04-competition/car-plan3-debug-workflow.md) |
-| 备赛方案如何演进 | [方案迭代](docs/04-competition/solution-evolution.md) |
 | 代码目录和模块边界 | [仓库结构](docs/05-engineering/repository-structure.md) |
+| 已知问题和排查记录 | [故障排查索引](docs/05-engineering/troubleshooting.md) |
 
 ## 推荐阅读路线
 
-### 通用飞控
+### 只想理解飞控
 
-硬件与引脚 -> 软件架构 -> IMU 与姿态估计 -> 高度估计与控制 -> 遥控器与飞行模式 -> 通信总览
+[软件架构](docs/02-flight-control/software-architecture.md) -> [IMU 与姿态估计](docs/02-flight-control/imu-and-attitude.md) -> [高度估计与控制](docs/02-flight-control/height-estimation-and-control.md) -> [遥控器与飞行模式](docs/02-flight-control/rc-and-flight-modes.md)
 
-### 国赛系统
+### 想理解空地协同
 
-软件架构 -> 通信总览 -> 多摄像头系统 -> 相机模型标定 -> CarPlan3 -> 上位机调试 -> 方案迭代
+[软件架构](docs/02-flight-control/software-architecture.md) -> [AirComm](docs/03-communication/aircomm.md) -> [Camera SPI 与双核 IPC](docs/03-communication/camera-spi-and-ipc.md) -> [WiFi SPI 调试](docs/03-communication/wifi-spi-debugging.md)
 
-## 文档目录
+### 想理解图像到车模速度
 
-- [硬件与工程](docs/01-hardware/)
-- [飞控核心](docs/02-flight-control/)
-- [通信与调试](docs/03-communication/)
-- [国赛专项](docs/04-competition/)
-- [工程实践](docs/05-engineering/)
+[Camera SPI 与双核 IPC](docs/03-communication/camera-spi-and-ipc.md) -> [相机模型标定](docs/04-competition/camera-model-calibration.md) -> [CarPlan3 调试流程](docs/04-competition/car-plan3-debug-workflow.md) -> 母仓库的 [Car 端工程](https://github.com/choumouing/CYT4bb7_Car/)
 
-## 当前说明
+## 代码目录地图
 
-- 文档中的参数、波形和分析结论应与实际锁存代码对应。
-- IMU、定高和相机标定文档将保留最终频域分析图、对比图和测试结论，不恢复全量临时日志与中间产物。
-- 已知协议设计和故障记录暂保留在 [`doc/`](doc/) 目录，后续由新文档统一建立入口。
+```text
+project/user/                 两个核心的入口和主循环调度
+project/code/Estimation/      IMU、姿态、高度和位置估计
+project/code/FlightController/飞行模式、姿态/位置控制和自动降落
+project/code/Planner/         相机模型、三摄融合和 CarPlan3/4
+project/code/Protocols/       AirComm、Camera SPI、WiFi SPI 等通信
+project/code/IPC/             双核之间的 image_data 和参数快照
+project/code/Image/           图像结果结构体及有效性判断
+libraries/                    芯片、逐飞库和外设驱动
+doc/                          早期设计稿和具体故障原始记录
+docs/                         面向开源阅读整理后的正式文档
+```
+
+代码阅读时，建议从 [`project/user/main_cm7_0.c`](project/user/main_cm7_0.c) 开始，再根据目标进入 `Estimation`、`FlightController`、`Planner` 或 `Protocols`。`docs/` 是解释思路和实验过程的入口，`doc/` 里的内容更偏历史记录；两者不要混为同一套最终规范。
+
+## 文档状态
+
+- `docs/01-hardware` 到 `docs/05-engineering` 是面向开源阅读的正式入口。
+- `doc/` 保留早期通信设计和故障原始记录，后续只通过正式文档建立跳转，不随意删除历史材料。
+- 文档中的参数、波形和分析结论应与对应 Git 提交和源码版本一起理解。
+- [待填写：哪些模块是最终比赛版本，哪些模块只是实验版本。]
+
+## 返回路径
+
+- [返回母仓库总 README](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/README.md)
+- [返回母仓库硬件 PCB 总文档](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/hardware/README.md)
+- [查看 Air 子仓库最新代码](https://github.com/ZhangStudyLife/CYT4BB7_Air/tree/national-2026)

@@ -123,7 +123,7 @@ Air 端自己的代码主要放在 [`project/code`](../../project/code/) 下，�
 
 处理前后的波形可以参考这张图：
 
-![LC302 姿态解耦前后波形](image/software-architecture/1787799525486.png)
+![LC302 姿态解耦前后波形](image/software-architecture/lc302-attitude-decoupling-waveform.png)
 
 [`FlowGyroDecoupler.c`](../../project/code/Estimation/Pos_Est/FlowGyroDecoupler.c) 是古早的 PMW3901 版本，很早就没有实际使用了，但文件还留在那里。
 
@@ -210,4 +210,4 @@ WiFi 里面又拆成 `wifi_cmd`、`wifi_params`、`wifi_cal_imu` 和 `wifi_justf
 
 如果只是为了把代码显得干净，我当然可以把旧文件全部删掉。但我还是想先把它们为什么存在写清楚。以后真要继续整理，也应该是在确认新方案已经完全覆盖旧方案以后再动，而不是看见文件多就一股脑删掉。
 
-[返回总览](../../README.md)
+[返回 Air 总文档](../../README.md) · [返回母仓库 README](../../../README.md)

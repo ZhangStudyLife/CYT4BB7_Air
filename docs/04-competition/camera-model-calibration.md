@@ -12,7 +12,7 @@
 
 采集用的是我专门写的一个程序,对应 air 子仓库的这个节点:[cff4599「采集摄像头标定数据专用的mode3/自由旋转+随机高度+遥控器为全局坐标系」](https://github.com/ZhangStudyLife/CYT4BB7_Air/commit/cff4599bb0854691d94aaaeb13bc4581f67beb3e)。你也可以让你的 AI 回看这个节点,问它"使用 wifispi 向上位机依次发送了哪些日志"。
 
-![采集到的标定日志列表](image/camera-model-calibration/1787814949995.png)
+![采集到的标定日志列表](image/camera-model-calibration/calibration-log-files.png)
 
 *▲ 采出来的日志,文件名就是"车灯距离为 X 米"*
 
@@ -95,7 +95,7 @@
 
 最终 AI 给出类似以下的回复:
 
-![AI 拟合分析报告](image/camera-model-calibration/1787817562424.png)
+![AI 拟合分析报告](image/camera-model-calibration/model-fitting-report.png)
 
 *▲ AI 拟合完给出的分析报告(最后选了 Double Sphere)*
 
@@ -107,7 +107,7 @@
 
 先说背景:F 车模用 car_plan2 会抖,是因为 F 的角速度和角度闭环不像麦轮那么好调,于是在目标速度的角度变化上加入了一个低通,结果毫无改善。
 
-![我当时发给 AI 的实验思路](image/camera-model-calibration/1787817945385.png)
+![我当时发给 AI 的实验思路](image/camera-model-calibration/offline-experiment-prompt.png)
 
 *▲ 当时发给 AI 的想法:信标灯固定在车 yaw=0 正前方,车和飞机各自遍历角度/位置*
 
@@ -115,7 +115,7 @@
 
 然后根据这个想法,我初步采了几份日志。结果随便一跑,从 AI 的分析拟合结果来看,我一下子就惊呆了:
 
-![新旧算法误差对比](image/camera-model-calibration/1787818234242.png)
+![新旧算法误差对比](image/camera-model-calibration/old-vs-new-error-comparison.png)
 
 *▲ AI 给的改善效果对比(9 个车辆 yaw 平台留一验证)*
 
@@ -123,13 +123,13 @@
 
 我直接:
 
-![让 AI 临时改 car_plan2](image/camera-model-calibration/1787819129440.png)
+![让 AI 临时改 car_plan2](image/camera-model-calibration/car-plan2-change-request.png)
 
 *▲ "请你临时修改 car_plan2 里面的算法,只是修改这个速度方向,保持代码简洁!"*
 
 然后直接开跑:
 
-![AI 改完 car_plan_2.c 的离线回放结果](image/camera-model-calibration/1787819159352.png)
+![AI 改完 car_plan_2.c 的离线回放结果](image/camera-model-calibration/offline-replay-result.png)
 
 *▲ AI 改完 car_plan_2.c 的汇报,跑完我又采了更多数据*
 
@@ -143,9 +143,9 @@
 
 顺便看一眼我使唤 AI 的强度,感受一下:
 
-![AI 使用量统计](image/camera-model-calibration/1787819363439.png)
+![AI 使用量统计](image/camera-model-calibration/ai-usage-statistics.png)
 
-![token 费用统计](image/camera-model-calibration/1787819386601.png)
+![token 费用统计](image/camera-model-calibration/token-cost-statistics.png)
 
 *▲ 我的 AI 使用强度*
 
@@ -498,4 +498,4 @@ flowchart LR
     pose --> abs["场地绝对坐标\n(x_global,y_global)=(x_aircraft+x_m,y_aircraft+y_m)"]
 ```
 
-[返回总览](../../README.md)
+[返回 Air 总文档](../../README.md) · [返回母仓库 README](../../../README.md)

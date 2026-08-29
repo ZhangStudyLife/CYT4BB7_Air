@@ -161,4 +161,341 @@
 
 至于 AI 最后帮我拟合出来的模型长什么样、参数是多少,我就不往这篇里贴了,直接看代码:[Three_Camera.h](../../project/code/Planner/Three_Camera.h) / [Three_Camera.c](../../project/code/Planner/Three_Camera.c),车端的执行逻辑在 [car_plan_3.c](../../project/code/Planner/car_plan_3.c)。让 AI 带你读一遍就行。
 
+## 去畸变相机模型的具体算法(AI写的)
+
+> 本节按当前代码的真实执行顺序解释。这里的“去畸变”不是把鱼眼图像简单拉平成普通透视图，而是把一个像素反投影成三维视线，再结合相机外参、飞机姿态和高度，把视线与地面求交，直接得到米制坐标。
+>
+> 主要实现：[`Three_Camera.h`](../../project/code/Planner/Three_Camera.h)、[`Three_Camera.c`](../../project/code/Planner/Three_Camera.c)；规划侧调用：[`car_plan_3.c`](../../project/code/Planner/car_plan_3.c)、[`car_plan_4.c`](../../project/code/Planner/car_plan_4.c)。以下公式中的坐标轴约定以代码为准，具体正负方向应以结构体注释和实车安装方向为最终依据。
+
+### 1. 输入、输出与坐标系边界
+
+`Three_Camera_Update()` 每次接收三路图像检测结果、飞机 `roll/pitch/yaw`、ToF 高度和高度有效标志。三台相机各自拥有一套独立参数：
+
+- `fx, fy, cx, cy`：像素尺度和主点；
+- `xi, alpha`：Double Sphere 模型参数；
+- `camera_to_body`：相机坐标系到机体坐标系的旋转矩阵；
+- `translation_body_m`：相机相对机体参考点的平移，单位为米。
+
+代码的输出 `x_m, y_m` 是**以飞机参考点为原点、已经消除飞机姿态影响的水平对齐局部坐标**。它不是带有 GPS/里程计位置的场地绝对坐标；若飞机绝对位置为 `(x_aircraft, y_aircraft)`，才进一步有：
+
+```text
+x_global = x_aircraft + x_m
+y_global = y_aircraft + y_m
+```
+
+```mermaid
+flowchart TD
+    input["三路图像检测 + Roll/Pitch/Yaw + ToF 高度"] --> valid{"输入和高度有效?"}
+    valid -- "否" --> drop["本帧输出无效"]
+    valid -- "是" --> norm["像素中心化与归一化"]
+    norm --> ds["Double Sphere 反投影成三维射线"]
+    ds --> ext["相机坐标 -> 机体坐标"]
+    ext --> attitude["机体坐标 -> 水平对齐坐标"]
+    attitude --> intersect["射线与地面平面求交"]
+    intersect --> fusion["三摄融合车灯和信标"]
+    fusion --> pair["车灯-信标配对"]
+    pair --> planner["CarPlan3/4 跟踪与方向规划"]
+```
+
+### 2. 像素如何变成 Double Sphere 三维射线
+
+设图像检测到像素 `(x, y)`。第一步不是使用像素差直接判断方向，而是用该相机的内参进行归一化：
+
+$$
+m_x=\frac{x-c_x}{f_x},\qquad m_y=\frac{y-c_y}{f_y}
+$$
+
+$$
+r^2=m_x^2+m_y^2
+$$
+
+然后按 `Three_Camera_ProjectPoint()` 实现的 Double Sphere 逆模型计算：
+
+$$
+\Delta=1-(2\alpha-1)r^2
+$$
+
+$$
+m_z=\frac{1-\alpha^2r^2}
+{\alpha\sqrt{\Delta}+1-\alpha}
+$$
+
+$$
+q=\sqrt{m_z^2+(1-\xi^2)r^2}
+$$
+
+$$
+\eta=\frac{m_z\xi+q}{m_z^2+r^2}
+$$
+
+最终得到相机坐标系下的单位方向（代码中随后会使用其比例进行求交）：
+
+$$
+\mathbf r_c=
+\begin{bmatrix}
+\eta m_x\\
+\eta m_y\\
+\eta m_z-\xi
+\end{bmatrix}
+$$
+
+其中 `alpha` 描述双球模型的形状，`xi` 描述两个球面/投影中心之间的偏移。它们不是普通针孔模型中的焦距，不能用“把焦距调大或调小”的直觉替代。
+
+在进入开方和除法前，代码会检查 `inside`、`second` 以及分母是否大于 `THREE_CAMERA_MODEL_EPSILON`。因此以下情况会丢弃观测：像素落在模型无解区域、浮点误差导致根号参数为负、或接近奇异点。这个检查是必要的，否则一个坏像素可能生成极大的地面坐标并污染后续跟踪。
+
+```mermaid
+flowchart LR
+    pixel["检测像素 x,y"] --> center["x-cx, y-cy"]
+    center --> scale["除以 fx, fy"]
+    scale --> radius["计算 r²"]
+    radius --> inside["计算 Delta"]
+    inside --> mz["计算 mz"]
+    mz --> second["计算 q"]
+    second --> gain["计算 eta"]
+    gain --> ray["生成 rc=(eta*mx, eta*my, eta*mz-xi)"]
+    inside -. "Delta 无效" .-> invalid["丢弃观测"]
+    second -. "q/分母无效" .-> invalid
+```
+
+### 3. 从相机射线到水平地面坐标
+
+#### 3.1 相机坐标到机体坐标
+
+Double Sphere 只解决“这个像素对应哪条相机视线”。相机安装方向不同，还必须使用该相机的外参：
+
+$$
+\mathbf r_b=R_{bc}\mathbf r_c
+$$
+
+其中 `R_bc = camera_to_body`。三路相机不能只靠给图像横坐标加一个常数拼接，因为每个镜头的旋转和平移都不同。
+
+#### 3.2 机体坐标到水平对齐坐标
+
+`Three_Camera_BuildWorldRotation()` 根据飞机的滚转、俯仰、偏航构造机体系到水平坐标系的旋转矩阵。代码同时加入标定得到的固定偏航偏置：
+
+```text
+world_yaw = yaw + THREE_CAMERA_YAW_BIAS_RAD
+THREE_CAMERA_YAW_BIAS_RAD = 0.4068566800 rad ≈ 23.31°
+```
+
+矩阵可写成（`cr=cos(roll)`、`sr=sin(roll)`，其余同理）：
+
+$$
+R_{wb}=\begin{bmatrix}
+ c_pc_y & s_rs_pc_y-c_rs_y & c_rs_pc_y+s_rs_y\\
+ c_ps_y & s_rs_ps_y+c_rc_y & c_rs_ps_y-c_rs_y\\
+ -s_p & s_rc_p & c_rc_p
+\end{bmatrix}
+$$
+
+射线和相机原点都要变换，不能只变换方向：
+
+$$
+\mathbf r_w=R_{wb}\mathbf r_b,\qquad
+\mathbf o_w=R_{wb}\mathbf t_b
+$$
+
+这里 `o_w` 是相机相对飞机参考点的平移在水平坐标系中的表达。保留它，才能正确处理三摄之间的基线。
+
+#### 3.3 射线与地面求交
+
+设飞机高度为 `h`（ToF 的毫米值先乘 `0.001` 转成米），地面是 `z=h` 以下的水平平面。代码用竖直方向分量进行射线参数求交：
+
+$$
+\lambda=\frac{h-o_{w,z}}{r_{w,z}}
+$$
+
+$$
+x_m=o_{w,x}+\lambda r_{w,x},\qquad
+y_m=o_{w,y}+\lambda r_{w,y}
+$$
+
+只有当射线确实朝向地面（`r_w,z > 0.0001`）、求交参数为正，并且地面距离不超过 `15 m` 时，结果才被接受。姿态、高度或模型参数任一项不可信，都会使“像素位置”无法可靠转换成米制平面位置。
+
+```mermaid
+flowchart TD
+    rc["相机射线 rc"] --> rbody["r_b = R_bc * rc"]
+    rbody --> rworld["r_w = R_wb * r_b"]
+    trans["相机平移 t_b"] --> oworld["o_w = R_wb * t_b"]
+    rworld --> down{"r_w,z 朝向地面?"}
+    down -- "否" --> reject["无有效地面交点"]
+    down -- "是" --> lambda["lambda=(h-o_w,z)/r_w,z"]
+    lambda --> range{"lambda 或距离在有效范围?"}
+    range -- "否" --> reject
+    range -- "是" --> xy["(x_m,y_m)=o_w,xy + lambda*r_w,xy"]
+```
+
+### 4. 车灯角度为什么也要做三维投影
+
+车灯检测通常包含中心、长轴角度和长度。图像中的长轴方向受鱼眼畸变、姿态和相机安装方向共同影响，因此代码不直接把图像角度加上 yaw。
+
+设车灯中心为 `(c_x, c_y)`，图像长轴角为 `theta`，长度为 `L`，先构造两端点：
+
+$$
+p_1=(c_x-\frac L2\cos\theta,\ c_y-\frac L2\sin\theta)
+$$
+
+$$
+p_2=(c_x+\frac L2\cos\theta,\ c_y+\frac L2\sin\theta)
+$$
+
+两个端点分别执行完整的“Double Sphere 反投影 -> 外参 -> 姿态 -> 地面求交”，得到 `(x_1,y_1)`、`(x_2,y_2)`，再求水平角：
+
+$$
+\theta_{world}=atan2(y_2-y_1,\ x_2-x_1)
+$$
+
+这是地面上的真实长轴方向。因为车灯长轴没有正反方向，`theta` 和 `theta+180°` 等价，三摄融合时使用二倍角平均：
+
+$$
+\bar\theta=\frac12 atan2(\sum_i\sin 2\theta_i,\sum_i\cos 2\theta_i)
+$$
+
+```mermaid
+flowchart LR
+    lamp["车灯中心、角度 theta、长度 L"] --> endpoints["沿长轴生成 p1、p2"]
+    endpoints --> project1["p1 完整地面投影"]
+    endpoints --> project2["p2 完整地面投影"]
+    project1 --> atan["atan2(y2-y1, x2-x1)"]
+    project2 --> atan
+    atan --> undirected["得到水平无向角"]
+```
+
+### 5. 三摄车灯、信标和配对
+
+每台相机独立完成投影后，代码再在同一个水平坐标系中融合：
+
+1. **车灯融合**：对有效车灯的 `(x_m,y_m)` 做平均，并用二倍角平均处理无向角；同时保留 `camera_mask` 记录来源。
+2. **信标融合**：遍历三路信标，在米制平面坐标中按 `0.35 m` 半径合并，同一物理信标的观测增量平均，面积取较大值。
+3. **Center 锚点策略**：Center 可与 Front/Back 建立跨摄关联；Front 和 Back 不直接互相合并，避免两端视野重叠时错误串点。
+4. **车灯—信标配对**：优先使用同一相机中的车灯和信标；只有必要时才使用跨摄组合。相对距离必须满足 `0.20 m <= d <= 6.00 m`。
+
+对配对结果定义：
+
+$$
+\Delta x=x_{beacon}-x_{lamp},\qquad
+\Delta y=y_{beacon}-y_{lamp}
+$$
+
+这个相对向量才是后续 CarPlan3/4 的主要几何输入。它已经把镜头畸变、三摄基线、飞机姿态和高度影响转换成了米制平面关系。
+
+```mermaid
+flowchart TD
+    front["Front 相机投影"] --> merge["按世界坐标融合信标"]
+    center["Center 相机投影"] --> merge
+    back["Back 相机投影"] --> merge
+    merge --> beacon["合并后的物理信标列表"]
+    lamp["融合后的车灯列表"] --> pair["同摄优先配对"]
+    beacon --> pair
+    pair --> distance{"0.20m <= 距离 <= 6.00m?"}
+    distance -- "否" --> discard["拒绝候选"]
+    distance -- "是" --> vector["输出 pair_dx_m, pair_dy_m, pair_lamp_angle_deg"]
+```
+
+### 6. CarPlan3 从视觉坐标到车模方向
+
+CarPlan3 并不是拿原始像素直接控制车模，而是：
+
+```mermaid
+flowchart TD
+    raw["三路原始车灯/信标检测"] --> filter["FilterNearLamp 过滤车灯附近误检"]
+    filter --> fresh["检查是否为真实新相机帧"]
+    fresh --> camera["Three_Camera_Update"]
+    camera --> candidates["局部水平坐标中的候选信标"]
+    candidates --> select["候选选择：距离、创新、方向一致性"]
+    select --> state{"SEARCH / TRACK / COAST"}
+    state -- "SEARCH" --> confirm["连续确认后锁定目标"]
+    confirm --> track["TRACK"]
+    state -- "TRACK" --> accept{"新观测通过门限?"}
+    accept -- "是" --> track_out["更新 dx、dy、灯角和 yaw"]
+    accept -- "否但可短暂保持" --> coast["COAST"]
+    accept -- "否且超时" --> search["回到 SEARCH"]
+    coast --> propagate["用车辆世界速度传播相对向量"]
+    propagate --> track_out
+    track_out --> direction["投影到车体系前向/右向"]
+    direction --> speed["速度规划输出"]
+```
+
+近车灯过滤的意图是解决一个很实际的问题：视觉算法可能把车灯本身或车灯边缘误识别成信标。CarPlan3 使用约 `3 px` 的近灯可疑距离、约 `10 px` 的远距离历史条件、约 `15 px` 的轨迹匹配半径，并要求历史持续约 `300 ms`；只有具备足够远距离历史的目标才允许通过。CarPlan4 保留同类过滤逻辑。
+
+SEARCH 阶段需要连续确认（代码中为约两次更新）才锁定；TRACK 阶段对候选执行距离、世界坐标创新、车灯角度/yaw 一致性和最佳/次佳歧义检查；有效观测短暂丢失时进入 COAST，而不是立刻把目标清零。
+
+在 COAST 中，若车体前向速度为 `v_forward`、右向速度为 `v_strafe`、车体 yaw 为 `psi`，世界速度为：
+
+$$
+v_x=v_{forward}\cos\psi-v_{strafe}\sin\psi
+$$
+
+$$
+v_y=v_{forward}\sin\psi+v_{strafe}\cos\psi
+$$
+
+由于信标相对车灯的运动方向与车体位移相反，按时间间隔 `dt` 传播：
+
+$$
+\Delta x_{t+dt}=\Delta x_t-v_xdt,
+\qquad
+\Delta y_{t+dt}=\Delta y_t-v_ydt
+$$
+
+最后，CarPlan3 使用车灯在水平坐标中的长轴角构造右向单位向量，再结合当前车模 yaw 处理 `180°` 无向歧义，把 `(Delta x, Delta y)` 投影为车体系的前向/右向目标方向，并交给速度规划器。
+
+### 7. CarPlan4 的变化：几何模型不变，增加快速通道
+
+CarPlan4 的相机模型、地面投影、三摄融合、配对、候选创新和 COAST 传播与 CarPlan3 基本相同，仍然调用 `Three_Camera_Update()`。它的主要新增是 `CarPlan_4_CheckDualLineFast()`：
+
+- 目标在车体前方，方向角小于约 `24°`；
+- yaw rate 小于约 `140~150°/s`；
+- 存在第二个前向信标；
+- 第二个信标距离至少约 `1.2 m`；
+- 两个信标方向夹角小于约 `35°`。
+
+满足条件时，CarPlan4 可以直接进入更快的速度档；这改变的是速度规划策略，不是像素到地面坐标的数学模型。
+
+```mermaid
+flowchart LR
+    geometry["与 CarPlan3 相同的 Three_Camera 几何链路"] --> tracking["相同的 SEARCH/TRACK/COAST"]
+    tracking --> normal["普通速度规划"]
+    tracking --> dual["CarPlan4 双灯同线检查"]
+    dual --> fast{"前向、夹角、yaw rate、距离均满足?"}
+    fast -- "否" --> normal
+    fast -- "是" --> fast_speed["快速速度档"]
+```
+
+### 8. 不要把旧二维映射与当前模型混为一谈
+
+仓库中还存在 `CameraModel.c` 和 `ProjectionCenter.c`，它们容易让“去畸变”这个词产生歧义。
+
+`CameraModel.c` 是经验型二维径向映射，大致形式为：
+
+$$
+x'=x-s(b_x+k_r roll),\qquad y'=y-s(b_y+k_p pitch)
+$$
+
+$$
+\rho=10^{-4}(x'^2+y'^2),\qquad
+(x_{out},y_{out})=(x'(1+k_4\rho^2),y'(1+k_4\rho^2))
+$$
+
+它只对二维像素做姿态相关偏置和径向缩放，没有相机三维射线、外参旋转、相机平移和地面求交，不能等同于当前正式的 `Three_Camera` 模型。
+
+`ProjectionCenter.c` 主要维护带约 `40 ms` 延迟的 roll/pitch 历史，用于估计姿态相关投影中心：
+
+$$
+c_x=b_x+k_r roll_{t-40ms},\qquad
+c_y=b_y+k_p pitch_{t-40ms}
+$$
+
+它是旧式投影中心补偿，也不是三摄 Double Sphere 地面坐标恢复的替代品。当前需要解释“像素如何变成车灯/信标的米制位置”时，应以 `Three_Camera.c` 为准。
+
+### 9. 一句话总结
+
+当前算法的完整链路是：**像素检测 -> Double Sphere 反投影 -> 相机外参 -> 飞机姿态补偿 -> 高度约束下与地面求交 -> 三摄融合 -> 车灯/信标配对 -> CarPlan3/4 跟踪 -> 车体系方向与速度输出**。它把“鱼眼图像中的一个点”变成了“水平地面上距离飞机参考点多少米的一个点”，因此比直接在像素域控制稳定得多。
+
+```mermaid
+flowchart LR
+    local["Three_Camera 局部水平坐标 (x_m,y_m)"] --> pose["飞机绝对位置 (x_aircraft,y_aircraft)"]
+    pose --> abs["场地绝对坐标\n(x_global,y_global)=(x_aircraft+x_m,y_aircraft+y_m)"]
+```
+
 [返回总览](../../README.md)

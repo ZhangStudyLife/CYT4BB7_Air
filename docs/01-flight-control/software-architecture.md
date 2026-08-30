@@ -210,4 +210,4 @@ WiFi 里面又拆成 `wifi_cmd`、`wifi_params`、`wifi_cal_imu` 和 `wifi_justf
 
 如果只是为了把代码显得干净，我当然可以把旧文件全部删掉。但我还是想先把它们为什么存在写清楚。以后真要继续整理，也应该是在确认新方案已经完全覆盖旧方案以后再动，而不是看见文件多就一股脑删掉。
 
-[返回 Air 总文档](../../README.md) · [返回母仓库 README](../../../README.md)
+[返回 Air 总文档](../../README.md) · [返回母仓库 README](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/README.md)

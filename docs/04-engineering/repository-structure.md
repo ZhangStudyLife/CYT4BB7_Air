@@ -20,4 +20,4 @@
 - 新功能应该放在哪里
 - 本项目结构演进中的经验与代价
 
-[返回 Air 总文档](../../README.md) · [返回母仓库 README](../../../README.md)
+[返回 Air 总文档](../../README.md) · [返回母仓库 README](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/README.md)

@@ -87,4 +87,4 @@
 
 当然，我对多传感器融合也只是初窥门径。理论上如果能把 GPS、IMU、光流、气压计、TOF 等数据放进一个总的观测器，让它们从不同方向互相佐证，肯定会比只靠六轴 IMU 更完整。例如光流和 GPS 可以给水平运动提供额外约束，气压计和 TOF 可以给高度提供参考。不过也不是传感器越多就一定越好，时间同步、安装误差、噪声和异常数据如果没处理好，新的传感器也可能带来新的问题。这个方向应该是更优的，但目前更多还是我自己的理解，不保真。
 
-[返回 Air 总文档](../../README.md) · [返回母仓库 README](../../../README.md)
+[返回 Air 总文档](../../README.md) · [返回母仓库 README](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/README.md)

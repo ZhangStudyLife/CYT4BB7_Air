@@ -15,4 +15,4 @@
 
 每项故障应包含现象、复现条件、排查过程、根因、修复、验证结果和可复用经验。
 
-[返回 Air 总文档](../../README.md) · [返回母仓库 README](../../../README.md)
+[返回 Air 总文档](../../README.md) · [返回母仓库 README](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/README.md)

@@ -82,11 +82,11 @@ WiFi SPI 的基本用法可以参考[《WiFi SPI 调试》](../02-communication/
    └─ src/CoordinateView.cpp            全局坐标和车模运动显示
 ```
 
-我自己读代码时一般从 [`main_cm7_0.c`](../../project/user/main_cm7_0.c) 的 `car_plan_debug_200hz()` 开始，先弄清楚每个通道是什么；然后跳到 [`image_data.h`](../../project/code/Image/image_data.h) 看原始数据长什么样；再看 [`Three_Camera.c`](../../project/code/Planner/Three_Camera.c) 如何把像素变成米制坐标；最后才看 [`car_plan_3.c`](../../project/code/Planner/car_plan_3.c) 如何过滤、选目标和输出速度。上位机侧可以继续看 [`TelemetryProtocol.cpp`](../../../BeaconImageAnalyzer/src/TelemetryProtocol.cpp)、[`CarPlan3Model.cpp`](../../../BeaconImageAnalyzer/src/CarPlan3Model.cpp)、[`CameraView.cpp`](../../../BeaconImageAnalyzer/src/CameraView.cpp) 和 [`CoordinateView.cpp`](../../../BeaconImageAnalyzer/src/CoordinateView.cpp)。WiFi 的发送细节直接看 [`wifi_justfloat.c`](../../project/code/Protocols/wifi/wifi_justfloat/wifi_justfloat.c) 和[《WiFi 协议总览》](../../project/code/Protocols/wifi/README.MD)就行，这篇不重复抄协议实现。
+我自己读代码时一般从 [`main_cm7_0.c`](../../project/user/main_cm7_0.c) 的 `car_plan_debug_200hz()` 开始，先弄清楚每个通道是什么；然后跳到 [`image_data.h`](../../project/code/Image/image_data.h) 看原始数据长什么样；再看 [`Three_Camera.c`](../../project/code/Planner/Three_Camera.c) 如何把像素变成米制坐标；最后才看 [`car_plan_3.c`](../../project/code/Planner/car_plan_3.c) 如何过滤、选目标和输出速度。上位机侧可以继续看 [`TelemetryProtocol.cpp`](https://github.com/ZhangStudyLife/BeaconImageAnalyzer/blob/car_plan/src/TelemetryProtocol.cpp)、[`CarPlan3Model.cpp`](https://github.com/ZhangStudyLife/BeaconImageAnalyzer/blob/car_plan/src/CarPlan3Model.cpp)、[`CameraView.cpp`](https://github.com/ZhangStudyLife/BeaconImageAnalyzer/blob/car_plan/src/CameraView.cpp) 和 [`CoordinateView.cpp`](https://github.com/ZhangStudyLife/BeaconImageAnalyzer/blob/car_plan/src/CoordinateView.cpp)。WiFi 的发送细节直接看 [`wifi_justfloat.c`](../../project/code/Protocols/wifi/wifi_justfloat/wifi_justfloat.c) 和[《WiFi 协议总览》](../../project/code/Protocols/wifi/README.MD)就行，这篇不重复抄协议实现。
 
 ## 上位机怎么启动
 
-上位机代码在根目录的 [`BeaconImageAnalyzer`](../../../BeaconImageAnalyzer/) 子仓库里。它是我为了调试 CarPlan3 专门裁剪和改出来的简易版本，不是一个通用视觉平台。
+上位机代码在根目录的 [`BeaconImageAnalyzer`](https://github.com/ZhangStudyLife/BeaconImageAnalyzer/tree/car_plan) 子仓库里。它是我为了调试 CarPlan3 专门裁剪和改出来的简易版本，不是一个通用视觉平台。
 
 在 PowerShell 里进入仓库根目录后运行：
 
@@ -94,7 +94,7 @@ WiFi SPI 的基本用法可以参考[《WiFi SPI 调试》](../02-communication/
 ./BeaconImageAnalyzer/tools/run.ps1
 ```
 
-脚本会在没有可执行文件时先构建，再启动程序。具体构建选项和当前支持的日志格式，可以看 [`BeaconImageAnalyzer/README.md`](../../../BeaconImageAnalyzer/README.md)。启动界面大概是这样：
+脚本会在没有可执行文件时先构建，再启动程序。具体构建选项和当前支持的日志格式，可以看 [`BeaconImageAnalyzer/README.md`](https://github.com/ZhangStudyLife/BeaconImageAnalyzer/blob/car_plan/README.md)。启动界面大概是这样：
 
 ![CarPlan3 调试上位机](image/car-plan3-debug-workflow/car-plan3-monitor.png)
 
@@ -108,7 +108,7 @@ WiFi SPI 的基本用法可以参考[《WiFi SPI 调试》](../02-communication/
 2. 三摄融合后的全局坐标：确认相机模型输出的车灯、信标位置有没有跳变，来源摄像头掩码是否合理。
 3. 车模运动和规划输出：看选中的信标、目标速度、车模 yaw 和实际速度是否互相匹配。
 
-上位机也会把 UDP 帧记录成 CSV。之后可以直接导入日志逐帧回放，不需要让飞机和车模再跑一遍。当前仓库里有一份示例日志：[`justfloat_20260820_041811_yaw0.csv`](../../../BeaconImageAnalyzer/examples/justfloat_20260820_041811_yaw0.csv)。它是一次真实飞行记录，只适合用来体验回放流程，不应该直接当成“标准调参数据”。
+上位机也会把 UDP 帧记录成 CSV。之后可以直接导入日志逐帧回放，不需要让飞机和车模再跑一遍。当前仓库里有一份示例日志：[`justfloat_20260820_041811_yaw0.csv`](https://github.com/ZhangStudyLife/BeaconImageAnalyzer/blob/car_plan/examples/justfloat_20260820_041811_yaw0.csv)。它是一次真实飞行记录，只适合用来体验回放流程，不应该直接当成“标准调参数据”。
 
 我觉得离线回放是这套工具最有价值的地方：路径规划后面想换阈值、换目标选择策略，完全可以先拿旧日志验证，确认离线结果值得上车，再去冒险飞。
 
@@ -165,4 +165,4 @@ WiFi SPI 的基本用法可以参考[《WiFi SPI 调试》](../02-communication/
 
 我自己的决赛表现确实很差，这个没什么好美化的；但从工程角度看，这套“记录中间量、离线回放、再决定是否改代码”的方法，才是我觉得最值得留下来的东西。后续无论是继续优化 CarPlan3，还是换一套路径规划算法，都可以沿着同一个调试闭环继续做下去。
 
-[返回 Air 总文档](../../README.md) · [返回母仓库 README](../../../README.md)
+[返回 Air 总文档](../../README.md) · [返回母仓库 README](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/README.md)

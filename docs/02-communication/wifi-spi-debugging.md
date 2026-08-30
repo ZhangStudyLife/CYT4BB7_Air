@@ -273,4 +273,4 @@ wifi_justfloat(g_euler.roll,       /* I1 */
 
 对于这种辅助模块，我觉得“失效以后主系统还能继续干正事”，比功能看起来多高级重要得多。
 
-[返回 Air 总文档](../../README.md) · [返回母仓库 README](../../../README.md)
+[返回 Air 总文档](../../README.md) · [返回母仓库 README](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/README.md)

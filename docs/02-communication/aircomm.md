@@ -66,7 +66,7 @@ flowchart LR
 | Air | `UART_2` | `SCB4` | `P10_1` | `P10_0` | `1152000` |      `64 Byte` |
 | Car | `UART_3` | `SCB3` | `P17_2` | `P17_1` | `1152000` |      `32 Byte` |
 
-Air 端在 [`air_comm_air_init()`](../../project/code/Protocols/AirComm/air_comm_air.c) 中初始化 `UART_2`，打开 RX 中断，并先关闭暂时用不到的 TX trigger。Car 端则在 [`air_comm_car_init()`](../../../CYT4bb7_Car/project/code/Protocols/AirComm/air_comm_car.c) 中完成对应初始化。
+Air 端在 [`air_comm_air_init()`](../../project/code/Protocols/AirComm/air_comm_air.c) 中初始化 `UART_2`，打开 RX 中断，并先关闭暂时用不到的 TX trigger。Car 端则在 [`air_comm_car_init()`](https://github.com/choumouing/CYT4bb7_Car/blob/national-2026/project/code/Protocols/AirComm/air_comm_car.c) 中完成对应初始化。
 
 这里没有使用 DMA。当前方案是：
 
@@ -146,7 +146,7 @@ UART ISR 的处理放在 [`cm7_0_isr.c`](../../project/user/cm7_0_isr.c) 中。�
 
 Air 端的 `air_comm_air_poll()` 每次最多消费 `512` 个字节。这个上限相当于一个保险：哪怕线路上连续来了很多数据，单次 poll 也不会无限循环。正常情况下队列会很快被清空；真发生持续灌爆时，统计量也能明确告诉我问题发生在“接收队列来不及消费”，而不是让我只看到一个模糊的通信失败。
 
-Car 端也是同样的 `512 Byte` 环形队列和 ISR 只收字节、主循环再解析的结构，可以直接对照 [`air_comm_car.c`](../../../CYT4bb7_Car/project/code/Protocols/AirComm/air_comm_car.c)。
+Car 端也是同样的 `512 Byte` 环形队列和 ISR 只收字节、主循环再解析的结构，可以直接对照 [`air_comm_car.c`](https://github.com/choumouing/CYT4bb7_Car/blob/national-2026/project/code/Protocols/AirComm/air_comm_car.c)。
 
 ## TX 发送缓冲区和拥塞策略
 
@@ -358,7 +358,7 @@ Air 端还有一个比较宽松的处理：只要收到任意一帧 CRC 正确�
 
 Air 收到后会保存 Car 的速度、yaw、yaw rate、目标量和大转弯状态，并用索引 10 的 Car tick 判断是不是真的来了一帧新数据。只有这个同步时间发生变化，`g_car_last_update_time_ms` 才刷新，避免一份旧数据被重复处理后看起来仍然“很新”。
 
-不过这里必须提醒一句：**当前主车工程和 Air 对 11 项上行数据的字段解释还没有完全对齐。** Air 当前把索引 2 当作 `Car yaw target`，把 5、6、7 当作目标速度 X、目标速度 Y 和大转弯状态；而 `CYT4bb7_Car` 的索引 2 实际发的是“是否压到信标”，5～7 还是 0。另一份 [`CYT4BB7_Car_F` 的实现](../../../CYT4BB7_Car_F/project/code/Controller/car_loop.c) 更接近 Air 当前解释。这个问题不会让串口解析崩掉，但会让字段语义错位，所以后续两端联调前一定要先统一数据字典。
+不过这里必须提醒一句：**当前主车工程和 Air 对 11 项上行数据的字段解释还没有完全对齐。** Air 当前把索引 2 当作 `Car yaw target`，把 5、6、7 当作目标速度 X、目标速度 Y 和大转弯状态；而 `CYT4bb7_Car` 的索引 2 实际发的是“是否压到信标”，5～7 还是 0。另一份 [`CYT4BB7_Car_F` 的实现](https://github.com/ZhangStudyLife/CYT4BB7_Car_F/blob/national-2026/project/code/Controller/car_loop.c) 更接近 Air 当前解释。这个问题不会让串口解析崩掉，但会让字段语义错位，所以后续两端联调前一定要先统一数据字典。
 
 ## 参数读取和修改
 
@@ -513,7 +513,7 @@ AirComm 自己没有另起一个会抢占飞控的任务，而是挂在现有节
 
 Air 的实际调用入口在 [`main_cm7_0.c`](../../project/user/main_cm7_0.c)，1 ms tick 和 UART ISR 在 [`cm7_0_isr.c`](../../project/user/cm7_0_isr.c)。其中 `air_comm_air_poll()` 放在 IMU、位置估计和飞控快速更新之后，也说明优先级很明确：先完成本周期真正的飞控工作，再处理通信队列。
 
-Car 端同样在 1 ms ISR 中只维护 tick，在主循环调用 `air_comm_car_poll()`，每 5 ms 调用 `air_comm_car_update_200HZ()` 并发送自己的运行数据。对应入口可以看 [`car_loop.c`](../../../CYT4bb7_Car/project/code/Controller/car_loop.c)。
+Car 端同样在 1 ms ISR 中只维护 tick，在主循环调用 `air_comm_car_poll()`，每 5 ms 调用 `air_comm_car_update_200HZ()` 并发送自己的运行数据。对应入口可以看 [`car_loop.c`](https://github.com/choumouing/CYT4bb7_Car/blob/national-2026/project/code/Controller/car_loop.c)。
 
 ## 统计信息和排障
 
@@ -556,7 +556,7 @@ Car 端还会统计 ACK 成功、超时和重试次数，并暴露当前 pending
 | 实时数据       | `air_comm_send_run_data()`、`air_comm_set_run_data_callback()`、`air_comm_get_last_run_data()`                               |
 | 诊断           | `air_comm_air_get_stats()`                                                                                                       |
 
-Car 端则多了事务发起和 ACK 查询：`air_comm_car_set_param()`、`air_comm_car_get_param()`、`air_comm_car_exec_command()` 负责发请求；带 `_with_timeout` 的接口用于相机这类慢参数；`air_comm_car_has_pending_ack()`、`air_comm_car_get_last_ack()` 和几个 value/name/text getter 用来让菜单知道请求还在等、成功了还是超时了；三个 `cancel_pending` 接口用于退出菜单或飞行状态切换时主动取消旧事务。完整声明都在 [`air_comm_car.h`](../../../CYT4bb7_Car/project/code/Protocols/AirComm/air_comm_car.h) 中。
+Car 端则多了事务发起和 ACK 查询：`air_comm_car_set_param()`、`air_comm_car_get_param()`、`air_comm_car_exec_command()` 负责发请求；带 `_with_timeout` 的接口用于相机这类慢参数；`air_comm_car_has_pending_ack()`、`air_comm_car_get_last_ack()` 和几个 value/name/text getter 用来让菜单知道请求还在等、成功了还是超时了；三个 `cancel_pending` 接口用于退出菜单或飞行状态切换时主动取消旧事务。完整声明都在 [`air_comm_car.h`](https://github.com/choumouing/CYT4bb7_Car/blob/national-2026/project/code/Protocols/AirComm/air_comm_car.h) 中。
 
 `air_comm_get_last_run_data()` 适合某些不想注册回调的地方主动读取最近一帧，回调接口则适合数据一到就更新上层缓存。无论哪种方式，涉及控制时都还要同时检查新鲜度，不能把“缓存里有过一帧”当成“对端现在仍然在线”。
 
@@ -568,7 +568,7 @@ Car 端则多了事务发起和 ACK 查询：`air_comm_car_set_param()`、`air_c
 
 当前 Air 飞行期间发送 `17` 项关键数据，待机发送 `52` 项诊断数据。
 
-主车工程 [`CYT4bb7_Car`](../../../CYT4bb7_Car/project/code/Controller/car_loop.c) 当前只接受长度为 `15`、`45`、`48` 或 `52` 的 Air 数据，因此会直接忽略 17 项飞行关键包。另一份 [`CYT4BB7_Car_F`](../../../CYT4BB7_Car_F/project/code/Controller/car_loop.c) 能接受 `16` 或 `17` 项，并能读取索引 15 的时间戳和索引 16 的负压允许标志，与当前 Air 更匹配。
+主车工程 [`CYT4bb7_Car`](https://github.com/choumouing/CYT4bb7_Car/blob/national-2026/project/code/Controller/car_loop.c) 当前只接受长度为 `15`、`45`、`48` 或 `52` 的 Air 数据，因此会直接忽略 17 项飞行关键包。另一份 [`CYT4BB7_Car_F`](https://github.com/ZhangStudyLife/CYT4BB7_Car_F/blob/national-2026/project/code/Controller/car_loop.c) 能接受 `16` 或 `17` 项，并能读取索引 15 的时间戳和索引 16 的负压允许标志，与当前 Air 更匹配。
 
 ### Car 上行字段
 
@@ -598,7 +598,7 @@ Car 端则多了事务发起和 ACK 查询：`air_comm_car_set_param()`、`air_c
 3. [`cm7_0_isr.c`](../../project/user/cm7_0_isr.c)：确认 1 ms tick、RX 字节入队和 TX FIFO 服务是怎么接到真实中断上的。
 4. [`main_cm7_0.c`](../../project/user/main_cm7_0.c)：看 poll、200 Hz 调度、两种 Air RUN_DATA，以及 Car 数据最后被谁使用。
 5. [`ipc_image_data.h`](../../project/code/IPC/ipc_image_data.h) 和 [`ipc_image_data.c`](../../project/code/IPC/ipc_image_data.c)：看 Core1/2BL3 参数如何异步执行、读回、超时和回滚。
-6. [`air_comm_car.h`](../../../CYT4bb7_Car/project/code/Protocols/AirComm/air_comm_car.h) 和 [`air_comm_car.c`](../../../CYT4bb7_Car/project/code/Protocols/AirComm/air_comm_car.c)：对照 Car 的 ACK 等待、重试、接收解析和统计。
-7. [`car_loop.c`](../../../CYT4bb7_Car/project/code/Controller/car_loop.c)：最后确认 Car 实际发送/接收的 RUN_DATA 字段，以及断联后上层怎么处理。
+6. [`air_comm_car.h`](https://github.com/choumouing/CYT4bb7_Car/blob/national-2026/project/code/Protocols/AirComm/air_comm_car.h) 和 [`air_comm_car.c`](https://github.com/choumouing/CYT4bb7_Car/blob/national-2026/project/code/Protocols/AirComm/air_comm_car.c)：对照 Car 的 ACK 等待、重试、接收解析和统计。
+7. [`car_loop.c`](https://github.com/choumouing/CYT4bb7_Car/blob/national-2026/project/code/Controller/car_loop.c)：最后确认 Car 实际发送/接收的 RUN_DATA 字段，以及断联后上层怎么处理。
 
-[返回 Air 总文档](../../README.md) · [返回母仓库 README](../../../README.md)
+[返回 Air 总文档](../../README.md) · [返回母仓库 README](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/README.md)

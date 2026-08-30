@@ -70,4 +70,4 @@ Mode = 左侧三挡开关位置 x 3 + 右侧三挡开关位置
 
 例如左边是 `1`、右边是 `2`，那么最终选择的就是 Mode 5。两个开关一共可以组合出 Mode 0 到 Mode 8，也正好对应代码里的九种飞行模式。
 
-[返回 Air 总文档](../../README.md) · [返回母仓库 README](../../../README.md)
+[返回 Air 总文档](../../README.md) · [返回母仓库 README](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/README.md)

@@ -96,4 +96,4 @@ TOF 的标定参数和高度融合都在 [`Height_Est.c`](../../project/code/Est
 
 这段经历对我影响还挺大的。估计器并不是越复杂就一定越好，尤其是在比赛这种时间有限的场景里，只要传感器数据干净、异常值处理靠谱、延迟能接受，一个简单而且能解释清楚的方案往往更容易调通。现在加入 IMU，是为了让两次 TOF 更新之间的速度变化更及时，但前提仍然是加速度校准、方向和时间同步都要先做对。
 
-[返回 Air 总文档](../../README.md) · [返回母仓库 README](../../../README.md)
+[返回 Air 总文档](../../README.md) · [返回母仓库 README](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/README.md)

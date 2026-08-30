@@ -10,11 +10,11 @@ CarPlan3 这部分调起来比较痛苦，主要有两个原因：一个是三�
 
 ## 先说结论：这不是普通的闭环调参曲线
 
-WiFi SPI 的基本用法可以参考[《WiFi SPI 调试》](../03-communication/wifi-spi-debugging.md)。我这里的 WiFi SPI 走 UDP 通道，使用 JustFloat 协议把数据发送到电脑；如果只是看姿态、PID 之类的浮点曲线，用 VOFA+ 就够了。
+WiFi SPI 的基本用法可以参考[《WiFi SPI 调试》](../02-communication/wifi-spi-debugging.md)。我这里的 WiFi SPI 走 UDP 通道，使用 JustFloat 协议把数据发送到电脑；如果只是看姿态、PID 之类的浮点曲线，用 VOFA+ 就够了。
 
 但 CarPlan3 不是这种“看一条曲线，然后调一个 PID”的问题。路径规划里有三路图像、目标点、车灯角度、飞机姿态和高度，很多数据之间还有空间关系。只看曲线看不出“这个信标到底是不是车灯旁边的那个信标”，也看不出三路摄像头融合之后的点有没有跳到奇怪的位置。
 
-因此这里需要一个专门的可视化工具，实时查看和回放 `image_data`。`image_data` 是什么，可以先看[《Camera SPI 与双核 IPC》](../03-communication/camera-spi-and-ipc.md)以及 [`image_data.h`](../../project/code/Image/image_data.h)：它里面放着 Front、Center、Back 三路摄像头检测到的信标和车灯结果。相机模型和三摄融合的背景，可以继续看[《相机模型标定》](camera-model-calibration.md)。
+因此这里需要一个专门的可视化工具，实时查看和回放 `image_data`。`image_data` 是什么，可以先看[《Camera SPI 与双核 IPC》](../02-communication/camera-spi-and-ipc.md)以及 [`image_data.h`](../../project/code/Image/image_data.h)：它里面放着 Front、Center、Back 三路摄像头检测到的信标和车灯结果。相机模型和三摄融合的背景，可以继续看[《相机模型标定》](camera-model-calibration.md)。
 
 ## 整体数据流
 
@@ -98,7 +98,7 @@ WiFi SPI 的基本用法可以参考[《WiFi SPI 调试》](../03-communication/
 
 ![CarPlan3 调试上位机](image/car-plan3-debug-workflow/car-plan3-monitor.png)
 
-飞机端只需要插上 WiFi SPI 模块，烧录好启用了 `car_plan_debug_200hz()` 的程序；电脑端启动上位机并监听默认 UDP 端口，就能看到实时数据。WiFi 模块、UDP 和 JustFloat 的初始化与轮询都在飞控的 WiFi 协议目录里，遇到“程序开了但没有数据”时，先看[《WiFi SPI 调试》](../03-communication/wifi-spi-debugging.md)，不要先怀疑 CarPlan3。
+飞机端只需要插上 WiFi SPI 模块，烧录好启用了 `car_plan_debug_200hz()` 的程序；电脑端启动上位机并监听默认 UDP 端口，就能看到实时数据。WiFi 模块、UDP 和 JustFloat 的初始化与轮询都在飞控的 WiFi 协议目录里，遇到“程序开了但没有数据”时，先看[《WiFi SPI 调试》](../02-communication/wifi-spi-debugging.md)，不要先怀疑 CarPlan3。
 
 ## 实时看和离线回放
 

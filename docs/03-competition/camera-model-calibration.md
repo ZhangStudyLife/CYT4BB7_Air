@@ -4,7 +4,7 @@
 
 ## 为什么要标定
 
-为什么要标定,[software-architecture.md](../02-flight-control/software-architecture.md) 里其实讲过一半:省赛的时候,我的 car_plan1/2([car_plan.c](../../project/code/Planner/car_plan.c) / [car_plan_2.c](../../project/code/Planner/car_plan_2.c))在直接使用 F 车模车体坐标系下的目标速度向量时出了问题——从像素域直接算目标向量,车模走起路来一扭一扭的,根本跑不直。
+为什么要标定,[software-architecture.md](../01-flight-control/software-architecture.md) 里其实讲过一半:省赛的时候,我的 car_plan1/2([car_plan.c](../../project/code/Planner/car_plan.c) / [car_plan_2.c](../../project/code/Planner/car_plan_2.c))在直接使用 F 车模车体坐标系下的目标速度向量时出了问题——从像素域直接算目标向量,车模走起路来一扭一扭的,根本跑不直。
 
 那我的目标就很明确了:车要走直线。我需要这么一个算法,输入基本上只依赖 [image_data](../../project/code/Image/image_data.h) 这个结构体(其他文档也写过它,里面装着三摄所有的信标坐标、车灯坐标和角度),再加上飞机的高度和姿态;其他真的没什么可依赖的了,最多再加一个车的 yaw 和飞机的 yaw(上电时要保证两个 yaw 对齐)。输出则是一个正确的目标速度向量,它直接决定车模能不能对准信标。
 

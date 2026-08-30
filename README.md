@@ -18,33 +18,32 @@ PCB 源文件、板卡照片和硬件迭代记录不在这里维护，请直接�
 
 | 我想了解 | 建议入口 |
 | --- | --- |
-| 硬件、引脚和外设 | [硬件与引脚分配](docs/01-hardware/hardware-and-pinout.md) |
-| 编译和烧录工程 | [编译与烧录](docs/01-hardware/build-and-flash.md) |
-| 双核飞控如何运行 | [软件架构](docs/02-flight-control/software-architecture.md) |
-| IMU、姿态解算和滤波 | [IMU 与姿态估计](docs/02-flight-control/imu-and-attitude.md) |
-| 四路 TOF 定高 | [高度估计与控制](docs/02-flight-control/height-estimation-and-control.md) |
-| 遥控器和 CRSF 飞行模式 | [遥控器与飞行模式](docs/02-flight-control/rc-and-flight-modes.md) |
-| Air 和 Car 怎么通信 | [AirComm 空地通信](docs/03-communication/aircomm.md) |
-| 图像板和双核 IPC | [Camera SPI 与双核 IPC](docs/03-communication/camera-spi-and-ipc.md) |
-| WiFi SPI 怎么发日志 | [WiFi SPI 调试](docs/03-communication/wifi-spi-debugging.md) |
-| 多摄像头和相机模型 | [相机模型标定](docs/04-competition/camera-model-calibration.md) |
-| CarPlan3 和上位机联调 | [CarPlan3 调试流程](docs/04-competition/car-plan3-debug-workflow.md) |
-| 代码目录和模块边界 | [仓库结构](docs/05-engineering/repository-structure.md) |
-| 已知问题和排查记录 | [故障排查索引](docs/05-engineering/troubleshooting.md) |
+| PCB、板卡和硬件迭代 | 母仓库的[硬件 PCB 总文档](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/hardware/README.md) |
+| 双核飞控如何运行 | [软件架构](docs/01-flight-control/software-architecture.md) |
+| IMU、姿态解算和滤波 | [IMU 与姿态估计](docs/01-flight-control/imu-and-attitude.md) |
+| 四路 TOF 定高 | [高度估计与控制](docs/01-flight-control/height-estimation-and-control.md) |
+| 遥控器和 CRSF 飞行模式 | [遥控器与飞行模式](docs/01-flight-control/rc-and-flight-modes.md) |
+| Air 和 Car 怎么通信 | [AirComm 空地通信](docs/02-communication/aircomm.md) |
+| 图像板和双核 IPC | [Camera SPI 与双核 IPC](docs/02-communication/camera-spi-and-ipc.md) |
+| WiFi SPI 怎么发日志 | [WiFi SPI 调试](docs/02-communication/wifi-spi-debugging.md) |
+| 多摄像头和相机模型 | [相机模型标定](docs/03-competition/camera-model-calibration.md) |
+| CarPlan3 和上位机联调 | [CarPlan3 调试流程](docs/03-competition/car-plan3-debug-workflow.md) |
+| 代码目录和模块边界 | [仓库结构](docs/04-engineering/repository-structure.md) |
+| 已知问题和排查记录 | [故障排查索引](docs/04-engineering/troubleshooting.md) |
 
 ## 推荐阅读路线
 
 ### 只想理解飞控
 
-[软件架构](docs/02-flight-control/software-architecture.md) -> [IMU 与姿态估计](docs/02-flight-control/imu-and-attitude.md) -> [高度估计与控制](docs/02-flight-control/height-estimation-and-control.md) -> [遥控器与飞行模式](docs/02-flight-control/rc-and-flight-modes.md)
+[软件架构](docs/01-flight-control/software-architecture.md) -> [IMU 与姿态估计](docs/01-flight-control/imu-and-attitude.md) -> [高度估计与控制](docs/01-flight-control/height-estimation-and-control.md) -> [遥控器与飞行模式](docs/01-flight-control/rc-and-flight-modes.md)
 
 ### 想理解空地协同
 
-[软件架构](docs/02-flight-control/software-architecture.md) -> [AirComm](docs/03-communication/aircomm.md) -> [Camera SPI 与双核 IPC](docs/03-communication/camera-spi-and-ipc.md) -> [WiFi SPI 调试](docs/03-communication/wifi-spi-debugging.md)
+[软件架构](docs/01-flight-control/software-architecture.md) -> [AirComm](docs/02-communication/aircomm.md) -> [Camera SPI 与双核 IPC](docs/02-communication/camera-spi-and-ipc.md) -> [WiFi SPI 调试](docs/02-communication/wifi-spi-debugging.md)
 
 ### 想理解图像到车模速度
 
-[Camera SPI 与双核 IPC](docs/03-communication/camera-spi-and-ipc.md) -> [相机模型标定](docs/04-competition/camera-model-calibration.md) -> [CarPlan3 调试流程](docs/04-competition/car-plan3-debug-workflow.md) -> 母仓库的 [Car 端工程](https://github.com/choumouing/CYT4bb7_Car/)
+[Camera SPI 与双核 IPC](docs/02-communication/camera-spi-and-ipc.md) -> [相机模型标定](docs/03-competition/camera-model-calibration.md) -> [CarPlan3 调试流程](docs/03-competition/car-plan3-debug-workflow.md) -> 母仓库的 [Car 端工程](https://github.com/choumouing/CYT4bb7_Car/)
 
 ## 代码目录地图
 
@@ -65,7 +64,7 @@ docs/                         面向开源阅读整理后的正式文档
 
 ## 文档状态
 
-- `docs/01-hardware` 到 `docs/05-engineering` 是面向开源阅读的正式入口。
+- `docs/01-flight-control` 到 `docs/04-engineering` 是面向开源阅读的正式入口，硬件相关内容统一跳转母仓库。
 - `doc/` 保留早期通信设计和故障原始记录，后续只通过正式文档建立跳转，不随意删除历史材料。
 - 文档中的参数、波形和分析结论应与对应 Git 提交和源码版本一起理解。
 - [待填写：哪些模块是最终比赛版本，哪些模块只是实验版本。]

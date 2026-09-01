@@ -8,7 +8,7 @@ PCB 源文件、板卡照片和硬件迭代记录不在这里维护，请直接前往母仓库的[硬件 PCB 总文
 
 ## 先看这里
 
-- [待填写：Air 飞控或比赛系统演示视频]
+- [Air 飞控系统演示视频](https://b23.tv/vJi0Gqp)
 - [母仓库总 README](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/README.md)
 - [CarPlan3 上位机调试视频](https://www.bilibili.com/video/BV1Rm4m6fEMv/)
 
@@ -67,7 +67,6 @@ docs/                         面向开源阅读整理后的正式文档
 - `docs/01-flight-control` 到 `docs/04-engineering` 是面向开源阅读的正式入口，硬件相关内容统一跳转母仓库。
 - `doc/` 保留早期通信设计和故障原始记录，后续只通过正式文档建立跳转，不随意删除历史材料。
 - 文档中的参数、波形和分析结论应与对应 Git 提交和源码版本一起理解。
-- [待填写：哪些模块是最终比赛版本，哪些模块只是实验版本。]
 
 ## 返回路径
 

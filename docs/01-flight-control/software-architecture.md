@@ -45,7 +45,7 @@
 
 我靠，那个时候我真的崩溃了。每天起早摸黑烧 token，试各种采集方式。现在回头看，当时的调试方法也比较“愚蠢”：唯一的手段就是插着下载器看静态 `printf`，飞机起飞以后的各种中间变量基本都看不到，差不多就是盲调。
 
-当时 2BL3 的代码还在这个仓库里：[`Car_Air_Protocol/rebuilt_pmw3901`](https://github.com/ZhangStudyLife/Car_Air_Protocol/tree/rebuilt_pmw3901)。里面也有一百多次提交了。后面的速度估计实在是被 AI 堆得太厉害，已经成了屎山，根本没法继续用。
+当时 2BL3 的代码还在这个仓库里：[CYT2BL3_Image 图像板仓库](https://github.com/ZhangStudyLife/CYT2BL3_Image/tree/national-2026)。里面也有一百多次提交了。后面的速度估计实在是被 AI 堆得太厉害，已经成了屎山，根本没法继续用。
 
 回学校前几天，我手上只有一块 4BB7 学习板，但还是硬把一整架飞机装起来了。用的是 Mark5 机架，板子太大放不进去，只能挂在飞机下面，再用热熔胶统一固定。整个造型非常抽象，但至少它真的飞起来了。
 

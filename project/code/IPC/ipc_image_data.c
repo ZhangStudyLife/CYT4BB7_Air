@@ -31,10 +31,10 @@ volatile ipc_remote_param_mailbox_t g_ipc_remote_param_response;
 #pragma data_alignment=64
 volatile ipc_attitude_data_t g_ipc_attitude_data;
 
-struct image_data image_data[IMAGE_CAMERA_COUNT];                               /* æœ¬æ ¸ä½¿ç”¨çš„ä¸‰è·¯ä¸€è‡´æ€§å›¾åƒå·¥ä½œå‰¯æœ¬ã€‚ */
-volatile uint32 g_image_data_rx_seq;                                             /* CM7_0æœ€è¿‘æ¥æ”¶çš„ä¸€è‡´æ€§å¿«ç…§åºå·ã€‚ */
-volatile uint32 g_image_camera_rx_seq[IMAGE_CAMERA_COUNT];                      /* CM7_0æœ€è¿‘æ¥æ”¶çš„ä¸‰è·¯çœŸå®ç»“æœåºå·ã€‚ */
-volatile uint32 g_image_data_rx_fresh_mask;                                     /* CM7_0æœ€è¿‘æ¥æ”¶å¿«ç…§çš„æ–°ç»“æœæ©ç ã€‚ */
+struct image_data image_data[IMAGE_CAMERA_COUNT];                               /* ±¾ºËÊ¹ÓÃµÄÈıÂ·Ò»ÖÂĞÔÍ¼Ïñ¹¤×÷¸±±¾¡£ */
+volatile uint32 g_image_data_rx_seq;                                             /* CM7_0×î½ü½ÓÊÕµÄÒ»ÖÂĞÔ¿ìÕÕĞòºÅ¡£ */
+volatile uint32 g_image_camera_rx_seq[IMAGE_CAMERA_COUNT];                      /* CM7_0×î½ü½ÓÊÕµÄÈıÂ·ÕæÊµ½á¹ûĞòºÅ¡£ */
+volatile uint32 g_image_data_rx_fresh_mask;                                     /* CM7_0×î½ü½ÓÊÕ¿ìÕÕµÄĞÂ½á¹ûÑÚÂë¡£ */
 
 #define IPC_FLIGHT_STATE_MAGIC   (0xA5000000UL)
 #define IPC_FLIGHT_STATE_MASK    (0xFFFF0000UL)
@@ -43,16 +43,16 @@ volatile uint32 g_image_data_rx_fresh_mask;                                     
 #define IPC_FLIGHT_STATE_BL3_SCREEN_ENABLE (0x00000004UL)
 #define IPC_FLIGHT_STATE_BL3_HORIZON_ENABLE (0x00000008UL)
 #define IPC_FLIGHT_STATE_PARAM_WRITE_ENABLE (0x00000010UL)
-/* å›¾ä¼ å‘é€æ¨¡å¼åœ¨ IPC æ•°æ®ä½ 16 ä½ä¸­çš„åç§» */
+/* Í¼´«·¢ËÍÄ£Ê½ÔÚ IPC Êı¾İµÍ 16 Î»ÖĞµÄÆ«ÒÆ */
 #define IPC_IMAGE_SEND_SHIFT     (8U)
-/* å›¾ä¼ å‘é€æ¨¡å¼åœ¨ IPC æ•°æ®ä½ 16 ä½ä¸­çš„æ©ç  */
+/* Í¼´«·¢ËÍÄ£Ê½ÔÚ IPC Êı¾İµÍ 16 Î»ÖĞµÄÑÚÂë */
 #define IPC_IMAGE_SEND_MASK      (0x0000FF00UL)
-#define IPC_IMAGE_SNAPSHOT_MAX_ATTEMPTS (4U) /* CM7_0å•æ¬¡è½®è¯¢æœ€å¤šå°è¯•çš„ä¸€è‡´æ€§å¿«ç…§æ¬¡æ•°ã€‚ */
+#define IPC_IMAGE_SNAPSHOT_MAX_ATTEMPTS (4U) /* CM7_0µ¥´ÎÂÖÑ¯×î¶à³¢ÊÔµÄÒ»ÖÂĞÔ¿ìÕÕ´ÎÊı¡£ */
 
-/* è¿œç¨‹å‚æ•°é‚®ç®±æ ¡éªŒç›å€¼ï¼Œé¿å…å…¨é›¶å†…å®¹è¢«è¯¯åˆ¤ä¸ºåˆæ³•äº‹åŠ¡ã€‚ */
+/* Ô¶³Ì²ÎÊıÓÊÏäĞ£ÑéÑÎÖµ£¬±ÜÃâÈ«ÁãÄÚÈİ±»ÎóÅĞÎªºÏ·¨ÊÂÎñ¡£ */
 #define IPC_REMOTE_PARAM_CHECKSUM_SALT (0xA57C31E9UL)
 
-/* è®¡ç®—è¿œç¨‹å‚æ•°é‚®ç®±åè®®å­—æ®µçš„32ä½æ ¡éªŒå€¼ã€‚ */
+/* ¼ÆËãÔ¶³Ì²ÎÊıÓÊÏäĞ­Òé×Ö¶ÎµÄ32Î»Ğ£ÑéÖµ¡£ */
 static uint32 ipc_remote_param_checksum(const ipc_remote_param_mailbox_t *mailbox)
 {
     uint32 meta;
@@ -71,7 +71,7 @@ static uint32 ipc_remote_param_checksum(const ipc_remote_param_mailbox_t *mailbo
            mailbox->transaction ^ mailbox->value_bits ^ mailbox->previous_bits;
 }
 
-/* æ£€æŸ¥è¿œç¨‹å‚æ•°é‚®ç®±çš„ç‰ˆæœ¬ã€äº‹åŠ¡å·å’Œæ ¡éªŒå€¼ã€‚ */
+/* ¼ì²éÔ¶³Ì²ÎÊıÓÊÏäµÄ°æ±¾¡¢ÊÂÎñºÅºÍĞ£ÑéÖµ¡£ */
 static uint8 ipc_remote_param_mailbox_valid(const ipc_remote_param_mailbox_t *mailbox)
 {
     if((mailbox == NULL) ||
@@ -90,9 +90,9 @@ static uint8 ipc_remote_param_mailbox_valid(const ipc_remote_param_mailbox_t *ma
 
 static uint32 s_tx_seq = 0U;
 static volatile uint8 s_core0_flying = 0U;
-/* æ ¸0åŒæ­¥è¿‡æ¥çš„ 2BL3 å›¾ä¼ å‘é€æ¨¡å¼ */
+/* ºË0Í¬²½¹ıÀ´µÄ 2BL3 Í¼´«·¢ËÍÄ£Ê½ */
 static volatile uint8 s_core0_image_send_enable = 0U;
-/* æ ¸1ä¸Šç”µé»˜è®¤ç¦æ­¢åˆ·å±ï¼Œæ”¶åˆ°æ ¸0æ˜ç¡®è®¸å¯åæ‰åˆå§‹åŒ–IPS114ã€‚ */
+/* ºË1ÉÏµçÄ¬ÈÏ½ûÖ¹Ë¢ÆÁ£¬ÊÕµ½ºË0Ã÷È·Ğí¿Éºó²Å³õÊ¼»¯IPS114¡£ */
 static volatile uint8 s_core0_screen_refresh_enable = 0U;
 static volatile uint8 s_core0_param_write_enable = 0U;
 static volatile uint8 s_core0_bl3_screen_enable = 0U;
@@ -111,13 +111,13 @@ typedef struct
     ipc_remote_param_mailbox_t request;
 } ipc_remote_param_core1_set_cache_t;
 
-/* æœ€è¿‘ä¸€æ¬¡å·²å›å¤æˆåŠŸçš„æ ¸1 SETï¼Œç”¨äºå¤„ç†å“åº”ä¸å–æ¶ˆå¢“ç¢‘äº¤å‰æ—¶çš„è¡¥å¿å›æ»šã€‚ */
+/* ×î½üÒ»´ÎÒÑ»Ø¸´³É¹¦µÄºË1 SET£¬ÓÃÓÚ´¦ÀíÏìÓ¦ÓëÈ¡ÏûÄ¹±®½»²æÊ±µÄ²¹³¥»Ø¹ö¡£ */
 static ipc_remote_param_core1_set_cache_t s_remote_param_core1_set_cache;
 
 /*
- * å‡½æ•°åŠŸèƒ½: å°†CM7_1æœ¬åœ°å›¾åƒç»“æœä¸€è‡´æ€§å‘å¸ƒåˆ°å…±äº«å†…å­˜å¹¶å‘é€éé˜»å¡é€šçŸ¥ã€‚
- * è¾“å…¥å‚æ•°: fresh_maskä¸ºæœ¬æ¬¡çœŸå®æ–°ç®—æ³•ç»“æœå¯¹åº”çš„æ‘„åƒå¤´ä½æ©ç ã€‚
- * è¿”å›å€¼: æ— ã€‚
+ * º¯Êı¹¦ÄÜ: ½«CM7_1±¾µØÍ¼Ïñ½á¹ûÒ»ÖÂĞÔ·¢²¼µ½¹²ÏíÄÚ´æ²¢·¢ËÍ·Ç×èÈûÍ¨Öª¡£
+ * ÊäÈë²ÎÊı: fresh_maskÎª±¾´ÎÕæÊµĞÂËã·¨½á¹û¶ÔÓ¦µÄÉãÏñÍ·Î»ÑÚÂë¡£
+ * ·µ»ØÖµ: ÎŞ¡£
  */
 void ipc_image_publish(uint8 fresh_mask)
 {
@@ -178,9 +178,9 @@ void ipc_image_publish(uint8 fresh_mask)
 #endif
 
 /*
- * å‡½æ•°åŠŸèƒ½: åˆå§‹åŒ–æœ¬æ ¸å›¾åƒå·¥ä½œå‰¯æœ¬åŠè·¨æ ¸å‘å¸ƒæˆ–æ¥æ”¶çŠ¶æ€ã€‚
- * è¾“å…¥å‚æ•°: æ— ã€‚
- * è¿”å›å€¼: æ— ã€‚
+ * º¯Êı¹¦ÄÜ: ³õÊ¼»¯±¾ºËÍ¼Ïñ¹¤×÷¸±±¾¼°¿çºË·¢²¼»ò½ÓÊÕ×´Ì¬¡£
+ * ÊäÈë²ÎÊı: ÎŞ¡£
+ * ·µ»ØÖµ: ÎŞ¡£
  */
 void ipc_image_init(void)
 {
@@ -287,7 +287,7 @@ static uint8 ipc_remote_param_is_cancel_terminal(
             (response->status == IPC_REMOTE_PARAM_STATUS_ROLLBACK_FAIL)) ? 1U : 0U;
 }
 
-/* SETç¡¬è¶…æ—¶ä¿ç•™å–æ¶ˆæ ‡è®°ï¼›GETå¯ç«‹å³é‡Šæ”¾ï¼Œè¿Ÿåˆ°äº‹åŠ¡ç”±æ ¸1åœ¨æ–°è¯·æ±‚åˆ°è¾¾æ—¶æ¸…ç†ã€‚ */
+/* SETÓ²³¬Ê±±£ÁôÈ¡Ïû±ê¼Ç£»GET¿ÉÁ¢¼´ÊÍ·Å£¬³Ùµ½ÊÂÎñÓÉºË1ÔÚĞÂÇëÇóµ½´ïÊ±ÇåÀí¡£ */
 static void ipc_remote_param_core0_reap_cancelled(void)
 {
     ipc_remote_param_mailbox_t response;
@@ -311,7 +311,7 @@ static void ipc_remote_param_core0_reap_cancelled(void)
 }
 #endif
 
-/* æ ¸1å‘å¸ƒæœ€ç»ˆå‚æ•°å“åº”ï¼Œåªæœ‰ç›®æ ‡ç«¯èµ‹å€¼å¹¶è¯»å›åæ‰è°ƒç”¨ã€‚ */
+/* ºË1·¢²¼×îÖÕ²ÎÊıÏìÓ¦£¬Ö»ÓĞÄ¿±ê¶Ë¸³Öµ²¢¶Á»Øºó²Åµ÷ÓÃ¡£ */
 static void ipc_remote_param_publish_response(const ipc_remote_param_mailbox_t *request,
                                               uint8 status,
                                               uint32 actual_bits)
@@ -472,7 +472,7 @@ void ipc_camera_spi_log_get(ipc_camera_spi_log_t *out)
     memcpy((void *)out, (const void *)&g_ipc_camera_spi_log, sizeof(ipc_camera_spi_log_t));
 }
 
-/* åˆå§‹åŒ–æ ¸0è¯·æ±‚ç«¯ï¼Œå¹¶æ¸…é™¤æ ¸0æ‹¥æœ‰çš„è¯·æ±‚é‚®ç®±ã€‚ */
+/* ³õÊ¼»¯ºË0ÇëÇó¶Ë£¬²¢Çå³ıºË0ÓµÓĞµÄÇëÇóÓÊÏä¡£ */
 void ipc_remote_param_core0_init(void)
 {
 #if defined(CY_CORE_CM7_0)
@@ -493,7 +493,7 @@ void ipc_remote_param_core0_init(void)
 #endif
 }
 
-/* æ ¸0å‘å¸ƒä¸€ç¬”è¿œç¨‹å‚æ•°è¯·æ±‚ï¼ŒIPC Pipeä»…ä½œä¸ºåŠ é€Ÿæç¤ºã€‚ */
+/* ºË0·¢²¼Ò»±ÊÔ¶³Ì²ÎÊıÇëÇó£¬IPC Pipe½ö×÷Îª¼ÓËÙÌáÊ¾¡£ */
 uint8 ipc_remote_param_core0_start(uint8 target,
                                    uint8 op,
                                    uint8 type,
@@ -563,7 +563,7 @@ uint8 ipc_remote_param_core0_start(uint8 target,
 #endif
 }
 
-/* æ ¸0é«˜é¢‘è½®è¯¢å“åº”é‚®ç®±ï¼Œä¸ä¾èµ–IPCä¸­æ–­å›è°ƒã€‚ */
+/* ºË0¸ßÆµÂÖÑ¯ÏìÓ¦ÓÊÏä£¬²»ÒÀÀµIPCÖĞ¶Ï»Øµ÷¡£ */
 uint8 ipc_remote_param_core0_poll(ipc_remote_param_mailbox_t *response)
 {
 #if defined(CY_CORE_CM7_0)
@@ -594,7 +594,7 @@ uint8 ipc_remote_param_core0_poll(ipc_remote_param_mailbox_t *response)
 #endif
 }
 
-/* æ ¸0å‘å¸ƒåŒäº‹åŠ¡å–æ¶ˆæ ‡è®°ï¼Œä½†ç»§ç»­ç­‰å¾…æ ¸1ç¡®è®¤ä¸‹æ¸¸å·²åœæ­¢æˆ–å®Œæˆå›æ»šã€‚ */
+/* ºË0·¢²¼Í¬ÊÂÎñÈ¡Ïû±ê¼Ç£¬µ«¼ÌĞøµÈ´ıºË1È·ÈÏÏÂÓÎÒÑÍ£Ö¹»òÍê³É»Ø¹ö¡£ */
 uint8 ipc_remote_param_core0_request_cancel(uint32 transaction)
 {
 #if defined(CY_CORE_CM7_0)
@@ -622,7 +622,7 @@ uint8 ipc_remote_param_core0_request_cancel(uint32 transaction)
 #endif
 }
 
-/* GETç¡¬è¶…æ—¶ç«‹å³é‡Šæ”¾Core0ï¼›SETç»§ç»­å ç”¨é‚®ç®±ï¼Œç­‰å¾…æ ¸1å®Œæˆå›æ»šã€‚ */
+/* GETÓ²³¬Ê±Á¢¼´ÊÍ·ÅCore0£»SET¼ÌĞøÕ¼ÓÃÓÊÏä£¬µÈ´ıºË1Íê³É»Ø¹ö¡£ */
 void ipc_remote_param_core0_cancel(uint32 transaction)
 {
 #if defined(CY_CORE_CM7_0)
@@ -651,7 +651,7 @@ uint8 ipc_remote_param_core0_is_busy(void)
 #endif
 }
 
-/* åˆå§‹åŒ–æ ¸1æ‰§è¡Œç«¯ï¼Œå¹¶æ¸…é™¤æ ¸1æ‹¥æœ‰çš„å“åº”é‚®ç®±ã€‚ */
+/* ³õÊ¼»¯ºË1Ö´ĞĞ¶Ë£¬²¢Çå³ıºË1ÓµÓĞµÄÏìÓ¦ÓÊÏä¡£ */
 void ipc_remote_param_core1_init(void)
 {
 #if defined(CY_CORE_CM7_1)
@@ -668,7 +668,7 @@ void ipc_remote_param_core1_init(void)
 #endif
 }
 
-/* æ ¸1åœ¨100Hzå¸§è¾¹ç•Œæ‰§è¡Œæœ¬æ ¸å‚æ•°ï¼Œæˆ–æ¨è¿›ä¸¤é¢—2BL3å¹¿æ’­äº‹åŠ¡ã€‚ */
+/* ºË1ÔÚ100HzÖ¡±ß½çÖ´ĞĞ±¾ºË²ÎÊı£¬»òÍÆ½øÁ½¿Å2BL3¹ã²¥ÊÂÎñ¡£ */
 void ipc_remote_param_core1_poll(void)
 {
 #if defined(CY_CORE_CM7_1)
@@ -797,7 +797,7 @@ void ipc_remote_param_core1_poll(void)
     }
     else
     {
-        /* æ–°çš„æ­£å¸¸è¯·æ±‚æ„å‘³ç€ä¸Šä¸€ç¬”æˆåŠŸå“åº”å·²è¢«æ ¸0æ¥æ”¶ï¼Œä¸å†å…è®¸è¿Ÿåˆ°å–æ¶ˆå›æ»šã€‚ */
+        /* ĞÂµÄÕı³£ÇëÇóÒâÎ¶×ÅÉÏÒ»±Ê³É¹¦ÏìÓ¦ÒÑ±»ºË0½ÓÊÕ£¬²»ÔÙÔÊĞí³Ùµ½È¡Ïû»Ø¹ö¡£ */
         s_remote_param_core1_set_cache.valid = 0U;
         if(request.target == IPC_REMOTE_PARAM_TARGET_CORE1)
         {
@@ -914,9 +914,9 @@ void ipc_image_callback(uint32 ipc_data)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: CM7_0ä¸»åŠ¨è¯»å–å¹¶æäº¤ä¸€ä»½è·¨æ ¸ä¸€è‡´æ€§å›¾åƒå¿«ç…§ã€‚
- * è¾“å…¥å‚æ•°: æ— ã€‚
- * è¿”å›å€¼: æ¥æ”¶åˆ°æ–°å‘å¸ƒå¿«ç…§è¿”å›1ï¼Œå¦åˆ™è¿”å›0ã€‚
+ * º¯Êı¹¦ÄÜ: CM7_0Ö÷¶¯¶ÁÈ¡²¢Ìá½»Ò»·İ¿çºËÒ»ÖÂĞÔÍ¼Ïñ¿ìÕÕ¡£
+ * ÊäÈë²ÎÊı: ÎŞ¡£
+ * ·µ»ØÖµ: ½ÓÊÕµ½ĞÂ·¢²¼¿ìÕÕ·µ»Ø1£¬·ñÔò·µ»Ø0¡£
  */
 uint8 ipc_image_poll(void)
 {

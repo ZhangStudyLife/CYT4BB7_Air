@@ -5,9 +5,9 @@
 #include "../Planner/ProjectionCenter.h"
 #include <math.h>
 
-static const float s_mode4_two_pi = 6.283185307179586f; /* æ¨¡å¼4è§’é¢‘ç‡æ¢ç®—å¸¸é‡ã€‚ */
-static const float s_mode4_deg_to_rad = 0.017453292519943295f; /* æ¨¡å¼4è§’åº¦è½¬å¼§åº¦ç³»æ•°ã€‚ */
-static const float s_mode4_angle_limit_deg = 30.0f; /* æ¨¡å¼4æ¨ªå‘å§¿æ€ç›®æ ‡é™å¹…ï¼Œå•ä½degã€‚ */
+static const float s_mode4_two_pi = 6.283185307179586f; /* Ä£Ê½4½ÇÆµÂÊ»»Ëã³£Á¿¡£ */
+static const float s_mode4_deg_to_rad = 0.017453292519943295f; /* Ä£Ê½4½Ç¶È×ª»¡¶ÈÏµÊı¡£ */
+static const float s_mode4_angle_limit_deg = 30.0f; /* Ä£Ê½4ºáÏò×ËÌ¬Ä¿±êÏŞ·ù£¬µ¥Î»deg¡£ */
 
 extern float g_car_vel_x;
 extern float g_car_vel_y;
@@ -20,35 +20,35 @@ extern float g_car_sync_time_ms;
 extern uint32 g_car_last_update_time_ms;
 extern volatile uint32 tick_1000us_cnt;
 
-pid_t g_mode4_imgx_pid; /* æ¨¡å¼4å›¾åƒXè½´PDçŠ¶æ€ï¼Œä¾›æ§åˆ¶ä¸è°ƒè¯•è®¿é—®ã€‚ */
-pid_t g_mode4_imgy_pid; /* æ¨¡å¼4å›¾åƒYè½´PDçŠ¶æ€ï¼Œä¾›æ§åˆ¶ä¸è°ƒè¯•è®¿é—®ã€‚ */
-float g_mode4_car_accel_angle_ff_x_deg = 0.0f; /* æ¨¡å¼4è½¦åŠ é€Ÿåº¦Rollå‰é¦ˆï¼Œå•ä½degã€‚ */
-float g_mode4_car_accel_angle_ff_y_deg = 0.0f; /* æ¨¡å¼4è½¦åŠ é€Ÿåº¦Pitchå‰é¦ˆï¼Œå•ä½degã€‚ */
-float g_mode4_car_accel_x_mps2 = 0.0f; /* æ¨¡å¼4æŠ•å½±åˆ°é£æœºXè½´çš„è½¦åŠ é€Ÿåº¦ï¼Œå•ä½m/s^2ã€‚ */
-float g_mode4_car_accel_y_mps2 = 0.0f; /* æ¨¡å¼4æŠ•å½±åˆ°é£æœºYè½´çš„è½¦åŠ é€Ÿåº¦ï¼Œå•ä½m/s^2ã€‚ */
-float g_mode4_raw_roll_correction_deg = 0.0f; /* æ¨¡å¼4é™å¹…å‰Rollä¿®æ­£ï¼Œå•ä½degã€‚ */
-float g_mode4_raw_pitch_correction_deg = 0.0f; /* æ¨¡å¼4é™å¹…å‰Pitchä¿®æ­£ï¼Œå•ä½degã€‚ */
-float g_mode4_img_error_rate_x_pxps = 0.0f; /* æ¨¡å¼4å›¾åƒXè¯¯å·®å˜åŒ–ç‡ï¼Œå•ä½px/sã€‚ */
-float g_mode4_img_error_rate_y_pxps = 0.0f; /* æ¨¡å¼4å›¾åƒYè¯¯å·®å˜åŒ–ç‡ï¼Œå•ä½px/sã€‚ */
-float g_mode4_car_dt_ms = 0.0f; /* æ¨¡å¼4è½¦ç«¯åŒæ­¥æ—¶é—´é—´éš”ï¼Œå•ä½msã€‚ */
-float g_mode4_car_vel_error_x_mps = 0.0f; /* æ¨¡å¼4æ»¤æ³¢åçš„è½¦Xé€Ÿåº¦è¯¯å·®ï¼Œå•ä½m/sã€‚ */
-float g_mode4_car_vel_error_y_mps = 0.0f; /* æ¨¡å¼4æ»¤æ³¢åçš„è½¦Yé€Ÿåº¦è¯¯å·®ï¼Œå•ä½m/sã€‚ */
-float g_mode4_car_body_accel_x_mps2 = 0.0f; /* æ¨¡å¼4è½¦ä½“ç³»XåŠ é€Ÿåº¦ï¼Œå•ä½m/s^2ã€‚ */
-float g_mode4_car_body_accel_y_mps2 = 0.0f; /* æ¨¡å¼4è½¦ä½“ç³»YåŠ é€Ÿåº¦ï¼Œå•ä½m/s^2ã€‚ */
-float g_mode4_car_turn_accel_mps2 = 0.0f; /* æ¨¡å¼4æ»¤æ³¢åçš„è½¦è½¬å¼¯åŠ é€Ÿåº¦ï¼Œå•ä½m/s^2ã€‚ */
-float g_mode4_yaw_diff_deg = 0.0f; /* æ¨¡å¼4è½¦æœºèˆªå‘å·®ï¼Œå•ä½degã€‚ */
-uint32 g_mode4_control_seq = 0U; /* æ¨¡å¼4æ§åˆ¶æ›´æ–°åºå·ã€‚ */
+pid_t g_mode4_imgx_pid; /* Ä£Ê½4Í¼ÏñXÖáPD×´Ì¬£¬¹©¿ØÖÆÓëµ÷ÊÔ·ÃÎÊ¡£ */
+pid_t g_mode4_imgy_pid; /* Ä£Ê½4Í¼ÏñYÖáPD×´Ì¬£¬¹©¿ØÖÆÓëµ÷ÊÔ·ÃÎÊ¡£ */
+float g_mode4_car_accel_angle_ff_x_deg = 0.0f; /* Ä£Ê½4³µ¼ÓËÙ¶ÈRollÇ°À¡£¬µ¥Î»deg¡£ */
+float g_mode4_car_accel_angle_ff_y_deg = 0.0f; /* Ä£Ê½4³µ¼ÓËÙ¶ÈPitchÇ°À¡£¬µ¥Î»deg¡£ */
+float g_mode4_car_accel_x_mps2 = 0.0f; /* Ä£Ê½4Í¶Ó°µ½·É»úXÖáµÄ³µ¼ÓËÙ¶È£¬µ¥Î»m/s^2¡£ */
+float g_mode4_car_accel_y_mps2 = 0.0f; /* Ä£Ê½4Í¶Ó°µ½·É»úYÖáµÄ³µ¼ÓËÙ¶È£¬µ¥Î»m/s^2¡£ */
+float g_mode4_raw_roll_correction_deg = 0.0f; /* Ä£Ê½4ÏŞ·ùÇ°RollĞŞÕı£¬µ¥Î»deg¡£ */
+float g_mode4_raw_pitch_correction_deg = 0.0f; /* Ä£Ê½4ÏŞ·ùÇ°PitchĞŞÕı£¬µ¥Î»deg¡£ */
+float g_mode4_img_error_rate_x_pxps = 0.0f; /* Ä£Ê½4Í¼ÏñXÎó²î±ä»¯ÂÊ£¬µ¥Î»px/s¡£ */
+float g_mode4_img_error_rate_y_pxps = 0.0f; /* Ä£Ê½4Í¼ÏñYÎó²î±ä»¯ÂÊ£¬µ¥Î»px/s¡£ */
+float g_mode4_car_dt_ms = 0.0f; /* Ä£Ê½4³µ¶ËÍ¬²½Ê±¼ä¼ä¸ô£¬µ¥Î»ms¡£ */
+float g_mode4_car_vel_error_x_mps = 0.0f; /* Ä£Ê½4ÂË²¨ºóµÄ³µXËÙ¶ÈÎó²î£¬µ¥Î»m/s¡£ */
+float g_mode4_car_vel_error_y_mps = 0.0f; /* Ä£Ê½4ÂË²¨ºóµÄ³µYËÙ¶ÈÎó²î£¬µ¥Î»m/s¡£ */
+float g_mode4_car_body_accel_x_mps2 = 0.0f; /* Ä£Ê½4³µÌåÏµX¼ÓËÙ¶È£¬µ¥Î»m/s^2¡£ */
+float g_mode4_car_body_accel_y_mps2 = 0.0f; /* Ä£Ê½4³µÌåÏµY¼ÓËÙ¶È£¬µ¥Î»m/s^2¡£ */
+float g_mode4_car_turn_accel_mps2 = 0.0f; /* Ä£Ê½4ÂË²¨ºóµÄ³µ×ªÍä¼ÓËÙ¶È£¬µ¥Î»m/s^2¡£ */
+float g_mode4_yaw_diff_deg = 0.0f; /* Ä£Ê½4³µ»úº½Ïò²î£¬µ¥Î»deg¡£ */
+uint32 g_mode4_control_seq = 0U; /* Ä£Ê½4¿ØÖÆ¸üĞÂĞòºÅ¡£ */
 
-static float s_mode4_prev_img_error_x = 0.0f; /* æ¨¡å¼4ä¸Šæ¬¡å›¾åƒXè¯¯å·®ã€‚ */
-static float s_mode4_prev_img_error_y = 0.0f; /* æ¨¡å¼4ä¸Šæ¬¡å›¾åƒYè¯¯å·®ã€‚ */
-static float s_mode4_prev_car_sync_time_ms = 0.0f; /* æ¨¡å¼4ä¸Šæ¬¡è½¦ç«¯åŒæ­¥æ—¶é—´ï¼Œå•ä½msã€‚ */
-static uint8 s_mode4_image_initialized = 0U; /* æ¨¡å¼4å›¾åƒå¾®åˆ†å†å²æœ‰æ•ˆæ ‡å¿—ã€‚ */
+static float s_mode4_prev_img_error_x = 0.0f; /* Ä£Ê½4ÉÏ´ÎÍ¼ÏñXÎó²î¡£ */
+static float s_mode4_prev_img_error_y = 0.0f; /* Ä£Ê½4ÉÏ´ÎÍ¼ÏñYÎó²î¡£ */
+static float s_mode4_prev_car_sync_time_ms = 0.0f; /* Ä£Ê½4ÉÏ´Î³µ¶ËÍ¬²½Ê±¼ä£¬µ¥Î»ms¡£ */
+static uint8 s_mode4_image_initialized = 0U; /* Ä£Ê½4Í¼ÏñÎ¢·ÖÀúÊ·ÓĞĞ§±êÖ¾¡£ */
 
 /*
- * å‡½æ•°å: FC_Mode4_Init
- * åŠŸèƒ½: åˆå§‹åŒ–æ¨¡å¼4å›¾åƒPDæ§åˆ¶å™¨å¹¶å¤ä½æ§åˆ¶çŠ¶æ€
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: FC_Mode4_Init
+ * ¹¦ÄÜ: ³õÊ¼»¯Ä£Ê½4Í¼ÏñPD¿ØÖÆÆ÷²¢¸´Î»¿ØÖÆ×´Ì¬
+ * ÊäÈë²ÎÊı: ÎŞ
+ * ·µ»ØÖµ: ÎŞ
  */
 void FC_Mode4_Init(void)
 {
@@ -62,10 +62,10 @@ void FC_Mode4_Init(void)
 }
 
 /*
- * å‡½æ•°å: FC_Mode4_Reset
- * åŠŸèƒ½: æ¸…ç©ºæ¨¡å¼4å›¾åƒã€è½¦é€Ÿå‰é¦ˆå’Œèˆªå‘æ§åˆ¶çŠ¶æ€
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: FC_Mode4_Reset
+ * ¹¦ÄÜ: Çå¿ÕÄ£Ê½4Í¼Ïñ¡¢³µËÙÇ°À¡ºÍº½Ïò¿ØÖÆ×´Ì¬
+ * ÊäÈë²ÎÊı: ÎŞ
+ * ·µ»ØÖµ: ÎŞ
  */
 void FC_Mode4_Reset(void)
 {
@@ -91,10 +91,10 @@ void FC_Mode4_Reset(void)
 }
 
 /*
- * å‡½æ•°å: FC_Mode4_100Hz
- * åŠŸèƒ½: æ ¹æ®æ¨¡å¼4ç‹¬ç«‹èˆªå‘æ§åˆ¶æ¨¡å¼æ›´æ–° yaw ç›®æ ‡
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: FC_Mode4_100Hz
+ * ¹¦ÄÜ: ¸ù¾İÄ£Ê½4¶ÀÁ¢º½Ïò¿ØÖÆÄ£Ê½¸üĞÂ yaw Ä¿±ê
+ * ÊäÈë²ÎÊı: ÎŞ
+ * ·µ»ØÖµ: ÎŞ
  */
 void FC_Mode4_100Hz(void)
 {
@@ -110,11 +110,11 @@ void FC_Mode4_100Hz(void)
 }
 
 /*
- * å‡½æ•°å: FC_Mode4_Control100Hz
- * åŠŸèƒ½: ä½¿ç”¨å›¾åƒPDä¸è½¦åŠ é€Ÿåº¦å‰é¦ˆè®¡ç®—æ¨¡å¼4æ¨ªå‘å§¿æ€ç›®æ ‡
- * è¾“å…¥å‚æ•°:
- *   dt - æœ¬æ¬¡è°ƒç”¨å‘¨æœŸï¼Œå•ä½sï¼›éæ­£å€¼æ—¶ä½¿ç”¨é£æ§é»˜è®¤å‘¨æœŸ
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: FC_Mode4_Control100Hz
+ * ¹¦ÄÜ: Ê¹ÓÃÍ¼ÏñPDÓë³µ¼ÓËÙ¶ÈÇ°À¡¼ÆËãÄ£Ê½4ºáÏò×ËÌ¬Ä¿±ê
+ * ÊäÈë²ÎÊı:
+ *   dt - ±¾´Îµ÷ÓÃÖÜÆÚ£¬µ¥Î»s£»·ÇÕıÖµÊ±Ê¹ÓÃ·É¿ØÄ¬ÈÏÖÜÆÚ
+ * ·µ»ØÖµ: ÎŞ
  */
 void FC_Mode4_Control100Hz(float dt)
 {
@@ -218,7 +218,7 @@ void FC_Mode4_Control100Hz(float dt)
         g_mode4_car_body_accel_x_mps2 = car_accel_x_mps2;
         g_mode4_car_body_accel_y_mps2 = car_accel_y_mps2;
 
-        /* æ»¤æ³¢è½¦æ¨¡å‘å¿ƒåŠ é€Ÿåº¦ï¼Œå†æŒ‰å®æ—¶è½¦æœºèˆªå‘å·®æŠ•å½±åˆ°Roll/Pitchã€‚ */
+        /* ÂË²¨³µÄ£ÏòĞÄ¼ÓËÙ¶È£¬ÔÙ°´ÊµÊ±³µ»úº½Ïò²îÍ¶Ó°µ½Roll/Pitch¡£ */
         alpha = s_mode4_two_pi * g_fc_params.mode4_car_turn_accel_lpf_hz * dt;
         alpha /= 1.0f + alpha;
         g_mode4_car_turn_accel_mps2 += alpha *

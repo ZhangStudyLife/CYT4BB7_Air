@@ -44,27 +44,27 @@ extern volatile uint32 g_image_core1_tick_overflow_count; // ´ý´¦Àí½ÚÅÄ¼ÆÊýÆ÷±¥º
 
 
 // **************************** PITÖÐ¶Ïº¯Êý ****************************
-void pit0_ch0_isr()                     // ¶¨Ê±Æ÷Í¨µÀ 0 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý      
+void pit0_ch0_isr()                     // ¶¨Ê±Æ÷Í¨µÀ 0 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý
 {
     pit_isr_flag_clear(PIT_CH0);
-  
-    
-    
+
+
+
 }
 
-void pit0_ch1_isr()                     // ¶¨Ê±Æ÷Í¨µÀ 1 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý      
+void pit0_ch1_isr()                     // ¶¨Ê±Æ÷Í¨µÀ 1 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý
 {
     pit_isr_flag_clear(PIT_CH1);
-    
+
 }
 
-void pit0_ch2_isr()                     // ¶¨Ê±Æ÷Í¨µÀ 2 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý      
+void pit0_ch2_isr()                     // ¶¨Ê±Æ÷Í¨µÀ 2 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý
 {
     pit_isr_flag_clear(PIT_CH2);
-    
+
 }
 
-void pit0_ch10_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 10 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý      
+void pit0_ch10_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 10 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý
 {
     pit_isr_flag_clear(PIT_CH10);
     g_image_core1_tick_generated++;
@@ -79,67 +79,67 @@ void pit0_ch10_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 10 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý
 
 }
 
-void pit0_ch11_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 11 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý      
+void pit0_ch11_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 11 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý
 {
     pit_isr_flag_clear(PIT_CH11);
-    
+
 }
 
-void pit0_ch12_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 12 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý      
+void pit0_ch12_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 12 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý
 {
     pit_isr_flag_clear(PIT_CH12);
-    
+
 }
 
-void pit0_ch13_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 13 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý      
+void pit0_ch13_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 13 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý
 {
     pit_isr_flag_clear(PIT_CH13);
-    
+
 }
 
-void pit0_ch14_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 14 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý      
+void pit0_ch14_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 14 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý
 {
     pit_isr_flag_clear(PIT_CH14);
-    
+
 }
 
-void pit0_ch15_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 15 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý      
+void pit0_ch15_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 15 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý
 {
     pit_isr_flag_clear(PIT_CH15);
-    
+
 }
 
-void pit0_ch16_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 16 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý      
+void pit0_ch16_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 16 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý
 {
     pit_isr_flag_clear(PIT_CH16);
-    
+
 }
 
-void pit0_ch17_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 17 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý      
+void pit0_ch17_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 17 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý
 {
     pit_isr_flag_clear(PIT_CH17);
-    
+
 }
 
-void pit0_ch18_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 18 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý      
+void pit0_ch18_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 18 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý
 {
     pit_isr_flag_clear(PIT_CH18);
-    
+
 }
 
-void pit0_ch19_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 19 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý      
+void pit0_ch19_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 19 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý
 {
     pit_isr_flag_clear(PIT_CH19);
-    
+
 }
 
-void pit0_ch20_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 20 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý      
+void pit0_ch20_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 20 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý
 {
     pit_isr_flag_clear(PIT_CH20);
-    
+
 }
 
-void pit0_ch21_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 21 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý      
+void pit0_ch21_isr()                    // ¶¨Ê±Æ÷Í¨µÀ 21 ÖÜÆÚÖÐ¶Ï·þÎñº¯Êý
 {
     pit_isr_flag_clear(PIT_CH21);
     tsl1401_collect_pit_handler();
@@ -153,17 +153,17 @@ void uart0_isr (void)
 {
     if(uart_isr_mask(UART_0))            // ´®¿Ú0½ÓÊÕÖÐ¶Ï
     {
-        
+
 #if DEBUG_UART_USE_INTERRUPT             // Èç¹û¿ªÆô debug ´®¿ÚÖÐ¶Ï
         debug_interrupr_handler();       // µ÷ÓÃ debug ´®¿Ú½ÓÊÕ´¦Àíº¯Êý Êý¾Ý»á±» debug »·ÐÎ»º³åÇø¶ÁÈ¡
 #endif                                   // Èç¹ûÐÞ¸ÄÁË DEBUG_UART_INDEX ÄÇÕâ¶Î´úÂëÐèÒª·Åµ½¶ÔÓ¦µÄ´®¿ÚÖÐ¶ÏÈ¥
-      
+
     }
     else                                 // ´®¿Ú0·¢ËÍÖÐ¶Ï
-    {           
-        
-        
-        
+    {
+
+
+
     }
 }
 
@@ -171,15 +171,15 @@ void uart1_isr (void)
 {
     if(uart_isr_mask(UART_1))            // ´®¿Ú1½ÓÊÕÖÐ¶Ï
     {
-        
+
         wireless_module_uart_handler();
-      
+
     }
     else                                // ´®¿Ú1·¢ËÍÖÐ¶Ï
     {
-      
-        
-        
+
+
+
     }
 }
 
@@ -187,15 +187,15 @@ void uart2_isr (void)
 {
     if(uart_isr_mask(UART_2))            // ´®¿Ú2½ÓÊÕÖÐ¶Ï
     {
-        
+
         gnss_uart_callback();
-        
+
     }
     else                                // ´®¿Ú2·¢ËÍÖÐ¶Ï
     {
-        
-        
-       
+
+
+
     }
 }
 
@@ -203,15 +203,15 @@ void uart3_isr (void)
 {
     if(uart_isr_mask(UART_3))            // ´®¿Ú3½ÓÊÕÖÐ¶Ï
     {
-        
-        
-        
+
+
+
     }
     else                                // ´®¿Ú3·¢ËÍÖÐ¶Ï
     {
-      
-        
-        
+
+
+
     }
 }
 
@@ -221,13 +221,13 @@ void uart4_isr (void)
     {
 
         uart_receiver_handler();                                                                // ´®¿Ú½ÓÊÕ»ú»Øµ÷º¯Êý
-       
+
     }
     else                                // ´®¿Ú4·¢ËÍÖÐ¶Ï
     {
-      
-        
-        
+
+
+
     }
 }
 
@@ -235,15 +235,15 @@ void uart5_isr (void)
 {
     if(uart_isr_mask(UART_5))            // ´®¿Ú5½ÓÊÕÖÐ¶Ï
     {
-        
-        
-       
+
+
+
     }
     else                                // ´®¿Ú5·¢ËÍÖÐ¶Ï
     {
-      
-        
-        
+
+
+
     }
 }
 
@@ -252,73 +252,73 @@ void uart6_isr (void)
     if(uart_isr_mask(UART_6))            // ´®¿Ú6½ÓÊÕÖÐ¶Ï
     {
 
-        
-       
+
+
     }
     else                                // ´®¿Ú6·¢ËÍÖÐ¶Ï
     {
-      
-        
-        
+
+
+
     }
 }
 // **************************** ´®¿ÚÖÐ¶Ïº¯Êý ****************************
 
 // **************************** Íâ²¿ÖÐ¶Ïº¯Êý ****************************
-void gpio_0_exti_isr()                  // Íâ²¿ GPIO_0 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_0_exti_isr()                  // Íâ²¿ GPIO_0 ÖÐ¶Ï·þÎñº¯Êý
 {
-    
-  
-  
+
+
+
 }
 
-void gpio_1_exti_isr()                  // Íâ²¿ GPIO_1 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_1_exti_isr()                  // Íâ²¿ GPIO_1 ÖÐ¶Ï·þÎñº¯Êý
 {
     if(exti_flag_get(P01_0))		// Ê¾ÀýP1_0¶Ë¿ÚÍâ²¿ÖÐ¶ÏÅÐ¶Ï
     {
 
-      
-      
-            
+
+
+
     }
     if(exti_flag_get(P01_1))
     {
 
-            
-            
+
+
     }
 }
 
-void gpio_2_exti_isr()                  // Íâ²¿ GPIO_2 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_2_exti_isr()                  // Íâ²¿ GPIO_2 ÖÐ¶Ï·þÎñº¯Êý
 {
     if(exti_flag_get(P02_0))
     {
-            
-            
+
+
     }
     if(exti_flag_get(P02_4))
     {
-            
-            
+
+
     }
 
 }
 
-void gpio_3_exti_isr()                  // Íâ²¿ GPIO_3 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_3_exti_isr()                  // Íâ²¿ GPIO_3 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 
 
 }
 
-void gpio_4_exti_isr()                  // Íâ²¿ GPIO_4 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_4_exti_isr()                  // Íâ²¿ GPIO_4 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 
 
 }
 
-void gpio_5_exti_isr()                  // Íâ²¿ GPIO_5 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_5_exti_isr()                  // Íâ²¿ GPIO_5 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 
@@ -326,126 +326,126 @@ void gpio_5_exti_isr()                  // Íâ²¿ GPIO_5 ÖÐ¶Ï·þÎñº¯Êý
 }
 
 
-void gpio_6_exti_isr()                  // Íâ²¿ GPIO_6 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_6_exti_isr()                  // Íâ²¿ GPIO_6 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 
 
 }
 
-void gpio_7_exti_isr()                  // Íâ²¿ GPIO_7 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_7_exti_isr()                  // Íâ²¿ GPIO_7 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 
 
 }
 
-void gpio_8_exti_isr()                  // Íâ²¿ GPIO_8 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_8_exti_isr()                  // Íâ²¿ GPIO_8 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 
 
 }
 
-void gpio_9_exti_isr()                  // Íâ²¿ GPIO_9 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_9_exti_isr()                  // Íâ²¿ GPIO_9 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 
 
 }
 
-void gpio_10_exti_isr()                  // Íâ²¿ GPIO_10 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_10_exti_isr()                  // Íâ²¿ GPIO_10 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 
 
 }
 
-void gpio_11_exti_isr()                  // Íâ²¿ GPIO_11 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_11_exti_isr()                  // Íâ²¿ GPIO_11 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 
 
 }
 
-void gpio_12_exti_isr()                  // Íâ²¿ GPIO_12 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_12_exti_isr()                  // Íâ²¿ GPIO_12 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 
 
 }
 
-void gpio_13_exti_isr()                  // Íâ²¿ GPIO_13 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_13_exti_isr()                  // Íâ²¿ GPIO_13 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 
 
 }
 
-void gpio_14_exti_isr()                  // Íâ²¿ GPIO_14 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_14_exti_isr()                  // Íâ²¿ GPIO_14 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 
 
 }
 
-void gpio_15_exti_isr()                  // Íâ²¿ GPIO_15 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_15_exti_isr()                  // Íâ²¿ GPIO_15 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 
 
 }
 
-void gpio_16_exti_isr()                  // Íâ²¿ GPIO_16 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_16_exti_isr()                  // Íâ²¿ GPIO_16 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 
 
 }
 
-void gpio_17_exti_isr()                  // Íâ²¿ GPIO_17 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_17_exti_isr()                  // Íâ²¿ GPIO_17 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 
 
 }
 
-void gpio_18_exti_isr()                  // Íâ²¿ GPIO_18 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_18_exti_isr()                  // Íâ²¿ GPIO_18 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 
 
 }
 
-void gpio_19_exti_isr()                  // Íâ²¿ GPIO_19 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_19_exti_isr()                  // Íâ²¿ GPIO_19 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 
 
 }
 
-void gpio_20_exti_isr()                  // Íâ²¿ GPIO_20 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_20_exti_isr()                  // Íâ²¿ GPIO_20 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 
 
 }
 
-void gpio_21_exti_isr()                  // Íâ²¿ GPIO_21 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_21_exti_isr()                  // Íâ²¿ GPIO_21 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 
 
 }
 
-void gpio_22_exti_isr()                  // Íâ²¿ GPIO_22 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_22_exti_isr()                  // Íâ²¿ GPIO_22 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 
 
 }
 
-void gpio_23_exti_isr()                  // Íâ²¿ GPIO_23 ÖÐ¶Ï·þÎñº¯Êý     
+void gpio_23_exti_isr()                  // Íâ²¿ GPIO_23 ÖÐ¶Ï·þÎñº¯Êý
 {
 
 

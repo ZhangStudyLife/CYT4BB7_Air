@@ -15,7 +15,7 @@
     ((IMAGE_SCREEN_TICK_PERIOD_US + IMAGE_CORE1_TASK_PERIOD_US - 1U) / \
      IMAGE_CORE1_TASK_PERIOD_US)
 
-/* Airä¾§ä»…è´Ÿè´£å€™é€‰å…³è”å’Œè¾“å‡ºæ§½ä½é‡æ’ï¼Œä¸å‚ä¸å›¾åƒæ£€æµ‹ã€‚ */
+/* Air²à½ö¸ºÔğºòÑ¡¹ØÁªºÍÊä³ö²ÛÎ»ÖØÅÅ£¬²»²ÎÓëÍ¼Ïñ¼ì²â¡£ */
 #define AIR_BEACON0_MATCH_DISTANCE_SQ       (18.0f * 18.0f)
 #define AIR_BEACON0_NEW_TARGET_DISTANCE_SQ  (36.0f * 36.0f)
 #define AIR_BEACON0_SWITCH_AREA_RATIO       1.45f
@@ -101,7 +101,7 @@ static void air_beacon0_output_track(struct image_data *data,
 
     if(matched > 0)
     {
-        /* å…ˆç§»é™¤å…³è”å€™é€‰ï¼Œå†æŠŠå†å²è½¨è¿¹æ’å…¥0å·æ§½ï¼Œä¿æŒå…¶ä½™å€™é€‰ç›¸å¯¹é¡ºåºã€‚ */
+        /* ÏÈÒÆ³ı¹ØÁªºòÑ¡£¬ÔÙ°ÑÀúÊ·¹ì¼£²åÈë0ºÅ²Û£¬±£³ÖÆäÓàºòÑ¡Ïà¶ÔË³Ğò¡£ */
         for(i = (uint8)matched; i + 1U < IMAGE_MAX_BEACON_COUNT; i++)
         {
             data->beacon_data[i] = data->beacon_data[i + 1U];
@@ -280,7 +280,7 @@ static uint8 image_attitude_poll(void)
     return (s_image_attitude_age < IMAGE_ATTITUDE_TIMEOUT_TICKS) ? 1U : 0U;
 }
 
-/* æ›´æ–°ä¸‰è·¯å›¾åƒï¼Œå¹¶åˆ†åˆ«è¿”å›å†…å®¹å˜åŒ–å’ŒçœŸå®æ–°ç»“æœæ©ç ã€‚ */
+/* ¸üĞÂÈıÂ·Í¼Ïñ£¬²¢·Ö±ğ·µ»ØÄÚÈİ±ä»¯ºÍÕæÊµĞÂ½á¹ûÑÚÂë¡£ */
 static uint8 Get_Image_data(uint8 *fresh_mask)
 {
     uint8 image_frame_updated;

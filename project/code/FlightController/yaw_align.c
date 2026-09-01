@@ -32,14 +32,14 @@ static const float s_yaw_align_lamp_gate_min_dy_px = -5.0f;
 static const uint8 s_yaw_align_stable_frames = 5U;
 static const uint8 s_yaw_align_lost_reset_frames = 20U;
 
-#define YAW_ALIGN_SEARCH_HOLD_TICKS (75U) /* æ¯ä¸ªæœç´¢èˆªå‘ä¿æŒ750msï¼Œå¯¹åº”100Hzè°ƒç”¨75æ¬¡ */
-#define YAW_ALIGN_SEARCH_STEP_DEG (45.0f) /* ç›¸é‚»æœç´¢ç›®æ ‡çš„èˆªå‘é—´éš”ï¼Œå•ä½åº¦ */
-#define YAW_ALIGN_SEARCH_COMPLETE_DEG (360.0f) /* å•è½®ä¿¡æ ‡æœç´¢å®Œæˆè§’åº¦ï¼Œå•ä½åº¦ */
-#define YAW_ALIGN_PLAN_VALID_TICKS (10U) /* CarPlan3ç»“æœè¿ç»­æœ‰æ•ˆ100msï¼Œå¯¹åº”100Hzè°ƒç”¨10æ¬¡ */
-#define YAW_ALIGN_PLAN_INVALID_TICKS (15U) /* CarPlan3ç»“æœè¿ç»­æ— æ•ˆ150msåå¼€å§‹æœç´¢ */
+#define YAW_ALIGN_SEARCH_HOLD_TICKS (75U) /* Ã¿¸öËÑË÷º½Ïò±£³Ö750ms£¬¶ÔÓ¦100Hzµ÷ÓÃ75´Î */
+#define YAW_ALIGN_SEARCH_STEP_DEG (45.0f) /* ÏàÁÚËÑË÷Ä¿±êµÄº½Ïò¼ä¸ô£¬µ¥Î»¶È */
+#define YAW_ALIGN_SEARCH_COMPLETE_DEG (360.0f) /* µ¥ÂÖĞÅ±êËÑË÷Íê³É½Ç¶È£¬µ¥Î»¶È */
+#define YAW_ALIGN_PLAN_VALID_TICKS (10U) /* CarPlan3½á¹ûÁ¬ĞøÓĞĞ§100ms£¬¶ÔÓ¦100Hzµ÷ÓÃ10´Î */
+#define YAW_ALIGN_PLAN_INVALID_TICKS (15U) /* CarPlan3½á¹ûÁ¬ĞøÎŞĞ§150msºó¿ªÊ¼ËÑË÷ */
 
-extern float g_car_yaw; /* è½¦ç«¯å½“å‰èˆªå‘è§’ï¼Œå•ä½åº¦ã€‚ */
-extern float g_car_yaw_rate_dps; /* è½¦ç«¯å½“å‰èˆªå‘è§’é€Ÿåº¦ï¼Œå•ä½åº¦æ¯ç§’ã€‚ */
+extern float g_car_yaw; /* ³µ¶Ëµ±Ç°º½Ïò½Ç£¬µ¥Î»¶È¡£ */
+extern float g_car_yaw_rate_dps; /* ³µ¶Ëµ±Ç°º½Ïò½ÇËÙ¶È£¬µ¥Î»¶ÈÃ¿Ãë¡£ */
 
 static yaw_align_beacon_t s_locked_beacon;
 static yaw_align_beacon_t s_candidate_beacon;
@@ -53,21 +53,21 @@ static float s_center_turn_target_yaw = 0.0f;
 static yaw_align_beacon_t s_active_beacon;
 static float s_yaw_delta_deg = 0.0f;
 static uint8 s_action = YAW_ALIGN_ACTION_IDLE;
-static uint8 s_control_mode = 0U; /* ä¸Šæ¬¡é€‰æ‹©çš„èˆªå‘æ§åˆ¶æ¨¡å¼ï¼ŒèŒƒå›´0è‡³2 */
-static uint8 s_plan_valid = 0U; /* mode=2å½“å‰CarPlan3è§„åˆ’ç»“æœæ˜¯å¦æœ‰æ•ˆã€‚ */
-static uint8 s_plan_confirmed = 0U; /* è§„åˆ’ç»“æœæ˜¯å¦å·²è¿ç»­æœ‰æ•ˆ100msã€‚ */
-static uint8 s_plan_valid_ticks = 0U; /* è§„åˆ’ç»“æœè¿ç»­æœ‰æ•ˆè®¡æ•°ï¼Œå•ä½10msã€‚ */
-static uint8 s_plan_invalid_ticks = 0U; /* è§„åˆ’ç»“æœè¿ç»­æ— æ•ˆè®¡æ•°ï¼Œå•ä½10msã€‚ */
-static uint8 s_search_active = 0U; /* mode=2æ˜¯å¦æ­£åœ¨æ‰§è¡Œæ— ä¿¡æ ‡æ—‹è½¬æœç´¢ã€‚ */
-static uint8 s_search_forced = 0U; /* å¼ºåˆ¶æŒç»­æ—‹è½¬æœç´¢ï¼Œä¾›è‡ªåŠ¨é™è½åŒæ—‹è½¬é˜¶æ®µä½¿ç”¨ã€‚ */
-static int8 s_search_direction = 1; /* mode=2æœç´¢æ–¹å‘ï¼Œ1ä¸ºyawæ­£æ–¹å‘ï¼Œ-1ä¸ºyawè´Ÿæ–¹å‘ã€‚ */
-static float s_search_target_yaw = 0.0f; /* mode=2å½“å‰æœç´¢èˆªå‘ç›®æ ‡ï¼Œå•ä½åº¦ã€‚ */
-static float s_search_rotation_deg = 0.0f; /* æœ¬è½®æ— ä¿¡æ ‡æœŸé—´å®é™…å®šå‘æ—‹è½¬è§’ï¼Œå•ä½åº¦ã€‚ */
-static float s_cable_twist_deg = 0.0f; /* é£æœºç›¸å¯¹è½¦è¾†çš„ç´¯è®¡çº¿ç¼†æ‰­è½¬è§’ï¼Œå•ä½åº¦ã€‚ */
-static float s_previous_air_yaw = 0.0f; /* ä¸Šæ¬¡é£æœºèˆªå‘è§’ï¼Œå•ä½åº¦ã€‚ */
-static float s_previous_car_yaw = 0.0f; /* ä¸Šæ¬¡è½¦è¾†èˆªå‘è§’ï¼Œå•ä½åº¦ã€‚ */
-static uint8 s_yaw_history_valid = 0U; /* é£æœºå’Œè½¦è¾†å†å²èˆªå‘æ˜¯å¦å·²ç»åˆå§‹åŒ–ã€‚ */
-static uint8 s_mode4_target_sent = 0U; /* æœ¬æ¬¡Mode4ä¼šè¯æ˜¯å¦æ›¾ä¸‹å‘æœ‰æ•ˆè½¦ç›®æ ‡é€Ÿåº¦ã€‚ */
+static uint8 s_control_mode = 0U; /* ÉÏ´ÎÑ¡ÔñµÄº½Ïò¿ØÖÆÄ£Ê½£¬·¶Î§0ÖÁ2 */
+static uint8 s_plan_valid = 0U; /* mode=2µ±Ç°CarPlan3¹æ»®½á¹ûÊÇ·ñÓĞĞ§¡£ */
+static uint8 s_plan_confirmed = 0U; /* ¹æ»®½á¹ûÊÇ·ñÒÑÁ¬ĞøÓĞĞ§100ms¡£ */
+static uint8 s_plan_valid_ticks = 0U; /* ¹æ»®½á¹ûÁ¬ĞøÓĞĞ§¼ÆÊı£¬µ¥Î»10ms¡£ */
+static uint8 s_plan_invalid_ticks = 0U; /* ¹æ»®½á¹ûÁ¬ĞøÎŞĞ§¼ÆÊı£¬µ¥Î»10ms¡£ */
+static uint8 s_search_active = 0U; /* mode=2ÊÇ·ñÕıÔÚÖ´ĞĞÎŞĞÅ±êĞı×ªËÑË÷¡£ */
+static uint8 s_search_forced = 0U; /* Ç¿ÖÆ³ÖĞøĞı×ªËÑË÷£¬¹©×Ô¶¯½µÂäË«Ğı×ª½×¶ÎÊ¹ÓÃ¡£ */
+static int8 s_search_direction = 1; /* mode=2ËÑË÷·½Ïò£¬1ÎªyawÕı·½Ïò£¬-1Îªyaw¸º·½Ïò¡£ */
+static float s_search_target_yaw = 0.0f; /* mode=2µ±Ç°ËÑË÷º½ÏòÄ¿±ê£¬µ¥Î»¶È¡£ */
+static float s_search_rotation_deg = 0.0f; /* ±¾ÂÖÎŞĞÅ±êÆÚ¼äÊµ¼Ê¶¨ÏòĞı×ª½Ç£¬µ¥Î»¶È¡£ */
+static float s_cable_twist_deg = 0.0f; /* ·É»úÏà¶Ô³µÁ¾µÄÀÛ¼ÆÏßÀÂÅ¤×ª½Ç£¬µ¥Î»¶È¡£ */
+static float s_previous_air_yaw = 0.0f; /* ÉÏ´Î·É»úº½Ïò½Ç£¬µ¥Î»¶È¡£ */
+static float s_previous_car_yaw = 0.0f; /* ÉÏ´Î³µÁ¾º½Ïò½Ç£¬µ¥Î»¶È¡£ */
+static uint8 s_yaw_history_valid = 0U; /* ·É»úºÍ³µÁ¾ÀúÊ·º½ÏòÊÇ·ñÒÑ¾­³õÊ¼»¯¡£ */
+static uint8 s_mode4_target_sent = 0U; /* ±¾´ÎMode4»á»°ÊÇ·ñÔøÏÂ·¢ÓĞĞ§³µÄ¿±êËÙ¶È¡£ */
 
 static float YawAlign_Clamp(float value, float min_value, float max_value)
 {
@@ -325,9 +325,9 @@ static void YawAlign_UpdateCandidate(const yaw_align_beacon_t *beacon)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: æ¸…ç©ºèˆªå‘å¯¹å‡†ã€æœç´¢å’Œçº¿ç¼†æ‰­è½¬è·Ÿè¸ªçŠ¶æ€
- * è¾“å…¥å‚æ•°: æ— 
- * è¾“å‡ºå‚æ•°æˆ–è¿”å›å€¼: æ— 
+ * º¯Êı¹¦ÄÜ: Çå¿Õº½Ïò¶Ô×¼¡¢ËÑË÷ºÍÏßÀÂÅ¤×ª¸ú×Ù×´Ì¬
+ * ÊäÈë²ÎÊı: ÎŞ
+ * Êä³ö²ÎÊı»ò·µ»ØÖµ: ÎŞ
  */
 void YawAlign_Reset(void)
 {
@@ -371,9 +371,9 @@ static void YawAlign_FillDebugBeacon(const yaw_align_beacon_t *src,
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: è·å–èˆªå‘å¯¹å‡†å’Œæœç´¢çŠ¶æ€çš„åªè¯»è°ƒè¯•å¿«ç…§
- * è¾“å…¥å‚æ•°: out - è°ƒè¯•å¿«ç…§è¾“å‡ºåœ°å€ï¼Œä¸å¯ä¸ºç©º
- * è¾“å‡ºå‚æ•°æˆ–è¿”å›å€¼: æ— 
+ * º¯Êı¹¦ÄÜ: »ñÈ¡º½Ïò¶Ô×¼ºÍËÑË÷×´Ì¬µÄÖ»¶Áµ÷ÊÔ¿ìÕÕ
+ * ÊäÈë²ÎÊı: out - µ÷ÊÔ¿ìÕÕÊä³öµØÖ·£¬²»¿ÉÎª¿Õ
+ * Êä³ö²ÎÊı»ò·µ»ØÖµ: ÎŞ
  */
 void YawAlign_GetDebug(yaw_align_debug_t *out)
 {
@@ -415,9 +415,9 @@ static float YawAlign_GetYawDelta(const yaw_align_beacon_t *beacon)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: æ‰§è¡Œç°æœ‰çš„ä¿¡æ ‡èˆªå‘å¯¹å‡†é€»è¾‘
- * è¾“å…¥å‚æ•°: æ— 
- * è¾“å‡ºå‚æ•°æˆ–è¿”å›å€¼: 1è¡¨ç¤ºå·²é”å®šå¹¶ä½¿ç”¨æœ‰æ•ˆä¿¡æ ‡ï¼Œ0è¡¨ç¤ºå°šæœªå®Œæˆé”å®š
+ * º¯Êı¹¦ÄÜ: Ö´ĞĞÏÖÓĞµÄĞÅ±êº½Ïò¶Ô×¼Âß¼­
+ * ÊäÈë²ÎÊı: ÎŞ
+ * Êä³ö²ÎÊı»ò·µ»ØÖµ: 1±íÊ¾ÒÑËø¶¨²¢Ê¹ÓÃÓĞĞ§ĞÅ±ê£¬0±íÊ¾ÉĞÎ´Íê³ÉËø¶¨
  */
 static uint8 YawAlign_UpdateBeacon(void)
 {
@@ -502,9 +502,9 @@ static uint8 YawAlign_UpdateBeacon(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: CarPlan3æ— æœ‰æ•ˆç›®æ ‡æ—¶æŒ‰45åº¦æ•´æ•°ç½‘æ ¼å¾ªç¯æœç´¢
- * è¾“å…¥å‚æ•°: aircraft_yaw_delta_deg - æœ¬æ¬¡é£æœºå®é™…èˆªå‘å¢é‡ï¼Œå•ä½åº¦
- * è¾“å‡ºå‚æ•°æˆ–è¿”å›å€¼: æ— 
+ * º¯Êı¹¦ÄÜ: CarPlan3ÎŞÓĞĞ§Ä¿±êÊ±°´45¶ÈÕûÊıÍø¸ñÑ­»·ËÑË÷
+ * ÊäÈë²ÎÊı: aircraft_yaw_delta_deg - ±¾´Î·É»úÊµ¼Êº½ÏòÔöÁ¿£¬µ¥Î»¶È
+ * Êä³ö²ÎÊı»ò·µ»ØÖµ: ÎŞ
  */
 static void YawAlign_UpdateSearch(float aircraft_yaw_delta_deg)
 {
@@ -521,7 +521,7 @@ static void YawAlign_UpdateSearch(float aircraft_yaw_delta_deg)
         s_mode4_target_sent = 1U;
     }
 
-    /* Mode4åˆšè¿›å…¥ä¸”è½¦å°šæœªæ”¶åˆ°è¿‡ç›®æ ‡é€Ÿåº¦æ—¶ï¼Œç­‰å¾…ä¿¡æ ‡ç³»ç»Ÿå¯åŠ¨ï¼Œä¸æ—‹è½¬ã€‚ */
+    /* Mode4¸Õ½øÈëÇÒ³µÉĞÎ´ÊÕµ½¹ıÄ¿±êËÙ¶ÈÊ±£¬µÈ´ıĞÅ±êÏµÍ³Æô¶¯£¬²»Ğı×ª¡£ */
     if((FC_START_CRSF_Get_Flight_Mode() == FC_START_CRSF_FLIGHT_MODE_4) &&
        (s_mode4_target_sent == 0U) &&
        (s_search_forced == 0U))
@@ -539,7 +539,7 @@ static void YawAlign_UpdateSearch(float aircraft_yaw_delta_deg)
 
     beacon.valid = 0U;
     s_active_beacon.valid = 0U;
-    /* åŸå§‹ä¿¡æ ‡ä»…ä¿ç•™ç»™æ—¥å¿—è§‚å¯Ÿï¼Œä¸å†å‚ä¸mode=2æœç´¢å’Œé™è½åˆ¤æ–­ã€‚ */
+    /* Ô­Ê¼ĞÅ±ê½ö±£Áô¸øÈÕÖ¾¹Û²ì£¬²»ÔÙ²ÎÓëmode=2ËÑË÷ºÍ½µÂäÅĞ¶Ï¡£ */
     if((YawAlign_FindLargestBeacon(&beacon) != 0U) ||
        (YawAlign_FindLargestCenterBeacon(&beacon) != 0U))
     {
@@ -629,7 +629,7 @@ static void YawAlign_UpdateSearch(float aircraft_yaw_delta_deg)
         s_action = YAW_ALIGN_ACTION_SEARCH;
         yaw_angle_pid.kp = 3.0f * g_fc_params.yaw_angle_kp;
 
-        /* æœ‰æ•ˆç»“æœå…ˆä¿æŒå½“å‰45åº¦æ¡£ä½ï¼›ä¸è¶³100mså¤±æ•ˆåç­‰å¾…150mså†ç»§ç»­è®¡æ—¶ã€‚ */
+        /* ÓĞĞ§½á¹ûÏÈ±£³Öµ±Ç°45¶ÈµµÎ»£»²»×ã100msÊ§Ğ§ºóµÈ´ı150msÔÙ¼ÌĞø¼ÆÊ±¡£ */
         if((s_plan_valid == 0U) &&
            (s_plan_invalid_ticks >= YAW_ALIGN_PLAN_INVALID_TICKS))
         {
@@ -652,9 +652,9 @@ static void YawAlign_UpdateSearch(float aircraft_yaw_delta_deg)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: æ ¹æ®èˆªå‘æ§åˆ¶æ¨¡å¼æ›´æ–°yawç›®æ ‡å’Œæœç´¢çŠ¶æ€
- * è¾“å…¥å‚æ•°: yaw_change_mode - èˆªå‘æ§åˆ¶æ¨¡å¼ï¼Œ0=å›ºå®š0åº¦ï¼Œ1=ä¿¡æ ‡å¯¹å‡†ï¼Œ2=æ­¥è¿›æœç´¢
- * è¾“å‡ºå‚æ•°æˆ–è¿”å›å€¼: æ— 
+ * º¯Êı¹¦ÄÜ: ¸ù¾İº½Ïò¿ØÖÆÄ£Ê½¸üĞÂyawÄ¿±êºÍËÑË÷×´Ì¬
+ * ÊäÈë²ÎÊı: yaw_change_mode - º½Ïò¿ØÖÆÄ£Ê½£¬0=¹Ì¶¨0¶È£¬1=ĞÅ±ê¶Ô×¼£¬2=²½½øËÑË÷
+ * Êä³ö²ÎÊı»ò·µ»ØÖµ: ÎŞ
  */
 void YawAlign_Update(float yaw_change_mode)
 {
@@ -676,7 +676,7 @@ void YawAlign_Update(float yaw_change_mode)
         control_mode = 2U;
     }
 
-    /* è‡ªåŠ¨é™è½åŒæ—‹è½¬é˜¶æ®µå¼ºåˆ¶æŒ‰æ­¥è¿›æœç´¢æ—‹è½¬ï¼Œæ— è§†yawmodeå‚æ•°ã€‚ */
+    /* ×Ô¶¯½µÂäË«Ğı×ª½×¶ÎÇ¿ÖÆ°´²½½øËÑË÷Ğı×ª£¬ÎŞÊÓyawmode²ÎÊı¡£ */
     if(s_search_forced != 0U)
     {
         control_mode = 2U;
@@ -687,7 +687,7 @@ void YawAlign_Update(float yaw_change_mode)
         s_mode4_target_sent = 0U;
     }
 
-    /* è½¦ç«¯å¼€å…³æœªä½¿èƒ½æ—¶ä¿æŒé›¶èˆªå‘ç›®æ ‡ï¼Œå¹¶ç¦æ­¢æ—‹è½¬æœç´¢ã€‚ */
+    /* ³µ¶Ë¿ª¹ØÎ´Ê¹ÄÜÊ±±£³ÖÁãº½ÏòÄ¿±ê£¬²¢½ûÖ¹Ğı×ªËÑË÷¡£ */
     if(CRSF_STD[4] != 1)
     {
         YawAlign_Reset();
@@ -696,7 +696,7 @@ void YawAlign_Update(float yaw_change_mode)
         return;
     }
 
-    /* æ¨¡å¼æ”¹å˜æ—¶æ¸…ç©ºæ—§ä¿¡æ ‡é”å®šå’Œæœç´¢è¿›åº¦ï¼Œå†è¿›å…¥æ–°æ¨¡å¼ï¼›å¼ºåˆ¶æœç´¢é™¤å¤–ã€‚ */
+    /* Ä£Ê½¸Ä±äÊ±Çå¿Õ¾ÉĞÅ±êËø¶¨ºÍËÑË÷½ø¶È£¬ÔÙ½øÈëĞÂÄ£Ê½£»Ç¿ÖÆËÑË÷³ıÍâ¡£ */
     if(control_mode != s_control_mode)
     {
         if(s_search_forced == 0U)
@@ -706,7 +706,7 @@ void YawAlign_Update(float yaw_change_mode)
         s_control_mode = control_mode;
     }
 
-    /* å±•å¼€é£æœºå’Œè½¦è¾†èˆªå‘ï¼ŒæŒç»­ä¼°è®¡ä¾›æœç´¢æ–¹å‘é€‰æ‹©ä½¿ç”¨çš„çº¿ç¼†æ‰­è½¬ã€‚ */
+    /* Õ¹¿ª·É»úºÍ³µÁ¾º½Ïò£¬³ÖĞø¹À¼Æ¹©ËÑË÷·½ÏòÑ¡ÔñÊ¹ÓÃµÄÏßÀÂÅ¤×ª¡£ */
     if(s_yaw_history_valid != 0U)
     {
         aircraft_yaw_delta_deg = YawAlign_Wrap180Deg(g_euler.yaw -
@@ -749,9 +749,9 @@ uint8 YawAlign_IsSearchActive(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: è®¾ç½®å¼ºåˆ¶æœç´¢ï¼Œä¾›è‡ªåŠ¨é™è½åŒæ—‹è½¬é˜¶æ®µä½¿ç”¨
- * è¾“å…¥å‚æ•°: forced - 1ä¸ºå¼ºåˆ¶æŒç»­æ—‹è½¬æœç´¢ï¼Œ0ä¸ºæ¢å¤æ­£å¸¸æœç´¢
- * è¾“å‡ºå‚æ•°æˆ–è¿”å›å€¼: æ— 
+ * º¯Êı¹¦ÄÜ: ÉèÖÃÇ¿ÖÆËÑË÷£¬¹©×Ô¶¯½µÂäË«Ğı×ª½×¶ÎÊ¹ÓÃ
+ * ÊäÈë²ÎÊı: forced - 1ÎªÇ¿ÖÆ³ÖĞøĞı×ªËÑË÷£¬0Îª»Ö¸´Õı³£ËÑË÷
+ * Êä³ö²ÎÊı»ò·µ»ØÖµ: ÎŞ
  */
 void YawAlign_SetSearchForced(uint8 forced)
 {

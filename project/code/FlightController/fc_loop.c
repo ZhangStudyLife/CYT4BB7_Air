@@ -22,80 +22,80 @@ pid_t pitch_angle_pid;
 pid_t yaw_angle_pid;
 static pid_t height_pos_pid;
 static pid_t height_vel_pid;
-/* Roll è§’é€Ÿåº¦ç›®æ ‡ï¼Œå•ä½åº¦æ¯ç§’ */
+/* Roll ½ÇËÙ¶ÈÄ¿±ê£¬µ¥Î»¶ÈÃ¿Ãë */
 float roll_gyro_target = 0.0f;
-/* Pitch è§’é€Ÿåº¦ç›®æ ‡ï¼Œå•ä½åº¦æ¯ç§’ */
+/* Pitch ½ÇËÙ¶ÈÄ¿±ê£¬µ¥Î»¶ÈÃ¿Ãë */
 float pitch_gyro_target = 0.0f;
-/* Yaw è§’é€Ÿåº¦ç›®æ ‡ï¼Œå•ä½åº¦æ¯ç§’ */
+/* Yaw ½ÇËÙ¶ÈÄ¿±ê£¬µ¥Î»¶ÈÃ¿Ãë */
 float yaw_gyro_target = 0.0f;
-/* Roll è§’åº¦ç›®æ ‡ï¼Œå•ä½åº¦ */
+/* Roll ½Ç¶ÈÄ¿±ê£¬µ¥Î»¶È */
 float roll_angle_target = 0.0f;
-/* Pitch è§’åº¦ç›®æ ‡ï¼Œå•ä½åº¦ */
+/* Pitch ½Ç¶ÈÄ¿±ê£¬µ¥Î»¶È */
 float pitch_angle_target = 0.0f;
-/* Yaw è§’åº¦ç›®æ ‡ï¼Œå•ä½åº¦ */
+/* Yaw ½Ç¶ÈÄ¿±ê£¬µ¥Î»¶È */
 float yaw_angle_target = 0.0f;
-/* æ°´å¹³é€Ÿåº¦æŽ§åˆ¶å…è®¸è¾“å‡ºçš„æœ€å¤§ Roll/Pitch ç›®æ ‡è§’ï¼Œå•ä½ deg */
+/* Ë®Æ½ËÙ¶È¿ØÖÆÔÊÐíÊä³öµÄ×î´ó Roll/Pitch Ä¿±ê½Ç£¬µ¥Î» deg */
 float angle_target_max = 30.0f;
-/* æ­£å¸¸é£žè¡Œç›®æ ‡é«˜åº¦ï¼Œå•ä½ m */
+/* Õý³£·ÉÐÐÄ¿±ê¸ß¶È£¬µ¥Î» m */
 float g_fc_target_height_m = 1.1f;
-/* é«˜åº¦é€Ÿåº¦çŽ¯è¾“å‡ºï¼Œå•ä½ PWM */
+/* ¸ß¶ÈËÙ¶È»·Êä³ö£¬µ¥Î» PWM */
 static float height_vel_out = 0.0f;
-/* é«˜åº¦ä½ç½®çŽ¯è¾“å‡ºï¼Œå•ä½ç±³æ¯ç§’ */
+/* ¸ß¶ÈÎ»ÖÃ»·Êä³ö£¬µ¥Î»Ã×Ã¿Ãë */
 static float height_pos_out = 0.0f;
-/* ç›®æ ‡é«˜åº¦ï¼Œå•ä½ç±³ */
+/* Ä¿±ê¸ß¶È£¬µ¥Î»Ã× */
 extern volatile uint32 tick_1000us_cnt;
 
-/* Yaw è§’åº¦ç›®æ ‡æ˜¯å¦å·²ç»å¯¹é½å½“å‰æœºå¤´æ–¹å‘ */
+/* Yaw ½Ç¶ÈÄ¿±êÊÇ·ñÒÑ¾­¶ÔÆëµ±Ç°»úÍ··½Ïò */
 static uint8_t s_yaw_target_inited = 0U;
 #define FC_LANDING_TARGET_HEIGHT_M -0.5f
 #define FC_LANDING_HEIGHT_POS_KP_SCALE 0.5f
-/* 100Hz é”å­˜çš„é£žè¡Œæ¨¡å¼ï¼Œ50Hz æŽ§åˆ¶åªæ¶ˆè´¹è¯¥é”å­˜å€¼ */
+/* 100Hz Ëø´æµÄ·ÉÐÐÄ£Ê½£¬50Hz ¿ØÖÆÖ»Ïû·Ñ¸ÃËø´æÖµ */
 static FC_START_CRSF_flight_mode_e s_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
-/* ä¸Šä¸€æ¬¡é”å­˜çš„é£žè¡Œæ¨¡å¼ï¼Œç”¨äºŽæ£€æµ‹æ¨¡å¼åˆ‡æ¢è¾¹æ²¿ */
+/* ÉÏÒ»´ÎËø´æµÄ·ÉÐÐÄ£Ê½£¬ÓÃÓÚ¼ì²âÄ£Ê½ÇÐ»»±ßÑØ */
 static FC_START_CRSF_flight_mode_e s_prev_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
-/* ä¸Šä¸€æ¬¡é£žæŽ§çŠ¶æ€ï¼Œç”¨äºŽæ£€æµ‹é£žè¡Œæ€åˆ‡æ¢è¾¹æ²¿ */
+/* ÉÏÒ»´Î·É¿Ø×´Ì¬£¬ÓÃÓÚ¼ì²â·ÉÐÐÌ¬ÇÐ»»±ßÑØ */
 static FC_START_CRSF_state_e s_prev_fc_state = FC_START_CRSF_STATE_INIT;
-/* Mode0 æ‰‹åŠ¨å§¿æ€å‰é¦ˆæ˜¯å¦å·²å®Œæˆç›®æ ‡å¯¹é½ */
+/* Mode0 ÊÖ¶¯×ËÌ¬Ç°À¡ÊÇ·ñÒÑÍê³ÉÄ¿±ê¶ÔÆë */
 static uint8_t s_mode0_angle_ff_active = 0U;
-/* æ‚¬åœæ²¹é—¨åœ¨çº¿å­¦ä¹ ï¼ˆå€Ÿé‰´ ArduPilot MOT_THST_HOVERï¼‰ */
-#define FC_HOVER_THR_TC 2.0f /* æ‚¬åœæ²¹é—¨Ié¡¹è½¬ç§»æ—¶é—´å¸¸æ•°ï¼Œå•ä½sã€‚ */
-#define FC_HOVER_LEARN_MIN_DELTA (-300.0f) /* æ‚¬åœæ²¹é—¨ç›¸å¯¹åŸºå‡†çš„æœ€å°å­¦ä¹ é‡ï¼Œå•ä½PWMã€‚ */
-#define FC_HOVER_LEARN_MAX_DELTA 700.0f /* æ‚¬åœæ²¹é—¨ç›¸å¯¹åŸºå‡†çš„æœ€å¤§å­¦ä¹ é‡ï¼Œå•ä½PWMã€‚ */
+/* ÐüÍ£ÓÍÃÅÔÚÏßÑ§Ï°£¨½è¼ø ArduPilot MOT_THST_HOVER£© */
+#define FC_HOVER_THR_TC 2.0f /* ÐüÍ£ÓÍÃÅIÏî×ªÒÆÊ±¼ä³£Êý£¬µ¥Î»s¡£ */
+#define FC_HOVER_LEARN_MIN_DELTA (-300.0f) /* ÐüÍ£ÓÍÃÅÏà¶Ô»ù×¼µÄ×îÐ¡Ñ§Ï°Á¿£¬µ¥Î»PWM¡£ */
+#define FC_HOVER_LEARN_MAX_DELTA 700.0f /* ÐüÍ£ÓÍÃÅÏà¶Ô»ù×¼µÄ×î´óÑ§Ï°Á¿£¬µ¥Î»PWM¡£ */
 #define FC_HOVER_LEARN_VZ_MAX 0.18f
 #define FC_HOVER_LEARN_POS_MAX 0.08f
 #define FC_HOVER_LEARN_TILT_MAX 7.0f
 #define FC_HOVER_LEARN_ACC_MAX 0.20f
 #define FC_HOVER_LEARN_TOF_SPREAD_MAX 250.0f
-#define FC_HOVER_LEARN_RATE_MAX 60.0f /* æ‚¬åœæ²¹é—¨Ié¡¹æœ€å¤§è½¬ç§»é€Ÿåº¦ï¼Œå•ä½PWM/sã€‚ */
-#define FC_HEIGHT_VEL_TARGET_LIMIT 2.0f /* åž‚ç›´é€Ÿåº¦ç›®æ ‡é™å¹…ï¼Œå•ä½m/sã€‚ */
+#define FC_HOVER_LEARN_RATE_MAX 60.0f /* ÐüÍ£ÓÍÃÅIÏî×î´ó×ªÒÆËÙ¶È£¬µ¥Î»PWM/s¡£ */
+#define FC_HEIGHT_VEL_TARGET_LIMIT 2.0f /* ´¹Ö±ËÙ¶ÈÄ¿±êÏÞ·ù£¬µ¥Î»m/s¡£ */
 #define FC_HEIGHT_VEL_OUT_MIN (-1000.0f)
 #define FC_HEIGHT_VEL_OUT_MAX 1000.0f
 static float s_hover_throttle = 3200.0f;
 static float s_hover_learn_step = 0.0f;
-/* å§¿æ€è§’å¤–çŽ¯è¾“å‡ºåˆ°è§’é€Ÿåº¦ç›®æ ‡çš„é™å¹…ï¼Œå•ä½ deg/s */
+/* ×ËÌ¬½ÇÍâ»·Êä³öµ½½ÇËÙ¶ÈÄ¿±êµÄÏÞ·ù£¬µ¥Î» deg/s */
 static const float s_fc_angle_out_limit = 260.0f;
 static const float s_fc_yaw_out_limit = 2000.0f;
-/* Yaw è§’åº¦ä¿æŒä¿®æ­£é™å¹…ï¼Œå•ä½ deg/s */
+/* Yaw ½Ç¶È±£³ÖÐÞÕýÏÞ·ù£¬µ¥Î» deg/s */
 static const float s_fc_yaw_hold_rate_limit_dps = 500.0f;
-/* Yaw ç›®æ ‡ç›¸å¯¹å½“å‰èˆªå‘çš„æœ€å¤§è¶…å‰è§’ï¼Œå•ä½ deg */
+/* Yaw Ä¿±êÏà¶Ôµ±Ç°º½ÏòµÄ×î´ó³¬Ç°½Ç£¬µ¥Î» deg */
 static const float s_fc_yaw_target_delta_limit_deg = 100.0f;
-/* å§¿æ€è§’å¤–çŽ¯ anti-windup å›žç®—å¢žç›Š */
+/* ×ËÌ¬½ÇÍâ»· anti-windup »ØËãÔöÒæ */
 static const float s_fc_angle_aw_gain = 0.15f;
-/* å§¿æ€è§’å¤–çŽ¯ç§¯åˆ†æ¾å¼›é˜ˆå€¼ï¼Œç›®æ ‡å˜åŒ–è¿‡å¿«æ—¶é™ä½Žç§¯åˆ†å †ç§¯ */
+/* ×ËÌ¬½ÇÍâ»·»ý·ÖËÉ³ÚãÐÖµ£¬Ä¿±ê±ä»¯¹ý¿ìÊ±½µµÍ»ý·Ö¶Ñ»ý */
 static const float s_fc_angle_iterm_relax_threshold = 30.0f;
 static const float s_fc_deg_to_rad = 0.017453293f;
 static const float s_fc_tilt_cos_min = 0.8f;
 static const float s_fc_tilt_comp_throttle_max = 10000.0f;
 
 /*
- * å‡½æ•°å: fc_clampf
- * åŠŸèƒ½: å¯¹æµ®ç‚¹æ•°è¿›è¡Œä¸Šä¸‹é™é’³ä½
- * è¾“å…¥å‚æ•°:
- *   value     - è¾“å…¥å€¼
- *   min_value - æœ€å°å…è®¸å€¼
- *   max_value - æœ€å¤§å…è®¸å€¼
- * è¿”å›žå€¼:
- *   é™å¹…åŽçš„æµ®ç‚¹å€¼
+ * º¯ÊýÃû: fc_clampf
+ * ¹¦ÄÜ: ¶Ô¸¡µãÊý½øÐÐÉÏÏÂÏÞÇ¯Î»
+ * ÊäÈë²ÎÊý:
+ *   value     - ÊäÈëÖµ
+ *   min_value - ×îÐ¡ÔÊÐíÖµ
+ *   max_value - ×î´óÔÊÐíÖµ
+ * ·µ»ØÖµ:
+ *   ÏÞ·ùºóµÄ¸¡µãÖµ
  */
 static float fc_clampf(float value, float min_value, float max_value)
 {
@@ -111,12 +111,12 @@ static float fc_clampf(float value, float min_value, float max_value)
 }
 
 /*
- * å‡½æ•°å: FC_Wrap180Deg
- * åŠŸèƒ½: å°†è§’åº¦åŒ…è£¹åˆ° [-180, 180]ï¼Œé¿å… yaw è·¨è¾¹ç•Œæ—¶å‡ºçŽ° 360 åº¦è·³å˜
- * è¾“å…¥å‚æ•°:
- *   angle_deg - è¾“å…¥è§’åº¦ï¼Œå•ä½ deg
- * è¿”å›žå€¼:
- *   åŒ…è£¹åŽçš„è§’åº¦ï¼Œå•ä½ deg
+ * º¯ÊýÃû: FC_Wrap180Deg
+ * ¹¦ÄÜ: ½«½Ç¶È°ü¹üµ½ [-180, 180]£¬±ÜÃâ yaw ¿ç±ß½çÊ±³öÏÖ 360 ¶ÈÌø±ä
+ * ÊäÈë²ÎÊý:
+ *   angle_deg - ÊäÈë½Ç¶È£¬µ¥Î» deg
+ * ·µ»ØÖµ:
+ *   °ü¹üºóµÄ½Ç¶È£¬µ¥Î» deg
  */
 static float FC_Wrap180Deg(float angle_deg)
 {
@@ -132,12 +132,12 @@ static float FC_Wrap180Deg(float angle_deg)
 }
 
 /*
- * å‡½æ•°å: FC_Apply_Tilt_Throttle_Compensation
- * åŠŸèƒ½: ä½¿ç”¨å½“å‰ Roll/Pitch åŽŸå§‹å§¿æ€è§’ï¼Œå¯¹æ€»æ²¹é—¨åšä¿å®ˆçš„åž‚å‘åˆ†åŠ›è¡¥å¿
- * è¾“å…¥å‚æ•°:
- *   throttle_raw - è¡¥å¿å‰æ€»æ²¹é—¨ï¼Œå•ä½ mixer è¾“å…¥
- * è¿”å›žå€¼:
- *   è¡¥å¿åŽçš„æ€»æ²¹é—¨ï¼Œå·²é™å¹…åˆ°[0, s_fc_tilt_comp_throttle_max]
+ * º¯ÊýÃû: FC_Apply_Tilt_Throttle_Compensation
+ * ¹¦ÄÜ: Ê¹ÓÃµ±Ç° Roll/Pitch Ô­Ê¼×ËÌ¬½Ç£¬¶Ô×ÜÓÍÃÅ×ö±£ÊØµÄ´¹Ïò·ÖÁ¦²¹³¥
+ * ÊäÈë²ÎÊý:
+ *   throttle_raw - ²¹³¥Ç°×ÜÓÍÃÅ£¬µ¥Î» mixer ÊäÈë
+ * ·µ»ØÖµ:
+ *   ²¹³¥ºóµÄ×ÜÓÍÃÅ£¬ÒÑÏÞ·ùµ½[0, s_fc_tilt_comp_throttle_max]
  */
 static float FC_Apply_Tilt_Throttle_Compensation(float throttle_raw)
 {
@@ -148,7 +148,7 @@ static float FC_Apply_Tilt_Throttle_Compensation(float throttle_raw)
         return 0.0f;
     }
 
-    /* ç›´æŽ¥ä½¿ç”¨å½“å‰åŽŸå§‹å§¿æ€è§’ï¼Œè¡¥å¿ç›¸å¯¹é‡åŠ›æ–¹å‘çš„æ€»å€¾æ–œæŸå¤± */
+    /* Ö±½ÓÊ¹ÓÃµ±Ç°Ô­Ê¼×ËÌ¬½Ç£¬²¹³¥Ïà¶ÔÖØÁ¦·½ÏòµÄ×ÜÇãÐ±ËðÊ§ */
     cos_term = cosf(g_euler.roll * s_fc_deg_to_rad) * cosf(g_euler.pitch * s_fc_deg_to_rad);
     cos_term = fc_clampf(cos_term, s_fc_tilt_cos_min, 1.0f);
 
@@ -173,10 +173,10 @@ void FC_Loop_GetHeightDebug(fc_height_debug_t *debug)
 }
 
 /*
- * å‡½æ•°å: FC_Reset_All_Mode_Control
- * åŠŸèƒ½: ç»Ÿä¸€å¤ä½æ‰€æœ‰æ¨¡å¼æŽ§åˆ¶çŠ¶æ€
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›žå€¼: æ— 
+ * º¯ÊýÃû: FC_Reset_All_Mode_Control
+ * ¹¦ÄÜ: Í³Ò»¸´Î»ËùÓÐÄ£Ê½¿ØÖÆ×´Ì¬
+ * ÊäÈë²ÎÊý: ÎÞ
+ * ·µ»ØÖµ: ÎÞ
  */
 static void FC_Reset_All_Mode_Control(void)
 {
@@ -192,12 +192,12 @@ static void FC_Reset_All_Mode_Control(void)
 }
 
 /*
- * å‡½æ•°å: FC_Handle_Mode_Transition_100Hz
- * åŠŸèƒ½: åœ¨100Hzç»Ÿä¸€å¤„ç†æ¨¡å¼åˆ‡æ¢ä¸Žé£žè¡ŒçŠ¶æ€åˆ‡æ¢å¤ä½
- * è¾“å…¥å‚æ•°:
- *   flight_mode - å½“å‰é”å­˜é£žè¡Œæ¨¡å¼
- *   fc_state    - å½“å‰é£žæŽ§çŠ¶æ€
- * è¿”å›žå€¼: æ— 
+ * º¯ÊýÃû: FC_Handle_Mode_Transition_100Hz
+ * ¹¦ÄÜ: ÔÚ100HzÍ³Ò»´¦ÀíÄ£Ê½ÇÐ»»Óë·ÉÐÐ×´Ì¬ÇÐ»»¸´Î»
+ * ÊäÈë²ÎÊý:
+ *   flight_mode - µ±Ç°Ëø´æ·ÉÐÐÄ£Ê½
+ *   fc_state    - µ±Ç°·É¿Ø×´Ì¬
+ * ·µ»ØÖµ: ÎÞ
  */
 static void FC_Handle_Mode_Transition_100Hz(FC_START_CRSF_flight_mode_e flight_mode,
                                             FC_START_CRSF_state_e fc_state)
@@ -223,10 +223,10 @@ static void FC_Handle_Mode_Transition_100Hz(FC_START_CRSF_flight_mode_e flight_m
 }
 
 /*
- * å‡½æ•°å: FC_Loop_Init
- * åŠŸèƒ½: åˆå§‹åŒ–é£žæŽ§å„çº§ PID ä¸ŽæŽ§åˆ¶è¾“å‡ºé»˜è®¤çŠ¶æ€
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›žå€¼: æ— 
+ * º¯ÊýÃû: FC_Loop_Init
+ * ¹¦ÄÜ: ³õÊ¼»¯·É¿Ø¸÷¼¶ PID Óë¿ØÖÆÊä³öÄ¬ÈÏ×´Ì¬
+ * ÊäÈë²ÎÊý: ÎÞ
+ * ·µ»ØÖµ: ÎÞ
  */
 void FC_Loop_Init(void)
 {
@@ -234,7 +234,7 @@ void FC_Loop_Init(void)
              g_fc_params.roll_angle_kp, g_fc_params.roll_angle_ki, g_fc_params.roll_angle_kd,
              g_fc_params.roll_angle_kff, g_fc_params.angle_dt,
              g_fc_params.roll_angle_i_limit, g_fc_params.roll_angle_d_lpf);
-    /* Roll å§¿æ€å¤–çŽ¯å¯ç”¨å·¥ç¨‹é™å¹…å’Œ anti-windupï¼Œé¿å…æŒç»­åå·®æŠŠè§’é€Ÿåº¦ç›®æ ‡æŽ¨å¾—è¿‡çŒ› */
+    /* Roll ×ËÌ¬Íâ»·ÆôÓÃ¹¤³ÌÏÞ·ùºÍ anti-windup£¬±ÜÃâ³ÖÐøÆ«²î°Ñ½ÇËÙ¶ÈÄ¿±êÍÆµÃ¹ýÃÍ */
     roll_angle_pid.aw_enable = 1U;
     roll_angle_pid.aw_gain = s_fc_angle_aw_gain;
     roll_angle_pid.output_min = -s_fc_angle_out_limit;
@@ -246,7 +246,7 @@ void FC_Loop_Init(void)
              g_fc_params.pitch_angle_kp, g_fc_params.pitch_angle_ki, g_fc_params.pitch_angle_kd,
              g_fc_params.pitch_angle_kff, g_fc_params.angle_dt,
              g_fc_params.pitch_angle_i_limit, g_fc_params.pitch_angle_d_lpf);
-    /* Pitch å§¿æ€å¤–çŽ¯ä¸Ž Roll ä¿æŒç›¸åŒä¿æŠ¤ç­–ç•¥ï¼Œå‡å°ä¸¤è½´æŽ§åˆ¶å“è´¨åˆ†å‰ */
+    /* Pitch ×ËÌ¬Íâ»·Óë Roll ±£³ÖÏàÍ¬±£»¤²ßÂÔ£¬¼õÐ¡Á½Öá¿ØÖÆÆ·ÖÊ·Ö²æ */
     pitch_angle_pid.aw_enable = 1U;
     pitch_angle_pid.aw_gain = s_fc_angle_aw_gain;
     pitch_angle_pid.output_min = -s_fc_angle_out_limit;
@@ -265,7 +265,7 @@ void FC_Loop_Init(void)
              g_fc_params.roll_gyro_i_limit, g_fc_params.roll_gyro_d_lpf);
     PID_SetFeedforwardFilter(&roll_gyro_pid, g_fc_params.gyro_ff_smoothing_ms, 0.0f,
                              g_fc_params.gyro_ff_limit);
-    /* Roll è§’é€Ÿåº¦ç›®æ ‡æŒç»­å˜åŒ–æ—¶ï¼Œæå‰æ”¾æ¾ç§¯åˆ†ï¼Œå‡å°‘ä½Žé¢‘æ‹‰æ‰¯å’Œçº¿ç¼†å¤–åŠ›å¸¦æ¥çš„ç§¯åˆ†å †ç§¯ */
+    /* Roll ½ÇËÙ¶ÈÄ¿±ê³ÖÐø±ä»¯Ê±£¬ÌáÇ°·ÅËÉ»ý·Ö£¬¼õÉÙµÍÆµÀ­³¶ºÍÏßÀÂÍâÁ¦´øÀ´µÄ»ý·Ö¶Ñ»ý */
     roll_gyro_pid.iterm_relax_threshold = 40.0f;
     PID_Init(&pitch_gyro_pid,
              g_fc_params.pitch_gyro_kp, g_fc_params.pitch_gyro_ki, g_fc_params.pitch_gyro_kd,
@@ -273,7 +273,7 @@ void FC_Loop_Init(void)
              g_fc_params.pitch_gyro_i_limit, g_fc_params.pitch_gyro_d_lpf);
     PID_SetFeedforwardFilter(&pitch_gyro_pid, g_fc_params.gyro_ff_smoothing_ms, 0.0f,
                              g_fc_params.gyro_ff_limit);
-    /* Pitch è§’é€Ÿåº¦çŽ¯ä¸Ž Roll ä¿æŒç›¸åŒçš„ç§¯åˆ†æ”¾æ¾ç­–ç•¥ï¼Œé™ä½Žè¿žç»­ç›®æ ‡å˜åŒ–æ—¶çš„ç§¯åˆ†æ‹–æ‹½ */
+    /* Pitch ½ÇËÙ¶È»·Óë Roll ±£³ÖÏàÍ¬µÄ»ý·Ö·ÅËÉ²ßÂÔ£¬½µµÍÁ¬ÐøÄ¿±ê±ä»¯Ê±µÄ»ý·ÖÍÏ×§ */
     pitch_gyro_pid.iterm_relax_threshold = 40.0f;
     PID_Init(&yaw_gyro_pid,
              g_fc_params.yaw_gyro_kp, g_fc_params.yaw_gyro_ki, g_fc_params.yaw_gyro_kd,
@@ -309,10 +309,10 @@ void FC_Loop_Init(void)
 }
 
 /*
- * å‡½æ•°å: FC_Loop_Reset
- * åŠŸèƒ½: å¤ä½é£žæŽ§æŽ§åˆ¶çŽ¯å†…éƒ¨çŠ¶æ€ä¸Žå…³é”®ç›®æ ‡é‡
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›žå€¼: æ— 
+ * º¯ÊýÃû: FC_Loop_Reset
+ * ¹¦ÄÜ: ¸´Î»·É¿Ø¿ØÖÆ»·ÄÚ²¿×´Ì¬Óë¹Ø¼üÄ¿±êÁ¿
+ * ÊäÈë²ÎÊý: ÎÞ
+ * ·µ»ØÖµ: ÎÞ
  */
 void FC_Loop_Reset(void)
 {
@@ -347,10 +347,10 @@ void FC_Loop_Reset(void)
 }
 
 /*
- * å‡½æ•°å: FC_Loop_50Hz
- * åŠŸèƒ½: æ‰§è¡Œ50Hzé«˜åº¦ä½ç½®çŽ¯ï¼Œå¹¶åˆ†å‘éžå›¾åƒæ¨¡å¼çš„50HzæŽ§åˆ¶
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›žå€¼: æ— 
+ * º¯ÊýÃû: FC_Loop_50Hz
+ * ¹¦ÄÜ: Ö´ÐÐ50Hz¸ß¶ÈÎ»ÖÃ»·£¬²¢·Ö·¢·ÇÍ¼ÏñÄ£Ê½µÄ50Hz¿ØÖÆ
+ * ÊäÈë²ÎÊý: ÎÞ
+ * ·µ»ØÖµ: ÎÞ
  */
 void FC_Loop_50Hz(void)
 {
@@ -382,7 +382,7 @@ void FC_Loop_50Hz(void)
         }
         else
         {
-            /* éžå¯¹ç§°é«˜åº¦çŽ¯ï¼šæœªåˆ°ç›®æ ‡(éœ€ä¸Šå‡)ç”¨åŸºå‡† kpï¼Œè¶…è¿‡ç›®æ ‡(éœ€ä¸‹é™)åŠ å¿« 1.5 å€ */
+            /* ·Ç¶Ô³Æ¸ß¶È»·£ºÎ´µ½Ä¿±ê(ÐèÉÏÉý)ÓÃ»ù×¼ kp£¬³¬¹ýÄ¿±ê(ÐèÏÂ½µ)¼Ó¿ì 1.5 ±¶ */
             height_pos_pid.kp = (height_meas_m > target_height_m) ?
                                 (1.5f * g_fc_params.pos_z_kp) : g_fc_params.pos_z_kp;
         }
@@ -431,7 +431,7 @@ void FC_Loop_50Hz(void)
         break;
     }
 
-    // å…ˆå•çº¯è°ƒé£žæœº,æ²¡æœ‰è½¦
+    // ÏÈµ¥´¿µ÷·É»ú,Ã»ÓÐ³µ
     // car_data_fresh = ((g_car_sync_time_ms > 0.0f) &&
     //                   ((tick_now - g_car_last_update_time_ms) < FC_MODE_CAR_RUN_DATA_TIMEOUT_MS)) ? 1U : 0U;
     // Beep_SetAlarm(BEEP_ALARM_CAR_DATA_LOST,
@@ -440,10 +440,10 @@ void FC_Loop_50Hz(void)
 }
 
 /*
- * å‡½æ•°å: FC_Loop_100Hz
- * åŠŸèƒ½: æ‰§è¡Œ100Hzé«˜åº¦æµ‹é€Ÿã€é«˜åº¦é€Ÿåº¦çŽ¯ã€å›¾åƒé“¾ä¸Žæ¨¡å¼åˆ†å‘
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›žå€¼: æ— 
+ * º¯ÊýÃû: FC_Loop_100Hz
+ * ¹¦ÄÜ: Ö´ÐÐ100Hz¸ß¶È²âËÙ¡¢¸ß¶ÈËÙ¶È»·¡¢Í¼ÏñÁ´ÓëÄ£Ê½·Ö·¢
+ * ÊäÈë²ÎÊý: ÎÞ
+ * ·µ»ØÖµ: ÎÞ
  */
 void FC_Loop_100Hz(void)
 {
@@ -460,7 +460,7 @@ void FC_Loop_100Hz(void)
     }
 
     fc_state = FC_START_CRSF_Get_State();
-    s_flight_mode = FC_START_CRSF_Get_Flight_Mode(); /* æ£€æµ‹é¥æŽ§å™¨çš„æ¨¡å¼ */
+    s_flight_mode = FC_START_CRSF_Get_Flight_Mode(); /* ¼ì²âÒ£¿ØÆ÷µÄÄ£Ê½ */
     FC_Handle_Mode_Transition_100Hz(s_flight_mode, fc_state);
 
     CarLampFused_Update100Hz();
@@ -494,7 +494,7 @@ void FC_Loop_100Hz(void)
         height_vel_out = 0.0f;
     }
 
-    /* æ‚¬åœæ²¹é—¨åœ¨çº¿å­¦ä¹ ï¼šä»…åœ¨æŽ¥è¿‘ç¨³æ€æ‚¬åœæ—¶æ›´æ–° */
+    /* ÐüÍ£ÓÍÃÅÔÚÏßÑ§Ï°£º½öÔÚ½Ó½üÎÈÌ¬ÐüÍ£Ê±¸üÐÂ */
     s_hover_learn_step = 0.0f;
     if ((fc_state == FC_START_CRSF_STATE_FLYING) &&
         (g_height_pollution_active == 0U) &&
@@ -513,7 +513,7 @@ void FC_Loop_100Hz(void)
                                        (float)g_fc_params.base_throttle + FC_HOVER_LEARN_MIN_DELTA,
                                        (float)g_fc_params.base_throttle + FC_HOVER_LEARN_MAX_DELTA) -
                              s_hover_throttle;
-        /* å°†é€Ÿåº¦çŽ¯Ié¡¹åç½®ç­‰é‡è½¬å…¥æ‚¬åœæ²¹é—¨ï¼Œä¿æŒé€å…¥æ··æŽ§çš„æ€»æ²¹é—¨è¿žç»­ã€‚ */
+        /* ½«ËÙ¶È»·IÏîÆ«ÖÃµÈÁ¿×ªÈëÐüÍ£ÓÍÃÅ£¬±£³ÖËÍÈë»ì¿ØµÄ×ÜÓÍÃÅÁ¬Ðø¡£ */
         s_hover_throttle += s_hover_learn_step;
         height_vel_pid.integral -= s_hover_learn_step;
         height_vel_pid.i_term -= s_hover_learn_step;
@@ -579,9 +579,9 @@ void FC_Loop_100Hz(void)
 void FC_Loop_500Hz(void)
 {
     static uint32 tick_1000us_cnt_last = 0;
-    uint32 tick_now = tick_1000us_cnt; // è¯»ä¸€æ¬¡ï¼Œç¼“å­˜
+    uint32 tick_now = tick_1000us_cnt; // ¶ÁÒ»´Î£¬»º´æ
     uint32 diff = tick_now - tick_1000us_cnt_last;
-    float dt = diff * 0.001f; // ç§’
+    float dt = diff * 0.001f; // Ãë
 
     tick_1000us_cnt_last = tick_now;
     if ((FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING) ||
@@ -613,7 +613,7 @@ void FC_Loop_500Hz(void)
             pitch_angle_target = -angle_target_max;
         }
 
-        /* æŽ§åˆ¶é‡é™å¹… */
+        /* ¿ØÖÆÁ¿ÏÞ·ù */
         limit = s_fc_angle_out_limit;
         mode0_angle_ff_enable = ((s_flight_mode == FC_START_CRSF_FLIGHT_MODE_0) ||
                                  (s_flight_mode == FC_START_CRSF_FLIGHT_MODE_3) ||
@@ -637,7 +637,7 @@ void FC_Loop_500Hz(void)
         roll_ctrl = fc_clampf(PID_Update(&roll_angle_pid, roll_angle_target, roll_angle_meas, dt), -limit, limit);
         pitch_ctrl = fc_clampf(PID_Update(&pitch_angle_pid, pitch_angle_target, pitch_angle_meas, dt), -limit, limit);
 
-        /* é¦–æ¬¡è¿›å…¥é£žè¡Œæ€æ—¶å¤ä½ yaw å¤–çŽ¯ï¼ŒåŽç»­ yaw ç›®æ ‡å›ºå®šä¸º 0 åº¦ */
+        /* Ê×´Î½øÈë·ÉÐÐÌ¬Ê±¸´Î» yaw Íâ»·£¬ºóÐø yaw Ä¿±ê¹Ì¶¨Îª 0 ¶È */
         if (0U == s_yaw_target_inited)
         {
             yaw_angle_target = yaw_angle_meas;
@@ -645,7 +645,7 @@ void FC_Loop_500Hz(void)
             s_yaw_target_inited = 1U;
         }
 
-        /* Mode1/2/3/4/5/8 ä¿ç•™ç‹¬ç«‹ yaw ç›®æ ‡ï¼Œå…¶ä½™æ¨¡å¼å›ºå®šä¸º 0 åº¦ã€‚ */
+        /* Mode1/2/3/4/5/8 ±£Áô¶ÀÁ¢ yaw Ä¿±ê£¬ÆäÓàÄ£Ê½¹Ì¶¨Îª 0 ¶È¡£ */
         if ((s_flight_mode != FC_START_CRSF_FLIGHT_MODE_1) &&
             (s_flight_mode != FC_START_CRSF_FLIGHT_MODE_2) &&
             (s_flight_mode != FC_START_CRSF_FLIGHT_MODE_3) &&
@@ -656,7 +656,7 @@ void FC_Loop_500Hz(void)
             yaw_angle_target = 0.0f;
         }
 
-        /* é™åˆ¶ç›®æ ‡ç›¸å¯¹å½“å‰èˆªå‘çš„è¯¯å·®ï¼Œå¤„ç†çº¿ç¼†æ‹‰æ‰¯è‡ªæ—‹å’Œ +/-180 åº¦è·¨ç•Œè·³å˜ */
+        /* ÏÞÖÆÄ¿±êÏà¶Ôµ±Ç°º½ÏòµÄÎó²î£¬´¦ÀíÏßÀÂÀ­³¶×ÔÐýºÍ +/-180 ¶È¿ç½çÌø±ä */
         yaw_error_deg = FC_Wrap180Deg(yaw_angle_target - yaw_angle_meas);
         yaw_error_deg = fc_clampf(yaw_error_deg,
                                   -s_fc_yaw_target_delta_limit_deg,
@@ -686,27 +686,27 @@ void FC_Loop_500Hz(void)
 void FC_Loop_1000Hz(void)
 {
     static uint32 tick_1000us_cnt_last = 0;
-    uint32 tick_now = tick_1000us_cnt; // è¯»ä¸€æ¬¡ï¼Œç¼“å­˜
+    uint32 tick_now = tick_1000us_cnt; // ¶ÁÒ»´Î£¬»º´æ
     uint32 diff = tick_now - tick_1000us_cnt_last;
-    float dt = diff * 0.001f; // ç§’
+    float dt = diff * 0.001f; // Ãë
 
     tick_1000us_cnt_last = tick_now;
     if ((FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING) ||
         (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_LANDING))
     {
-        /* è¯»å–å½“å‰è§’é€Ÿåº¦ */
+        /* ¶ÁÈ¡µ±Ç°½ÇËÙ¶È */
         float roll_gyro_meas = g_imufilter_1000hz.gyrox;
         float pitch_gyro_meas = g_imufilter_1000hz.gyroy;
         float yaw_gyro_meas = g_imufilter_1000hz.gyroz;
 
-        /* æŽ§åˆ¶é‡é™å¹… */
+        /* ¿ØÖÆÁ¿ÏÞ·ù */
         float limit = 10000.0f;
         int32_t roll_ctrl = (int32_t)fc_clampf(PID_Update(&roll_gyro_pid, roll_gyro_target, roll_gyro_meas, dt), -limit, limit);
         int32_t pitch_ctrl = (int32_t)fc_clampf(PID_Update(&pitch_gyro_pid, pitch_gyro_target, pitch_gyro_meas, dt), -limit, limit);
         int32_t yaw_ctrl = (int32_t)fc_clampf(PID_Update(&yaw_gyro_pid, yaw_gyro_target, yaw_gyro_meas, dt),
                                               -s_fc_yaw_out_limit, s_fc_yaw_out_limit);
-        /* è§’é€Ÿåº¦çŽ¯è°ƒè¯•åˆ‡æ¢åˆ° Pitchï¼šç›®æ ‡ã€åŽŸå§‹é™€èžºã€æ»¤æ³¢åŽé™€èžºã€æŽ§åˆ¶è¾“å‡ºå’Œ PID åˆ†é¡¹ */
-        //                         pitch_gyro_raw,è¿™ä¸¤ä¸ªCSVæ–‡ä»¶æ˜¯æˆ‘ç¦»çº¿æ ‡å®šçš„æ•°æ®
+        /* ½ÇËÙ¶È»·µ÷ÊÔÇÐ»»µ½ Pitch£ºÄ¿±ê¡¢Ô­Ê¼ÍÓÂÝ¡¢ÂË²¨ºóÍÓÂÝ¡¢¿ØÖÆÊä³öºÍ PID ·ÖÏî */
+        //                         pitch_gyro_raw,ÕâÁ½¸öCSVÎÄ¼þÊÇÎÒÀëÏß±ê¶¨µÄÊý¾Ý
         //                         pitch_gyro_meas,
         //                         pitch_ctrl,
         //                         pitch_gyro_pid.p_term,

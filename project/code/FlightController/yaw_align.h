@@ -18,13 +18,13 @@ typedef struct
     uint8 candidate_frames;
     uint8 lost_frames;
     uint8 action;
-    uint8 beacon_visible; /* plan_result.valid æ˜¯å¦å·²è¿ç»­æœ‰æ•ˆ100msã€‚ */
-    uint8 plan_valid; /* å½“å‰ plan_result.valid åŸå§‹çŠ¶æ€ã€‚ */
-    uint8 search_active; /* å½“å‰æ˜¯å¦æ­£åœ¨æ‰§è¡Œæ— ä¿¡æ ‡æ—‹è½¬æœç´¢ã€‚ */
-    int8 search_direction; /* æœç´¢æ–¹å‘ï¼Œ1ä¸ºyawæ­£æ–¹å‘ï¼Œ-1ä¸ºyawè´Ÿæ–¹å‘ã€‚ */
+    uint8 beacon_visible; /* plan_result.valid ÊÇ·ñÒÑÁ¬ĞøÓĞĞ§100ms¡£ */
+    uint8 plan_valid; /* µ±Ç° plan_result.valid Ô­Ê¼×´Ì¬¡£ */
+    uint8 search_active; /* µ±Ç°ÊÇ·ñÕıÔÚÖ´ĞĞÎŞĞÅ±êĞı×ªËÑË÷¡£ */
+    int8 search_direction; /* ËÑË÷·½Ïò£¬1ÎªyawÕı·½Ïò£¬-1Îªyaw¸º·½Ïò¡£ */
     float yaw_delta_deg;
-    float search_rotation_deg; /* æœ¬è½®å®é™…å®šå‘æœç´¢è§’ï¼Œå•ä½åº¦ã€‚ */
-    float cable_twist_deg; /* é£æœºç›¸å¯¹è½¦è¾†çš„ç´¯è®¡çº¿ç¼†æ‰­è½¬è§’ï¼Œå•ä½åº¦ã€‚ */
+    float search_rotation_deg; /* ±¾ÂÖÊµ¼Ê¶¨ÏòËÑË÷½Ç£¬µ¥Î»¶È¡£ */
+    float cable_twist_deg; /* ·É»úÏà¶Ô³µÁ¾µÄÀÛ¼ÆÏßÀÂÅ¤×ª½Ç£¬µ¥Î»¶È¡£ */
     yaw_align_debug_beacon_t active_beacon;
     yaw_align_debug_beacon_t locked_beacon;
     yaw_align_debug_beacon_t candidate_beacon;
@@ -42,37 +42,37 @@ typedef enum
 } yaw_align_action_e;
 
 /**
- * @brief æ¸…ç©ºèˆªå‘å¯¹å‡†ã€æœç´¢å’Œçº¿ç¼†æ‰­è½¬è·Ÿè¸ªçŠ¶æ€ã€‚
- * @param æ— ã€‚
- * @return æ— ã€‚
+ * @brief Çå¿Õº½Ïò¶Ô×¼¡¢ËÑË÷ºÍÏßÀÂÅ¤×ª¸ú×Ù×´Ì¬¡£
+ * @param ÎŞ¡£
+ * @return ÎŞ¡£
  */
 void YawAlign_Reset(void);
 /**
- * @brief æ ¹æ®èˆªå‘æ§åˆ¶æ¨¡å¼æ›´æ–°yawç›®æ ‡å’Œæœç´¢çŠ¶æ€ã€‚
- * @param yaw_change_mode èˆªå‘æ§åˆ¶æ¨¡å¼ï¼Œ0=å›ºå®š0åº¦ï¼Œ1=ä¿¡æ ‡å¯¹å‡†ï¼Œ2=æ­¥è¿›æœç´¢ã€‚
- * @return æ— ã€‚
+ * @brief ¸ù¾İº½Ïò¿ØÖÆÄ£Ê½¸üĞÂyawÄ¿±êºÍËÑË÷×´Ì¬¡£
+ * @param yaw_change_mode º½Ïò¿ØÖÆÄ£Ê½£¬0=¹Ì¶¨0¶È£¬1=ĞÅ±ê¶Ô×¼£¬2=²½½øËÑË÷¡£
+ * @return ÎŞ¡£
  */
 void YawAlign_Update(float yaw_change_mode);
 
 /**
- * @brief æŸ¥è¯¢mode=2æ˜¯å¦æ­£åœ¨æ‰§è¡Œæ—‹è½¬æœç´¢ã€‚
- * @param æ— ã€‚
- * @return 1è¡¨ç¤ºæ­£åœ¨æœç´¢ï¼Œ0è¡¨ç¤ºæœªæœç´¢ã€‚
+ * @brief ²éÑ¯mode=2ÊÇ·ñÕıÔÚÖ´ĞĞĞı×ªËÑË÷¡£
+ * @param ÎŞ¡£
+ * @return 1±íÊ¾ÕıÔÚËÑË÷£¬0±íÊ¾Î´ËÑË÷¡£
  */
 uint8 YawAlign_IsSearchActive(void);
 
 /**
- * @brief è®¾ç½®å¼ºåˆ¶æœç´¢ï¼Œä¾›è‡ªåŠ¨é™è½åŒæ—‹è½¬é˜¶æ®µä½¿ç”¨ã€‚
- * @param forced 1ä¸ºå¼ºåˆ¶æŒç»­æ—‹è½¬æœç´¢ï¼Œ0ä¸ºæ¢å¤æ­£å¸¸æœç´¢ã€‚
- * @return æ— ã€‚
- * @note å¼ºåˆ¶æœŸé—´å¿½ç•¥planç¡®è®¤å¯¹æœç´¢çš„åœæ­¢ï¼Œå¹¶è·³è¿‡é¦–ä¸ªç›®æ ‡é€Ÿåº¦ç­‰å¾…ã€‚
+ * @brief ÉèÖÃÇ¿ÖÆËÑË÷£¬¹©×Ô¶¯½µÂäË«Ğı×ª½×¶ÎÊ¹ÓÃ¡£
+ * @param forced 1ÎªÇ¿ÖÆ³ÖĞøĞı×ªËÑË÷£¬0Îª»Ö¸´Õı³£ËÑË÷¡£
+ * @return ÎŞ¡£
+ * @note Ç¿ÖÆÆÚ¼äºöÂÔplanÈ·ÈÏ¶ÔËÑË÷µÄÍ£Ö¹£¬²¢Ìø¹ıÊ×¸öÄ¿±êËÙ¶ÈµÈ´ı¡£
  */
 void YawAlign_SetSearchForced(uint8 forced);
 
 /**
- * @brief è·å–èˆªå‘å¯¹å‡†å’Œæœç´¢çŠ¶æ€çš„åªè¯»è°ƒè¯•å¿«ç…§ã€‚
- * @param out è°ƒè¯•å¿«ç…§è¾“å‡ºåœ°å€ï¼Œä¸å¯ä¸ºç©ºã€‚
- * @return æ— ã€‚
+ * @brief »ñÈ¡º½Ïò¶Ô×¼ºÍËÑË÷×´Ì¬µÄÖ»¶Áµ÷ÊÔ¿ìÕÕ¡£
+ * @param out µ÷ÊÔ¿ìÕÕÊä³öµØÖ·£¬²»¿ÉÎª¿Õ¡£
+ * @return ÎŞ¡£
  */
 void YawAlign_GetDebug(yaw_align_debug_t *out);
 

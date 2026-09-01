@@ -5,16 +5,16 @@
 #include "car_plan_4.h"
 #include <string.h>
 
-float Car_Speed = 2.0f; /* è½¦æ¨¡å¸¸è§„è§„åˆ’é€Ÿåº¦ï¼Œå•ä½m/sï¼Œå¯ç”±è½¦æœºé€šè¿‡AirCommä¿®æ”¹ã€‚ */
-float Car_Speed_Fast = 3.0f; /* è½¦æ¨¡å¿«é€Ÿè§„åˆ’é€Ÿåº¦ï¼Œå•ä½m/sï¼Œå¯ç”±è½¦æœºé€šè¿‡AirCommä¿®æ”¹ã€‚ */
-int32 Car_Plan_Mode = 3; /* ä¸‹å‘è½¦æ¨¡çš„è§„åˆ’ç®—æ³•ç¼–å·ï¼ŒèŒƒå›´1è‡³4ã€‚ */
+float Car_Speed = 2.0f; /* ³µÄ£³£¹æ¹æ»®ËÙ¶È£¬µ¥Î»m/s£¬¿ÉÓÉ³µ»úÍ¨¹ıAirCommĞŞ¸Ä¡£ */
+float Car_Speed_Fast = 3.0f; /* ³µÄ£¿ìËÙ¹æ»®ËÙ¶È£¬µ¥Î»m/s£¬¿ÉÓÉ³µ»úÍ¨¹ıAirCommĞŞ¸Ä¡£ */
+int32 Car_Plan_Mode = 3; /* ÏÂ·¢³µÄ£µÄ¹æ»®Ëã·¨±àºÅ£¬·¶Î§1ÖÁ4¡£ */
 
-static car_plan_result_t s_car_plan_results[CAR_PLAN_COUNT]; /* å››å¥—ç®—æ³•çš„æœ€è¿‘ä¸€æ¬¡é€Ÿåº¦è§„åˆ’ç»“æœã€‚ */
+static car_plan_result_t s_car_plan_results[CAR_PLAN_COUNT]; /* ËÄÌ×Ëã·¨µÄ×î½üÒ»´ÎËÙ¶È¹æ»®½á¹û¡£ */
 
 /**
- * @brief å¤ä½ä¸‰å¥—è½¦æ¨¡é€Ÿåº¦è§„åˆ’ç®—æ³•åŠå…¶è¾“å‡ºç»“æœã€‚
- * @param æ— ã€‚
- * @return æ— ã€‚
+ * @brief ¸´Î»ÈıÌ×³µÄ£ËÙ¶È¹æ»®Ëã·¨¼°ÆäÊä³ö½á¹û¡£
+ * @param ÎŞ¡£
+ * @return ÎŞ¡£
  */
 void CarPlanEntry_Reset(void)
 {
@@ -26,9 +26,9 @@ void CarPlanEntry_Reset(void)
 }
 
 /**
- * @brief ä¾æ¬¡è¿è¡Œä¸‰å¥—è§„åˆ’ç®—æ³•å¹¶è¾“å‡ºå½“å‰é€‰ä¸­ç®—æ³•çš„ç»“æœã€‚
- * @param result å½“å‰é€‰ä¸­ç®—æ³•çš„é€Ÿåº¦è§„åˆ’ç»“æœï¼›å…è®¸ä¼ å…¥ç©ºæŒ‡é’ˆã€‚
- * @return æ— ã€‚
+ * @brief ÒÀ´ÎÔËĞĞÈıÌ×¹æ»®Ëã·¨²¢Êä³öµ±Ç°Ñ¡ÖĞËã·¨µÄ½á¹û¡£
+ * @param result µ±Ç°Ñ¡ÖĞËã·¨µÄËÙ¶È¹æ»®½á¹û£»ÔÊĞí´«Èë¿ÕÖ¸Õë¡£
+ * @return ÎŞ¡£
  */
 void CarPlanEntry_Update(car_plan_result_t *result)
 {

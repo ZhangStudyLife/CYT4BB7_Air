@@ -163,7 +163,7 @@ void MahonyAhrs_Update(MahonyAhrs_t *ahrs,
         az = accel_z / accel_mag;
 
 #if (MAHONY_INPUT_ACCEL_IS_SPECIFIC_FORCE != 0U)
-        /* åŠ é€Ÿåº¦è®¡è¾“å‡ºæ¯”åŠ›ï¼Œæ–¹å‘ä¸Žé‡åŠ›ç›¸åï¼Œè¿™é‡Œè½¬æ¢ä¸ºé‡åŠ›æ–¹å‘å‘é‡ */
+        /* ¼ÓËÙ¶È¼ÆÊä³ö±ÈÁ¦£¬·½ÏòÓëÖØÁ¦Ïà·´£¬ÕâÀï×ª»»ÎªÖØÁ¦·½ÏòÏòÁ¿ */
         ax = -ax;
         ay = -ay;
         az = -az;

@@ -81,28 +81,28 @@ extern uint32 g_car_last_update_time_ms;
 #define POS_EST_FLOW_REACQUIRE_SPEED_CMPS (260.0f)
 #define POS_EST_FLOW_REACQUIRE_INNOVATION_CMPS (300.0f)
 
-/* æ–°ä¼°è®¡å™¨çš„å…‰æµæ ¡æ­£å¢žç›Šã€‚ */
+/* ÐÂ¹À¼ÆÆ÷µÄ¹âÁ÷Ð£ÕýÔöÒæ¡£ */
 #define POS_EST2_FLOW_GAIN (0.06f)
-/* è½¦ç«¯é€Ÿåº¦æ•°æ®å…è®¸çš„æœ€å¤§æ›´æ–°æ—¶é—´ï¼Œå•ä½msã€‚ */
+/* ³µ¶ËËÙ¶ÈÊý¾ÝÔÊÐíµÄ×î´ó¸üÐÂÊ±¼ä£¬µ¥Î»ms¡£ */
 #define POS_EST2_CAR_DATA_TIMEOUT_MS (200U)
-/* è§£è€¦å™¨å¯åŠ¨æˆ–è¶…æ—¶é‡ç½®åŽæ¢å¤èžåˆæ‰€éœ€çš„è¿žç»­æœ‰æ•ˆå¸§æ•°ã€‚ */
+/* ½âñîÆ÷Æô¶¯»ò³¬Ê±ÖØÖÃºó»Ö¸´ÈÚºÏËùÐèµÄÁ¬ÐøÓÐÐ§Ö¡Êý¡£ */
 #define POS_EST2_FLOW_REACQUIRE_FRAMES (4U)
-/* è½¦ç¯è·ç¦»æŠ•å½±ä¸­å¿ƒè¾¾åˆ°è¯¥å€¼æ—¶è®¤ä¸ºä¸å†è¦†ç›–å…‰æµè½ç‚¹ï¼Œå•ä½pxã€‚ */
+/* ³µµÆ¾àÀëÍ¶Ó°ÖÐÐÄ´ïµ½¸ÃÖµÊ±ÈÏÎª²»ÔÙ¸²¸Ç¹âÁ÷Âäµã£¬µ¥Î»px¡£ */
 #define POS_EST2_COVERAGE_ZERO_RADIUS_PX (70.0f)
-/* è½¦ç¯è¦†ç›–çŽ‡ä»Ž1è¡°å‡åˆ°0æ‰€ä½¿ç”¨çš„åŠå¾„è·¨åº¦ï¼Œå•ä½pxã€‚ */
+/* ³µµÆ¸²¸ÇÂÊ´Ó1Ë¥¼õµ½0ËùÊ¹ÓÃµÄ°ë¾¶¿ç¶È£¬µ¥Î»px¡£ */
 #define POS_EST2_COVERAGE_RADIUS_SPAN_PX (50.0f)
-/* è½¦ç¯é¢ç§¯å½’ä¸€åŒ–åŸºå‡†ï¼Œå•ä½px^2ã€‚ */
+/* ³µµÆÃæ»ý¹éÒ»»¯»ù×¼£¬µ¥Î»px^2¡£ */
 #define POS_EST2_LAMP_AREA_NOMINAL_PX2 (75.0f)
-/* è½¦ç¯é¢ç§¯æƒé‡ä¸‹é™ã€‚ */
+/* ³µµÆÃæ»ýÈ¨ÖØÏÂÏÞ¡£ */
 #define POS_EST2_LAMP_AREA_WEIGHT_MIN (0.6f)
-/* è½¦ç¯é¢ç§¯æƒé‡ä¸Šé™ã€‚ */
+/* ³µµÆÃæ»ýÈ¨ÖØÉÏÏÞ¡£ */
 #define POS_EST2_LAMP_AREA_WEIGHT_MAX (1.2f)
 
 float Pos_Est_vel_x = 0.0f;
 float Pos_Est_vel_y = 0.0f;
-/* åŽ»é™¤è½¦æ¨¡å¹³ç§»é€Ÿåº¦å½±å“åŽçš„æœºä½“Xè½´é€Ÿåº¦ï¼Œå·¦æ­£ï¼Œå•ä½cm/sã€‚ */
+/* È¥³ý³µÄ£Æ½ÒÆËÙ¶ÈÓ°ÏìºóµÄ»úÌåXÖáËÙ¶È£¬×óÕý£¬µ¥Î»cm/s¡£ */
 float Pos_Est_vel_x_2 = 0.0f;
-/* åŽ»é™¤è½¦æ¨¡å¹³ç§»é€Ÿåº¦å½±å“åŽçš„æœºä½“Yè½´é€Ÿåº¦ï¼Œå‰æ­£ï¼Œå•ä½cm/sã€‚ */
+/* È¥³ý³µÄ£Æ½ÒÆËÙ¶ÈÓ°ÏìºóµÄ»úÌåYÖáËÙ¶È£¬Ç°Õý£¬µ¥Î»cm/s¡£ */
 float Pos_Est_vel_y_2 = 0.0f;
 
 static float s_vel_pred_x = 0.0f;
@@ -134,13 +134,13 @@ static float s_flow_ref_y = 0.0f;
 static uint8_t s_flow_ref_valid = 0U;
 static uint8_t s_flow_ref_frame_count = 0U;
 
-/* æ—§ä¼°è®¡å™¨å‘å¸ƒç»™æ–°ä¼°è®¡å™¨çš„æœ¬å‘¨æœŸåŠ é€Ÿåº¦å’Œåèˆªè§’é€Ÿåº¦å¿«ç…§ã€‚ */
+/* ¾É¹À¼ÆÆ÷·¢²¼¸øÐÂ¹À¼ÆÆ÷µÄ±¾ÖÜÆÚ¼ÓËÙ¶ÈºÍÆ«º½½ÇËÙ¶È¿ìÕÕ¡£ */
 static float s_common_acc_x_cmss = 0.0f;
 static float s_common_acc_y_cmss = 0.0f;
 static float s_common_yaw_rate_dps = 0.0f;
 static uint8_t s_common_accel_bias_locked = 0U;
 
-/* æ—§ä¼°è®¡å™¨å”¯ä¸€æ¶ˆè´¹LC302åŽå‘å¸ƒçš„åŽŸå§‹ç§¯åˆ†å’Œè§£è€¦å…‰æµå¿«ç…§ã€‚ */
+/* ¾É¹À¼ÆÆ÷Î¨Ò»Ïû·ÑLC302ºó·¢²¼µÄÔ­Ê¼»ý·ÖºÍ½âñî¹âÁ÷¿ìÕÕ¡£ */
 static uint32_t s_common_flow_sequence = 0U;
 static float s_common_flow_raw_x = 0.0f;
 static float s_common_flow_raw_y = 0.0f;
@@ -152,7 +152,7 @@ static uint8_t s_common_flow_valid = 0U;
 static uint8_t s_common_flow_height_valid = 0U;
 static uint32_t s_common_flow_reset_sequence = 0U;
 
-/* æ–°ä¼°è®¡å™¨ç‹¬ç«‹ç»´æŠ¤çš„é€Ÿåº¦å’Œå…‰æµæ¶ˆè´¹çŠ¶æ€ã€‚ */
+/* ÐÂ¹À¼ÆÆ÷¶ÀÁ¢Î¬»¤µÄËÙ¶ÈºÍ¹âÁ÷Ïû·Ñ×´Ì¬¡£ */
 static float s_vel_pred_x_2 = 0.0f;
 static float s_vel_pred_y_2 = 0.0f;
 static uint32_t s_flow_sequence_consumed_2 = 0U;
@@ -535,9 +535,9 @@ void Pos_Est_Init(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šè¯»å–æœ€è¿‘ä¸€å¸§LC302åŽŸå§‹ç§¯åˆ†å’Œå§¿æ€è§£è€¦å…‰æµå¿«ç…§ã€‚
- * è¾“å…¥å‚æ•°ï¼štelemetry - è¾“å‡ºå¿«ç…§æŒ‡é’ˆã€‚
- * è¿”å›žå€¼ï¼šæ— ï¼Œç»“æžœå†™å…¥telemetryæŒ‡å‘çš„ç»“æž„ä½“ã€‚
+ * º¯Êý¹¦ÄÜ£º¶ÁÈ¡×î½üÒ»Ö¡LC302Ô­Ê¼»ý·ÖºÍ×ËÌ¬½âñî¹âÁ÷¿ìÕÕ¡£
+ * ÊäÈë²ÎÊý£ºtelemetry - Êä³ö¿ìÕÕÖ¸Õë¡£
+ * ·µ»ØÖµ£ºÎÞ£¬½á¹ûÐ´ÈëtelemetryÖ¸ÏòµÄ½á¹¹Ìå¡£
  */
 void Pos_Est_GetFlowTelemetry(pos_est_flow_telemetry_t *telemetry)
 {
@@ -656,7 +656,7 @@ void Pos_Est_Update_1000HZ(void)
     }
     yaw_delta_rad = yaw_rate_dps * POS_EST_DEG_TO_RAD * POS_EST_ACC_DT_S;
 
-    /* å‘å¸ƒå·²ç»å®Œæˆæ ‡å®šã€é™å¹…å’Œå†²å‡»é—¨æŽ§çš„å…¬å…±IMUå¿«ç…§ã€‚ */
+    /* ·¢²¼ÒÑ¾­Íê³É±ê¶¨¡¢ÏÞ·ùºÍ³å»÷ÃÅ¿ØµÄ¹«¹²IMU¿ìÕÕ¡£ */
     s_common_acc_x_cmss = acc_x_lp;
     s_common_acc_y_cmss = acc_y_lp;
     s_common_yaw_rate_dps = yaw_rate_dps;
@@ -705,7 +705,7 @@ void Pos_Est_Update_1000HZ(void)
                                  frame_valid,
                                  tick_1000us_cnt);
 
-        /* åºå·æœ€åŽæ›´æ–°ï¼Œä¿è¯æ–°ä¼°è®¡å™¨çœ‹åˆ°çš„æ˜¯å®Œæ•´çš„åŒä¸€å¸§å¿«ç…§ã€‚ */
+        /* ÐòºÅ×îºó¸üÐÂ£¬±£Ö¤ÐÂ¹À¼ÆÆ÷¿´µ½µÄÊÇÍêÕûµÄÍ¬Ò»Ö¡¿ìÕÕ¡£ */
         s_common_flow_raw_x = (float)frame_flow_x;
         s_common_flow_raw_y = (float)frame_flow_y;
         s_common_flow_dec_x = (frame_valid != 0U) ? FlowGyroDecoupler_LC302_GetDecX() : 0.0f;
@@ -776,9 +776,9 @@ void Pos_Est_Update_1000HZ(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šåˆå§‹åŒ–åŽ»é™¤è½¦æ¨¡å¹³ç§»é€Ÿåº¦å½±å“çš„å¹¶è¡Œé€Ÿåº¦ä¼°è®¡å™¨ã€‚
- * è¾“å…¥å‚æ•°ï¼šæ— ã€‚
- * è¿”å›žå€¼ï¼šæ— ã€‚
+ * º¯Êý¹¦ÄÜ£º³õÊ¼»¯È¥³ý³µÄ£Æ½ÒÆËÙ¶ÈÓ°ÏìµÄ²¢ÐÐËÙ¶È¹À¼ÆÆ÷¡£
+ * ÊäÈë²ÎÊý£ºÎÞ¡£
+ * ·µ»ØÖµ£ºÎÞ¡£
  */
 void Pos_Est_Init_2(void)
 {
@@ -797,9 +797,9 @@ void Pos_Est_Init_2(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šåœ¨1000Hzä¸‹æ›´æ–°åŽ»é™¤è½¦æ¨¡å¹³ç§»é€Ÿåº¦å½±å“çš„æœºä½“é€Ÿåº¦ä¼°è®¡å€¼ã€‚
- * è¾“å…¥å‚æ•°ï¼šæ— ã€‚
- * è¿”å›žå€¼ï¼šæ— ï¼Œç»“æžœå†™å…¥Pos_Est_vel_x_2å’ŒPos_Est_vel_y_2ã€‚
+ * º¯Êý¹¦ÄÜ£ºÔÚ1000HzÏÂ¸üÐÂÈ¥³ý³µÄ£Æ½ÒÆËÙ¶ÈÓ°ÏìµÄ»úÌåËÙ¶È¹À¼ÆÖµ¡£
+ * ÊäÈë²ÎÊý£ºÎÞ¡£
+ * ·µ»ØÖµ£ºÎÞ£¬½á¹ûÐ´ÈëPos_Est_vel_x_2ºÍPos_Est_vel_y_2¡£
  */
 void Pos_Est_Update_1000HZ_2(void)
 {
@@ -830,7 +830,7 @@ void Pos_Est_Update_1000HZ_2(void)
         s_flow_prev_observation_valid_2 = 0U;
     }
 
-    /* ä¸Žæ—§ä¼°è®¡å™¨ä¸€è‡´ï¼šå…ˆæ—‹è½¬æœºä½“ç³»é€Ÿåº¦ï¼Œå†ç§¯åˆ†æœºä½“åŠ é€Ÿåº¦ã€‚ */
+    /* Óë¾É¹À¼ÆÆ÷Ò»ÖÂ£ºÏÈÐý×ª»úÌåÏµËÙ¶È£¬ÔÙ»ý·Ö»úÌå¼ÓËÙ¶È¡£ */
     yaw_delta_rad = s_common_yaw_rate_dps * POS_EST_DEG_TO_RAD * POS_EST_ACC_DT_S;
     Pos_Est_RotateBodyVelocity(&s_vel_pred_x_2,
                                &s_vel_pred_y_2,
@@ -861,7 +861,7 @@ void Pos_Est_Update_1000HZ_2(void)
             flow_observation_x = height_m * s_common_flow_dec_x * POS_EST_FLOW_TO_CMPS;
             flow_observation_y = height_m * s_common_flow_dec_y * POS_EST_FLOW_TO_CMPS;
 
-            /* æ ¹æ®è½¦ç¯ç›¸å¯¹æŠ•å½±ä¸­å¿ƒçš„ä½ç½®å’Œé¢ç§¯ä¼°è®¡è½¦å¯¹å…‰æµè½ç‚¹çš„è¦†ç›–çŽ‡ã€‚ */
+            /* ¸ù¾Ý³µµÆÏà¶ÔÍ¶Ó°ÖÐÐÄµÄÎ»ÖÃºÍÃæ»ý¹À¼Æ³µ¶Ô¹âÁ÷ÂäµãµÄ¸²¸ÇÂÊ¡£ */
             if (g_car_lamp_fused.valid != 0U)
             {
                 if ((g_projection_center.valid != 0U) &&
@@ -897,7 +897,7 @@ void Pos_Est_Update_1000HZ_2(void)
                 }
             }
 
-            /* è¦†ç›–çŽ‡å¤§äºŽ0ä½†è½¦é€Ÿå·²è¿‡æœŸæ—¶ï¼Œæ‹’ç»å¯èƒ½è¢«è½¦æ±¡æŸ“çš„å…‰æµå¸§ã€‚ */
+            /* ¸²¸ÇÂÊ´óÓÚ0µ«³µËÙÒÑ¹ýÆÚÊ±£¬¾Ü¾ø¿ÉÄÜ±»³µÎÛÈ¾µÄ¹âÁ÷Ö¡¡£ */
             if ((observation_available != 0U) && (car_coverage > 0.0f))
             {
                 if ((g_car_sync_time_ms > 0.0f) &&

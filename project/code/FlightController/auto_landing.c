@@ -10,21 +10,21 @@
 #include "../Protocols/crsf/crsf.h"
 #include <math.h>
 
-#define AUTO_LANDING_INITIAL_WAIT_TICKS (500U) /* ä½¿èƒ½åå‰ç½®ç­‰å¾…5sï¼Œå¯¹åº”100Hzè°ƒç”¨500æ¬¡ã€‚ */
-#define AUTO_LANDING_NO_TARGET_TICKS    (500U) /* æœ€è¿‘5sæ— é€Ÿåº¦ä¸‹å‘åˆ¤å®šé™è½ã€‚ */
-#define AUTO_LANDING_VALID_TICKS        (20U)  /* CarPlan3/4é€Ÿåº¦ä¸‹å‘éœ€è¿ç»­æœ‰æ•ˆ200msæ‰ç¡®è®¤ã€‚ */
-#define AUTO_LANDING_ROTATE_DEG         (360.0f) /* é£æœºä¸è½¦æ¨¡å„è‡ªæ—‹è½¬ä¸€åœˆçš„å®Œæˆè§’ï¼Œå•ä½åº¦ã€‚ */
-#define AUTO_LANDING_ROTATE_RATE_DPS    (60.0f)  /* è½¦æ¨¡æ—‹è½¬æŒ‡ä»¤çš„èˆªå‘æ¨è¿›é€Ÿç‡ï¼Œå•ä½deg/sã€‚ */
-#define AUTO_LANDING_ROTATE_SPEED_MPS   (0.3f)   /* è½¦æ¨¡æ—‹è½¬æŒ‡ä»¤çš„å¹³ç§»é€Ÿåº¦ï¼Œå•ä½m/sã€‚ */
-#define AUTO_LANDING_ROTATE_TIMEOUT_TICKS (1000U) /* åŒæ—‹è½¬é˜¶æ®µè¶…æ—¶10så¼ºåˆ¶é™è½ï¼Œé˜²æ­»é”ã€‚ */
+#define AUTO_LANDING_INITIAL_WAIT_TICKS (500U) /* Ê¹ÄÜºóÇ°ÖÃµÈ´ı5s£¬¶ÔÓ¦100Hzµ÷ÓÃ500´Î¡£ */
+#define AUTO_LANDING_NO_TARGET_TICKS    (500U) /* ×î½ü5sÎŞËÙ¶ÈÏÂ·¢ÅĞ¶¨½µÂä¡£ */
+#define AUTO_LANDING_VALID_TICKS        (20U)  /* CarPlan3/4ËÙ¶ÈÏÂ·¢ĞèÁ¬ĞøÓĞĞ§200ms²ÅÈ·ÈÏ¡£ */
+#define AUTO_LANDING_ROTATE_DEG         (360.0f) /* ·É»úÓë³µÄ£¸÷×ÔĞı×ªÒ»È¦µÄÍê³É½Ç£¬µ¥Î»¶È¡£ */
+#define AUTO_LANDING_ROTATE_RATE_DPS    (60.0f)  /* ³µÄ£Ğı×ªÖ¸ÁîµÄº½ÏòÍÆ½øËÙÂÊ£¬µ¥Î»deg/s¡£ */
+#define AUTO_LANDING_ROTATE_SPEED_MPS   (0.3f)   /* ³µÄ£Ğı×ªÖ¸ÁîµÄÆ½ÒÆËÙ¶È£¬µ¥Î»m/s¡£ */
+#define AUTO_LANDING_ROTATE_TIMEOUT_TICKS (1000U) /* Ë«Ğı×ª½×¶Î³¬Ê±10sÇ¿ÖÆ½µÂä£¬·ÀËÀËø¡£ */
 #define AUTO_LANDING_DEG_TO_RAD         (0.017453292519943295f)
 
 typedef enum
 {
-    AUTO_LANDING_STATE_IDLE = 0U, /* å…¥å£æ¡ä»¶æœªæ»¡è¶³ã€‚ */
-    AUTO_LANDING_STATE_DETECT,    /* 5sç­‰å¾…åæ£€æµ‹æœ€è¿‘5sæ˜¯å¦æœ‰é€Ÿåº¦ä¸‹å‘ã€‚ */
-    AUTO_LANDING_STATE_ROTATE,    /* å…³é—­è´Ÿå‹å¹¶è®©é£æœºä¸è½¦æ¨¡å„æ—‹è½¬ä¸€åœˆã€‚ */
-    AUTO_LANDING_STATE_TRIGGERED  /* å·²è¯·æ±‚é™è½ï¼Œé”å­˜ç›´åˆ°å›å¾…æœºã€‚ */
+    AUTO_LANDING_STATE_IDLE = 0U, /* Èë¿ÚÌõ¼şÎ´Âú×ã¡£ */
+    AUTO_LANDING_STATE_DETECT,    /* 5sµÈ´ıºó¼ì²â×î½ü5sÊÇ·ñÓĞËÙ¶ÈÏÂ·¢¡£ */
+    AUTO_LANDING_STATE_ROTATE,    /* ¹Ø±Õ¸ºÑ¹²¢ÈÃ·É»úÓë³µÄ£¸÷Ğı×ªÒ»È¦¡£ */
+    AUTO_LANDING_STATE_TRIGGERED  /* ÒÑÇëÇó½µÂä£¬Ëø´æÖ±µ½»Ø´ı»ú¡£ */
 } auto_landing_state_e;
 
 extern float g_car_yaw;
@@ -33,18 +33,18 @@ extern uint32 g_car_last_update_time_ms;
 extern volatile uint32 tick_1000us_cnt;
 
 static auto_landing_state_e s_state = AUTO_LANDING_STATE_IDLE;
-static uint16 s_initial_wait_ticks = 0U; /* è‡ªåŠ¨é™è½å‰ç½®ç­‰å¾…è®¡æ•°ã€‚ */
-static uint16 s_no_target_ticks = 0U; /* è¿ç»­æ— å¯ä¿¡ç›®æ ‡è®¡æ•°ã€‚ */
-static uint16 s_valid_target_ticks = 0U; /* CarPlan3è¿ç»­æœ‰æ•ˆè®¡æ•°ã€‚ */
-static uint16 s_rotate_timeout_ticks = 0U; /* åŒæ—‹è½¬é˜¶æ®µè¶…æ—¶è®¡æ•°ã€‚ */
-static float s_rotate_air_accum_deg = 0.0f; /* åŒæ—‹è½¬é˜¶æ®µé£æœºç´¯è®¡æ—‹è½¬è§’ã€‚ */
-static float s_rotate_car_accum_deg = 0.0f; /* åŒæ—‹è½¬é˜¶æ®µè½¦æ¨¡ç´¯è®¡æ—‹è½¬è§’ã€‚ */
-static float s_rotate_prev_air_yaw = 0.0f; /* åŒæ—‹è½¬é˜¶æ®µä¸Šæ¬¡é£æœºèˆªå‘ã€‚ */
-static float s_rotate_prev_car_yaw = 0.0f; /* åŒæ—‹è½¬é˜¶æ®µä¸Šæ¬¡è½¦æ¨¡èˆªå‘ã€‚ */
-static float s_rotate_car_heading_deg = 0.0f; /* è½¦æ¨¡æ—‹è½¬æŒ‡ä»¤çš„ç»å¯¹èˆªå‘ç›®æ ‡ã€‚ */
-static float s_rotate_car_dir = 1.0f; /* è½¦æ¨¡æ—‹è½¬æ–¹å‘ï¼Œ1ä¸ºyawæ­£æ–¹å‘ï¼Œ-1ä¸ºyawè´Ÿæ–¹å‘ã€‚ */
-static float s_rotate_strafe_mps = 0.0f; /* è½¦æ¨¡æ—‹è½¬æŒ‡ä»¤æ¨ªç§»é€Ÿåº¦ã€‚ */
-static float s_rotate_forward_mps = 0.0f; /* è½¦æ¨¡æ—‹è½¬æŒ‡ä»¤å‰å‘é€Ÿåº¦ã€‚ */
+static uint16 s_initial_wait_ticks = 0U; /* ×Ô¶¯½µÂäÇ°ÖÃµÈ´ı¼ÆÊı¡£ */
+static uint16 s_no_target_ticks = 0U; /* Á¬ĞøÎŞ¿ÉĞÅÄ¿±ê¼ÆÊı¡£ */
+static uint16 s_valid_target_ticks = 0U; /* CarPlan3Á¬ĞøÓĞĞ§¼ÆÊı¡£ */
+static uint16 s_rotate_timeout_ticks = 0U; /* Ë«Ğı×ª½×¶Î³¬Ê±¼ÆÊı¡£ */
+static float s_rotate_air_accum_deg = 0.0f; /* Ë«Ğı×ª½×¶Î·É»úÀÛ¼ÆĞı×ª½Ç¡£ */
+static float s_rotate_car_accum_deg = 0.0f; /* Ë«Ğı×ª½×¶Î³µÄ£ÀÛ¼ÆĞı×ª½Ç¡£ */
+static float s_rotate_prev_air_yaw = 0.0f; /* Ë«Ğı×ª½×¶ÎÉÏ´Î·É»úº½Ïò¡£ */
+static float s_rotate_prev_car_yaw = 0.0f; /* Ë«Ğı×ª½×¶ÎÉÏ´Î³µÄ£º½Ïò¡£ */
+static float s_rotate_car_heading_deg = 0.0f; /* ³µÄ£Ğı×ªÖ¸ÁîµÄ¾ø¶Ôº½ÏòÄ¿±ê¡£ */
+static float s_rotate_car_dir = 1.0f; /* ³µÄ£Ğı×ª·½Ïò£¬1ÎªyawÕı·½Ïò£¬-1Îªyaw¸º·½Ïò¡£ */
+static float s_rotate_strafe_mps = 0.0f; /* ³µÄ£Ğı×ªÖ¸ÁîºáÒÆËÙ¶È¡£ */
+static float s_rotate_forward_mps = 0.0f; /* ³µÄ£Ğı×ªÖ¸ÁîÇ°ÏòËÙ¶È¡£ */
 
 static float AutoLanding_Wrap180Deg(float angle_deg)
 {
@@ -74,9 +74,9 @@ static void AutoLanding_ResetAll(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: è¿›å…¥åŒæ—‹è½¬é˜¶æ®µï¼Œé£æœºä¸è½¦æ¨¡åŒå‘å„æ—‹è½¬ä¸€åœˆ
- * è¾“å…¥å‚æ•°: æ— 
- * è¾“å‡ºå‚æ•°æˆ–è¿”å›å€¼: æ— 
+ * º¯Êı¹¦ÄÜ: ½øÈëË«Ğı×ª½×¶Î£¬·É»úÓë³µÄ£Í¬Ïò¸÷Ğı×ªÒ»È¦
+ * ÊäÈë²ÎÊı: ÎŞ
+ * Êä³ö²ÎÊı»ò·µ»ØÖµ: ÎŞ
  */
 static void AutoLanding_StartRotate(void)
 {
@@ -89,17 +89,17 @@ static void AutoLanding_StartRotate(void)
     s_rotate_prev_air_yaw = g_euler.yaw;
     s_rotate_prev_car_yaw = g_car_yaw;
     s_rotate_car_heading_deg = g_car_yaw;
-    /* è½¦æ¨¡ä¸é£æœºæœç´¢åŒå‘æ—‹è½¬ï¼Œé¿å…çº¿ç¼†é¢å¤–æ‰­è½¬ã€‚ */
+    /* ³µÄ£Óë·É»úËÑË÷Í¬ÏòĞı×ª£¬±ÜÃâÏßÀÂ¶îÍâÅ¤×ª¡£ */
     YawAlign_GetDebug(&yaw_debug);
     s_rotate_car_dir = (yaw_debug.search_direction < 0) ? -1.0f : 1.0f;
-    /* å¼ºåˆ¶é£æœºæŒç»­æ—‹è½¬æœç´¢ï¼Œæ— è§†planæŠ–åŠ¨æœ‰æ•ˆå¯¼è‡´çš„æœç´¢åœæ­¢ã€‚ */
+    /* Ç¿ÖÆ·É»ú³ÖĞøĞı×ªËÑË÷£¬ÎŞÊÓplan¶¶¶¯ÓĞĞ§µ¼ÖÂµÄËÑË÷Í£Ö¹¡£ */
     YawAlign_SetSearchForced(1U);
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: ä»¥100Hzæ¨è¿›åŒæ—‹è½¬é˜¶æ®µï¼Œä¸¤åœˆå®Œæˆæˆ–è¶…æ—¶åè¯·æ±‚ç°æœ‰é™è½ç¨‹åº
- * è¾“å…¥å‚æ•°: æ— 
- * è¾“å‡ºå‚æ•°æˆ–è¿”å›å€¼: æ— 
+ * º¯Êı¹¦ÄÜ: ÒÔ100HzÍÆ½øË«Ğı×ª½×¶Î£¬Á½È¦Íê³É»ò³¬Ê±ºóÇëÇóÏÖÓĞ½µÂä³ÌĞò
+ * ÊäÈë²ÎÊı: ÎŞ
+ * Êä³ö²ÎÊı»ò·µ»ØÖµ: ÎŞ
  */
 static void AutoLanding_UpdateRotate(void)
 {
@@ -112,7 +112,7 @@ static void AutoLanding_UpdateRotate(void)
         s_rotate_timeout_ticks++;
     }
 
-    /* æŒ‰[-180,180]åŒ…è§’å·®ç´¯è®¡é£æœºä¸è½¦æ¨¡çš„å®é™…æ—‹è½¬è§’ã€‚ */
+    /* °´[-180,180]°ü½Ç²îÀÛ¼Æ·É»úÓë³µÄ£µÄÊµ¼ÊĞı×ª½Ç¡£ */
     air_delta_deg = AutoLanding_Wrap180Deg(g_euler.yaw - s_rotate_prev_air_yaw);
     car_delta_deg = AutoLanding_Wrap180Deg(g_car_yaw - s_rotate_prev_car_yaw);
     s_rotate_prev_air_yaw = g_euler.yaw;
@@ -134,7 +134,7 @@ static void AutoLanding_UpdateRotate(void)
         s_rotate_car_accum_deg = 0.0f;
     }
 
-    /* è½¦æ¨¡æ—‹è½¬æŒ‡ä»¤ï¼šæŒç»­æ¨è¿›ç»å¯¹èˆªå‘ï¼Œè½¦ç«¯æŒ‰atan2(strafe,forward)ç›¸å¯¹è‡ªèº«èˆªå‘è½¬å‘è·Ÿéšã€‚ */
+    /* ³µÄ£Ğı×ªÖ¸Áî£º³ÖĞøÍÆ½ø¾ø¶Ôº½Ïò£¬³µ¶Ë°´atan2(strafe,forward)Ïà¶Ô×ÔÉíº½Ïò×ªÏò¸úËæ¡£ */
     if (s_rotate_car_accum_deg < AUTO_LANDING_ROTATE_DEG)
     {
         s_rotate_car_heading_deg +=
@@ -160,7 +160,7 @@ static void AutoLanding_UpdateRotate(void)
     }
     else if (s_rotate_timeout_ticks >= AUTO_LANDING_ROTATE_TIMEOUT_TICKS)
     {
-        /* è¶…æ—¶å…œåº•ï¼šæ—‹è½¬æœªå®Œæˆä¹Ÿè¿›å…¥é™è½ï¼Œé¿å…é•¿æœŸæ»ç•™ç©ºä¸­ã€‚ */
+        /* ³¬Ê±¶µµ×£ºĞı×ªÎ´Íê³ÉÒ²½øÈë½µÂä£¬±ÜÃâ³¤ÆÚÖÍÁô¿ÕÖĞ¡£ */
         YawAlign_SetSearchForced(0U);
         s_state = AUTO_LANDING_STATE_TRIGGERED;
         FC_START_CRSF_Request_Landing();
@@ -168,9 +168,9 @@ static void AutoLanding_UpdateRotate(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: ä»¥100Hzæ£€æµ‹Mode4è‡ªåŠ¨é™è½æ¡ä»¶å¹¶è¯·æ±‚ç°æœ‰è½åœ°ç¨‹åº
- * è¾“å…¥å‚æ•°: æ— 
- * è¾“å‡ºå‚æ•°æˆ–è¿”å›å€¼: æ— 
+ * º¯Êı¹¦ÄÜ: ÒÔ100Hz¼ì²âMode4×Ô¶¯½µÂäÌõ¼ş²¢ÇëÇóÏÖÓĞÂäµØ³ÌĞò
+ * ÊäÈë²ÎÊı: ÎŞ
+ * Êä³ö²ÎÊı»ò·µ»ØÖµ: ÎŞ
  */
 void AutoLanding_Update100Hz(void)
 {
@@ -189,7 +189,7 @@ void AutoLanding_Update100Hz(void)
         return;
     }
 
-    /* è½¦æ¨¡å¯åŠ¨åˆ¤å®šï¼šæœ€è¿‘200mså†…æœ‰è½¦ç«¯æ—¶é—´æˆ³æ¨è¿›ã€‚ */
+    /* ³µÄ£Æô¶¯ÅĞ¶¨£º×î½ü200msÄÚÓĞ³µ¶ËÊ±¼ä´ÁÍÆ½ø¡£ */
     car_started = ((g_car_sync_time_ms > 0.0f) &&
                    ((tick_1000us_cnt - g_car_last_update_time_ms) <
                     FC_MODE_CAR_RUN_DATA_TIMEOUT_MS)) ? 1U : 0U;
@@ -210,7 +210,7 @@ void AutoLanding_Update100Hz(void)
 
     if ((state != FC_START_CRSF_STATE_FLYING) ||
         (mode != FC_START_CRSF_FLIGHT_MODE_4) ||
-        (g_fc_params.yaw_change_mode4 >= 0.5f) || /* ä»…yawmode0è‡ªåŠ¨é™è½ï¼Œä»»åŠ¡æœŸé—´yawç›®æ ‡ä¿æŒ0åº¦ã€‚ */
+        (g_fc_params.yaw_change_mode4 >= 0.5f) || /* ½öyawmode0×Ô¶¯½µÂä£¬ÈÎÎñÆÚ¼äyawÄ¿±ê±£³Ö0¶È¡£ */
         (CRSF_STD[4] != 1) ||
         ((Car_Plan_Mode != 3) && (Car_Plan_Mode != 4)) ||
         (car_started == 0U))
@@ -230,7 +230,7 @@ void AutoLanding_Update100Hz(void)
         return;
     }
 
-    /* æŒ‰å½“å‰é€‰ä¸­çš„CarPlanè¯»å–é€Ÿåº¦ä¸‹å‘ç»“æœï¼Œåˆ¤å®šæœ€è¿‘æ˜¯å¦æœ‰å¯ä¿¡ç›®æ ‡ã€‚ */
+    /* °´µ±Ç°Ñ¡ÖĞµÄCarPlan¶ÁÈ¡ËÙ¶ÈÏÂ·¢½á¹û£¬ÅĞ¶¨×î½üÊÇ·ñÓĞ¿ÉĞÅÄ¿±ê¡£ */
     if (Car_Plan_Mode == 3)
     {
         CarPlan_3_GetResult(&plan3_result);
@@ -267,9 +267,9 @@ void AutoLanding_Update100Hz(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: æŸ¥è¯¢è‡ªåŠ¨é™è½è§¦å‘é”å­˜çŠ¶æ€
- * è¾“å…¥å‚æ•°: æ— 
- * è¾“å‡ºå‚æ•°æˆ–è¿”å›å€¼: 1è¡¨ç¤ºè‡ªåŠ¨é™è½å·²è§¦å‘ï¼Œ0è¡¨ç¤ºæœªè§¦å‘
+ * º¯Êı¹¦ÄÜ: ²éÑ¯×Ô¶¯½µÂä´¥·¢Ëø´æ×´Ì¬
+ * ÊäÈë²ÎÊı: ÎŞ
+ * Êä³ö²ÎÊı»ò·µ»ØÖµ: 1±íÊ¾×Ô¶¯½µÂäÒÑ´¥·¢£¬0±íÊ¾Î´´¥·¢
  */
 uint8 AutoLanding_IsTriggered(void)
 {
@@ -277,9 +277,9 @@ uint8 AutoLanding_IsTriggered(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: æŸ¥è¯¢åŒæ—‹è½¬é˜¶æ®µæ˜¯å¦è¿›è¡Œä¸­
- * è¾“å…¥å‚æ•°: æ— 
- * è¾“å‡ºå‚æ•°æˆ–è¿”å›å€¼: 1è¡¨ç¤ºé£æœºä¸è½¦æ¨¡æ­£åœ¨å„æ—‹è½¬ä¸€åœˆï¼Œ0è¡¨ç¤ºæœªåœ¨æ—‹è½¬
+ * º¯Êı¹¦ÄÜ: ²éÑ¯Ë«Ğı×ª½×¶ÎÊÇ·ñ½øĞĞÖĞ
+ * ÊäÈë²ÎÊı: ÎŞ
+ * Êä³ö²ÎÊı»ò·µ»ØÖµ: 1±íÊ¾·É»úÓë³µÄ£ÕıÔÚ¸÷Ğı×ªÒ»È¦£¬0±íÊ¾Î´ÔÚĞı×ª
  */
 uint8 AutoLanding_IsRotationActive(void)
 {
@@ -287,10 +287,10 @@ uint8 AutoLanding_IsRotationActive(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: è·å–åŒæ—‹è½¬é˜¶æ®µä¸‹å‘è½¦æ¨¡çš„æ—‹è½¬æŒ‡ä»¤é€Ÿåº¦
- * è¾“å…¥å‚æ•°: strafe_mps - è½¦ä½“å³å‘é€Ÿåº¦è¾“å‡ºåœ°å€ï¼Œä¸å¯ä¸ºç©º
- *          forward_mps - è½¦ä½“å‰å‘é€Ÿåº¦è¾“å‡ºåœ°å€ï¼Œä¸å¯ä¸ºç©º
- * è¾“å‡ºå‚æ•°æˆ–è¿”å›å€¼: æ— 
+ * º¯Êı¹¦ÄÜ: »ñÈ¡Ë«Ğı×ª½×¶ÎÏÂ·¢³µÄ£µÄĞı×ªÖ¸ÁîËÙ¶È
+ * ÊäÈë²ÎÊı: strafe_mps - ³µÌåÓÒÏòËÙ¶ÈÊä³öµØÖ·£¬²»¿ÉÎª¿Õ
+ *          forward_mps - ³µÌåÇ°ÏòËÙ¶ÈÊä³öµØÖ·£¬²»¿ÉÎª¿Õ
+ * Êä³ö²ÎÊı»ò·µ»ØÖµ: ÎŞ
  */
 void AutoLanding_GetRotateCommand(float *strafe_mps, float *forward_mps)
 {
@@ -299,9 +299,9 @@ void AutoLanding_GetRotateCommand(float *strafe_mps, float *forward_mps)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: è·å–è‡ªåŠ¨é™è½æ£€æµ‹çš„åªè¯»è°ƒè¯•å¿«ç…§
- * è¾“å…¥å‚æ•°: debug - è°ƒè¯•å¿«ç…§è¾“å‡ºåœ°å€ï¼Œä¸å¯ä¸ºç©º
- * è¾“å‡ºå‚æ•°æˆ–è¿”å›å€¼: æ— 
+ * º¯Êı¹¦ÄÜ: »ñÈ¡×Ô¶¯½µÂä¼ì²âµÄÖ»¶Áµ÷ÊÔ¿ìÕÕ
+ * ÊäÈë²ÎÊı: debug - µ÷ÊÔ¿ìÕÕÊä³öµØÖ·£¬²»¿ÉÎª¿Õ
+ * Êä³ö²ÎÊı»ò·µ»ØÖµ: ÎŞ
  */
 void AutoLanding_GetDebug(auto_landing_debug_t *debug)
 {

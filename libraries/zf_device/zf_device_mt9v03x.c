@@ -1,49 +1,49 @@
 /*********************************************************************************************************************
-* MM32F527X-E9P Opensource Library å³ï¼ˆMM32F527X-E9P å¼€æºåº“ï¼‰æ˜¯ä¸€ä¸ªåŸºäºå®˜æ–¹ SDK æ¥å£çš„ç¬¬ä¸‰æ–¹å¼€æºåº“
-* Copyright (c) 2022 SEEKFREE é€é£ç§‘æŠ€
+* MM32F527X-E9P Opensource Library ¼´£¨MM32F527X-E9P ¿ªÔ´¿â£©ÊÇÒ»¸ö»ùÓÚ¹Ù·½ SDK ½Ó¿ÚµÄµÚÈı·½¿ªÔ´¿â
+* Copyright (c) 2022 SEEKFREE Öğ·É¿Æ¼¼
 * 
-* æœ¬æ–‡ä»¶æ˜¯ MM32F527X-E9P å¼€æºåº“çš„ä¸€éƒ¨åˆ†
+* ±¾ÎÄ¼şÊÇ MM32F527X-E9P ¿ªÔ´¿âµÄÒ»²¿·Ö
 * 
-* MM32F527X-E9P å¼€æºåº“ æ˜¯å…è´¹è½¯ä»¶
-* æ‚¨å¯ä»¥æ ¹æ®è‡ªç”±è½¯ä»¶åŸºé‡‘ä¼šå‘å¸ƒçš„ GPLï¼ˆGNU General Public Licenseï¼Œå³ GNUé€šç”¨å…¬å…±è®¸å¯è¯ï¼‰çš„æ¡æ¬¾
-* å³ GPL çš„ç¬¬3ç‰ˆï¼ˆå³ GPL3.0ï¼‰æˆ–ï¼ˆæ‚¨é€‰æ‹©çš„ï¼‰ä»»ä½•åæ¥çš„ç‰ˆæœ¬ï¼Œé‡æ–°å‘å¸ƒå’Œ/æˆ–ä¿®æ”¹å®ƒ
+* MM32F527X-E9P ¿ªÔ´¿â ÊÇÃâ·ÑÈí¼ş
+* Äú¿ÉÒÔ¸ù¾İ×ÔÓÉÈí¼ş»ù½ğ»á·¢²¼µÄ GPL£¨GNU General Public License£¬¼´ GNUÍ¨ÓÃ¹«¹²Ğí¿ÉÖ¤£©µÄÌõ¿î
+* ¼´ GPL µÄµÚ3°æ£¨¼´ GPL3.0£©»ò£¨ÄúÑ¡ÔñµÄ£©ÈÎºÎºóÀ´µÄ°æ±¾£¬ÖØĞÂ·¢²¼ºÍ/»òĞŞ¸ÄËü
 * 
-* æœ¬å¼€æºåº“çš„å‘å¸ƒæ˜¯å¸Œæœ›å®ƒèƒ½å‘æŒ¥ä½œç”¨ï¼Œä½†å¹¶æœªå¯¹å…¶ä½œä»»ä½•çš„ä¿è¯
-* ç”šè‡³æ²¡æœ‰éšå«çš„é€‚é”€æ€§æˆ–é€‚åˆç‰¹å®šç”¨é€”çš„ä¿è¯
-* æ›´å¤šç»†èŠ‚è¯·å‚è§ GPL
+* ±¾¿ªÔ´¿âµÄ·¢²¼ÊÇÏ£ÍûËüÄÜ·¢»Ó×÷ÓÃ£¬µ«²¢Î´¶ÔÆä×÷ÈÎºÎµÄ±£Ö¤
+* ÉõÖÁÃ»ÓĞÒşº¬µÄÊÊÏúĞÔ»òÊÊºÏÌØ¶¨ÓÃÍ¾µÄ±£Ö¤
+* ¸ü¶àÏ¸½ÚÇë²Î¼û GPL
 * 
-* æ‚¨åº”è¯¥åœ¨æ”¶åˆ°æœ¬å¼€æºåº“çš„åŒæ—¶æ”¶åˆ°ä¸€ä»½ GPL çš„å‰¯æœ¬
-* å¦‚æœæ²¡æœ‰ï¼Œè¯·å‚é˜…<https://www.gnu.org/licenses/>
+* ÄúÓ¦¸ÃÔÚÊÕµ½±¾¿ªÔ´¿âµÄÍ¬Ê±ÊÕµ½Ò»·İ GPL µÄ¸±±¾
+* Èç¹ûÃ»ÓĞ£¬Çë²ÎÔÄ<https://www.gnu.org/licenses/>
 * 
-* é¢å¤–æ³¨æ˜ï¼š
-* æœ¬å¼€æºåº“ä½¿ç”¨ GPL3.0 å¼€æºè®¸å¯è¯åè®® ä»¥ä¸Šè®¸å¯ç”³æ˜ä¸ºè¯‘æ–‡ç‰ˆæœ¬
-* è®¸å¯ç”³æ˜è‹±æ–‡ç‰ˆåœ¨ libraries/doc æ–‡ä»¶å¤¹ä¸‹çš„ GPL3_permission_statement.txt æ–‡ä»¶ä¸­
-* è®¸å¯è¯å‰¯æœ¬åœ¨ libraries æ–‡ä»¶å¤¹ä¸‹ å³è¯¥æ–‡ä»¶å¤¹ä¸‹çš„ LICENSE æ–‡ä»¶
-* æ¬¢è¿å„ä½ä½¿ç”¨å¹¶ä¼ æ’­æœ¬ç¨‹åº ä½†ä¿®æ”¹å†…å®¹æ—¶å¿…é¡»ä¿ç•™é€é£ç§‘æŠ€çš„ç‰ˆæƒå£°æ˜ï¼ˆå³æœ¬å£°æ˜ï¼‰
+* ¶îÍâ×¢Ã÷£º
+* ±¾¿ªÔ´¿âÊ¹ÓÃ GPL3.0 ¿ªÔ´Ğí¿ÉÖ¤Ğ­Òé ÒÔÉÏĞí¿ÉÉêÃ÷ÎªÒëÎÄ°æ±¾
+* Ğí¿ÉÉêÃ÷Ó¢ÎÄ°æÔÚ libraries/doc ÎÄ¼ş¼ĞÏÂµÄ GPL3_permission_statement.txt ÎÄ¼şÖĞ
+* Ğí¿ÉÖ¤¸±±¾ÔÚ libraries ÎÄ¼ş¼ĞÏÂ ¼´¸ÃÎÄ¼ş¼ĞÏÂµÄ LICENSE ÎÄ¼ş
+* »¶Ó­¸÷Î»Ê¹ÓÃ²¢´«²¥±¾³ÌĞò µ«ĞŞ¸ÄÄÚÈİÊ±±ØĞë±£ÁôÖğ·É¿Æ¼¼µÄ°æÈ¨ÉùÃ÷£¨¼´±¾ÉùÃ÷£©
 * 
-* æ–‡ä»¶åç§°          zf_device_mt9v03x
-* å…¬å¸åç§°          æˆéƒ½é€é£ç§‘æŠ€æœ‰é™å…¬å¸
-* ç‰ˆæœ¬ä¿¡æ¯          æŸ¥çœ‹ libraries/doc æ–‡ä»¶å¤¹å†… version æ–‡ä»¶ ç‰ˆæœ¬è¯´æ˜
-* å¼€å‘ç¯å¢ƒ          IAR 9.40.1
-* é€‚ç”¨å¹³å°          CYT2BL3
-* åº—é“ºé“¾æ¥          https://seekfree.taobao.com/
+* ÎÄ¼şÃû³Æ          zf_device_mt9v03x
+* ¹«Ë¾Ãû³Æ          ³É¶¼Öğ·É¿Æ¼¼ÓĞÏŞ¹«Ë¾
+* °æ±¾ĞÅÏ¢          ²é¿´ libraries/doc ÎÄ¼ş¼ĞÄÚ version ÎÄ¼ş °æ±¾ËµÃ÷
+* ¿ª·¢»·¾³          IAR 9.40.1
+* ÊÊÓÃÆ½Ì¨          CYT2BL3
+* µêÆÌÁ´½Ó          https://seekfree.taobao.com/
 * 
-* ä¿®æ”¹è®°å½•
-* æ—¥æœŸ              ä½œè€…                å¤‡æ³¨
+* ĞŞ¸Ä¼ÇÂ¼
+* ÈÕÆÚ              ×÷Õß                ±¸×¢
 * 2024-11-19       pudding            first version
 ********************************************************************************************************************/
 /*********************************************************************************************************************
-* æ¥çº¿å®šä¹‰ï¼š
+* ½ÓÏß¶¨Òå£º
 *                   ------------------------------------
-*                   æ¨¡å—ç®¡è„š            å•ç‰‡æœºç®¡è„š
-*                   TXD                 æŸ¥çœ‹ zf_device_mt9v03x.h ä¸­ MT9V03X_COF_UART_TX å®å®šä¹‰
-*                   RXD                 æŸ¥çœ‹ zf_device_mt9v03x.h ä¸­ MT9V03X_COF_UART_RX å®å®šä¹‰
-*                   PCLK                æŸ¥çœ‹ zf_device_mt9v03x.h ä¸­ MT9V03X_PCLK_PIN å®å®šä¹‰
-*                   VSY                 æŸ¥çœ‹ zf_device_mt9v03x.h ä¸­ MT9V03X_VSYNC_PIN å®å®šä¹‰
-*                   D0-D7               æŸ¥çœ‹ zf_device_mt9v03x.h ä¸­ MT9V03X_DATA_PIN å®å®šä¹‰ ä»è¯¥å®šä¹‰å¼€å§‹çš„è¿ç»­å…«ä¸ªå¼•è„š
-*                   VCC                 3.3Vç”µæº
-*                   GND                 ç”µæºåœ°
-*                   å…¶ä½™å¼•è„šæ‚¬ç©º
+*                   Ä£¿é¹Ü½Å            µ¥Æ¬»ú¹Ü½Å
+*                   TXD                 ²é¿´ zf_device_mt9v03x.h ÖĞ MT9V03X_COF_UART_TX ºê¶¨Òå
+*                   RXD                 ²é¿´ zf_device_mt9v03x.h ÖĞ MT9V03X_COF_UART_RX ºê¶¨Òå
+*                   PCLK                ²é¿´ zf_device_mt9v03x.h ÖĞ MT9V03X_PCLK_PIN ºê¶¨Òå
+*                   VSY                 ²é¿´ zf_device_mt9v03x.h ÖĞ MT9V03X_VSYNC_PIN ºê¶¨Òå
+*                   D0-D7               ²é¿´ zf_device_mt9v03x.h ÖĞ MT9V03X_DATA_PIN ºê¶¨Òå ´Ó¸Ã¶¨Òå¿ªÊ¼µÄÁ¬Ğø°Ë¸öÒı½Å
+*                   VCC                 3.3VµçÔ´
+*                   GND                 µçÔ´µØ
+*                   ÆäÓàÒı½ÅĞü¿Õ
 *                   ------------------------------------
 ********************************************************************************************************************/
 
@@ -55,17 +55,17 @@
 #include "zf_device_config.h"
 #include "zf_device_mt9v03x.h"
 
-vuint8 mt9v03x_finish_flag = 0;                                                 // ä¸€åœºå›¾åƒé‡‡é›†å®Œæˆæ ‡å¿—ä½
+vuint8 mt9v03x_finish_flag = 0;                                                 // Ò»³¡Í¼Ïñ²É¼¯Íê³É±êÖ¾Î»
 uint8 mt9v03x_image[MT9V03X_H][MT9V03X_W];     
-uint16 g_mt9v03x_exp_time = 400U;                                                // è¿è¡Œæ—¶æ›å…‰æ—¶é—´
-uint16 g_mt9v03x_fps = MT9V03X_FPS_DEF;                                         // è¿è¡Œæ—¶ç›®æ ‡å¸§ç‡
-uint16 g_mt9v03x_gain = MT9V03X_GAIN_DEF;                                       // è¿è¡Œæ—¶å›¾åƒå¢ç›Š
-volatile uint32 mt9v03x_frame_sequence = 0U;                                    // æœ€è¿‘å®Œæˆé‡‡é›†çš„æºå¸§åºå·
+uint16 g_mt9v03x_exp_time = 400U;                                                // ÔËĞĞÊ±ÆØ¹âÊ±¼ä
+uint16 g_mt9v03x_fps = MT9V03X_FPS_DEF;                                         // ÔËĞĞÊ±Ä¿±êÖ¡ÂÊ
+uint16 g_mt9v03x_gain = MT9V03X_GAIN_DEF;                                       // ÔËĞĞÊ±Í¼ÏñÔöÒæ
+volatile uint32 mt9v03x_frame_sequence = 0U;                                    // ×î½üÍê³É²É¼¯µÄÔ´Ö¡ĞòºÅ
 
 static uint8 perfect_proportion = 0;
 static uint8 s_mt9v03x_trig_initialized = 0U;
 
-#pragma location = 0x28026024                                                   // å°†ä¸‹é¢è¿™ä¸ªæ•°ç»„å®šä¹‰åˆ°æŒ‡å®šçš„RAMåœ°å€
+#pragma location = 0x28026024                                                   // ½«ÏÂÃæÕâ¸öÊı×é¶¨Òåµ½Ö¸¶¨µÄRAMµØÖ·
 __no_init uint8  mt9v03x_image_temp[MT9V03X_H][MT9V03X_W];                      
 #pragma location = 0x28006bf0
 __no_init uint16 mt9v03x_h_num;
@@ -80,7 +80,7 @@ void camera_finish_callback(void)
 
     memcpy(mt9v03x_image[0], mt9v03x_image_temp[0], MT9V03X_IMAGE_SIZE);
 
-    /* å›¾åƒå¤åˆ¶å®Œæˆåå‘å¸ƒå¸§åºå·ï¼Œé›¶å€¼ä¿ç•™ä¸ºå°šæœªæ”¶åˆ°æœ‰æ•ˆå¸§ã€‚ */
+    /* Í¼Ïñ¸´ÖÆÍê³Éºó·¢²¼Ö¡ĞòºÅ£¬ÁãÖµ±£ÁôÎªÉĞÎ´ÊÕµ½ÓĞĞ§Ö¡¡£ */
     __DMB();
     mt9v03x_frame_sequence++;
     if(0U == mt9v03x_frame_sequence)
@@ -102,7 +102,7 @@ static void mt9v03x_trig_stop(void)
     }
 
     lock = interrupt_global_disable();
-    /* åœæ­¢é‡‡é›†å¹¶æ¸…é™¤æ®‹ç•™ä¸­æ–­ä¸å¸§å‘å¸ƒçŠ¶æ€ã€‚ */
+    /* Í£Ö¹²É¼¯²¢Çå³ı²ĞÁôÖĞ¶ÏÓëÖ¡·¢²¼×´Ì¬¡£ */
     Cy_Tcpwm_Counter_Disable(TCPWM0_GRP0_CNT59);
     Cy_Tcpwm_Counter_ClearTC_Intr(TCPWM0_GRP0_CNT59);
     NVIC_ClearPendingIRQ(CPUIntIdx3_IRQn);
@@ -121,7 +121,7 @@ static void mt9v03x_trig_init(void)
         cy_stc_tcpwm_counter_config_t tcpwm_camera_config;
 
         Cy_SysClk_PeriphAssignDivider(PCLK_TCPWM0_CLOCKS59, (cy_en_divider_types_t)CY_SYSCLK_DIV_16_BIT, 0ul);
-        Cy_SysClk_PeriphSetDivider(Cy_SysClk_GetClockGroup(PCLK_TCPWM0_CLOCKS59), (cy_en_divider_types_t)CY_SYSCLK_DIV_16_BIT, 0ul, 9u); // 80Mhzæ—¶é’Ÿè¢«10åˆ†é¢‘ä¸º8Mhz
+        Cy_SysClk_PeriphSetDivider(Cy_SysClk_GetClockGroup(PCLK_TCPWM0_CLOCKS59), (cy_en_divider_types_t)CY_SYSCLK_DIV_16_BIT, 0ul, 9u); // 80MhzÊ±ÖÓ±»10·ÖÆµÎª8Mhz
         Cy_SysClk_PeriphEnableDivider(Cy_SysClk_GetClockGroup(PCLK_TCPWM0_CLOCKS59), (cy_en_divider_types_t)CY_SYSCLK_DIV_16_BIT, 0ul);
 
         mt9v03x_trig_irq_cfg.sysIntSrc  = tcpwm_0_interrupts_59_IRQn;
@@ -130,7 +130,7 @@ static void mt9v03x_trig_init(void)
         interrupt_init(&mt9v03x_trig_irq_cfg, camera_finish_callback, 0);
 
         memset(&tcpwm_camera_config, 0, sizeof(tcpwm_camera_config));
-        tcpwm_camera_config.period             = 0x0                                ;        // pitå‘¨æœŸè®¡ç®—
+        tcpwm_camera_config.period             = 0x0                                ;        // pitÖÜÆÚ¼ÆËã
         tcpwm_camera_config.clockPrescaler     = CY_TCPWM_PRESCALER_DIVBY_1         ;
         tcpwm_camera_config.runMode            = CY_TCPWM_COUNTER_ONESHOT           ;
         tcpwm_camera_config.countDirection     = CY_TCPWM_COUNTER_COUNT_UP          ;
@@ -155,13 +155,13 @@ static void mt9v03x_trig_init(void)
 
 
 //-------------------------------------------------------------------------------------------------------------------
-// å‡½æ•°ç®€ä»‹     å•ç‹¬è®¾ç½®æ‘„åƒå¤´æ›å…‰æ—¶é—´
-// å‚æ•°è¯´æ˜     light           è®¾å®šæ›å…‰æ—¶é—´
-// è¿”å›å‚æ•°     uint8           1-å¤±è´¥ 0-æˆåŠŸ
-// ä½¿ç”¨ç¤ºä¾‹     mt9v03x_set_exposure_time(100);                 // è°ƒç”¨è¯¥å‡½æ•°å‰è¯·å…ˆåˆå§‹åŒ–ä¸²å£
-// å¤‡æ³¨ä¿¡æ¯     è®¾ç½®æ›å…‰æ—¶é—´è¶Šå¤§å›¾åƒè¶Šäº®
-//              æ‘„åƒå¤´æ”¶åˆ°åä¼šæ ¹æ®åˆ†è¾¨ç‡åŠFPSè®¡ç®—æœ€å¤§æ›å…‰æ—¶é—´å¦‚æœè®¾ç½®çš„æ•°æ®è¿‡å¤§
-//              é‚£ä¹ˆæ‘„åƒå¤´å°†ä¼šè®¾ç½®è¿™ä¸ªæœ€å¤§å€¼
+// º¯Êı¼ò½é     µ¥¶ÀÉèÖÃÉãÏñÍ·ÆØ¹âÊ±¼ä
+// ²ÎÊıËµÃ÷     light           Éè¶¨ÆØ¹âÊ±¼ä
+// ·µ»Ø²ÎÊı     uint8           1-Ê§°Ü 0-³É¹¦
+// Ê¹ÓÃÊ¾Àı     mt9v03x_set_exposure_time(100);                 // µ÷ÓÃ¸Ãº¯ÊıÇ°ÇëÏÈ³õÊ¼»¯´®¿Ú
+// ±¸×¢ĞÅÏ¢     ÉèÖÃÆØ¹âÊ±¼äÔ½´óÍ¼ÏñÔ½ÁÁ
+//              ÉãÏñÍ·ÊÕµ½ºó»á¸ù¾İ·Ö±æÂÊ¼°FPS¼ÆËã×î´óÆØ¹âÊ±¼äÈç¹ûÉèÖÃµÄÊı¾İ¹ı´ó
+//              ÄÇÃ´ÉãÏñÍ·½«»áÉèÖÃÕâ¸ö×î´óÖµ
 //-------------------------------------------------------------------------------------------------------------------
 uint8 mt9v03x_set_exposure_time (uint16 light)
 {
@@ -174,11 +174,11 @@ uint8 mt9v03x_set_exposure_time (uint16 light)
 
 
 //-------------------------------------------------------------------------------------------------------------------
-// å‡½æ•°ç®€ä»‹     MT9V03X SCCB åˆå§‹åŒ–
-// å‚æ•°è¯´æ˜     void
-// è¿”å›å‚æ•°     uint8           0-æˆåŠŸ x-å¤±è´¥
-// ä½¿ç”¨ç¤ºä¾‹     mt9v03x_sccb_init();
-// å¤‡æ³¨ä¿¡æ¯     
+// º¯Êı¼ò½é     MT9V03X SCCB ³õÊ¼»¯
+// ²ÎÊıËµÃ÷     void
+// ·µ»Ø²ÎÊı     uint8           0-³É¹¦ x-Ê§°Ü
+// Ê¹ÓÃÊ¾Àı     mt9v03x_sccb_init();
+// ±¸×¢ĞÅÏ¢     
 //-------------------------------------------------------------------------------------------------------------------
 uint8 mt9v03x_sccb_init (void)
 {
@@ -193,20 +193,20 @@ uint8 mt9v03x_sccb_init (void)
     
     if(!mt9v03x_sccb_check_id(&mt9v03x_iic_struct))
     {
-        // éœ€è¦é…ç½®åˆ°æ‘„åƒå¤´çš„æ•°æ® ä¸å…è®¸åœ¨è¿™ä¿®æ”¹å‚æ•°
+        // ĞèÒªÅäÖÃµ½ÉãÏñÍ·µÄÊı¾İ ²»ÔÊĞíÔÚÕâĞŞ¸Ä²ÎÊı
         const int16 mt9v03x_set_confing_buffer[MT9V03X_CONFIG_FINISH][2]=
         {
-            {MT9V03X_INIT,              0},                                     // æ‘„åƒå¤´å¼€å§‹åˆå§‹åŒ–
+            {MT9V03X_INIT,              0},                                     // ÉãÏñÍ·¿ªÊ¼³õÊ¼»¯
 
-            {MT9V03X_AUTO_EXP,          MT9V03X_AUTO_EXP_DEF},                  // è‡ªåŠ¨æ›å…‰è®¾ç½®
-            {MT9V03X_EXP_TIME,          (int16)g_mt9v03x_exp_time},             // æ›å…‰æ—¶é—´
-            {MT9V03X_FPS,               (int16)g_mt9v03x_fps},                  // å›¾åƒå¸§ç‡
-            {MT9V03X_SET_COL,           MT9V03X_W * (perfect_proportion + 1)},  // å›¾åƒåˆ—æ•°é‡
-            {MT9V03X_SET_ROW,           MT9V03X_H * (perfect_proportion + 1)},  // å›¾åƒè¡Œæ•°é‡
-            {MT9V03X_LR_OFFSET,         MT9V03X_LR_OFFSET_DEF},                 // å›¾åƒå·¦å³åç§»é‡
-            {MT9V03X_UD_OFFSET,         MT9V03X_UD_OFFSET_DEF},                 // å›¾åƒä¸Šä¸‹åç§»é‡
-            {MT9V03X_GAIN,              (int16)g_mt9v03x_gain},                 // å›¾åƒå¢ç›Š
-            {MT9V03X_PCLK_MODE,         MT9V03X_PCLK_MODE_DEF},                 // åƒç´ æ—¶é’Ÿæ¨¡å¼
+            {MT9V03X_AUTO_EXP,          MT9V03X_AUTO_EXP_DEF},                  // ×Ô¶¯ÆØ¹âÉèÖÃ
+            {MT9V03X_EXP_TIME,          (int16)g_mt9v03x_exp_time},             // ÆØ¹âÊ±¼ä
+            {MT9V03X_FPS,               (int16)g_mt9v03x_fps},                  // Í¼ÏñÖ¡ÂÊ
+            {MT9V03X_SET_COL,           MT9V03X_W * (perfect_proportion + 1)},  // Í¼ÏñÁĞÊıÁ¿
+            {MT9V03X_SET_ROW,           MT9V03X_H * (perfect_proportion + 1)},  // Í¼ÏñĞĞÊıÁ¿
+            {MT9V03X_LR_OFFSET,         MT9V03X_LR_OFFSET_DEF},                 // Í¼Ïñ×óÓÒÆ«ÒÆÁ¿
+            {MT9V03X_UD_OFFSET,         MT9V03X_UD_OFFSET_DEF},                 // Í¼ÏñÉÏÏÂÆ«ÒÆÁ¿
+            {MT9V03X_GAIN,              (int16)g_mt9v03x_gain},                 // Í¼ÏñÔöÒæ
+            {MT9V03X_PCLK_MODE,         MT9V03X_PCLK_MODE_DEF},                 // ÏñËØÊ±ÖÓÄ£Ê½
         };
         return_state = mt9v03x_sccb_set_config(mt9v03x_set_confing_buffer);
     }
@@ -215,17 +215,17 @@ uint8 mt9v03x_sccb_init (void)
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-// å‡½æ•°ç®€ä»‹     MT9V03X æ‘„åƒå¤´åˆå§‹åŒ–
-// å‚æ•°è¯´æ˜     void
-// è¿”å›å‚æ•°     uint8           0-æˆåŠŸ x-å¤±è´¥
-// ä½¿ç”¨ç¤ºä¾‹     mt9v03x_init();
-// å¤‡æ³¨ä¿¡æ¯     
+// º¯Êı¼ò½é     MT9V03X ÉãÏñÍ·³õÊ¼»¯
+// ²ÎÊıËµÃ÷     void
+// ·µ»Ø²ÎÊı     uint8           0-³É¹¦ x-Ê§°Ü
+// Ê¹ÓÃÊ¾Àı     mt9v03x_init();
+// ±¸×¢ĞÅÏ¢     
 //-------------------------------------------------------------------------------------------------------------------
 uint8 mt9v03x_init (void)
 {
     uint8 return_state  = 0;
 
-    /* é‡å¤åˆå§‹åŒ–å‰åœæ­¢é‡‡é›†å¹¶ä¸¢å¼ƒæ®‹å¸§ï¼Œé¿å…æ—§å¸§åœ¨æ–°æ›å…‰è®¾ç½®åè¢«å¤„ç†ã€‚ */
+    /* ÖØ¸´³õÊ¼»¯Ç°Í£Ö¹²É¼¯²¢¶ªÆú²ĞÖ¡£¬±ÜÃâ¾ÉÖ¡ÔÚĞÂÆØ¹âÉèÖÃºó±»´¦Àí¡£ */
     mt9v03x_trig_stop();
     
     SCB_DisableICache();
@@ -234,7 +234,7 @@ uint8 mt9v03x_init (void)
     mt9v03x_h_num = MT9V03X_H;
     mt9v03x_w_num = MT9V03X_W;
     
-    if(mt9v03x_h_num == 60 && mt9v03x_w_num == 94)      // å®Œç¾ç¼©å‡æ¯”ä¾‹ å¯é‡‡é›†åˆ°å®Œæ•´æ¯”ä¾‹å›¾åƒ
+    if(mt9v03x_h_num == 60 && mt9v03x_w_num == 94)      // ÍêÃÀËõ¼õ±ÈÀı ¿É²É¼¯µ½ÍêÕû±ÈÀıÍ¼Ïñ
     {
         perfect_proportion = 1;
     }

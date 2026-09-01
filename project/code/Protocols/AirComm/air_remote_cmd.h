@@ -6,9 +6,9 @@
 typedef void (*air_remote_cmd_fn)(void);
 
 /*
- * å…¼å®¹æ—§æ–‡ä»¶åçš„è¿œç¨‹å‘½ä»¤æ¥å£ã€‚
- * å½“å‰ä¸»é“¾è·¯ç”± air_comm_air.c ç›´æ¥å¤„ç† 0x03 è¿œç¨‹å‘½ä»¤ï¼Œè¿™é‡Œåªè½¬å‘åˆ°ç»Ÿä¸€æ³¨å†Œæ¥å£ï¼Œ
- * é¿å…ä¿ç•™æ—§ start/poll/stop æ¨¡å‹é€ æˆåç»­ç»´æŠ¤æ··æ·†ã€‚
+ * ¼æÈİ¾ÉÎÄ¼şÃûµÄÔ¶³ÌÃüÁî½Ó¿Ú¡£
+ * µ±Ç°Ö÷Á´Â·ÓÉ air_comm_air.c Ö±½Ó´¦Àí 0x03 Ô¶³ÌÃüÁî£¬ÕâÀïÖ»×ª·¢µ½Í³Ò»×¢²á½Ó¿Ú£¬
+ * ±ÜÃâ±£Áô¾É start/poll/stop Ä£ĞÍÔì³ÉºóĞøÎ¬»¤»ìÏı¡£
  */
 void air_remote_cmd_init(void);
 uint8 air_remote_cmd_register_polling(const char *name, air_remote_cmd_fn run);

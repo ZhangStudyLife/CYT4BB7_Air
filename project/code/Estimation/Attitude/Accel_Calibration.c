@@ -1,10 +1,10 @@
 /********************************************************************
- * ï¿½Ä¼ï¿½ï¿½ï¿½  : accel_calibration.c
- * Ëµï¿½ï¿½    : ICM42688 ï¿½ï¿½ï¿½Ù¶È±ê¶¨ï¿½ë´¹Ö±ï¿½ï¿½ï¿½Ù¶ï¿½Ô¤ï¿½ï¿½ï¿½ï¿½
- * ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë®ï¿½ï¿½: rotate -> bias/scale -> È¥ï¿½ï¿½ï¿½ï¿½ -> ï¿½ï¿½ï¿½ï¿½Í¶Ó° -> ï¿½Ë²ï¿½ -> ï¿½ï¿½ï¿½ï¿½
- * ï¿½Ø¼ï¿½ï¿½Ó¿ï¿½:
- *   1) AccelCalibration_Start()         ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¹ï¿½ê¶¨
- *   2) AccelCalibration_Update_1000HZ() ÊµÊ±ï¿½ï¿½ï¿½Â£ï¿½1kHzï¿½ï¿½
+ * ÎÄ¼şÃû  : accel_calibration.c
+ * ËµÃ÷    : ICM42688 ¼ÓËÙ¶È±ê¶¨Óë´¹Ö±¼ÓËÙ¶ÈÔ¤´¦Àí
+ * ´¦ÀíÁ÷Ë®Ïß: rotate -> bias/scale -> È¥ÖØÁ¦ -> ÏòÏÂÍ¶Ó° -> ÂË²¨ -> »ı·Ö
+ * ¹Ø¼ü½Ó¿Ú:
+ *   1) AccelCalibration_Start()         Æô¶¯¾²Ö¹±ê¶¨
+ *   2) AccelCalibration_Update_1000HZ() ÊµÊ±¸üĞÂ£¨1kHz£©
  ********************************************************************/
 
 #include "Accel_Calibration.h"
@@ -22,10 +22,10 @@
 
 #define IMU_ACCEL_G_MAX_ABS                      (20.0f)
 #define IMU_GYRO_DPS_MAX_ABS                     (6000.0f)
-#define CALIB_MAX_TRY_SAMPLES                    (3000U) /* ï¿½ï¿½ï¿½Ù¶È¾ï¿½Ö¹ï¿½ê¶¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü´ï¿½ï¿½ï¿½ */
+#define CALIB_MAX_TRY_SAMPLES                    (3000U) /* ¼ÓËÙ¶È¾²Ö¹±ê¶¨×î´ó²ÉÑù×Ü´ÎÊı */
 
-/* AP ï¿½ï¿½ñ£º·Ö´ï¿½ï¿½Ú²É¼ï¿½ï¿½ï¿½ï¿½Ğ¶ï¿½ */
-#define ACCEL_CALIBRATION_WINDOW_SAMPLES         (200U)  /* ï¿½ï¿½Ö¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½1kHzÔ¼0.2ï¿½ï¿½ */
+/* AP ·ç¸ñ£º·Ö´°¿Ú²É¼¯²¢ÅĞ¶¨ */
+#define ACCEL_CALIBRATION_WINDOW_SAMPLES         (200U)  /* ¾²Ö¹²ÉÑù´°¿ÚÑù±¾Êı£¬1kHzÔ¼0.2Ãë */
 #define ACCEL_CALIBRATION_MAX_WINDOWS            (24U)
 #define ACCEL_CALIBRATION_CONVERGE_WINDOWS       (3U)
 #define ACCEL_CALIBRATION_STATIC_ACCEL_MIN_G     (0.80f)
@@ -35,7 +35,7 @@
 #define ACCEL_CALIBRATION_CONVERGE_BIAS_DELTA_G  (0.004f)
 #define ACCEL_CALIBRATION_CONVERGE_ACC_STD_G     (0.025f)
 
-/* ï¿½ï¿½ï¿½ï¿½Î¢ï¿½ï¿½Ä¬ï¿½Ï¹Ø±Õ£ï¿½×¨×¢Ò»ï¿½ï¿½ï¿½ï¿½Ğ£×¼ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½Ğ§ */
+/* ÔÚÏßÎ¢µ÷Ä¬ÈÏ¹Ø±Õ£¬×¨×¢Ò»´ÎĞÔĞ£×¼ºóÈ·ÈÏÓĞĞ§ */
 #define ACCEL_CALIBRATION_ENABLE_ONLINE_TRIM      (0U)
 #define ACCEL_CALIBRATION_ONLINE_BIAS_ALPHA      (0.0025f)
 #define ACCEL_CALIBRATION_ONLINE_GYRO_MAX_DPS    (1.2f)
@@ -49,25 +49,25 @@
 #define ACCEL_CALIBRATION_QUALITY_ALPHA_STATIC   (0.0020f)
 #define ACCEL_CALIBRATION_QUALITY_ALPHA_DYNAMIC  (0.0120f)
 
-/* ï¿½ï¿½Ö¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¹Ê±ï¿½Ô¶ï¿½Î¢ï¿½ï¿½Æ«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¦ï¿½ï¿½Æ¯ */
+/* ¾²Ö¹ÖØËø¶¨£ºÆô¶¯ºó¾²Ö¹Ê±×Ô¶¯Î¢µ÷Æ«ÖÃÒÔÊÊÓ¦ÎÂÆ¯ */
 #define ACCEL_CALIBRATION_STATIC_RELOCK_ENABLE        (1U)
 #define ACCEL_CALIBRATION_STATIC_RELOCK_ALPHA         (0.0010f)
 #define ACCEL_CALIBRATION_STATIC_RELOCK_GYRO_MAX_DPS  (0.35f)
 #define ACCEL_CALIBRATION_STATIC_RELOCK_ACC_ERR_MAX_G (0.025f)
 #define ACCEL_CALIBRATION_STATIC_RELOCK_TRIM_MAX_G    (0.60f)
 
-#define IMU_CALIB_GYRO_TARGET_VALID_SAMPLES      (60000U) /* ï¿½ï¿½ï¿½ï¿½ï¿½Ç¾ï¿½Ö¹ï¿½ê¶¨Ä¿ï¿½ï¿½ï¿½ï¿½Ğ§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼60ï¿½ï¿½ */
-#define IMU_CALIB_GYRO_TIMEOUT_SAMPLES           (300000U) /* ï¿½ï¿½ï¿½ï¿½ï¿½Ç¾ï¿½Ö¹ï¿½ê¶¨ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
+#define IMU_CALIB_GYRO_TARGET_VALID_SAMPLES      (60000U) /* ÍÓÂİÒÇ¾²Ö¹±ê¶¨Ä¿±êÓĞĞ§Ñù±¾Êı£¬Ô¼60Ãë */
+#define IMU_CALIB_GYRO_TIMEOUT_SAMPLES           (300000U) /* ÍÓÂİÒÇ¾²Ö¹±ê¶¨³¬Ê±Ñù±¾Êı */
 #define IMU_CALIB_GYRO_STATIC_MAX_DPS            (6.0f)
 #define IMU_CALIB_GYRO_STATIC_ACC_ERR_G          (0.06f)
 #define IMU_CALIB_GYRO_STD_MAX_DPS               (0.20f)
 #define IMU_CALIB_GYRO_BIAS_MAX_DPS              (8.0f)
-#define IMU_CALIB_GYRO_PRE_STABLE_SAMPLES        (1500U) /* ï¿½ï¿½ï¿½ï¿½ï¿½Ç±ê¶¨Ô¤ï¿½ï¿½ï¿½È¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
+#define IMU_CALIB_GYRO_PRE_STABLE_SAMPLES        (1500U) /* ÍÓÂİÒÇ±ê¶¨Ô¤ÈÈÎÈ¶¨Ñù±¾Êı */
 
-#define IMU_CALIB_ACC6_FACE_TARGET_SAMPLES       (2500U) /* 6ï¿½ï¿½ê¶¨ï¿½ï¿½ï¿½ï¿½Ä¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
-#define IMU_CALIB_ACC6_FACE_STABLE_SAMPLES       (750U)  /* 6ï¿½ï¿½ê¶¨ï¿½ï¿½ï¿½ï¿½È·ï¿½ï¿½ï¿½È¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
-#define IMU_CALIB_ACC6_FACE_HOLD_DELAY_SAMPLES   (500U)  /* 6ï¿½ï¿½ê¶¨ï¿½ï¿½ï¿½æ±£ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
-#define IMU_CALIB_ACC6_TIMEOUT_SAMPLES           (480000U) /* 6ï¿½ï¿½ê¶¨ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
+#define IMU_CALIB_ACC6_FACE_TARGET_SAMPLES       (2500U) /* 6Ãæ±ê¶¨µ¥ÃæÄ¿±ê²ÉÑùÊı */
+#define IMU_CALIB_ACC6_FACE_STABLE_SAMPLES       (750U)  /* 6Ãæ±ê¶¨µ¥ÃæÈ·ÈÏÎÈ¶¨Ñù±¾Êı */
+#define IMU_CALIB_ACC6_FACE_HOLD_DELAY_SAMPLES   (500U)  /* 6Ãæ±ê¶¨µ¥Ãæ±£³ÖÑÓÊ±Ñù±¾Êı */
+#define IMU_CALIB_ACC6_TIMEOUT_SAMPLES           (480000U) /* 6Ãæ±ê¶¨³¬Ê±×ÜÑù±¾Êı */
 #define IMU_CALIB_ACC6_STATIC_MAX_DPS            (3.0f)
 #define IMU_CALIB_ACC6_DOM_MIN_G                 (0.90f)
 #define IMU_CALIB_ACC6_OTHER_MAX_G               (0.25f)
@@ -78,7 +78,7 @@
 #define IMU_CALIB_ACC6_POST_NORM_ERR_MAX_G       (0.030f)
 #define IMU_CALIB_ACC6_POST_DOM_ERR_MAX_G        (0.060f)
 #define IMU_CALIB_ACC6_POST_OFF_AXIS_MAX_G       (0.090f)
-#define IMU_CALIB_ACC6_PRE_STABLE_SAMPLES        (1250U) /* 6ï¿½ï¿½ê¶¨Ô¤ï¿½ï¿½ï¿½È¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
+#define IMU_CALIB_ACC6_PRE_STABLE_SAMPLES        (1250U) /* 6Ãæ±ê¶¨Ô¤ÈÈÎÈ¶¨Ñù±¾Êı */
 
 #define IMU_CALIB_CMD_LINE_MAX                   (64U)
 #define IMU_CALIB_CMD_READ_MAX                   (64U)
@@ -150,7 +150,7 @@ typedef struct
 
 AccelCalibration_t g_accel_calibration = {0};
 static IMUCalibRuntime_t s_imu_calib = {0};
-/* IMU æ ¡å‡†æ–‡æœ¬è¾“å‡ºå›è°ƒï¼Œä¼˜å…ˆç”¨äº WiFi æ–‡æœ¬æç¤º */
+/* IMU Ğ£×¼ÎÄ±¾Êä³ö»Øµ÷£¬ÓÅÏÈÓÃÓÚ WiFi ÎÄ±¾ÌáÊ¾ */
 static IMUCalibTextSink_t s_imu_calib_text_sink = NULL;
 static void imu_calib_apply_default_accel_calibration(void);
 
@@ -170,9 +170,9 @@ static void imu_calib_apply_default_accel_calibration(void);
 #define ELLIP_POST_DIAG_MAX      (1.15f)
 #define ELLIP_POST_BIAS_NORM_MAX_G (0.35f)
 #define ELLIP_MOVING_GYRO_DPS    (8.0f)
-#define ELLIP_MANUAL_MAX_ORIENT  (128U)     /* æ‰‹åŠ¨æ¤­çƒæ¨¡å¼å…è®¸ç¼“å­˜çš„æœ€å¤§å§¿æ€ç‚¹æ•° */
-#define ELLIP_MANUAL_ORIENT_SAMPLES (5000U) /* æ‰‹åŠ¨æ¤­çƒæ¨¡å¼å•ä¸ªå§¿æ€ç‚¹é‡‡æ ·æ•° */
-#define ELLIP_MANUAL_TIMEOUT_SAMPLES (1800000U) /* æ‰‹åŠ¨æ¤­çƒæ¨¡å¼æ€»è¶…æ—¶ï¼Œçº¦ 30 åˆ†é’Ÿ */
+#define ELLIP_MANUAL_MAX_ORIENT  (128U)     /* ÊÖ¶¯ÍÖÇòÄ£Ê½ÔÊĞí»º´æµÄ×î´ó×ËÌ¬µãÊı */
+#define ELLIP_MANUAL_ORIENT_SAMPLES (5000U) /* ÊÖ¶¯ÍÖÇòÄ£Ê½µ¥¸ö×ËÌ¬µã²ÉÑùÊı */
+#define ELLIP_MANUAL_TIMEOUT_SAMPLES (1800000U) /* ÊÖ¶¯ÍÖÇòÄ£Ê½×Ü³¬Ê±£¬Ô¼ 30 ·ÖÖÓ */
 
 typedef struct
 {
@@ -207,7 +207,7 @@ static float s_static_relock_trim_g[3] = {0.0f, 0.0f, 0.0f};
 static uint8_t s_static_relock_trim_ready = 0U;
 #endif
 
-/* ========================= ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ßºï¿½ï¿½ï¿½ ========================= */
+/* ========================= »ù´¡¹¤¾ßº¯Êı ========================= */
 
 static float clampf_local(float v, float min_v, float max_v)
 {
@@ -238,11 +238,11 @@ static float fabsf_local(float v)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: è¾“å‡º IMU æ ¡å‡†è¿‡ç¨‹æ–‡æœ¬
- * è¾“å…¥å‚æ•°:
- *   format - printf é£æ ¼æ ¼å¼ä¸²
- *   ...    - æ ¼å¼åŒ–å‚æ•°
- * è¿”å›å€¼: æ— 
+ * º¯Êı¹¦ÄÜ: Êä³ö IMU Ğ£×¼¹ı³ÌÎÄ±¾
+ * ÊäÈë²ÎÊı:
+ *   format - printf ·ç¸ñ¸ñÊ½´®
+ *   ...    - ¸ñÊ½»¯²ÎÊı
+ * ·µ»ØÖµ: ÎŞ
  */
 static void imu_calib_emit_text(const char *format, ...)
 {
@@ -671,7 +671,7 @@ static int32_t ellip_apply_solution(const float bias[3], const float M[3][3])
 
 static bool euler_ready(void)
 {
-    /* ï¿½ï¿½ sin^2+cos^2ï¿½ï¿½1 ï¿½Ğ¶ï¿½ï¿½ï¿½Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½Çºï¿½ï¿½ï¿½ï¿½ï¿½Ğ§ï¿½ï¿½ï¿½Å³ï¿½Î´ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ì¬ï¿½ï¿½ï¿½ï¿½ */
+    /* ÓÃ sin^2+cos^2¡Ö1 ÅĞ¶¨×ËÌ¬½ÇÈı½Çº¯ÊıÓĞĞ§£¬ÅÅ³ıÎ´³õÊ¼»¯×ËÌ¬Êı¾İ */
     const float s2r = g_euler.sin_roll * g_euler.sin_roll;
     const float c2r = g_euler.cos_roll * g_euler.cos_roll;
     const float s2p = g_euler.sin_pitch * g_euler.sin_pitch;
@@ -723,9 +723,9 @@ static float calc_accel_down_from_body(const float accel_body_mps2[3])
 
 static void rotate_body_linear_to_level(const float accel_body_mps2[3], float accel_level_mps2[3])
 {
-    /* è¾“å…¥ä¸ºæœºä½“ç³»FRDçº¿æ€§åŠ é€Ÿåº¦ï¼Œå•ä½m/s^2ã€‚
-     * è¾“å‡ºä¸ºæ°´å¹³ç³»çº¿æ€§åŠ é€Ÿåº¦ï¼š+Xæœºå¤´å‰æ–¹ï¼Œ+Yæœºä½“å³ä¾§ï¼Œ+Zä¸ºDownã€‚
-     * å½“å…³é—­ yaw å‚ä¸æ—¶ï¼Œä»…å»é™¤roll/pitchå¯¼è‡´çš„åæ ‡å€¾æ–œã€‚
+    /* ÊäÈëÎª»úÌåÏµFRDÏßĞÔ¼ÓËÙ¶È£¬µ¥Î»m/s^2¡£
+     * Êä³öÎªË®Æ½ÏµÏßĞÔ¼ÓËÙ¶È£º+X»úÍ·Ç°·½£¬+Y»úÌåÓÒ²à£¬+ZÎªDown¡£
+     * µ±¹Ø±Õ yaw ²ÎÓëÊ±£¬½öÈ¥³ıroll/pitchµ¼ÖÂµÄ×ø±êÇãĞ±¡£
      */
     const float sin_pitch = g_euler.sin_pitch;
     const float cos_pitch = g_euler.cos_pitch;
@@ -836,7 +836,7 @@ static void apply_uniform_scale(float scale)
 
 static bool imu_sample_valid(float ax, float ay, float az, float gx, float gy, float gz)
 {
-    /* Í³Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğ§ï¿½Ô¼ï¿½é£ºï¿½ï¿½Öµï¿½ï¿½Ğ§ + ï¿½ï¿½ï¿½Ìºï¿½ï¿½ï¿½ + ï¿½ï¿½Ì¬ï¿½ï¿½ï¿½ï¿½ */
+    /* Í³Ò»²ÉÑùÓĞĞ§ĞÔ¼ì²é£ºÊıÖµÓĞĞ§ + Á¿³ÌºÏÀí + ×ËÌ¬¾ÍĞ÷ */
     if (!is_finitef_local(ax) || !is_finitef_local(ay) || !is_finitef_local(az) ||
         !is_finitef_local(gx) || !is_finitef_local(gy) || !is_finitef_local(gz))
     {
@@ -871,12 +871,12 @@ static void rotate_imu_to_body(const float vec_in[3], float vec_out[3])
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: è¯»å–å½“å‰å¸§ä¾› IMU æ ¡å‡†ä½¿ç”¨çš„åŸå§‹ä¼ æ„Ÿå™¨ç‰©ç†é‡ã€‚
- * è¾“å…¥å‚æ•°:
- *   accel_sensor_g - è¾“å‡ºä¼ æ„Ÿå™¨åæ ‡ç³»åŸå§‹åŠ é€Ÿåº¦ï¼Œå•ä½ gï¼›ä»…é‡ç¨‹æ¢ç®—ä¸ç¬¦å·æ˜ å°„
- *   gyro_sensor_dps - è¾“å‡ºä¼ æ„Ÿå™¨åæ ‡ç³»åŸå§‹è§’é€Ÿåº¦ï¼Œå•ä½ dpsï¼›å·²æ‰£é™¤é™€èºä»ªé›¶å
- * è¾“å‡ºå‚æ•°/è¿”å›å€¼:
- *   é€šè¿‡æ•°ç»„è¿”å›å½“å‰å¸§åŸå§‹ IMU æ•°æ®ï¼›ç©ºæŒ‡é’ˆæ—¶ç›´æ¥è¿”å›
+ * º¯Êı¹¦ÄÜ: ¶ÁÈ¡µ±Ç°Ö¡¹© IMU Ğ£×¼Ê¹ÓÃµÄÔ­Ê¼´«¸ĞÆ÷ÎïÀíÁ¿¡£
+ * ÊäÈë²ÎÊı:
+ *   accel_sensor_g - Êä³ö´«¸ĞÆ÷×ø±êÏµÔ­Ê¼¼ÓËÙ¶È£¬µ¥Î» g£»½öÁ¿³Ì»»ËãÓë·ûºÅÓ³Éä
+ *   gyro_sensor_dps - Êä³ö´«¸ĞÆ÷×ø±êÏµÔ­Ê¼½ÇËÙ¶È£¬µ¥Î» dps£»ÒÑ¿Û³ıÍÓÂİÒÇÁãÆ«
+ * Êä³ö²ÎÊı/·µ»ØÖµ:
+ *   Í¨¹ıÊı×é·µ»Øµ±Ç°Ö¡Ô­Ê¼ IMU Êı¾İ£»¿ÕÖ¸ÕëÊ±Ö±½Ó·µ»Ø
  */
 static void imu_calib_get_raw_sensor_sample(float accel_sensor_g[3], float gyro_sensor_dps[3])
 {
@@ -1480,7 +1480,7 @@ static void imu_calib_start_gyro(void)
     ICM42688_SetGyroBiasDps(0.0f, 0.0f, 0.0f, 0U);
     s_imu_calib.busy = 1U;
     s_imu_calib.mode = IMU_CALIB_MODE_GYRO;
-    imu_calib_emit_text("OK imu gyro å¼€å§‹ è¯·ä¿æŒé£æœºé™æ­¢");
+    imu_calib_emit_text("OK imu gyro ¿ªÊ¼ Çë±£³Ö·É»ú¾²Ö¹");
 }
 
 static void imu_calib_prepare_acc6_state(void)
@@ -1504,8 +1504,8 @@ static void imu_calib_prepare_acc6_state(void)
 
 static void imu_calib_manual_emit_next_commands(void)
 {
-    imu_calib_emit_text("OK imu accel_man æç¤º ç»§ç»­é‡‡ç‚¹è¯·å‘ imu acc collect");
-    imu_calib_emit_text("OK imu accel_man æç¤º ç»“æŸå¹¶æ±‚è§£è¯·å‘ imu acc stop");
+    imu_calib_emit_text("OK imu accel_man ÌáÊ¾ ¼ÌĞø²ÉµãÇë·¢ imu acc collect");
+    imu_calib_emit_text("OK imu accel_man ÌáÊ¾ ½áÊø²¢Çó½âÇë·¢ imu acc stop");
 }
 
 static void imu_calib_manual_reset_current_pose(void)
@@ -1564,10 +1564,10 @@ static void imu_calib_manual_begin_collect(void)
 {
     imu_calib_manual_reset_current_pose();
     s_ellip_manual.substate = IMU_CALIB_MANUAL_SUBSTATE_WAIT_STATIC;
-    imu_calib_emit_text("OK imu accel_man ç­‰å¾…é™æ­¢ pose=%u stable_target=%u",
+    imu_calib_emit_text("OK imu accel_man µÈ´ı¾²Ö¹ pose=%u stable_target=%u",
                         (unsigned int)(s_ellip_manual.orient_count + 1U),
                         (unsigned int)ELLIP_PRE_STABLE_SAMPLES);
-    imu_calib_emit_text("OK imu accel_man æç¤º é™æ­¢é€šè¿‡åè‡ªåŠ¨é‡‡é›† target=%u",
+    imu_calib_emit_text("OK imu accel_man ÌáÊ¾ ¾²Ö¹Í¨¹ıºó×Ô¶¯²É¼¯ target=%u",
                         (unsigned int)ELLIP_MANUAL_ORIENT_SAMPLES);
 }
 
@@ -1579,8 +1579,8 @@ static void imu_calib_start_ellip(void)
     memset(&s_ellip, 0, sizeof(s_ellip));
     s_imu_calib.busy = 1U;
     s_imu_calib.mode = IMU_CALIB_MODE_ELLIP;
-    imu_calib_emit_text("OK imu accel å¼€å§‹ è¯·ç¼“æ…¢åˆ‡æ¢å¤šä¸ªé™æ­¢å§¿æ€");
-    imu_calib_emit_text("OK imu accel æç¤º æ¯æ¬¡æ”¾ç¨³åä¿æŒé™æ­¢ ç³»ç»Ÿä¼šè‡ªåŠ¨é‡‡é›†å§¿æ€ç‚¹");
+    imu_calib_emit_text("OK imu accel ¿ªÊ¼ Çë»ºÂıÇĞ»»¶à¸ö¾²Ö¹×ËÌ¬");
+    imu_calib_emit_text("OK imu accel ÌáÊ¾ Ã¿´Î·ÅÎÈºó±£³Ö¾²Ö¹ ÏµÍ³»á×Ô¶¯²É¼¯×ËÌ¬µã");
 }
 
 static void imu_calib_start_ellip_manual(void)
@@ -1589,9 +1589,9 @@ static void imu_calib_start_ellip_manual(void)
     s_imu_calib.busy = 1U;
     s_imu_calib.mode = IMU_CALIB_MODE_ELLIP_MANUAL;
     s_ellip_manual.substate = IMU_CALIB_MANUAL_SUBSTATE_READY;
-    imu_calib_emit_text("OK imu accel_man å¼€å§‹ è¯·æ‰‹åŠ¨åˆ‡æ¢å¤šä¸ªé™æ­¢å§¿æ€");
-    imu_calib_emit_text("OK imu accel_man æç¤º å•æ¬¡é‡‡ç‚¹è¯·å‘ imu acc collect");
-    imu_calib_emit_text("OK imu accel_man æç¤º ç»“æŸå¹¶æ±‚è§£è¯·å‘ imu acc stop");
+    imu_calib_emit_text("OK imu accel_man ¿ªÊ¼ ÇëÊÖ¶¯ÇĞ»»¶à¸ö¾²Ö¹×ËÌ¬");
+    imu_calib_emit_text("OK imu accel_man ÌáÊ¾ µ¥´Î²ÉµãÇë·¢ imu acc collect");
+    imu_calib_emit_text("OK imu accel_man ÌáÊ¾ ½áÊø²¢Çó½âÇë·¢ imu acc stop");
 }
 
 static int32_t imu_calib_manual_solve(void)
@@ -1609,7 +1609,7 @@ static int32_t imu_calib_manual_solve(void)
 
     if (s_ellip_manual.orient_count < ELLIP_MIN_ORIENT)
     {
-        imu_calib_emit_text("ERR imu accel_man å¤±è´¥ åŸå› =å§¿æ€ç‚¹ä¸è¶³ count=%u min=%u",
+        imu_calib_emit_text("ERR imu accel_man Ê§°Ü Ô­Òò=×ËÌ¬µã²»×ã count=%u min=%u",
                             (unsigned int)s_ellip_manual.orient_count,
                             (unsigned int)ELLIP_MIN_ORIENT);
         return -1;
@@ -1619,7 +1619,7 @@ static int32_t imu_calib_manual_solve(void)
 
     if (ellip_fit_solve(s_ellip_manual.orient_mean, s_ellip_manual.orient_count, bias, M) != 0)
     {
-        imu_calib_emit_text("ERR imu accel_man å¤±è´¥ åŸå› =æ±‚è§£å¤±è´¥ pose_count=%u",
+        imu_calib_emit_text("ERR imu accel_man Ê§°Ü Ô­Òò=Çó½âÊ§°Ü pose_count=%u",
                             (unsigned int)s_ellip_manual.orient_count);
         return -1;
     }
@@ -1635,20 +1635,20 @@ static int32_t imu_calib_manual_solve(void)
                                            &diag_value);
     if (validate_ret == ELLIP_VALIDATE_ERR_BIAS)
     {
-        imu_calib_emit_text("ERR imu accel_man å¤±è´¥ åŸå› =åç½®è¿‡å¤§ value=%f",
+        imu_calib_emit_text("ERR imu accel_man Ê§°Ü Ô­Òò=Æ«ÖÃ¹ı´ó value=%f",
                             (double)bias_norm_g);
         return -1;
     }
     if (validate_ret == ELLIP_VALIDATE_ERR_DIAG)
     {
-        imu_calib_emit_text("ERR imu accel_man å¤±è´¥ åŸå› =çŸ©é˜µå¯¹è§’å¼‚å¸¸ axis=%u value=%f",
+        imu_calib_emit_text("ERR imu accel_man Ê§°Ü Ô­Òò=¾ØÕó¶Ô½ÇÒì³£ axis=%u value=%f",
                             (unsigned int)diag_axis,
                             (double)diag_value);
         return -1;
     }
     if (validate_ret == ELLIP_VALIDATE_ERR_NORM)
     {
-        imu_calib_emit_text("ERR imu accel_man å¤±è´¥ åŸå› =èŒƒæ•°è¯¯å·®è¿‡å¤§ fit_rms_g=%f max_norm_err_g=%f",
+        imu_calib_emit_text("ERR imu accel_man Ê§°Ü Ô­Òò=·¶ÊıÎó²î¹ı´ó fit_rms_g=%f max_norm_err_g=%f",
                             (double)fit_rms_g,
                             (double)max_norm_err_g);
         return -1;
@@ -1656,30 +1656,30 @@ static int32_t imu_calib_manual_solve(void)
 
     if (ellip_apply_solution(bias, M) != 0)
     {
-        imu_calib_emit_text("ERR imu accel_man å¤±è´¥ åŸå› =åº”ç”¨å¤±è´¥");
+        imu_calib_emit_text("ERR imu accel_man Ê§°Ü Ô­Òò=Ó¦ÓÃÊ§°Ü");
         return -1;
     }
 
     {
         uint8_t save_ok = IMUCalib_SaveCurrentToFlash();
-        imu_calib_emit_text("OK imu accel_man ç»“æœ pose_count=%u mean_pose_std_g=%f max_pose_std_g=%f",
+        imu_calib_emit_text("OK imu accel_man ½á¹û pose_count=%u mean_pose_std_g=%f max_pose_std_g=%f",
                             (unsigned int)s_ellip_manual.orient_count,
                             (double)mean_pose_std_g,
                             (double)max_pose_std_g);
-        imu_calib_emit_text("OK imu accel_man ç»“æœ bias_norm_g=%f fit_rms_g=%f max_norm_err_g=%f",
+        imu_calib_emit_text("OK imu accel_man ½á¹û bias_norm_g=%f fit_rms_g=%f max_norm_err_g=%f",
                             (double)bias_norm_g,
                             (double)fit_rms_g,
                             (double)max_norm_err_g);
-        imu_calib_emit_text("OK imu accel_man å®Œæˆ save=%u bias_g=%f,%f,%f",
+        imu_calib_emit_text("OK imu accel_man Íê³É save=%u bias_g=%f,%f,%f",
                             (unsigned int)save_ok,
                             (double)bias[0],
                             (double)bias[1],
                             (double)bias[2]);
-        imu_calib_emit_text("OK imu accel_man çŸ©é˜µ r0=%f,%f,%f",
+        imu_calib_emit_text("OK imu accel_man ¾ØÕó r0=%f,%f,%f",
                             (double)M[0][0], (double)M[0][1], (double)M[0][2]);
-        imu_calib_emit_text("OK imu accel_man çŸ©é˜µ r1=%f,%f,%f",
+        imu_calib_emit_text("OK imu accel_man ¾ØÕó r1=%f,%f,%f",
                             (double)M[1][0], (double)M[1][1], (double)M[1][2]);
-        imu_calib_emit_text("OK imu accel_man çŸ©é˜µ r2=%f,%f,%f",
+        imu_calib_emit_text("OK imu accel_man ¾ØÕó r2=%f,%f,%f",
                             (double)M[2][0], (double)M[2][1], (double)M[2][2]);
     }
 
@@ -1703,7 +1703,7 @@ static int32_t imu_calib_update_ellip_manual_step(void)
     s_ellip_manual.total_samples++;
     if (s_ellip_manual.total_samples >= ELLIP_MANUAL_TIMEOUT_SAMPLES)
     {
-        imu_calib_emit_text("ERR imu accel_man å¤±è´¥ åŸå› =è¶…æ—¶ total_samples=%lu",
+        imu_calib_emit_text("ERR imu accel_man Ê§°Ü Ô­Òò=³¬Ê± total_samples=%lu",
                             (unsigned long)s_ellip_manual.total_samples);
         return -1;
     }
@@ -1724,7 +1724,7 @@ static int32_t imu_calib_update_ellip_manual_step(void)
             return 0;
         }
 
-        imu_calib_emit_text("ERR imu accel_man å½“å‰å§¿æ€ç‚¹ä½œåºŸ åŸå› =æ ·æœ¬æ— æ•ˆ samples=%lu",
+        imu_calib_emit_text("ERR imu accel_man µ±Ç°×ËÌ¬µã×÷·Ï Ô­Òò=Ñù±¾ÎŞĞ§ samples=%lu",
                             (unsigned long)s_ellip_manual.orient_samples);
         imu_calib_manual_enter_ready_state();
         imu_calib_manual_emit_next_commands();
@@ -1747,7 +1747,7 @@ static int32_t imu_calib_update_ellip_manual_step(void)
             return 0;
         }
 
-        imu_calib_emit_text("ERR imu accel_man å½“å‰å§¿æ€ç‚¹ä½œåºŸ åŸå› =é‡‡é›†ä¸­æ£€æµ‹åˆ°æ™ƒåŠ¨ samples=%lu",
+        imu_calib_emit_text("ERR imu accel_man µ±Ç°×ËÌ¬µã×÷·Ï Ô­Òò=²É¼¯ÖĞ¼ì²âµ½»Î¶¯ samples=%lu",
                             (unsigned long)s_ellip_manual.orient_samples);
         imu_calib_manual_enter_ready_state();
         imu_calib_manual_emit_next_commands();
@@ -1761,7 +1761,7 @@ static int32_t imu_calib_update_ellip_manual_step(void)
         {
             imu_calib_manual_reset_current_pose();
             s_ellip_manual.substate = IMU_CALIB_MANUAL_SUBSTATE_COLLECTING;
-            imu_calib_emit_text("OK imu accel_man å¼€å§‹é‡‡é›† pose=%u target=%u",
+            imu_calib_emit_text("OK imu accel_man ¿ªÊ¼²É¼¯ pose=%u target=%u",
                                 (unsigned int)(s_ellip_manual.orient_count + 1U),
                                 (unsigned int)ELLIP_MANUAL_ORIENT_SAMPLES);
         }
@@ -1795,7 +1795,7 @@ static int32_t imu_calib_update_ellip_manual_step(void)
 
         if (std_max > ELLIP_ORIENT_STD_MAX_G)
         {
-            imu_calib_emit_text("ERR imu accel_man å½“å‰å§¿æ€ç‚¹ä½œåºŸ åŸå› =å™ªå£°è¿‡å¤§ pose=%u std_g=%f",
+            imu_calib_emit_text("ERR imu accel_man µ±Ç°×ËÌ¬µã×÷·Ï Ô­Òò=ÔëÉù¹ı´ó pose=%u std_g=%f",
                                 (unsigned int)(s_ellip_manual.orient_count + 1U),
                                 (double)std_max);
             imu_calib_manual_enter_ready_state();
@@ -1809,7 +1809,7 @@ static int32_t imu_calib_update_ellip_manual_step(void)
         s_ellip_manual.pose_std_max[s_ellip_manual.orient_count] = std_max;
         s_ellip_manual.orient_count++;
 
-        imu_calib_emit_text("OK imu accel_man å§¿æ€ç‚¹å®Œæˆ pose=%u mean_g=%f,%f,%f std_g=%f,%f,%f std_max_g=%f",
+        imu_calib_emit_text("OK imu accel_man ×ËÌ¬µãÍê³É pose=%u mean_g=%f,%f,%f std_g=%f,%f,%f std_max_g=%f",
                             (unsigned int)s_ellip_manual.orient_count,
                             (double)s_ellip_manual.collect_mean[0],
                             (double)s_ellip_manual.collect_mean[1],
@@ -1822,7 +1822,7 @@ static int32_t imu_calib_update_ellip_manual_step(void)
         imu_calib_manual_enter_ready_state();
         if (s_ellip_manual.orient_count >= ELLIP_MANUAL_MAX_ORIENT)
         {
-            imu_calib_emit_text("OK imu accel_man æç¤º å§¿æ€ç‚¹å·²è¾¾ä¸Šé™ è¯·å‘ imu acc stop");
+            imu_calib_emit_text("OK imu accel_man ÌáÊ¾ ×ËÌ¬µãÒÑ´ïÉÏÏŞ Çë·¢ imu acc stop");
             return 0;
         }
 
@@ -1844,7 +1844,7 @@ static int32_t imu_calib_update_ellip_step(void)
     s_ellip.total_samples++;
     if (s_ellip.total_samples >= ELLIP_TIMEOUT_SAMPLES)
     {
-        imu_calib_emit_text("ERR imu accel å¤±è´¥ åŸå› =è¶…æ—¶ total_samples=%lu",
+        imu_calib_emit_text("ERR imu accel Ê§°Ü Ô­Òò=³¬Ê± total_samples=%lu",
                             (unsigned long)s_ellip.total_samples);
         return -1;
     }
@@ -1903,7 +1903,7 @@ static int32_t imu_calib_update_ellip_step(void)
             s_ellip.orient_samples = 0U;
             memset(s_ellip.orient_sum, 0, sizeof(s_ellip.orient_sum));
             memset(s_ellip.orient_m2, 0, sizeof(s_ellip.orient_m2));
-            imu_calib_emit_text("OK imu accel å¼€å§‹é‡‡é›† pose=%u target=%u",
+            imu_calib_emit_text("OK imu accel ¿ªÊ¼²É¼¯ pose=%u target=%u",
                                 (unsigned int)(s_ellip.orient_count + 1U),
                                 (unsigned int)ELLIP_ORIENT_SAMPLES);
         }
@@ -1944,7 +1944,7 @@ static int32_t imu_calib_update_ellip_step(void)
 
         if (std_max > ELLIP_ORIENT_STD_MAX_G)
         {
-            imu_calib_emit_text("ERR imu accel å§¿æ€ç‚¹å™ªå£°è¿‡å¤§ pose=%u std_g=%f",
+            imu_calib_emit_text("ERR imu accel ×ËÌ¬µãÔëÉù¹ı´ó pose=%u std_g=%f",
                                 (unsigned int)(s_ellip.orient_count + 1U),
                                 (double)std_max);
             /* Reset and retry this orientation */
@@ -1978,7 +1978,7 @@ static int32_t imu_calib_update_ellip_step(void)
 
                 if (cos_angle > cos_min_angle)
                 {
-                    imu_calib_emit_text("ERR imu accel å§¿æ€ç‚¹è¿‡è¿‘ ref=%u",
+                    imu_calib_emit_text("ERR imu accel ×ËÌ¬µã¹ı½ü ref=%u",
                                         (unsigned int)(oi + 1U));
                     s_ellip.collecting = 0U;
                     s_ellip.orient_samples = 0U;
@@ -1995,7 +1995,7 @@ static int32_t imu_calib_update_ellip_step(void)
         s_ellip.orient_mean[s_ellip.orient_count][2] = s_ellip.orient_sum[2];
         s_ellip.orient_count++;
 
-        imu_calib_emit_text("OK imu accel å§¿æ€ç‚¹å®Œæˆ pose=%u mean_g=%f,%f,%f",
+        imu_calib_emit_text("OK imu accel ×ËÌ¬µãÍê³É pose=%u mean_g=%f,%f,%f",
                             (unsigned int)s_ellip.orient_count,
                             (double)s_ellip.orient_sum[0],
                             (double)s_ellip.orient_sum[1],
@@ -2012,18 +2012,18 @@ static int32_t imu_calib_update_ellip_step(void)
             float bias[3];
             float M[3][3];
 
-            imu_calib_emit_text("OK imu accel å¼€å§‹æ±‚è§£ pose_count=%u",
+            imu_calib_emit_text("OK imu accel ¿ªÊ¼Çó½â pose_count=%u",
                                 (unsigned int)s_ellip.orient_count);
 
             if (ellip_fit_solve(s_ellip.orient_mean, s_ellip.orient_count, bias, M) != 0)
             {
                 if (s_ellip.orient_count >= ELLIP_MAX_ORIENT)
                 {
-                    imu_calib_emit_text("ERR imu accel å¤±è´¥ åŸå› =æ±‚è§£å¤±è´¥ pose_count=%u",
+                    imu_calib_emit_text("ERR imu accel Ê§°Ü Ô­Òò=Çó½âÊ§°Ü pose_count=%u",
                                         (unsigned int)s_ellip.orient_count);
                     return -1;
                 }
-                imu_calib_emit_text("OK imu accel æ±‚è§£æœªé€šè¿‡ è¯·ç»§ç»­å¢åŠ å§¿æ€ç‚¹ current=%u",
+                imu_calib_emit_text("OK imu accel Çó½âÎ´Í¨¹ı Çë¼ÌĞøÔö¼Ó×ËÌ¬µã current=%u",
                                     (unsigned int)s_ellip.orient_count);
                 s_ellip.wait_move = 1U;
                 return 0;
@@ -2039,7 +2039,7 @@ static int32_t imu_calib_update_ellip_step(void)
                 {
                     imu_calib_emit_text("%s imu accel %s value=%f",
                                         (s_ellip.orient_count >= ELLIP_MAX_ORIENT) ? "ERR" : "OK",
-                                        (s_ellip.orient_count >= ELLIP_MAX_ORIENT) ? "å¤±è´¥ åŸå› =åç½®è¿‡å¤§" : "æ±‚è§£æœªé€šè¿‡ åŸå› =åç½®è¿‡å¤§",
+                                        (s_ellip.orient_count >= ELLIP_MAX_ORIENT) ? "Ê§°Ü Ô­Òò=Æ«ÖÃ¹ı´ó" : "Çó½âÎ´Í¨¹ı Ô­Òò=Æ«ÖÃ¹ı´ó",
                                         (double)bias_norm);
                     if (s_ellip.orient_count >= ELLIP_MAX_ORIENT)
                     {
@@ -2057,7 +2057,7 @@ static int32_t imu_calib_update_ellip_step(void)
                         {
                             imu_calib_emit_text("%s imu accel %s axis=%u value=%f",
                                                 (s_ellip.orient_count >= ELLIP_MAX_ORIENT) ? "ERR" : "OK",
-                                                (s_ellip.orient_count >= ELLIP_MAX_ORIENT) ? "å¤±è´¥ åŸå› =çŸ©é˜µå¯¹è§’å¼‚å¸¸" : "æ±‚è§£æœªé€šè¿‡ åŸå› =çŸ©é˜µå¯¹è§’å¼‚å¸¸",
+                                                (s_ellip.orient_count >= ELLIP_MAX_ORIENT) ? "Ê§°Ü Ô­Òò=¾ØÕó¶Ô½ÇÒì³£" : "Çó½âÎ´Í¨¹ı Ô­Òò=¾ØÕó¶Ô½ÇÒì³£",
                                                 (unsigned int)di,
                                                 (double)M[di][di]);
                             if (s_ellip.orient_count >= ELLIP_MAX_ORIENT)
@@ -2094,7 +2094,7 @@ static int32_t imu_calib_update_ellip_step(void)
                 {
                     imu_calib_emit_text("%s imu accel %s value=%f",
                                         (s_ellip.orient_count >= ELLIP_MAX_ORIENT) ? "ERR" : "OK",
-                                        (s_ellip.orient_count >= ELLIP_MAX_ORIENT) ? "å¤±è´¥ åŸå› =èŒƒæ•°è¯¯å·®è¿‡å¤§" : "æ±‚è§£æœªé€šè¿‡ åŸå› =èŒƒæ•°è¯¯å·®è¿‡å¤§",
+                                        (s_ellip.orient_count >= ELLIP_MAX_ORIENT) ? "Ê§°Ü Ô­Òò=·¶ÊıÎó²î¹ı´ó" : "Çó½âÎ´Í¨¹ı Ô­Òò=·¶ÊıÎó²î¹ı´ó",
                                         (double)max_norm_err);
                     if (s_ellip.orient_count >= ELLIP_MAX_ORIENT)
                     {
@@ -2118,7 +2118,7 @@ static int32_t imu_calib_update_ellip_step(void)
 
                 if (!AccelCalibration_LoadParams(&params))
                 {
-                    imu_calib_emit_text("ERR imu accel å¤±è´¥ åŸå› =åº”ç”¨å¤±è´¥");
+                    imu_calib_emit_text("ERR imu accel Ê§°Ü Ô­Òò=Ó¦ÓÃÊ§°Ü");
                     return -1;
                 }
             }
@@ -2126,14 +2126,14 @@ static int32_t imu_calib_update_ellip_step(void)
             /* Save to flash */
             {
                 uint8_t save_ok = IMUCalib_SaveCurrentToFlash();
-                imu_calib_emit_text("OK imu accel å®Œæˆ save=%u bias_g=%f,%f,%f",
+                imu_calib_emit_text("OK imu accel Íê³É save=%u bias_g=%f,%f,%f",
                                     (unsigned int)save_ok,
                                     (double)bias[0], (double)bias[1], (double)bias[2]);
-                imu_calib_emit_text("OK imu accel çŸ©é˜µ r0=%f,%f,%f",
+                imu_calib_emit_text("OK imu accel ¾ØÕó r0=%f,%f,%f",
                                     (double)M[0][0], (double)M[0][1], (double)M[0][2]);
-                imu_calib_emit_text("OK imu accel çŸ©é˜µ r1=%f,%f,%f",
+                imu_calib_emit_text("OK imu accel ¾ØÕó r1=%f,%f,%f",
                                     (double)M[1][0], (double)M[1][1], (double)M[1][2]);
-                imu_calib_emit_text("OK imu accel çŸ©é˜µ r2=%f,%f,%f",
+                imu_calib_emit_text("OK imu accel ¾ØÕó r2=%f,%f,%f",
                                     (double)M[2][0], (double)M[2][1], (double)M[2][2]);
             }
             return 1;
@@ -2142,7 +2142,7 @@ static int32_t imu_calib_update_ellip_step(void)
         /* Not enough orientations yet, continue */
         if (s_ellip.orient_count >= ELLIP_MAX_ORIENT)
         {
-            imu_calib_emit_text("ERR imu accel å¤±è´¥ åŸå› =å§¿æ€ç‚¹å·²è¾¾ä¸Šé™ count=%u",
+            imu_calib_emit_text("ERR imu accel Ê§°Ü Ô­Òò=×ËÌ¬µãÒÑ´ïÉÏÏŞ count=%u",
                                 (unsigned int)s_ellip.orient_count);
             return -1;
         }
@@ -2290,7 +2290,7 @@ static int32_t imu_calib_update_gyro_step(void)
                 s_imu_calib.gyro_stable_progress_bucket = stable_bucket;
                 if ((stable_bucket >= 1U) && (stable_bucket <= 3U))
                 {
-                    imu_calib_emit_text("OK imu gyro é¢„ç¨³å®š progress=%u samples=%lu/%u",
+                    imu_calib_emit_text("OK imu gyro Ô¤ÎÈ¶¨ progress=%u samples=%lu/%u",
                                         (unsigned int)(stable_bucket * 25U),
                                         (unsigned long)s_imu_calib.gyro_static_stable_samples,
                                         (unsigned int)IMU_CALIB_GYRO_PRE_STABLE_SAMPLES);
@@ -2302,7 +2302,7 @@ static int32_t imu_calib_update_gyro_step(void)
         if (s_imu_calib.gyro_stable_progress_bucket < 4U)
         {
             s_imu_calib.gyro_stable_progress_bucket = 4U;
-            imu_calib_emit_text("OK imu gyro è¿›å…¥é‡‡é›†é˜¶æ®µ target=%u",
+            imu_calib_emit_text("OK imu gyro ½øÈë²É¼¯½×¶Î target=%u",
                                 (unsigned int)IMU_CALIB_GYRO_TARGET_VALID_SAMPLES);
         }
     }
@@ -2324,7 +2324,7 @@ static int32_t imu_calib_update_gyro_step(void)
                 s_imu_calib.gyro_collect_progress_bucket = collect_bucket;
                 if ((collect_bucket >= 1U) && (collect_bucket <= 3U))
                 {
-                    imu_calib_emit_text("OK imu gyro é‡‡é›† progress=%u valid=%lu/%u",
+                    imu_calib_emit_text("OK imu gyro ²É¼¯ progress=%u valid=%lu/%u",
                                         (unsigned int)(collect_bucket * 25U),
                                         (unsigned long)s_imu_calib.gyro_valid_samples,
                                         (unsigned int)IMU_CALIB_GYRO_TARGET_VALID_SAMPLES);
@@ -2355,13 +2355,13 @@ static int32_t imu_calib_update_gyro_step(void)
             (fabsf_local(by) > IMU_CALIB_GYRO_BIAS_MAX_DPS) ||
             (fabsf_local(bz) > IMU_CALIB_GYRO_BIAS_MAX_DPS))
         {
-            imu_calib_emit_text("ERR imu gyro å¤±è´¥ åŸå› =è´¨é‡ä¸è¶³ bias_dps=%f,%f,%f std_dps=%f,%f,%f",
+            imu_calib_emit_text("ERR imu gyro Ê§°Ü Ô­Òò=ÖÊÁ¿²»×ã bias_dps=%f,%f,%f std_dps=%f,%f,%f",
                                 bx, by, bz, std_x, std_y, std_z);
             return -1;
         }
 
         ICM42688_SetGyroBiasDps(bx, by, bz, 1U);
-        imu_calib_emit_text("OK imu gyro å®Œæˆ samples=%lu bias_dps=%f,%f,%f std_dps=%f,%f,%f",
+        imu_calib_emit_text("OK imu gyro Íê³É samples=%lu bias_dps=%f,%f,%f std_dps=%f,%f,%f",
                             (unsigned long)s_imu_calib.gyro_valid_samples,
                             bx, by, bz, std_x, std_y, std_z);
         return 1;
@@ -2369,7 +2369,7 @@ static int32_t imu_calib_update_gyro_step(void)
 
     if (s_imu_calib.gyro_total_samples >= IMU_CALIB_GYRO_TIMEOUT_SAMPLES)
     {
-        imu_calib_emit_text("ERR imu gyro å¤±è´¥ åŸå› =è¶…æ—¶ valid=%lu total=%lu",
+        imu_calib_emit_text("ERR imu gyro Ê§°Ü Ô­Òò=³¬Ê± valid=%lu total=%lu",
                             (unsigned long)s_imu_calib.gyro_valid_samples,
                             (unsigned long)s_imu_calib.gyro_total_samples);
         return -1;
@@ -2917,7 +2917,7 @@ static void imu_calib_print_boot_reminder(void)
 
 void AccelCalibration_Init(void)
 {
-    /* ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½È«ï¿½ï¿½ï¿½ï¿½Î» */
+    /* ³õÊ¼»¯²¢È«²¿¸´Î» */
     AccelCalibration_Reset();
 }
 
@@ -2929,7 +2929,7 @@ void AccelCalibration_Reset(void)
     uint8_t i;
     uint8_t j;
 
-    /* ï¿½ï¿½Î»Ç°ï¿½İ´ï¿½ IMU ï¿½ï¿½×°ï¿½ï¿½ï¿½ó£¬±ï¿½ï¿½â¸´Î»ï¿½ï¿½Ê§ IMU ï¿½ï¿½×°ï¿½ï¿½ï¿½ï¿½ */
+    /* ¸´Î»Ç°Ôİ´æ IMU °²×°¾ØÕó£¬±ÜÃâ¸´Î»ºó¶ªÊ§ IMU °²×°·½Ïò */
     memcpy(saved_matrix, g_accel_calibration.imu_to_body, sizeof(saved_matrix));
 
     for (i = 0U; i < 3U; i++)
@@ -2985,7 +2985,7 @@ void AccelCalibration_SetImuToBodyMatrix(const float matrix[3][3])
 
 void AccelCalibration_SetImuToBodyEulerDeg(float roll_deg, float pitch_deg, float yaw_deg)
 {
-    /* ZYX Å·ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½yaw->pitch->rollï¿½ï¿½ */
+    /* ZYX Å·À­½Ç×ªĞı×ª¾ØÕó£¨yaw->pitch->roll£© */
     const float roll = roll_deg * DEG_TO_RAD;
     const float pitch = pitch_deg * DEG_TO_RAD;
     const float yaw = yaw_deg * DEG_TO_RAD;
@@ -3012,11 +3012,11 @@ void AccelCalibration_SetImuToBodyEulerDeg(float roll_deg, float pitch_deg, floa
     g_accel_calibration.imu_to_body_identity = matrix_is_identity(g_accel_calibration.imu_to_body);
 }
 
-/* ========================= ï¿½ï¿½Ö¹ï¿½ê¶¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ =========================
- * AP ï¿½ï¿½ñ£º·Ö´ï¿½ï¿½Ú²É¼ï¿½ï¿½ï¿½Ö¹ï¿½ï¿½ï¿½ï¿½
- * - Ã¿ï¿½ï¿½ï¿½ï¿½ï¿½Ú²É¼ï¿½ï¿½Ì¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¾ï¿½Ö¹ï¿½ï¿½ï¿½ï¿½
- * - ï¿½È½Ï´ï¿½ï¿½Ú¼ï¿½ bias ï¿½ä»¯ï¿½ï¿½ï¿½ï¿½Ñ¡ï¿½ï¿½ï¿½ï¿½ï¿½Å´ï¿½ï¿½ï¿½
- * - ï¿½ïµ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğ¶ï¿½ï¿½ê¶¨ï¿½É¹ï¿½
+/* ========================= ¾²Ö¹±ê¶¨´¦Àí =========================
+ * AP ÈÎÎñ£º·Ö´°²É¼¯¾²Ö¹Êı¾İ
+ * - Ã¿´°²É¼¯¹Ì¶¨ÊıÁ¿µÄ¾²Ö¹Ñù±¾
+ * - ±È½Ï´°¿Ú¼ä bias ±ä»¯£¬Ñ¡Ôñ×îÓÅ´°¿Ú
+ * - ´ïµ½ÊÕÁ²Ìõ¼şÔòÅĞ¶¨±ê¶¨³É¹¦
  */
 bool AccelCalibration_Start(void)
 {
@@ -3036,7 +3036,7 @@ bool AccelCalibration_Start(void)
     float global_mean_norm = 0.0f;
     float global_m2_norm = 0.0f;
 
-    /* Ã¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ê¶¨Ç°ï¿½ï¿½Î»ï¿½ï¿½Ê·×´Ì¬ */
+    /* Ã¿´ÎÆô¶¯±ê¶¨Ç°¸´Î»ÀúÊ·×´Ì¬ */
     AccelCalibration_Reset();
 
     for (window_idx = 0U;
@@ -3068,7 +3068,7 @@ bool AccelCalibration_Start(void)
             float accel_norm_g;
             float gyro_norm_dps;
 
-            /* ï¿½ï¿½È¡Ò»Ö¡ IMU 1kHz ï¿½ï¿½ï¿½ï¿½ */
+            /* »ñÈ¡Ò»Ö¡ IMU 1kHz Êı¾İ */
             IMU_Update_1000HZ();
             window_tries++;
             total_tries++;
@@ -3076,7 +3076,7 @@ bool AccelCalibration_Start(void)
 
             imu_calib_get_raw_sensor_sample(accel_sensor_g, gyro_sensor_dps);
 
-            /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğ§ï¿½ï¿½É¸Ñ¡ */
+            /* Êı¾İÓĞĞ§ĞÔÉ¸Ñ¡ */
             if (!imu_sample_valid(accel_sensor_g[0], accel_sensor_g[1], accel_sensor_g[2],
                                   gyro_sensor_dps[0], gyro_sensor_dps[1], gyro_sensor_dps[2]))
             {
@@ -3087,7 +3087,7 @@ bool AccelCalibration_Start(void)
             rotate_imu_to_body(accel_sensor_g, accel_body_g);
             rotate_imu_to_body(gyro_sensor_dps, gyro_body_dps);
 
-            /* ï¿½ï¿½ï¿½Æ¾ï¿½Ö¹ï¿½ï¿½ï¿½ï¿½É¸Ñ¡ï¿½ï¿½|a|ï¿½ï¿½1g ï¿½Ò½ï¿½ï¿½Ù¶ï¿½Ğ¡ */
+            /* ½üËÆ¾²Ö¹Ìõ¼şÉ¸Ñ¡£º|a|¡Ö1g ÇÒ½ÇËÙ¶ÈĞ¡ */
             if (!static_calibration_sample_valid(accel_body_g, gyro_body_dps, &accel_norm_g, &gyro_norm_dps))
             {
                 g_accel_calibration.invalid_sample_count++;
@@ -3096,7 +3096,7 @@ bool AccelCalibration_Start(void)
 
             get_gravity_body_g(&gx, &gy, &gz);
 
-            /* ï¿½Ú»ï¿½ï¿½ï¿½Ïµï¿½Û¼Ó¹ï¿½ï¿½ï¿½ bias = measured - static_sign * gravity */
+            /* ÔÚ»úÌåÏµÀÛ¼Ó¹ÀËã bias = measured - static_sign * gravity */
             window_bias_sum_x += (accel_body_g[0] - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gx);
             window_bias_sum_y += (accel_body_g[1] - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gy);
             window_bias_sum_z += (accel_body_g[2] - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gz);
@@ -3125,7 +3125,7 @@ bool AccelCalibration_Start(void)
             current_bias[1] = window_bias_sum_y / (float)window_valid;
             current_bias[2] = window_bias_sum_z / (float)window_valid;
 
-                /* ï¿½Ã·ï¿½Ô½Ğ¡Ô½ï¿½Ã£ï¿½ï¿½ï¿½ï¿½Ù¶È²ï¿½ï¿½ï¿½Ğ¡ï¿½ï¿½ï¿½ï¿½ï¿½Ù¶È²ï¿½ï¿½ï¿½Ğ¡ï¿½ï¿½bias Ğ¡ */
+                /* µÃ·ÖÔ½Ğ¡Ô½ºÃ£º¼ÓËÙ¶È²¨¶¯Ğ¡¡¢½ÇËÙ¶È²¨¶¯Ğ¡¡¢bias Ğ¡ */
                 score = window_acc_std +
                     0.25f * window_gyro_std +
                     0.50f * vec3_norm(current_bias[0], current_bias[1], current_bias[2]);
@@ -3166,7 +3166,7 @@ bool AccelCalibration_Start(void)
             selected_bias[2] = current_bias[2];
             have_prev_window = true;
 
-            /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ïµ½ï¿½ï¿½Öµï¿½ï¿½ï¿½ï¿½ï¿½ */
+            /* ÊÕÁ²´°¿ÚÁ¬Ğø´ïµ½ãĞÖµÔòÍê³É */
             if ((total_valid_samples >= ACCEL_CALIBRATION_SAMPLES) &&
                 (converged_windows >= ACCEL_CALIBRATION_CONVERGE_WINDOWS))
             {
@@ -3182,7 +3182,7 @@ bool AccelCalibration_Start(void)
         return false;
     }
 
-    /* Î´ï¿½ï¿½ï¿½ï¿½Ê±ï¿½Ë»ï¿½Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½Å´ï¿½ï¿½Úµï¿½ bias */
+    /* Î´ÊÕÁ²Ê±ÍË»ØÊ¹ÓÃ×îÓÅ´°¿ÚµÄ bias */
     if (!converged && have_best_window)
     {
         selected_bias[0] = best_bias[0];
@@ -3196,7 +3196,7 @@ bool AccelCalibration_Start(void)
     clamp_bias();
 
     {
-        /* ï¿½ï¿½ï¿½ï¿½ scale ï¿½ï¿½Öµï¿½ï¿½Ê¹È«ï¿½ï¿½Æ½ï¿½ï¿½Ä£ï¿½ï¿½ï¿½Ó½ï¿½ 1g */
+        /* ¼ÆËã scale ³õÖµ£ºÊ¹È«¾ÖÆ½¾ùÄ£³¤½Ó½ü 1g */
         float startup_scale = 1.0f;
 
         if (is_finitef_local(global_mean_norm) && (global_mean_norm > 0.2f))
@@ -3220,7 +3220,7 @@ bool AccelCalibration_Start(void)
     }
 
     {
-        /* ï¿½ï¿½ï¿½İ±ê¶¨ï¿½×¶Î¹Û²âµ½ï¿½ï¿½Æ½ï¿½ï¿½Ä£ï¿½ï¿½Î¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
+        /* ¸ù¾İ±ê¶¨½×¶Î¹Û²âµ½µÄÆ½¾ùÄ£³¤Î¢µ÷ÖØÁ¦³£Êı¹À¼Æ */
         const float g_est = global_mean_norm * ACCEL_CALIBRATION_GRAVITY_MSS;
         if (is_finitef_local(g_est) && (g_est > 6.0f) && (g_est < 13.0f))
         {
@@ -3233,7 +3233,7 @@ bool AccelCalibration_Start(void)
     }
 
     {
-        /* ï¿½Ğ¶ï¿½ï¿½Ç·ï¿½Í¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ + ï¿½ï¿½ï¿½ï¿½ï¿½ã¹» + ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
+        /* ÅĞ¶¨ÊÇ·ñÍ¨¹ı£ºÖÊÁ¿´ï±ê + Ñù±¾×ã¹» + ÊÕÁ²»ò×îÓÅ */
         const bool quality_ok = (g_accel_calibration.accel_norm_std_g <= ACCEL_CALIBRATION_START_ACCEPT_STD_G);
         const bool enough_samples = (total_valid_samples >= (ACCEL_CALIBRATION_SAMPLES / 2U));
         const bool calibrated = converged || (have_best_window && enough_samples && quality_ok);
@@ -3244,8 +3244,8 @@ bool AccelCalibration_Start(void)
     }
 }
 
-/* ä¼ æ„Ÿå™¨åæ ‡ç³»åŠ é€Ÿåº¦è®¡æ ¡å‡†ï¼šåœ¨æ»¤æ³¢å™¨ä¹‹å‰è°ƒç”¨ï¼Œä¿è¯æ»¤æ³¢å™¨æ”¶åˆ°çš„æ˜¯æ ¡å‡†åæ•°æ®ã€‚
- * is_calibrated==false æ—¶ç›´æ¥ returnï¼Œä¸å¹²é¢„åŸå§‹æ•°æ®ï¼ˆä¿è¯æ ¡å‡†æ”¶é›†åˆ°åŸå§‹å€¼ï¼‰ã€‚ */
+/* ´«¸ĞÆ÷×ø±êÏµ¼ÓËÙ¶È¼ÆĞ£×¼£ºÔÚÂË²¨Æ÷Ö®Ç°µ÷ÓÃ£¬±£Ö¤ÂË²¨Æ÷ÊÕµ½µÄÊÇĞ£×¼ºóÊı¾İ¡£
+ * is_calibrated==false Ê±Ö±½Ó return£¬²»¸ÉÔ¤Ô­Ê¼Êı¾İ£¨±£Ö¤Ğ£×¼ÊÕ¼¯µ½Ô­Ê¼Öµ£©¡£ */
 void AccelCalibration_ApplySensorCorrection(float *ax, float *ay, float *az)
 {
     if (!g_accel_calibration.is_calibrated)
@@ -3273,7 +3273,7 @@ void AccelCalibration_ApplySensorCorrection(float *ax, float *ay, float *az)
     }
 }
 
-/* ï¿½ï¿½ï¿½ï¿½ï¿½Âºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ù¶ï¿½Ğ£×¼ï¿½ë´¹Ö±ï¿½ï¿½ï¿½Ù¶ï¿½Ô¤ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½1kHz ï¿½ï¿½Ñ­ï¿½ï¿½ï¿½Ğµï¿½ï¿½ï¿½ */
+/* Ö÷¸üĞÂº¯Êı£º¼ÓËÙ¶ÈĞ£×¼Óë´¹Ö±¼ÓËÙ¶ÈÔ¤´¦Àí£¬1kHz Ö÷Ñ­»·ÖĞµ÷ÓÃ */
 void AccelCalibration_Update_1000HZ(void)
 {
     float accel_sensor_g[3];
@@ -3289,7 +3289,7 @@ void AccelCalibration_Update_1000HZ(void)
     float trim_y_g = 0.0f;
     float trim_z_g = 0.0f;
 
-    /* ===================== ï¿½ï¿½ï¿½ï¿½ÎªÊµÊ±1kHzï¿½ï¿½ï¿½ï¿½ ===================== */
+    /* ===================== ÒÔÏÂÎªÊµÊ±1kHz¸üĞÂ ===================== */
     sanitize_scale();
 
     accel_sensor_g[0] = g_imufilter_1000hz.accx;
@@ -3301,7 +3301,7 @@ void AccelCalibration_Update_1000HZ(void)
 
     if (!imu_sample_valid(accel_sensor_g[0], accel_sensor_g[1], accel_sensor_g[2], gyro_sensor_dps[0], gyro_sensor_dps[1], gyro_sensor_dps[2]))
     {
-        /* ï¿½ï¿½Ğ§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ½ï¿½ï¿½Ë¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¹Í»ï¿½ï¿½ */
+        /* ÎŞĞ§Ñù±¾´¦Àí£º¶ÔÊä³ö×öÆ½»¬Ë¥¼õ£¬·ÀÖ¹Í»±ä */
         g_accel_calibration.invalid_sample_count++;
         g_accel_calibration.realtime_sample_valid = 0U;
         return;
@@ -3317,7 +3317,7 @@ void AccelCalibration_Update_1000HZ(void)
     rotate_imu_to_body(accel_sensor_g, g_accel_calibration.accel_corrected_body_g);
     rotate_imu_to_body(gyro_sensor_dps, g_accel_calibration.gyro_body_dps);
 
-    /* ï¿½ï¿½ï¿½ï¿½Î¢ï¿½ï¿½ï¿½ï¿½ï¿½Â£ï¿½ï¿½ï¿½ï¿½ï¿½Ö¹ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½Ğ§ï¿½ï¿½ */
+    /* ÔÚÏßÎ¢µ÷¸üĞÂ£¨½ö¾²Ö¹Ìõ¼şÊ±ÓĞĞ§£© */
     get_gravity_body_g(&gravity_x_g, &gravity_y_g, &gravity_z_g);
 #if ACCEL_CALIBRATION_ENABLE_ONLINE_TRIM
     update_bias_online(
@@ -3331,10 +3331,10 @@ void AccelCalibration_Update_1000HZ(void)
         g_accel_calibration.gyro_body_dps);
 #endif
 
-    /* æ ¡å‡†å·²åœ¨ ApplySensorCorrection å‰ç½®å®Œæˆ,
-       g_imufilter_1000hz ä¸­çš„ acc å·²ç»æ˜¯æ ¡å‡†åçš„å€¼,
-       rotate_imu_to_body åçš„ accel_raw_body_g å³ä¸ºæ ¡å‡†åæœºä½“ç³»å€¼ */
-    /* åŸå§‹ä¼ æ„Ÿå™¨å€¼å…ˆåšé›¶å/çŸ©é˜µæ ¡å‡†ï¼Œå†æ—‹è½¬åˆ°æœºä½“ç³»ï¼Œå¾—åˆ°å®æ—¶æ ¡å‡†è¾“å‡º */
+    /* Ğ£×¼ÒÑÔÚ ApplySensorCorrection Ç°ÖÃÍê³É,
+       g_imufilter_1000hz ÖĞµÄ acc ÒÑ¾­ÊÇĞ£×¼ºóµÄÖµ,
+       rotate_imu_to_body ºóµÄ accel_raw_body_g ¼´ÎªĞ£×¼ºó»úÌåÏµÖµ */
+    /* corrected = M * (raw - bias) or legacy diagonal path */
     update_runtime_quality(
         g_accel_calibration.accel_corrected_body_g,
         g_accel_calibration.gyro_body_dps);
@@ -3352,7 +3352,7 @@ void AccelCalibration_Update_1000HZ(void)
     trim_z_g = s_static_relock_trim_g[2];
 #endif
 
-    /* È¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ãµï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Ù¶ï¿½ */
+    /* È¥ÖØÁ¦£ºµÃµ½ÕæÊµÏßĞÔ¼ÓËÙ¶È */
     accel_body_real_mps2[0] =
         (g_accel_calibration.accel_corrected_body_g[0] - trim_x_g - ACCEL_CALIBRATION_STATIC_SPECIFIC_FORCE_SIGN * gravity_x_g) *
         g_accel_calibration.gravity_mps2;
@@ -3654,10 +3654,10 @@ uint8_t IMUCalib_IsBusy(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: è®¾ç½® IMU æ ¡å‡†æ–‡æœ¬è¾“å‡ºå›è°ƒ
- * è¾“å…¥å‚æ•°:
- *   sink - æ–‡æœ¬è¾“å‡ºå›è°ƒï¼Œä¼ å…¥ NULL è¡¨ç¤ºå…³é—­å¤–éƒ¨å›è°ƒ
- * è¿”å›å€¼: æ— 
+ * º¯Êı¹¦ÄÜ: ÉèÖÃ IMU Ğ£×¼ÎÄ±¾Êä³ö»Øµ÷
+ * ÊäÈë²ÎÊı:
+ *   sink - ÎÄ±¾Êä³ö»Øµ÷£¬´«Èë NULL ±íÊ¾¹Ø±ÕÍâ²¿»Øµ÷
+ * ·µ»ØÖµ: ÎŞ
  */
 void  IMUCalib_SetTextSink(IMUCalibTextSink_t sink)
 {
@@ -3665,12 +3665,12 @@ void  IMUCalib_SetTextSink(IMUCalibTextSink_t sink)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: è¯»å– Flash ä¸­ä¿å­˜çš„ IMU æ ¡å‡†å‚æ•°
- * è¾“å…¥å‚æ•°:
- *   info - è¾“å‡ºçš„å¯è¯»åŒ–æ ¡å‡†ä¿¡æ¯ç»“æ„ä½“æŒ‡é’ˆ
- * è¿”å›å€¼:
- *   1 - è°ƒç”¨æˆåŠŸï¼Œinfo->valid æŒ‡ç¤ºæ˜¯å¦å­˜åœ¨æœ‰æ•ˆæ•°æ®
- *   0 - è¾“å…¥å‚æ•°æ— æ•ˆ
+ * º¯Êı¹¦ÄÜ: ¶ÁÈ¡ Flash ÖĞ±£´æµÄ IMU Ğ£×¼²ÎÊı
+ * ÊäÈë²ÎÊı:
+ *   info - Êä³öµÄ¿É¶Á»¯Ğ£×¼ĞÅÏ¢½á¹¹ÌåÖ¸Õë
+ * ·µ»ØÖµ:
+ *   1 - µ÷ÓÃ³É¹¦£¬info->valid Ö¸Ê¾ÊÇ·ñ´æÔÚÓĞĞ§Êı¾İ
+ *   0 - ÊäÈë²ÎÊıÎŞĞ§
  */
 uint8_t IMUCalib_ReadFlashInfo(IMUCalibFlashInfo_t *info)
 {
@@ -3723,7 +3723,7 @@ uint8_t IMUCalib_ReadFlashInfo(IMUCalibFlashInfo_t *info)
     return 1U;
 }
 
-/* ï¿½ï¿½ï¿½ï¿½ï¿½Âºï¿½ï¿½ï¿½ï¿½ï¿½IMUĞ£×¼×´Ì¬ï¿½ï¿½ï¿½ï¿½1kHz ï¿½ï¿½Ñ­ï¿½ï¿½ï¿½Ğµï¿½ï¿½ï¿½ */
+/* ÍÓÂİÒÇÆô¶¯º¯Êı£º´¦ÀíIMUĞ£×¼×´Ì¬»ú£¬1kHz Ö÷Ñ­»·ÖĞµ÷ÓÃ */
 uint8_t IMUCalib_StartGyro(void)
 {
     uint32_t irq_state;
@@ -3746,11 +3746,11 @@ uint8_t IMUCalib_StartGyro(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: å¯åŠ¨åŠ é€Ÿåº¦æ¤­çƒæ ¡å‡†æµç¨‹
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›å€¼:
- *   1 - å¯åŠ¨æˆåŠŸ
- *   0 - å½“å‰å¿™ï¼Œå¯åŠ¨å¤±è´¥
+ * º¯Êı¹¦ÄÜ: Æô¶¯¼ÓËÙ¶ÈÍÖÇòĞ£×¼Á÷³Ì
+ * ÊäÈë²ÎÊı: ÎŞ
+ * ·µ»ØÖµ:
+ *   1 - Æô¶¯³É¹¦
+ *   0 - µ±Ç°Ã¦£¬Æô¶¯Ê§°Ü
  */
 uint8_t IMUCalib_StartAccel(void)
 {
@@ -3834,12 +3834,12 @@ uint8_t IMUCalib_ManualStop(void)
     {
         if (s_ellip_manual.substate == IMU_CALIB_MANUAL_SUBSTATE_COLLECTING)
         {
-            imu_calib_emit_text("OK imu accel_man æç¤º å½“å‰æœªå®Œæˆå§¿æ€ç‚¹å·²ä¸¢å¼ƒ");
+            imu_calib_emit_text("OK imu accel_man ÌáÊ¾ µ±Ç°Î´Íê³É×ËÌ¬µãÒÑ¶ªÆú");
         }
 
         imu_calib_manual_reset_current_pose();
         s_ellip_manual.substate = IMU_CALIB_MANUAL_SUBSTATE_SOLVING;
-        imu_calib_emit_text("OK imu accel_man å¼€å§‹æ±‚è§£ pose_count=%u",
+        imu_calib_emit_text("OK imu accel_man ¿ªÊ¼Çó½â pose_count=%u",
                             (unsigned int)s_ellip_manual.orient_count);
         interrupt_global_enable(irq_state);
         return 1U;

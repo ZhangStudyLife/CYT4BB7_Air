@@ -16,7 +16,7 @@
 #define IMAGE_SCREEN_DATA_PERIOD_TICKS (1U)
 #define IMAGE_SCREEN_SPI_SPEED         (20U * 1000U * 1000U)
 #define IMAGE_SCREEN_AUX_REFRESH_FRAMES (5U)
-#define IMAGE_SCREEN_FORCE_DISABLE     (0U) /* ä»…å®‰å…¨å¾…æœºæ—¶æŒ‰æ ¸0è®¸å¯åˆå§‹åŒ–å’Œåˆ·æ–°ã€‚ */
+#define IMAGE_SCREEN_FORCE_DISABLE     (0U) /* ½ö°²È«´ı»úÊ±°´ºË0Ğí¿É³õÊ¼»¯ºÍË¢ĞÂ¡£ */
 #define IMAGE_SCREEN_LCD_X_OFFSET       (40U)
 #define IMAGE_SCREEN_LCD_Y_OFFSET       (52U)
 #define IMAGE_SCREEN_AUX_X              (190U)
@@ -67,7 +67,7 @@ static void ImageDebugScreen_ShowRgb565Region(uint16 x,
                                               uint16 height,
                                               const uint16 *pixels);
 
-/* å·²æ¶ˆè´¹èŠ‚æ‹ä¸ISRå¾…å¤„ç†èŠ‚æ‹ä¹‹å’Œç­‰äºå½“å‰çœŸå®10msåºå·ã€‚ */
+/* ÒÑÏû·Ñ½ÚÅÄÓëISR´ı´¦Àí½ÚÅÄÖ®ºÍµÈÓÚµ±Ç°ÕæÊµ10msĞòºÅ¡£ */
 static uint32 ImageDebugScreen_Now(void)
 {
     uint32 consumed_tick = s_screen_tick_10ms;

@@ -1,48 +1,48 @@
 #include "PMW3901.h"
 
-/* ======================== å¯„å­˜å™¨åœ°å€å®šä¹‰ ======================== */
-#define PMW3901_REG_PRODUCT_ID         (0x00U)     /* äº§å“IDå¯„å­˜å™¨åœ°å€ */
-#define PMW3901_REG_MOTION             (0x02U)     /* è¿åŠ¨æ£€æµ‹å¯„å­˜å™¨åœ°å€ */
-#define PMW3901_REG_DELTA_X_L          (0x03U)     /* Xè½´åƒç´ ä½ç§»ä½å­—èŠ‚å¯„å­˜å™¨ */
-#define PMW3901_REG_DELTA_X_H          (0x04U)     /* Xè½´åƒç´ ä½ç§»é«˜å­—èŠ‚å¯„å­˜å™¨ */
-#define PMW3901_REG_DELTA_Y_L          (0x05U)     /* Yè½´åƒç´ ä½ç§»ä½å­—èŠ‚å¯„å­˜å™¨ */
-#define PMW3901_REG_DELTA_Y_H          (0x06U)     /* Yè½´åƒç´ ä½ç§»é«˜å­—èŠ‚å¯„å­˜å™¨ */
-#define PMW3901_REG_POWER_RST          (0x3AU)     /* ç”µæºå¤ä½å¯„å­˜å™¨åœ°å€ */
-#define PMW3901_REG_INV_PROD_ID2       (0x5FU)     /* åç äº§å“IDå¯„å­˜å™¨åœ°å€ï¼Œå€¼åº”ä¸º~PRODUCT_ID */
-#define PMW3901_REG_MOT_BURST2         (0x16U)     /* Burstè¯»å–å¯åŠ¨å¯„å­˜å™¨åœ°å€ */
+/* ======================== ¼Ä´æÆ÷µØÖ·¶¨Òå ======================== */
+#define PMW3901_REG_PRODUCT_ID         (0x00U)     /* ²úÆ·ID¼Ä´æÆ÷µØÖ· */
+#define PMW3901_REG_MOTION             (0x02U)     /* ÔË¶¯¼ì²â¼Ä´æÆ÷µØÖ· */
+#define PMW3901_REG_DELTA_X_L          (0x03U)     /* XÖáÏñËØÎ»ÒÆµÍ×Ö½Ú¼Ä´æÆ÷ */
+#define PMW3901_REG_DELTA_X_H          (0x04U)     /* XÖáÏñËØÎ»ÒÆ¸ß×Ö½Ú¼Ä´æÆ÷ */
+#define PMW3901_REG_DELTA_Y_L          (0x05U)     /* YÖáÏñËØÎ»ÒÆµÍ×Ö½Ú¼Ä´æÆ÷ */
+#define PMW3901_REG_DELTA_Y_H          (0x06U)     /* YÖáÏñËØÎ»ÒÆ¸ß×Ö½Ú¼Ä´æÆ÷ */
+#define PMW3901_REG_POWER_RST          (0x3AU)     /* µçÔ´¸´Î»¼Ä´æÆ÷µØÖ· */
+#define PMW3901_REG_INV_PROD_ID2       (0x5FU)     /* ·´Âë²úÆ·ID¼Ä´æÆ÷µØÖ·£¬ÖµÓ¦Îª~PRODUCT_ID */
+#define PMW3901_REG_MOT_BURST2         (0x16U)     /* Burst¶ÁÈ¡Æô¶¯¼Ä´æÆ÷µØÖ· */
 
-/* ======================== å¸¸é‡å®šä¹‰ ======================== */
-#define PMW3901_PRODUCT_ID_3901        (0x49U)     /* PMW3901çš„äº§å“IDæœŸæœ›å€¼ */
-#define PMW3901_POWER_ON_RESET_CMD     (0x5AU)     /* ä¸Šç”µå¤ä½å‘½ä»¤å­— */
-#define PMW3901_WRITE_FLAG             (0x80U)     /* SPIå†™æ“ä½œæ ‡å¿—ä½ï¼ˆå¯„å­˜å™¨åœ°å€æœ€é«˜ä½ç½®1ï¼‰ */
-#define PMW3901_DUMMY_BYTE             (0x00U)     /* SPIè¯»å–æ—¶å‘é€çš„å¡«å……å­—èŠ‚ */
+/* ======================== ³£Á¿¶¨Òå ======================== */
+#define PMW3901_PRODUCT_ID_3901        (0x49U)     /* PMW3901µÄ²úÆ·IDÆÚÍûÖµ */
+#define PMW3901_POWER_ON_RESET_CMD     (0x5AU)     /* ÉÏµç¸´Î»ÃüÁî×Ö */
+#define PMW3901_WRITE_FLAG             (0x80U)     /* SPIĞ´²Ù×÷±êÖ¾Î»£¨¼Ä´æÆ÷µØÖ·×î¸ßÎ»ÖÃ1£© */
+#define PMW3901_DUMMY_BYTE             (0x00U)     /* SPI¶ÁÈ¡Ê±·¢ËÍµÄÌî³ä×Ö½Ú */
 
-/* ======================== æ—¶åºå»¶è¿Ÿå‚æ•° ======================== */
-#define PMW3901_POWERUP_DELAY_MS       (50U)       /* ä¸Šç”µå¤ä½åç­‰å¾…æ—¶é—´ ms */
-#define PMW3901_STAGE_GAP_DELAY_MS     (100U)      /* ä¸¤é˜¶æ®µåˆå§‹åŒ–ä¹‹é—´çš„é—´éš”æ—¶é—´ ms */
-#define PMW3901_READY_DELAY_MS         (50U)       /* åˆå§‹åŒ–å®Œæˆåçš„å°±ç»ªç­‰å¾…æ—¶é—´ ms */
-#define PMW3901_REG_RETRY_MAX          (5U)        /* å¯„å­˜å™¨å†™å…¥/IDæ ¡éªŒæœ€å¤§é‡è¯•æ¬¡æ•° */
+/* ======================== Ê±ĞòÑÓ³Ù²ÎÊı ======================== */
+#define PMW3901_POWERUP_DELAY_MS       (50U)       /* ÉÏµç¸´Î»ºóµÈ´ıÊ±¼ä ms */
+#define PMW3901_STAGE_GAP_DELAY_MS     (100U)      /* Á½½×¶Î³õÊ¼»¯Ö®¼äµÄ¼ä¸ôÊ±¼ä ms */
+#define PMW3901_READY_DELAY_MS         (50U)       /* ³õÊ¼»¯Íê³ÉºóµÄ¾ÍĞ÷µÈ´ıÊ±¼ä ms */
+#define PMW3901_REG_RETRY_MAX          (5U)        /* ¼Ä´æÆ÷Ğ´Èë/IDĞ£Ñé×î´óÖØÊÔ´ÎÊı */
 
-/* ======================== SPIæ—¶åºå»¶è¿Ÿï¼ˆå¾®ç§’ï¼‰ ======================== */
-#define PMW3901_TSRAD_US               (300U)      /* åœ°å€å­—èŠ‚ä¸æ•°æ®å­—èŠ‚ä¹‹é—´çš„å»¶è¿Ÿ tSRAD */
-#define PMW3901_TSR_US                 (500U)      /* è¯»æ“ä½œåœ°å€åçš„ç­‰å¾…æ—¶é—´ tSR */
-#define PMW3901_TSWX_US                (120U)      /* å†™æ“ä½œå®Œæˆåçš„ç­‰å¾…æ—¶é—´ tSWx */
-#define PMW3901_TSRX_US                (200U)      /* è¯»æ“ä½œå®Œæˆåçš„ç­‰å¾…æ—¶é—´ tSRx */
-#define PMW3901_TBEXIT_US              (1U)        /* Burstè¯»å–ç»“æŸåçš„CSæ‹‰é«˜å»¶è¿Ÿ tBEXIT */
-#define PMW3901_MOTION_BURST_DELAY_US  (150U)      /* Burstè¯»å–å‘½ä»¤å‘é€åçš„ç­‰å¾…æ—¶é—´ */
-#define PMW3901_INIT_FLUSH_COUNT       (3U)        /* åˆå§‹åŒ–åä¸¢å¼ƒçš„è„æ•°æ®å¸§æ•° */
-#define PMW3901_FLUSH_INTERVAL_MS      (20U)       /* ä¸¢å¼ƒå¸§ä¹‹é—´çš„é—´éš”æ—¶é—´ ms */
+/* ======================== SPIÊ±ĞòÑÓ³Ù£¨Î¢Ãë£© ======================== */
+#define PMW3901_TSRAD_US               (300U)      /* µØÖ·×Ö½ÚÓëÊı¾İ×Ö½ÚÖ®¼äµÄÑÓ³Ù tSRAD */
+#define PMW3901_TSR_US                 (500U)      /* ¶Á²Ù×÷µØÖ·ºóµÄµÈ´ıÊ±¼ä tSR */
+#define PMW3901_TSWX_US                (120U)      /* Ğ´²Ù×÷Íê³ÉºóµÄµÈ´ıÊ±¼ä tSWx */
+#define PMW3901_TSRX_US                (200U)      /* ¶Á²Ù×÷Íê³ÉºóµÄµÈ´ıÊ±¼ä tSRx */
+#define PMW3901_TBEXIT_US              (1U)        /* Burst¶ÁÈ¡½áÊøºóµÄCSÀ­¸ßÑÓ³Ù tBEXIT */
+#define PMW3901_MOTION_BURST_DELAY_US  (150U)      /* Burst¶ÁÈ¡ÃüÁî·¢ËÍºóµÄµÈ´ıÊ±¼ä */
+#define PMW3901_INIT_FLUSH_COUNT       (3U)        /* ³õÊ¼»¯ºó¶ªÆúµÄÔàÊı¾İÖ¡Êı */
+#define PMW3901_FLUSH_INTERVAL_MS      (20U)       /* ¶ªÆúÖ¡Ö®¼äµÄ¼ä¸ôÊ±¼ä ms */
 
 /**
- * @brief å¯„å­˜å™¨é…ç½®é¡¹ç»“æ„ä½“ï¼Œç”¨äºåˆå§‹åŒ–å¯„å­˜å™¨è¡¨
+ * @brief ¼Ä´æÆ÷ÅäÖÃÏî½á¹¹Ìå£¬ÓÃÓÚ³õÊ¼»¯¼Ä´æÆ÷±í
  */
 typedef struct
 {
-    uint8 reg;      /* å¯„å­˜å™¨åœ°å€ */
-    uint8 value;    /* è¦å†™å…¥çš„å€¼ */
+    uint8 reg;      /* ¼Ä´æÆ÷µØÖ· */
+    uint8 value;    /* ÒªĞ´ÈëµÄÖµ */
 } pmw3901_reg_cfg_t;
 
-/* ç¬¬ä¸€é˜¶æ®µåˆå§‹åŒ–å¯„å­˜å™¨é…ç½®è¡¨ï¼ˆä¼ æ„Ÿå™¨å†…éƒ¨å‚æ•°è°ƒä¼˜ï¼‰ */
+/* µÚÒ»½×¶Î³õÊ¼»¯¼Ä´æÆ÷ÅäÖÃ±í£¨´«¸ĞÆ÷ÄÚ²¿²ÎÊıµ÷ÓÅ£© */
 static const pmw3901_reg_cfg_t pmw3901_init_stage1[] =
 {
     { 0x7F, 0x00 },
@@ -106,7 +106,7 @@ static const pmw3901_reg_cfg_t pmw3901_init_stage1[] =
     { 0x70, 0x00 }
 };
 
-/* ç¬¬äºŒé˜¶æ®µåˆå§‹åŒ–å¯„å­˜å™¨é…ç½®è¡¨ï¼ˆLED_Nå¯ç”¨ã€æœ€ç»ˆå·¥ä½œæ¨¡å¼é…ç½®ï¼‰ */
+/* µÚ¶ş½×¶Î³õÊ¼»¯¼Ä´æÆ÷ÅäÖÃ±í£¨LED_NÆôÓÃ¡¢×îÖÕ¹¤×÷Ä£Ê½ÅäÖÃ£© */
 static const pmw3901_reg_cfg_t pmw3901_init_stage2[] =
 {
     { 0x32, 0x44 },
@@ -128,17 +128,17 @@ static const pmw3901_reg_cfg_t pmw3901_init_stage2[] =
     { 0x7F, 0x00 }
 };
 
-/* PMW3901å…‰æµä¼ æ„Ÿå™¨åŸå§‹æ•°æ®ï¼Œç”±PMW3901_Update_50HZ()å‘¨æœŸæ€§å¡«å……ï¼Œå·²åšææ€§æ˜ å°„ */
+/* PMW3901¹âÁ÷´«¸ĞÆ÷Ô­Ê¼Êı¾İ£¬ÓÉPMW3901_Update_50HZ()ÖÜÆÚĞÔÌî³ä£¬ÒÑ×ö¼«ĞÔÓ³Éä */
 volatile pmw3901_raw_t g_pmw3901_raw = {0};
-/* åˆå§‹åŒ–å®Œæˆæ ‡å¿—ï¼Œ1=å·²åˆå§‹åŒ–ï¼Œ0=æœªåˆå§‹åŒ–æˆ–åˆå§‹åŒ–å¤±è´¥ */
+/* ³õÊ¼»¯Íê³É±êÖ¾£¬1=ÒÑ³õÊ¼»¯£¬0=Î´³õÊ¼»¯»ò³õÊ¼»¯Ê§°Ü */
 static uint8 pmw3901_inited = 0U;
 
 /**
- * @brief  SPIå•å­—èŠ‚æ”¶å‘
- *         åŒæ—¶å‘é€ä¸€ä¸ªå­—èŠ‚å¹¶æ¥æ”¶ä¸€ä¸ªå­—èŠ‚ï¼ˆå…¨åŒå·¥ï¼‰
+ * @brief  SPIµ¥×Ö½ÚÊÕ·¢
+ *         Í¬Ê±·¢ËÍÒ»¸ö×Ö½Ú²¢½ÓÊÕÒ»¸ö×Ö½Ú£¨È«Ë«¹¤£©
  *
- * @param  tx  è¦å‘é€çš„å­—èŠ‚
- * @return æ¥æ”¶åˆ°çš„å­—èŠ‚
+ * @param  tx  Òª·¢ËÍµÄ×Ö½Ú
+ * @return ½ÓÊÕµ½µÄ×Ö½Ú
  */
 static uint8 pmw3901_spi_transfer_byte(uint8 tx)
 {
@@ -148,12 +148,12 @@ static uint8 pmw3901_spi_transfer_byte(uint8 tx)
 }
 
 /**
- * @brief  å†™å…¥PMW3901å¯„å­˜å™¨
- *         æ‹‰ä½CSâ†’å‘é€åœ°å€(ç½®å†™æ ‡å¿—)â†’ç­‰å¾…tSRADâ†’å‘é€æ•°æ®â†’æ‹‰é«˜CSâ†’ç­‰å¾…tSWx
+ * @brief  Ğ´ÈëPMW3901¼Ä´æÆ÷
+ *         À­µÍCS¡ú·¢ËÍµØÖ·(ÖÃĞ´±êÖ¾)¡úµÈ´ıtSRAD¡ú·¢ËÍÊı¾İ¡úÀ­¸ßCS¡úµÈ´ıtSWx
  *
- * @param  reg    å¯„å­˜å™¨åœ°å€ï¼ˆ0x00~0x7Fï¼‰
- * @param  value  è¦å†™å…¥çš„å€¼
- * @return æ— 
+ * @param  reg    ¼Ä´æÆ÷µØÖ·£¨0x00~0x7F£©
+ * @param  value  ÒªĞ´ÈëµÄÖµ
+ * @return ÎŞ
  */
 static void pmw3901_reg_write(uint8 reg, uint8 value)
 {
@@ -166,11 +166,11 @@ static void pmw3901_reg_write(uint8 reg, uint8 value)
 }
 
 /**
- * @brief  è¯»å–PMW3901å¯„å­˜å™¨
- *         æ‹‰ä½CSâ†’å‘é€åœ°å€â†’ç­‰å¾…tSRâ†’è¯»å–æ•°æ®â†’æ‹‰é«˜CSâ†’ç­‰å¾…tSRx
+ * @brief  ¶ÁÈ¡PMW3901¼Ä´æÆ÷
+ *         À­µÍCS¡ú·¢ËÍµØÖ·¡úµÈ´ıtSR¡ú¶ÁÈ¡Êı¾İ¡úÀ­¸ßCS¡úµÈ´ıtSRx
  *
- * @param  reg  å¯„å­˜å™¨åœ°å€ï¼ˆ0x00~0x7Fï¼‰
- * @return è¯»å–åˆ°çš„å¯„å­˜å™¨å€¼
+ * @param  reg  ¼Ä´æÆ÷µØÖ·£¨0x00~0x7F£©
+ * @return ¶ÁÈ¡µ½µÄ¼Ä´æÆ÷Öµ
  */
 static uint8 pmw3901_reg_read(uint8 reg)
 {
@@ -185,12 +185,12 @@ static uint8 pmw3901_reg_read(uint8 reg)
 }
 
 /**
- * @brief  æ‰¹é‡åŠ è½½å¯„å­˜å™¨é…ç½®è¡¨
- *         éå†é…ç½®è¡¨é€é¡¹å†™å…¥ï¼Œå¼€å¯æ ¡éªŒæ—¶å†™åå›è¯»éªŒè¯ï¼Œå¤±è´¥åˆ™é‡è¯•
+ * @brief  ÅúÁ¿¼ÓÔØ¼Ä´æÆ÷ÅäÖÃ±í
+ *         ±éÀúÅäÖÃ±íÖğÏîĞ´Èë£¬¿ªÆôĞ£ÑéÊ±Ğ´ºó»Ø¶ÁÑéÖ¤£¬Ê§°ÜÔòÖØÊÔ
  *
- * @param  table      å¯„å­˜å™¨é…ç½®è¡¨æŒ‡é’ˆ
- * @param  table_len  é…ç½®è¡¨å…ƒç´ æ•°é‡
- * @return 0=åŠ è½½å®Œæˆ
+ * @param  table      ¼Ä´æÆ÷ÅäÖÃ±íÖ¸Õë
+ * @param  table_len  ÅäÖÃ±íÔªËØÊıÁ¿
+ * @return 0=¼ÓÔØÍê³É
  */
 static uint8 pmw3901_load_config(const pmw3901_reg_cfg_t *table, uint32 table_len)
 {
@@ -202,7 +202,7 @@ static uint8 pmw3901_load_config(const pmw3901_reg_cfg_t *table, uint32 table_le
         uint8 try_idx;
         uint8 matched = 0U;
 
-        /* å†™å…¥åå›è¯»æ ¡éªŒï¼Œå¤±è´¥åˆ™é‡è¯•æœ€å¤š REG_RETRY_MAX æ¬¡ */
+        /* Ğ´Èëºó»Ø¶ÁĞ£Ñé£¬Ê§°ÜÔòÖØÊÔ×î¶à REG_RETRY_MAX ´Î */
         for (try_idx = 0U; try_idx < PMW3901_REG_RETRY_MAX; ++try_idx)
         {
             pmw3901_reg_write(table[i].reg, table[i].value);
@@ -226,11 +226,11 @@ static uint8 pmw3901_load_config(const pmw3901_reg_cfg_t *table, uint32 table_le
 }
 
 /**
- * @brief  æ ¡éªŒPMW3901èŠ¯ç‰‡ID
- *         è¯»å–äº§å“IDå’Œåç IDï¼ŒéªŒè¯ä¸¤è€…äº’ä¸ºæŒ‰ä½å–åå…³ç³»
+ * @brief  Ğ£ÑéPMW3901Ğ¾Æ¬ID
+ *         ¶ÁÈ¡²úÆ·IDºÍ·´ÂëID£¬ÑéÖ¤Á½Õß»¥Îª°´Î»È¡·´¹ØÏµ
  *
- * @param  æ— 
- * @return 0=IDæ ¡éªŒé€šè¿‡ï¼Œ1=æ ¡éªŒå¤±è´¥
+ * @param  ÎŞ
+ * @return 0=IDĞ£ÑéÍ¨¹ı£¬1=Ğ£ÑéÊ§°Ü
  */
 static uint8 pmw3901_check_id(void)
 {
@@ -246,11 +246,11 @@ static uint8 pmw3901_check_id(void)
 }
 
 /**
- * @brief  å¤ä½å…‰æµåŸå§‹æ•°æ®å’Œåˆå§‹åŒ–æ ‡å¿—
- *         å°† g_pmw3901_raw æ¸…é›¶ï¼Œå¹¶å°† pmw3901_inited ç½®0
+ * @brief  ¸´Î»¹âÁ÷Ô­Ê¼Êı¾İºÍ³õÊ¼»¯±êÖ¾
+ *         ½« g_pmw3901_raw ÇåÁã£¬²¢½« pmw3901_inited ÖÃ0
  *
- * @param  æ— 
- * @return æ— 
+ * @param  ÎŞ
+ * @return ÎŞ
  */
 static void pmw3901_reset_raw_data(void)
 {
@@ -259,12 +259,12 @@ static void pmw3901_reset_raw_data(void)
 }
 
 /**
- * @brief  Motion Burstè¯»å–
- *         ä¸€æ¬¡æ€§è¯»å–å…¨éƒ¨è¿åŠ¨æ•°æ®ï¼ˆåƒç´ ä½ç§»ã€è´¨é‡ã€æ›å…‰ç­‰ï¼‰ï¼Œ
- *         å¹¶å¯¹å¤§ç«¯åºä¼ è¾“çš„shutterå­—æ®µåšå­—èŠ‚äº¤æ¢
+ * @brief  Motion Burst¶ÁÈ¡
+ *         Ò»´ÎĞÔ¶ÁÈ¡È«²¿ÔË¶¯Êı¾İ£¨ÏñËØÎ»ÒÆ¡¢ÖÊÁ¿¡¢ÆØ¹âµÈ£©£¬
+ *         ²¢¶Ô´ó¶ËĞò´«ÊäµÄshutter×Ö¶Î×ö×Ö½Ú½»»»
  *
- * @param  motion  è¾“å‡ºæŒ‡é’ˆï¼Œå­˜æ”¾è¯»å–åˆ°çš„åŸå§‹è¿åŠ¨æ•°æ®
- * @return æ— 
+ * @param  motion  Êä³öÖ¸Õë£¬´æ·Å¶ÁÈ¡µ½µÄÔ­Ê¼ÔË¶¯Êı¾İ
+ * @return ÎŞ
  */
 static void pmw3901_motion_burst_read(pmw3901_raw_t *motion)
 {
@@ -272,12 +272,12 @@ static void pmw3901_motion_burst_read(pmw3901_raw_t *motion)
     uint8 *raw = (uint8 *)motion;
     uint16 shutter_value;
 
-    /* æ‹‰ä½CSï¼Œå‘é€Burstè¯»å–å‘½ä»¤ï¼Œç­‰å¾…æ•°æ®å°±ç»ª */
+    /* À­µÍCS£¬·¢ËÍBurst¶ÁÈ¡ÃüÁî£¬µÈ´ıÊı¾İ¾ÍĞ÷ */
     gpio_low(PMW3901_CS_Pin);
     pmw3901_spi_transfer_byte(PMW3901_REG_MOT_BURST2);
     system_delay_us(PMW3901_MOTION_BURST_DELAY_US);
 
-    /* é€å­—èŠ‚è¯»å–æ•´ä¸ªBurstæ•°æ®å¸§ */
+    /* Öğ×Ö½Ú¶ÁÈ¡Õû¸öBurstÊı¾İÖ¡ */
     for (idx = 0U; idx < (uint8)sizeof(pmw3901_raw_t); ++idx)
     {
         raw[idx] = pmw3901_spi_transfer_byte(PMW3901_DUMMY_BYTE);
@@ -285,26 +285,26 @@ static void pmw3901_motion_burst_read(pmw3901_raw_t *motion)
     gpio_high(PMW3901_CS_Pin);
     system_delay_us(PMW3901_TBEXIT_US);
 
-    /* shutterå­—æ®µä¸ºå¤§ç«¯åºä¼ è¾“ï¼Œéœ€è¦å­—èŠ‚äº¤æ¢è½¬ä¸ºå°ç«¯åº */
+    /* shutter×Ö¶ÎÎª´ó¶ËĞò´«Êä£¬ĞèÒª×Ö½Ú½»»»×ªÎªĞ¡¶ËĞò */
     shutter_value = motion->shutter;
     motion->shutter = (uint16)(((shutter_value >> 8) & 0x00FFU)
                                | ((shutter_value & 0x00FFU) << 8));
 }
 
 /**
- * @brief  PMW3901å…‰æµä¼ æ„Ÿå™¨åˆå§‹åŒ–
- *         æ‰§è¡ŒSPIå¤–è®¾åˆå§‹åŒ–ã€èŠ¯ç‰‡ä¸Šç”µå¤ä½ã€IDæ ¡éªŒï¼ˆå¸¦é‡è¯•ï¼‰ã€
- *         ä¸¤é˜¶æ®µå¯„å­˜å™¨é…ç½®ï¼Œå¹¶æ‰§è¡Œé¦–æ¬¡æ•°æ®è¯»å–
+ * @brief  PMW3901¹âÁ÷´«¸ĞÆ÷³õÊ¼»¯
+ *         Ö´ĞĞSPIÍâÉè³õÊ¼»¯¡¢Ğ¾Æ¬ÉÏµç¸´Î»¡¢IDĞ£Ñé£¨´øÖØÊÔ£©¡¢
+ *         Á½½×¶Î¼Ä´æÆ÷ÅäÖÃ£¬²¢Ö´ĞĞÊ×´ÎÊı¾İ¶ÁÈ¡
  *
- * @param  æ— 
- * @return 0=åˆå§‹åŒ–æˆåŠŸï¼Œ1=åˆå§‹åŒ–å¤±è´¥ï¼ˆIDæ ¡éªŒæˆ–å¯„å­˜å™¨é…ç½®å¤±è´¥ï¼‰
+ * @param  ÎŞ
+ * @return 0=³õÊ¼»¯³É¹¦£¬1=³õÊ¼»¯Ê§°Ü£¨IDĞ£Ñé»ò¼Ä´æÆ÷ÅäÖÃÊ§°Ü£©
  */
 uint8 PMW3901_Init(void)
 {
     uint8 retry_cnt = 0U;
     pmw3901_reset_raw_data();
 
-    /* åˆå§‹åŒ–SPIå¤–è®¾å’ŒCSå¼•è„š */
+    /* ³õÊ¼»¯SPIÍâÉèºÍCSÒı½Å */
     spi_init(PMW3901_SPI,
              SPI_MODE3,
              PMW3901_SPI_SPEED,
@@ -315,11 +315,11 @@ uint8 PMW3901_Init(void)
     gpio_init(PMW3901_CS_Pin, GPO, 1, GPO_PUSH_PULL);
     system_delay_ms(10U);
 
-    /* å‘é€ä¸Šç”µå¤ä½å‘½ä»¤ï¼Œç­‰å¾…èŠ¯ç‰‡å°±ç»ª */
+    /* ·¢ËÍÉÏµç¸´Î»ÃüÁî£¬µÈ´ıĞ¾Æ¬¾ÍĞ÷ */
     pmw3901_reg_write(PMW3901_REG_POWER_RST, PMW3901_POWER_ON_RESET_CMD);
     system_delay_ms(PMW3901_POWERUP_DELAY_MS);
 
-    /* IDæ ¡éªŒï¼Œå¤±è´¥åˆ™é‡æ–°å¤ä½å¹¶é‡è¯•ï¼Œè¶…è¿‡æœ€å¤§æ¬¡æ•°åˆ™è¿”å›å¤±è´¥ */
+    /* IDĞ£Ñé£¬Ê§°ÜÔòÖØĞÂ¸´Î»²¢ÖØÊÔ£¬³¬¹ı×î´ó´ÎÊıÔò·µ»ØÊ§°Ü */
     while (pmw3901_check_id() != 0U)
     {
         retry_cnt++;
@@ -333,7 +333,7 @@ uint8 PMW3901_Init(void)
         system_delay_ms(PMW3901_POWERUP_DELAY_MS);
     }
 
-    /* åŠ è½½ç¬¬ä¸€é˜¶æ®µå¯„å­˜å™¨é…ç½® */
+    /* ¼ÓÔØµÚÒ»½×¶Î¼Ä´æÆ÷ÅäÖÃ */
     if (pmw3901_load_config(pmw3901_init_stage1,
                             (uint32)(sizeof(pmw3901_init_stage1) / sizeof(pmw3901_init_stage1[0]))) != 0U)
     {
@@ -342,7 +342,7 @@ uint8 PMW3901_Init(void)
     }
     system_delay_ms(PMW3901_STAGE_GAP_DELAY_MS);
 
-    /* åŠ è½½ç¬¬äºŒé˜¶æ®µå¯„å­˜å™¨é…ç½® */
+    /* ¼ÓÔØµÚ¶ş½×¶Î¼Ä´æÆ÷ÅäÖÃ */
     if (pmw3901_load_config(pmw3901_init_stage2,
                             (uint32)(sizeof(pmw3901_init_stage2) / sizeof(pmw3901_init_stage2[0]))) != 0U)
     {
@@ -351,10 +351,10 @@ uint8 PMW3901_Init(void)
     }
     system_delay_ms(PMW3901_READY_DELAY_MS);
 
-    /* æ ‡è®°åˆå§‹åŒ–å®Œæˆ */
+    /* ±ê¼Ç³õÊ¼»¯Íê³É */
     pmw3901_inited = 1U;
 
-    /* æ¸…é™¤åˆå§‹è„æ•°æ®ï¼šBurst Readä¼šåŒæ—¶æ¸…é™¤motionå’Œdeltaç´¯åŠ å™¨ï¼Œæ— éœ€é¢å¤–å•å¯„å­˜å™¨è¯»å– */
+    /* Çå³ı³õÊ¼ÔàÊı¾İ£ºBurst Read»áÍ¬Ê±Çå³ımotionºÍdeltaÀÛ¼ÓÆ÷£¬ÎŞĞè¶îÍâµ¥¼Ä´æÆ÷¶ÁÈ¡ */
     {
         uint8 flush_i;
         pmw3901_raw_t discard = {0};
@@ -365,17 +365,17 @@ uint8 PMW3901_Init(void)
         }
     }
 
-    /* æ‰§è¡Œé¦–æ¬¡æœ‰æ•ˆæ•°æ®è¯»å– */
+    /* Ö´ĞĞÊ×´ÎÓĞĞ§Êı¾İ¶ÁÈ¡ */
     PMW3901_Update_50HZ();
     return 0U;
 }
 
 /**
- * @brief  PMW3901é‡æ–°åˆå§‹åŒ–
- *         å…ˆæ¸…é›¶åŸå§‹æ•°æ®å’Œåˆå§‹åŒ–æ ‡å¿—ï¼Œå†è°ƒç”¨PMW3901_Init()å®Œæˆå®Œæ•´åˆå§‹åŒ–
+ * @brief  PMW3901ÖØĞÂ³õÊ¼»¯
+ *         ÏÈÇåÁãÔ­Ê¼Êı¾İºÍ³õÊ¼»¯±êÖ¾£¬ÔÙµ÷ÓÃPMW3901_Init()Íê³ÉÍêÕû³õÊ¼»¯
  *
- * @param  æ— 
- * @return 0=é‡æ–°åˆå§‹åŒ–æˆåŠŸï¼Œ1=å¤±è´¥
+ * @param  ÎŞ
+ * @return 0=ÖØĞÂ³õÊ¼»¯³É¹¦£¬1=Ê§°Ü
  */
 uint8 PMW3901_ReInit(void)
 {
@@ -384,13 +384,13 @@ uint8 PMW3901_ReInit(void)
 }
 
 /**
- * @brief  PMW3901æ•°æ®æ›´æ–°ï¼ˆéœ€å‘¨æœŸæ€§è°ƒç”¨ï¼Œå…¸å‹50Hzï¼‰
- *         æ‰§è¡ŒBurst Readè¯»å–å…¨éƒ¨è¿åŠ¨æ•°æ®ï¼Œæ£€æŸ¥motionOccuredæ ‡å¿—ä½ï¼Œ
- *         ä»…å½“ä¼ æ„Ÿå™¨æŠ¥å‘Šæœ‰æ–°è¿åŠ¨æ—¶æ‰æ›´æ–°deltaX/deltaYå¹¶æ–½åŠ ææ€§æ˜ å°„ï¼Œ
- *         å¦åˆ™å°†deltaX/deltaYæ¸…é›¶é˜²æ­¢æ®‹ç•™è„æ•°æ®
+ * @brief  PMW3901Êı¾İ¸üĞÂ£¨ĞèÖÜÆÚĞÔµ÷ÓÃ£¬µäĞÍ50Hz£©
+ *         Ö´ĞĞBurst Read¶ÁÈ¡È«²¿ÔË¶¯Êı¾İ£¬¼ì²émotionOccured±êÖ¾Î»£¬
+ *         ½öµ±´«¸ĞÆ÷±¨¸æÓĞĞÂÔË¶¯Ê±²Å¸üĞÂdeltaX/deltaY²¢Ê©¼Ó¼«ĞÔÓ³Éä£¬
+ *         ·ñÔò½«deltaX/deltaYÇåÁã·ÀÖ¹²ĞÁôÔàÊı¾İ
  *
- * @param  æ— 
- * @return æ— 
+ * @param  ÎŞ
+ * @return ÎŞ
  */
 void PMW3901_Update_50HZ(void)
 {
@@ -403,14 +403,14 @@ void PMW3901_Update_50HZ(void)
 
     pmw3901_motion_burst_read(&burst_data);
 
-    /* æ£€æŸ¥motionOccuredæ ‡å¿—ï¼šä¼ æ„Ÿå™¨æœªå®Œæˆæ–°å¸§å¤„ç†æ—¶deltaå¯èƒ½ä¸ºè„æ•°æ® */
+    /* ¼ì²émotionOccured±êÖ¾£º´«¸ĞÆ÷Î´Íê³ÉĞÂÖ¡´¦ÀíÊ±delta¿ÉÄÜÎªÔàÊı¾İ */
     if (burst_data.squal == 0U)
     {
         burst_data.deltaX = 0;
         burst_data.deltaY = 0;
     }
 
-    /* å¯¹åƒç´ ä½ç§»æ–½åŠ ææ€§æ˜ å°„ï¼Œå°†èŠ¯ç‰‡åæ ‡ç³»è½¬æ¢ä¸ºæœºä½“åæ ‡ç³» */
+    /* ¶ÔÏñËØÎ»ÒÆÊ©¼Ó¼«ĞÔÓ³Éä£¬½«Ğ¾Æ¬×ø±êÏµ×ª»»Îª»úÌå×ø±êÏµ */
     burst_data.deltaX = (int16)(PMW3901_SIGN_X * burst_data.deltaX);
     burst_data.deltaY = (int16)(PMW3901_SIGN_Y * burst_data.deltaY);
     if (burst_data.deltaX < -100)
@@ -437,6 +437,6 @@ void PMW3901_Update_50HZ(void)
         burst_data.deltaX = 0;
         burst_data.deltaY = 0;
     }
-    
+
     g_pmw3901_raw = burst_data;
 }

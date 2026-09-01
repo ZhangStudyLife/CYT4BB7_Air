@@ -3,14 +3,14 @@
 
 #include "car_plan_entry.h"
 
-#define CAR_PLAN_3_DEBUG_BEACON_COUNT (4U) /* è°ƒè¯•è¾“å‡ºçš„å…¨å±€èåˆä¿¡æ ‡æœ€å¤§æ•°é‡ã€‚ */
+#define CAR_PLAN_3_DEBUG_BEACON_COUNT (4U) /* µ÷ÊÔÊä³öµÄÈ«¾ÖÈÚºÏĞÅ±ê×î´óÊıÁ¿¡£ */
 
 typedef struct
 {
     uint8 valid;
     uint8 camera_mask;
-    float center_x; /* ä¸–ç•Œå¯¹é½å±€éƒ¨ X åæ ‡ï¼Œå•ä½ mã€‚ */
-    float center_y; /* ä¸–ç•Œå¯¹é½å±€éƒ¨ Y åæ ‡ï¼Œå•ä½ mã€‚ */
+    float center_x; /* ÊÀ½ç¶ÔÆë¾Ö²¿ X ×ø±ê£¬µ¥Î» m¡£ */
+    float center_y; /* ÊÀ½ç¶ÔÆë¾Ö²¿ Y ×ø±ê£¬µ¥Î» m¡£ */
     float area;
 } car_plan_3_debug_beacon_t;
 
@@ -18,9 +18,9 @@ typedef struct
 {
     uint8 valid;
     uint8 camera_mask;
-    float center_x; /* ä¸–ç•Œå¯¹é½å±€éƒ¨ X åæ ‡ï¼Œå•ä½ mã€‚ */
-    float center_y; /* ä¸–ç•Œå¯¹é½å±€éƒ¨ Y åæ ‡ï¼Œå•ä½ mã€‚ */
-    float angle_deg; /* è½¦ç¯é•¿è½´åœ¨æ°´å¹³å…¨å±€åæ ‡ç³»ä¸­çš„æ— å‘è§’åº¦ï¼Œå•ä½ degã€‚ */
+    float center_x; /* ÊÀ½ç¶ÔÆë¾Ö²¿ X ×ø±ê£¬µ¥Î» m¡£ */
+    float center_y; /* ÊÀ½ç¶ÔÆë¾Ö²¿ Y ×ø±ê£¬µ¥Î» m¡£ */
+    float angle_deg; /* ³µµÆ³¤ÖáÔÚË®Æ½È«¾Ö×ø±êÏµÖĞµÄÎŞÏò½Ç¶È£¬µ¥Î» deg¡£ */
 } car_plan_3_debug_lamp_t;
 
 typedef struct
@@ -33,10 +33,10 @@ typedef struct
 void CarPlan_3_Reset(void);
 
 /**
- * @brief ä½¿ç”¨ä¸‰æ‘„ Double Sphere å‡ ä½•ç¡®å®šè½¦ç¯åˆ°æœ€è¿‘ä¿¡æ ‡çš„ç›®æ ‡é€Ÿåº¦ï¼ŒåŒæ‘„ç»„åˆä¼˜å…ˆäºè·¨æ‘„ç»„åˆã€‚
- * @param result è¾“å‡ºè½¦ä½“ç³»æ¨ªå‘å’Œå‰å‘ç›®æ ‡é€Ÿåº¦ï¼›å…è®¸ä¼ å…¥ç©ºæŒ‡é’ˆã€‚
- * @return æˆåŠŸå¾—åˆ°å¯ä¿¡ç›®æ ‡æ–¹å‘æ—¶è¿”å› 1ï¼Œå¦åˆ™æ¸…ç©ºè¾“å‡ºå¹¶è¿”å› 0ã€‚
- * @note g_car_yaw åªç”¨äºæ¶ˆé™¤æ‰€é€‰è½¦ç¯é•¿è½´çš„ 180 åº¦æ–¹å‘æ­§ä¹‰ï¼Œä¸æ›¿ä»£å›¾åƒç›®æ ‡æ–¹å‘ã€‚
+ * @brief Ê¹ÓÃÈıÉã Double Sphere ¼¸ºÎÈ·¶¨³µµÆµ½×î½üĞÅ±êµÄÄ¿±êËÙ¶È£¬Í¬Éã×éºÏÓÅÏÈÓÚ¿çÉã×éºÏ¡£
+ * @param result Êä³ö³µÌåÏµºáÏòºÍÇ°ÏòÄ¿±êËÙ¶È£»ÔÊĞí´«Èë¿ÕÖ¸Õë¡£
+ * @return ³É¹¦µÃµ½¿ÉĞÅÄ¿±ê·½ÏòÊ±·µ»Ø 1£¬·ñÔòÇå¿ÕÊä³ö²¢·µ»Ø 0¡£
+ * @note g_car_yaw Ö»ÓÃÓÚÏû³ıËùÑ¡³µµÆ³¤ÖáµÄ 180 ¶È·½ÏòÆçÒå£¬²»Ìæ´úÍ¼ÏñÄ¿±ê·½Ïò¡£
  */
 uint8 CarPlan_3_Update(car_plan_result_t *result);
 void CarPlan_3_GetResult(car_plan_result_t *result);

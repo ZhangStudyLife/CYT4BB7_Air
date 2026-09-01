@@ -36,16 +36,16 @@
 #include "zf_driver_gpio.h"
 #include "zf_driver_spi.h"
 
-/* é£æ§é»˜è®¤é…ç½®ï¼š1kHz è¾“å‡ºé€Ÿç‡ï¼ˆBetaflight é£æ ¼ï¼‰ */
-#define ICM42688_SAMPLE_RATE_HZ          1000   /* IMU é»˜è®¤è¾“å‡ºé€Ÿç‡ï¼Œå•ä½ Hz */
-#define ICM42688_SAMPLE_INTERVAL_US      1000U  /* IMU é‡‡æ ·å‘¨æœŸï¼Œå•ä½ us */
+/* ·É¿ØÄ¬ÈÏÅäÖÃ£º1kHz Êä³öËÙÂÊ£¨Betaflight ·ç¸ñ£© */
+#define ICM42688_SAMPLE_RATE_HZ          1000   /* IMU Ä¬ÈÏÊä³öËÙÂÊ£¬µ¥Î» Hz */
+#define ICM42688_SAMPLE_INTERVAL_US      1000U  /* IMU ²ÉÑùÖÜÆÚ£¬µ¥Î» us */
 
-/* å¸¸ç”¨å‘½ä»¤ä¸è®¾å¤‡ä¿¡æ¯ */
+/* ³£ÓÃÃüÁîÓëÉè±¸ĞÅÏ¢ */
 #define WHO_AM_I                         0xF500
 #define ICM42688_ID                      0X47
 #define READ_ACC_X_HIGH                  0X9F
 
-/* SPI ç¡¬ä»¶é…ç½® */
+/* SPI Ó²¼şÅäÖÃ */
 #define ICM42688_SPI                     (SPI_2)
 #define ICM42688_MOSI_Pin                (SPI2_MOSI_P15_1)
 #define ICM42688_MISO_Pin                (SPI2_MISO_P15_0)
@@ -53,7 +53,7 @@
 #define ICM42688_SCK_Pin                 (SPI2_CLK_P15_2)
 #define ICM42688_SPEED                   (10 * 1000 * 1000)
 
-/* é™€èºä»ªçµæ•åº¦ï¼ˆLSB / dpsï¼‰ */
+/* ÍÓÂİÒÇÁéÃô¶È£¨LSB / dps£© */
 #define SENSITIVITY_ICM42688_GYRO_15_625dps  2097.2
 #define SENSITIVITY_ICM42688_GYRO_31_25dps   1048.6
 #define SENSITIVITY_ICM42688_GYRO_62_5dps    524.3
@@ -63,7 +63,7 @@
 #define SENSITIVITY_ICM42688_GYRO_1000dps    32.8
 #define SENSITIVITY_ICM42688_GYRO_2000dps    16.4
 
-/* åŠ é€Ÿåº¦è®¡çµæ•åº¦ï¼ˆLSB / gï¼‰ */
+/* ¼ÓËÙ¶È¼ÆÁéÃô¶È£¨LSB / g£© */
 #define SENSITIVITY_ICM42688_ACC_16G         2048
 #define SENSITIVITY_ICM42688_ACC_8G          4096
 #define SENSITIVITY_ICM42688_ACC_4G          8192
@@ -74,10 +74,10 @@
 #define ICM42688_SIGN_GZ                     (-1.0f)
 #define ICM42688_SIGN_AX                      (1.0f)
 #define ICM42688_SIGN_AY                     (-1.0f)
-/* AGENTS çº¦å®š: é™æ­¢å¹³æ”¾ azâ‰ˆ-1gï¼ˆæ¯”åŠ›ï¼Œ+Z å‘ä¸‹ï¼‰ */
+/* AGENTS Ô¼¶¨: ¾²Ö¹Æ½·Å az¡Ö-1g£¨±ÈÁ¦£¬+Z ÏòÏÂ£© */
 #define ICM42688_SIGN_AZ                     (-1.0f)
 
-/* ä¼ æ„Ÿå™¨åŸå§‹æ•°æ®ï¼ˆå¯„å­˜å™¨ç›´æ¥è¯»å‡ºçš„ LSB å€¼ï¼‰ */
+/* ´«¸ĞÆ÷Ô­Ê¼Êı¾İ£¨¼Ä´æÆ÷Ö±½Ó¶Á³öµÄ LSB Öµ£© */
 typedef struct ICM42688_RAW_DATA {
     int16 acc_x_lsb;
     int16 acc_y_lsb;
@@ -85,10 +85,10 @@ typedef struct ICM42688_RAW_DATA {
     int16 gyro_x_lsb;
     int16 gyro_y_lsb;
     int16 gyro_z_lsb;
-    int16 temp_lsb;     /* å½“å‰é©±åŠ¨æœªå¯ç”¨æ¸©åº¦æ¢ç®— */
+    int16 temp_lsb;     /* µ±Ç°Çı¶¯Î´ÆôÓÃÎÂ¶È»»Ëã */
 } ICM42688_RAW_DATA;
 
-/* ç‰©ç†é‡æ•°æ®ï¼ˆé™€èºä»ªï¼šdpsï¼ŒåŠ é€Ÿåº¦ï¼šgï¼‰ */
+/* ÎïÀíÁ¿Êı¾İ£¨ÍÓÂİÒÇ£ºdps£¬¼ÓËÙ¶È£ºg£© */
 typedef struct ICM42688_real_data {
     float acc_x;
     float acc_y;
@@ -96,10 +96,10 @@ typedef struct ICM42688_real_data {
     float gyro_x;
     float gyro_y;
     float gyro_z;
-    float temp;         /* å½“å‰é©±åŠ¨æœªå¯ç”¨æ¸©åº¦æ¢ç®— */
+    float temp;         /* µ±Ç°Çı¶¯Î´ÆôÓÃÎÂ¶È»»Ëã */
 } ICM42688_real_data;
 
-/* ODRï¼šOutput Data Rateï¼ˆè¾“å‡ºæ•°æ®é€Ÿç‡ï¼‰ */
+/* ODR£ºOutput Data Rate£¨Êä³öÊı¾İËÙÂÊ£© */
 typedef enum {
     GYRO_ODR_12_5HZ,
     GYRO_ODR_25HZ,
@@ -130,7 +130,7 @@ typedef enum {
     ACC_ODR_32000HZ,
 } ACC_ODR;
 
-/* FSRï¼šFull Scale Rangeï¼ˆæ»¡é‡ç¨‹ï¼‰ */
+/* FSR£ºFull Scale Range£¨ÂúÁ¿³Ì£© */
 typedef enum {
     GYRO_2000DPS,
     GYRO_1000DPS,
@@ -149,14 +149,14 @@ typedef enum {
     ACC_2G,
 } ACC_FSR;
 
-/* æ•°å­—ä½é€šæ»¤æ³¢å™¨é˜¶æ•° */
+/* Êı×ÖµÍÍ¨ÂË²¨Æ÷½×Êı */
 typedef enum {
     _1st,
     _2st,
     _3st,
 } Filter_Order;
 
-/* å¸¦å®½å› å­ï¼ˆè¯¦ç»†å«ä¹‰è¯·å‚è€ƒæ•°æ®æ‰‹å†Œæ»¤æ³¢ç« èŠ‚ï¼‰ */
+/* ´ø¿íÒò×Ó£¨ÏêÏ¸º¬ÒåÇë²Î¿¼Êı¾İÊÖ²áÂË²¨ÕÂ½Ú£© */
 typedef enum {
     Bandwidth_Factor_2,
     Bandwidth_Factor_4,
@@ -170,13 +170,13 @@ typedef enum {
     Low_Latency_2,
 } Bandwidth_Factor;
 
-/* æ˜¯å¦å¯ç”¨èŠ¯ç‰‡å†…éƒ¨é›¶åä¼°è®¡ */
+/* ÊÇ·ñÆôÓÃĞ¾Æ¬ÄÚ²¿ÁãÆ«¹À¼Æ */
 typedef enum {
     Bias_On_Chip_On,
     Bias_On_Chip_Off,
 } Bias_On_Chip;
 
-/* ICM42688 åˆå§‹åŒ–å‚æ•°é›†åˆ */
+/* ICM42688 ³õÊ¼»¯²ÎÊı¼¯ºÏ */
 typedef struct ICM42688_CONFIG_STRUCT {
     GYRO_FSR GYRO_FSR;
     GYRO_ODR GYRO_ODR;
@@ -199,16 +199,16 @@ extern float ICM42688_Bias_gyro_z;
 extern uint8 ICM42688_Bias_Init_Flag;
 extern ICM42688_real_data ICM42688;
 
-/* åˆå§‹åŒ–èŠ¯ç‰‡å¹¶æŒ‰ç…§é…ç½®å†™å…¥å¯„å­˜å™¨ */
+/* ³õÊ¼»¯Ğ¾Æ¬²¢°´ÕÕÅäÖÃĞ´Èë¼Ä´æÆ÷ */
 void ICM42688_Init(ICM42688_CONFIG_STRUCT *ICM42688_CONFIG);
 
-/* é™æ€æ ‡å®šé›¶åï¼Œtimes å»ºè®® >= 500 */
+/* ¾²Ì¬±ê¶¨ÁãÆ«£¬times ½¨Òé >= 500 */
 void ICM42688_Bias_Init(uint32 times);
 
-/* è¯»å–ä¸€æ¬¡ä¼ æ„Ÿå™¨æ•°æ®å¹¶å®Œæˆå•ä½æ¢ç®— */
+/* ¶ÁÈ¡Ò»´Î´«¸ĞÆ÷Êı¾İ²¢Íê³Éµ¥Î»»»Ëã */
 void ICM42688_Get_Data(void);
 
-/* è½¯é™€èºé›¶åè®¾ç½®/è¯»å–ï¼ˆdpsï¼‰ */
+/* ÈíÍÓÂİÁãÆ«ÉèÖÃ/¶ÁÈ¡£¨dps£© */
 void ICM42688_SetGyroBiasDps(float bx, float by, float bz, uint8 enable);
 void ICM42688_GetGyroBiasDps(float *bx, float *by, float *bz, uint8 *enable);
 

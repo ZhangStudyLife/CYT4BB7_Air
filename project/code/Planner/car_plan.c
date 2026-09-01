@@ -10,10 +10,10 @@
 #define CAR_PLAN_MIN_DIST_PX               (2.0f)
 #define CAR_PLAN_ANGLE_TO_RAD              (0.017453292519943295f)
 #define CAR_PLAN_CENTER_MAX_DIST_PX        (65.0f)
-#define CAR_PLAN_CAR_CENTER_Y_OFFSET_PX    (10.0f) /* è½¦ä½“ä¸­å¿ƒç›¸å¯¹è½¦ç¯ä¸­å¿ƒå‘å›¾åƒ y æ­£æ–¹å‘åç§»ï¼Œå•ä½ pxã€‚ */
+#define CAR_PLAN_CAR_CENTER_Y_OFFSET_PX    (10.0f) /* ³µÌåÖÐÐÄÏà¶Ô³µµÆÖÐÐÄÏòÍ¼Ïñ y Õý·½ÏòÆ«ÒÆ£¬µ¥Î» px¡£ */
 
-extern float g_car_yaw; /* è½¦æ¨¡yawè§’ï¼Œå•ä½degã€‚ */
-extern float g_car_sync_time_ms; /* æœ€è¿‘ä¸€æ¬¡è½¦ç«¯åŒæ­¥æ—¶é—´æˆ³ï¼Œå•ä½msã€‚ */
+extern float g_car_yaw; /* ³µÄ£yaw½Ç£¬µ¥Î»deg¡£ */
+extern float g_car_sync_time_ms; /* ×î½üÒ»´Î³µ¶ËÍ¬²½Ê±¼ä´Á£¬µ¥Î»ms¡£ */
 static car_plan_result_t s_car_plan_result;
 
 static void CarPlan_ClearResult(car_plan_result_t *result)
@@ -40,13 +40,13 @@ static uint8 CarPlan_CarLampValid(uint8 camera)
 }
 
 /**
- * @brief å°†æŒ‡å®šç›¸æœºçš„åƒç´ ç‚¹æ˜ å°„åˆ° Center ç›¸æœºåæ ‡ç³»ã€‚
- * @param camera è¾“å…¥ç›¸æœºç¼–å·ã€‚
- * @param x è¾“å…¥åƒç´ ç‚¹ X åæ ‡ï¼Œå•ä½ pxã€‚
- * @param y è¾“å…¥åƒç´ ç‚¹ Y åæ ‡ï¼Œå•ä½ pxã€‚
- * @param center_x è¾“å‡º Center åæ ‡ç³» X åæ ‡ï¼Œå•ä½ pxã€‚
- * @param center_y è¾“å‡º Center åæ ‡ç³» Y åæ ‡ï¼Œå•ä½ pxã€‚
- * @return æ— ã€‚
+ * @brief ½«Ö¸¶¨Ïà»úµÄÏñËØµãÓ³Éäµ½ Center Ïà»ú×ø±êÏµ¡£
+ * @param camera ÊäÈëÏà»ú±àºÅ¡£
+ * @param x ÊäÈëÏñËØµã X ×ø±ê£¬µ¥Î» px¡£
+ * @param y ÊäÈëÏñËØµã Y ×ø±ê£¬µ¥Î» px¡£
+ * @param center_x Êä³ö Center ×ø±êÏµ X ×ø±ê£¬µ¥Î» px¡£
+ * @param center_y Êä³ö Center ×ø±êÏµ Y ×ø±ê£¬µ¥Î» px¡£
+ * @return ÎÞ¡£
  */
 static void CarPlan_MapPointToCenter(uint8 camera,
                                      float x,
@@ -134,7 +134,7 @@ static uint8 CarPlan_MakeGeometryResult(uint8 camera, car_plan_result_t *out)
     if ((g_car_lamp_fused.valid != 0U) &&
         (g_car_sync_time_ms > 0.0f))
     {
-        /* å°†å„ç›¸æœºæ— å‘é•¿è½´ç»Ÿä¸€åˆ°çœŸå®žè½¦ä½“å³å‘ã€‚ */
+        /* ½«¸÷Ïà»úÎÞÏò³¤ÖáÍ³Ò»µ½ÕæÊµ³µÌåÓÒÏò¡£ */
         normal_x = cosf(g_car_lamp_fused.angle * CAR_PLAN_ANGLE_TO_RAD);
         normal_y = sinf(g_car_lamp_fused.angle * CAR_PLAN_ANGLE_TO_RAD);
         if (cosf((g_car_lamp_fused.angle - g_car_yaw + g_euler.yaw) *
@@ -189,7 +189,7 @@ static uint8 CarPlan_MakeGeometryResult(uint8 camera, car_plan_result_t *out)
             beacon_vector_y += projection_vector_y;
             direction_dot = projection_vector_x * beacon_vector_x +
                             projection_vector_y * beacon_vector_y;
-            /* ä¸¤ä¸ªè½¦ç¯å‡ºå‘å‘é‡å¤¹è§’å°äºŽ 60 åº¦æ—¶ä½¿ç”¨å¿«é€Ÿé€Ÿåº¦ã€‚ */
+            /* Á½¸ö³µµÆ³ö·¢ÏòÁ¿¼Ð½ÇÐ¡ÓÚ 60 ¶ÈÊ±Ê¹ÓÃ¿ìËÙËÙ¶È¡£ */
             if ((direction_dot > 0.0f) &&
                 ((direction_dot * direction_dot) >
                  (0.25f *
@@ -202,7 +202,7 @@ static uint8 CarPlan_MakeGeometryResult(uint8 camera, car_plan_result_t *out)
         }
     }
 
-    /* å– strafe/forward ä¸­ç»å¯¹å€¼è¾ƒå¤§è€…æ»¡é€Ÿä¸º plan_speedï¼Œå¦ä¸€è½´æŒ‰æ¯”ä¾‹ç¼©æ”¾ï¼ˆç¬¦å·ä¿æŒä¸å˜ï¼‰ */
+    /* È¡ strafe/forward ÖÐ¾ø¶ÔÖµ½Ï´óÕßÂúËÙÎª plan_speed£¬ÁíÒ»Öá°´±ÈÀýËõ·Å£¨·ûºÅ±£³Ö²»±ä£© */
     abs_strafe = fabsf(strafe);
     abs_forward = fabsf(forward);
     speed_scale = plan_speed / ((abs_strafe > abs_forward) ? abs_strafe : abs_forward);

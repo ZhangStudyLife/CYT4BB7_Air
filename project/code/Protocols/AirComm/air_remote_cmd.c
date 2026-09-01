@@ -2,7 +2,7 @@
 
 void air_remote_cmd_init(void)
 {
-    /* å½“å‰è¿œç¨‹å‘½ä»¤ä¸»é“¾è·¯åœ¨ air_comm_air_init() ä¸­åˆå§‹åŒ–ï¼Œè¿™é‡Œä¿ç•™ç©ºå®ç°å…¼å®¹æ—§è°ƒç”¨ã€‚ */
+    /* µ±Ç°Ô¶³ÌÃüÁîÖ÷Á´Â·ÔÚ air_comm_air_init() ÖĞ³õÊ¼»¯£¬ÕâÀï±£Áô¿ÕÊµÏÖ¼æÈİ¾Éµ÷ÓÃ¡£ */
 }
 
 uint8 air_remote_cmd_register_polling(const char *name, air_remote_cmd_fn run)
@@ -17,5 +17,5 @@ uint8 air_remote_cmd_register_instant(const char *name, air_remote_cmd_fn run)
 
 void air_remote_cmd_update_100HZ(void)
 {
-    /* å½“å‰è¿œç¨‹å‘½ä»¤ç”± air_comm_air_update_200HZ() ç»Ÿä¸€è°ƒåº¦ã€‚ */
+    /* µ±Ç°Ô¶³ÌÃüÁîÓÉ air_comm_air_update_200HZ() Í³Ò»µ÷¶È¡£ */
 }

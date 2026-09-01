@@ -1,15 +1,15 @@
-ï»¿#ifndef BMP388_H_
+#ifndef BMP388_H_
 #define BMP388_H_
 
 #include "zf_common_headfile.h"
 
-// å›ºå®šå¼•è„š 4çº¿è½¯ä»¶SPI
+// ¹Ì¶¨Òı½Å 4ÏßÈí¼şSPI
 #define BMP388_PIN_SCK               (P13_2)
 #define BMP388_PIN_MISO              (P13_3)
 #define BMP388_PIN_MOSI              (P13_4)
 #define BMP388_PIN_CS                (P13_5)
 
-// è¿”å›çŠ¶æ€
+// ·µ»Ø×´Ì¬
 #define BMP388_RET_OK                (0U)
 #define BMP388_RET_ERR_NOT_INIT      (1U)
 #define BMP388_RET_ERR_PARAM         (2U)
@@ -19,8 +19,8 @@
 #define BMP388_RET_ERR_CRC           (6U)
 #define BMP388_RET_ERR_CONFIG        (7U)
 
-// æ ¡å‡†å‚æ•°ç»“æ„ä½“
-// ä»…ä¿ç•™æ¸©åº¦å’Œæ°”å‹è¡¥å¿æ‰€éœ€å‚æ•°
+// Ğ£×¼²ÎÊı½á¹¹Ìå
+// ½ö±£ÁôÎÂ¶ÈºÍÆøÑ¹²¹³¥ËùĞè²ÎÊı
 typedef struct
 {
     uint16 par_t1;
@@ -42,8 +42,8 @@ typedef struct
     int64  t_lin;
 } BMP388_calib_t;
 
-// è®¾å¤‡å®ä¾‹ç»“æ„ä½“
-// å›ºå®šå¼•è„š é»˜è®¤é…ç½® è¿è¡ŒçŠ¶æ€
+// Éè±¸ÊµÀı½á¹¹Ìå
+// ¹Ì¶¨Òı½Å Ä¬ÈÏÅäÖÃ ÔËĞĞ×´Ì¬
 typedef struct
 {
     gpio_pin_enum sck_pin;
@@ -60,24 +60,24 @@ typedef struct
     uint8  inited;
 } BMP388_device_t;
 
-// å®æ—¶æ•°æ®ç»“æ„ä½“
-// åŸå§‹å€¼å’Œè¡¥å¿å€¼
+// ÊµÊ±Êı¾İ½á¹¹Ìå
+// Ô­Ê¼ÖµºÍ²¹³¥Öµ
 typedef struct
 {
-    uint32 raw_pressure;        // åŸå§‹æ°”å‹å€¼
-    uint32 raw_temperature;     // åŸå§‹æ¸©åº¦å€¼
-    float  pressure_pa;         // è¡¥å¿åæ°”å‹å€¼ å•ä½Pa/
-    float  temperature_c;       // è¡¥å¿åæ¸©åº¦å€¼ å•ä½â„ƒ/
+    uint32 raw_pressure;        // Ô­Ê¼ÆøÑ¹Öµ
+    uint32 raw_temperature;     // Ô­Ê¼ÎÂ¶ÈÖµ
+    float  pressure_pa;         // ²¹³¥ºóÆøÑ¹Öµ µ¥Î»Pa/
+    float  temperature_c;       // ²¹³¥ºóÎÂ¶ÈÖµ µ¥Î»¡æ/
 } BMP388_data_t;
 
 extern volatile BMP388_calib_t  g_BMP388_calib;
 extern volatile BMP388_device_t g_BMP388_dev;
 extern volatile BMP388_data_t   g_BMP388_data;
 
-// åˆå§‹åŒ– GPIO è½¯ä»¶SPI å¤ä½ IDæ ¡éªŒ æ ¡å‡†è¯»å– é…ç½®å†™å…¥
+// ³õÊ¼»¯ GPIO Èí¼şSPI ¸´Î» IDĞ£Ñé Ğ£×¼¶ÁÈ¡ ÅäÖÃĞ´Èë
 uint8 BMP388_init(void);
 
-// æ›´æ–° è§¦å‘æµ‹é‡ è¯»å–åŸå§‹å€¼ è¡¥å¿è®¡ç®— è¾“å‡ºæ¸©åº¦å’Œæ°”å‹
+// ¸üĞÂ ´¥·¢²âÁ¿ ¶ÁÈ¡Ô­Ê¼Öµ ²¹³¥¼ÆËã Êä³öÎÂ¶ÈºÍÆøÑ¹
 uint8 BMP388_update(void);
 uint8 BMP388_update_nonblocking(uint8 *is_new_sample);
 

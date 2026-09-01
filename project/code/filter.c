@@ -1,6 +1,6 @@
 #include "filter.h"
 
-/* === LPF1 瀹炵幇 === */
+/* === LPF1 实现 === */
 
 void LPF1_Init(LPF1_t *f, float alpha)
 {
@@ -19,7 +19,7 @@ void LPF1_Reset(LPF1_t *f)
     f->state = 0.0f;
 }
 
-/* === Kalman1D 瀹炵幇 === */
+/* === Kalman1D 实现 === */
 
 void Kalman1D_Init(Kalman1D_t *f, float q, float r, float p0, float x0)
 {
@@ -47,7 +47,7 @@ void Kalman1D_Reset(Kalman1D_t *f)
     f->p = f->p0;
 }
 
-/* === MovAvg 瀹炵幇 === */
+/* === MovAvg 实现 === */
 
 void MovAvg_Init(MovAvg_t *f, uint8 window)
 {
@@ -91,7 +91,7 @@ void MovAvg_Reset(MovAvg_t *f)
     }
 }
 
-/* === Median 瀹炵幇 === */
+/* === Median 实现 === */
 
 void Median_Init(Median_t *f, uint8 window)
 {
@@ -123,7 +123,7 @@ float Median_Update(Median_t *f, float z)
     }
     n = f->count;
 
-    /* 澶嶅埗鍒颁复鏃舵暟缁勫悗鎻掑叆鎺掑簭 */
+    /* 复制到临时数组后插入排序 */
     for (i = 0U; i < n; i++)
     {
         f->tmp[i] = f->buf[i];
@@ -155,7 +155,7 @@ void Median_Reset(Median_t *f)
     }
 }
 
-/* === StepLim 瀹炵幇 === */
+/* === StepLim 实现 === */
 
 void StepLim_Init(StepLim_t *f, float step)
 {
@@ -192,8 +192,8 @@ void StepLim_Reset(StepLim_t *f)
     f->seeded = 0U;
 }
 
-/* === Biquad 瀹炵幇 === */
-/* 鍙岀嚎鎬у彉鎹紝鏃犲閮ㄤ緷璧栵紝浠呯敤 cosf/sinf/sqrtf */
+/* === Biquad 实现 === */
+/* 双线性变换，无外部依赖，仅用 cosf/sinf/sqrtf */
 
 void Biquad_Init(Biquad_t *f, BiquadType_e type, float fs, float fc, float q)
 {
@@ -235,7 +235,7 @@ void Biquad_Init(Biquad_t *f, BiquadType_e type, float fs, float fc, float q)
             break;
     }
 
-    /* 褰掍竴鍖栵細闄や互 a0 */
+    /* 归一化：除以 a0 */
     f->b0 *= a0_inv;
     f->b1 *= a0_inv;
     f->b2 *= a0_inv;

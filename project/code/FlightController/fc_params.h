@@ -1,7 +1,7 @@
 /*****************************************************************************
- * æ–‡ä»¶: fc_params.h
- * æ¨¡å—: é£æ§ - å‚æ•°é›†ä¸­ç®¡ç†
- * èŒè´£: å®šä¹‰é£æ§æ§åˆ¶å‘¨æœŸã€æ²¹é—¨åŸºå‡†ã€æœºæ¢°é…å¹³è§’å’Œå„æ§åˆ¶ç¯å‚æ•°ç»“æ„ä½“ï¼Œå¹¶æä¾› Flash æŒä¹…åŒ–æ¥å£
+ * ÎÄ¼ş: fc_params.h
+ * Ä£¿é: ·É¿Ø - ²ÎÊı¼¯ÖĞ¹ÜÀí
+ * Ö°Ôğ: ¶¨Òå·É¿Ø¿ØÖÆÖÜÆÚ¡¢ÓÍÃÅ»ù×¼¡¢»úĞµÅäÆ½½ÇºÍ¸÷¿ØÖÆ»·²ÎÊı½á¹¹Ìå£¬²¢Ìá¹© Flash ³Ö¾Ã»¯½Ó¿Ú
  *****************************************************************************/
 
 #ifndef FC_PARAMS_H
@@ -9,142 +9,142 @@
 
 #include <stdint.h>
 
-/* é£æ§å‚æ•°å­˜å‚¨é¡µå·ï¼šå›ºå®šä½¿ç”¨ 94 é¡µï¼Œé¿å¼€ IMU æ ¡å‡†å ç”¨çš„ 95 é¡µ */
+/* ·É¿Ø²ÎÊı´æ´¢Ò³ºÅ£º¹Ì¶¨Ê¹ÓÃ 94 Ò³£¬±Ü¿ª IMU Ğ£×¼Õ¼ÓÃµÄ 95 Ò³ */
 #define FC_PARAMS_FLASH_PAGE (94U)
 
-/* ==================== é£æ§å‚æ•°ç»“æ„ä½“ ==================== */
+/* ==================== ·É¿Ø²ÎÊı½á¹¹Ìå ==================== */
 typedef struct
 {
-    /* ===== æ§åˆ¶å‘¨æœŸ ===== */
-    float gyro_dt;   /* è§’é€Ÿåº¦ç¯æ§åˆ¶å‘¨æœŸï¼Œå•ä½ s */
-    float angle_dt;  /* è§’åº¦ç¯æ§åˆ¶å‘¨æœŸï¼Œå•ä½ s */
-    float pos_xy_dt; /* æ°´å¹³ä½ç½®ç¯æ§åˆ¶å‘¨æœŸï¼Œå•ä½ s */
-    float pos_z_dt;  /* å‚ç›´ä½ç½®ç¯æ§åˆ¶å‘¨æœŸï¼Œå•ä½ s */
-    float vel_xy_dt; /* æ°´å¹³é€Ÿåº¦ç¯æ§åˆ¶å‘¨æœŸï¼Œå•ä½ s */
-    float vel_z_dt;  /* å‚ç›´é€Ÿåº¦ç¯æ§åˆ¶å‘¨æœŸï¼Œå•ä½ s */
+    /* ===== ¿ØÖÆÖÜÆÚ ===== */
+    float gyro_dt;   /* ½ÇËÙ¶È»·¿ØÖÆÖÜÆÚ£¬µ¥Î» s */
+    float angle_dt;  /* ½Ç¶È»·¿ØÖÆÖÜÆÚ£¬µ¥Î» s */
+    float pos_xy_dt; /* Ë®Æ½Î»ÖÃ»·¿ØÖÆÖÜÆÚ£¬µ¥Î» s */
+    float pos_z_dt;  /* ´¹Ö±Î»ÖÃ»·¿ØÖÆÖÜÆÚ£¬µ¥Î» s */
+    float vel_xy_dt; /* Ë®Æ½ËÙ¶È»·¿ØÖÆÖÜÆÚ£¬µ¥Î» s */
+    float vel_z_dt;  /* ´¹Ö±ËÙ¶È»·¿ØÖÆÖÜÆÚ£¬µ¥Î» s */
 
-    /* ===== æ²¹é—¨ä¸æœºæ¢°é…å¹³ ===== */
-    int32_t base_throttle;       /* æ‚¬åœæ²¹é—¨åŸºå‡†ï¼Œå•ä½ mixer è¾“å…¥ */
-    float roll_mech_trim_deg;    /* Roll æœºæ¢°é…å¹³è§’ï¼Œå•ä½ deg */
-    float pitch_mech_trim_deg;   /* Pitch æœºæ¢°é…å¹³è§’ï¼Œå•ä½ deg */
+    /* ===== ÓÍÃÅÓë»úĞµÅäÆ½ ===== */
+    int32_t base_throttle;       /* ĞüÍ£ÓÍÃÅ»ù×¼£¬µ¥Î» mixer ÊäÈë */
+    float roll_mech_trim_deg;    /* Roll »úĞµÅäÆ½½Ç£¬µ¥Î» deg */
+    float pitch_mech_trim_deg;   /* Pitch »úĞµÅäÆ½½Ç£¬µ¥Î» deg */
 
-    /* ===== Roll/Pitch å‰é¦ˆä¸è¾“å‡ºæ»¤æ³¢å‚æ•° ===== */
-    float gyro_ff_smoothing_ms;  /* è§’é€Ÿåº¦ç¯å‰é¦ˆ PT3 å•çº§å¹³æ»‘æ—¶é—´ï¼Œå•ä½ ms */
-    float gyro_ff_limit;         /* è§’é€Ÿåº¦ç¯å‰é¦ˆæ§åˆ¶é‡é™å¹… */
-    float angle_ff_smoothing_ms; /* è§’åº¦ç¯å‰é¦ˆ PT3 å•çº§å¹³æ»‘æ—¶é—´ï¼Œå•ä½ ms */
-    float angle_ff_limit_dps;    /* è§’åº¦ç¯å‰é¦ˆé™å¹…ï¼Œå•ä½ deg/s */
-    float angle_output_lpf_hz;   /* è§’åº¦ç¯è¾“å‡º PT3 ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½ Hz */
+    /* ===== Roll/Pitch Ç°À¡ÓëÊä³öÂË²¨²ÎÊı ===== */
+    float gyro_ff_smoothing_ms;  /* ½ÇËÙ¶È»·Ç°À¡ PT3 µ¥¼¶Æ½»¬Ê±¼ä£¬µ¥Î» ms */
+    float gyro_ff_limit;         /* ½ÇËÙ¶È»·Ç°À¡¿ØÖÆÁ¿ÏŞ·ù */
+    float angle_ff_smoothing_ms; /* ½Ç¶È»·Ç°À¡ PT3 µ¥¼¶Æ½»¬Ê±¼ä£¬µ¥Î» ms */
+    float angle_ff_limit_dps;    /* ½Ç¶È»·Ç°À¡ÏŞ·ù£¬µ¥Î» deg/s */
+    float angle_output_lpf_hz;   /* ½Ç¶È»·Êä³ö PT3 µÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î» Hz */
 
-    /* ===== Roll è½´è§’é€Ÿåº¦ç¯å‚æ•° ===== */
+    /* ===== Roll Öá½ÇËÙ¶È»·²ÎÊı ===== */
     float roll_gyro_kp;
     float roll_gyro_ki;
     float roll_gyro_kd;
-    float roll_gyro_kff;     /* å‰é¦ˆå¢ç›Š */
+    float roll_gyro_kff;     /* Ç°À¡ÔöÒæ */
     float roll_gyro_i_limit;
-    float roll_gyro_d_lpf;   /* D é¡¹ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½ Hzï¼Œ0 è¡¨ç¤ºæ—è·¯ */
+    float roll_gyro_d_lpf;   /* D ÏîµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î» Hz£¬0 ±íÊ¾ÅÔÂ· */
 
-    /* ===== Pitch è½´è§’é€Ÿåº¦ç¯å‚æ•° ===== */
+    /* ===== Pitch Öá½ÇËÙ¶È»·²ÎÊı ===== */
     float pitch_gyro_kp;
     float pitch_gyro_ki;
     float pitch_gyro_kd;
-    float pitch_gyro_kff;    /* å‰é¦ˆå¢ç›Š */
+    float pitch_gyro_kff;    /* Ç°À¡ÔöÒæ */
     float pitch_gyro_i_limit;
-    float pitch_gyro_d_lpf;  /* D é¡¹ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½ Hzï¼Œ0 è¡¨ç¤ºæ—è·¯ */
+    float pitch_gyro_d_lpf;  /* D ÏîµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î» Hz£¬0 ±íÊ¾ÅÔÂ· */
 
-    /* ===== Yaw è½´è§’é€Ÿåº¦ç¯å‚æ•° ===== */
+    /* ===== Yaw Öá½ÇËÙ¶È»·²ÎÊı ===== */
     float yaw_gyro_kp;
     float yaw_gyro_ki;
     float yaw_gyro_kd;
-    float yaw_gyro_kff;      /* å‰é¦ˆå¢ç›Š */
+    float yaw_gyro_kff;      /* Ç°À¡ÔöÒæ */
     float yaw_gyro_i_limit;
-    float yaw_gyro_d_lpf;    /* D é¡¹ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½ Hzï¼Œ0 è¡¨ç¤ºæ—è·¯ */
+    float yaw_gyro_d_lpf;    /* D ÏîµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î» Hz£¬0 ±íÊ¾ÅÔÂ· */
 
-    /* ===== Roll è½´è§’åº¦ç¯å‚æ•° ===== */
+    /* ===== Roll Öá½Ç¶È»·²ÎÊı ===== */
     float roll_angle_kp;
     float roll_angle_ki;
     float roll_angle_kd;
-    float roll_angle_kff;    /* å‰é¦ˆå¢ç›Š */
+    float roll_angle_kff;    /* Ç°À¡ÔöÒæ */
     float roll_angle_i_limit;
-    float roll_angle_d_lpf;  /* D é¡¹ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½ Hzï¼Œ0 è¡¨ç¤ºæ—è·¯ */
+    float roll_angle_d_lpf;  /* D ÏîµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î» Hz£¬0 ±íÊ¾ÅÔÂ· */
 
-    /* ===== Pitch è½´è§’åº¦ç¯å‚æ•° ===== */
+    /* ===== Pitch Öá½Ç¶È»·²ÎÊı ===== */
     float pitch_angle_kp;
     float pitch_angle_ki;
     float pitch_angle_kd;
-    float pitch_angle_kff;   /* å‰é¦ˆå¢ç›Š */
+    float pitch_angle_kff;   /* Ç°À¡ÔöÒæ */
     float pitch_angle_i_limit;
-    float pitch_angle_d_lpf; /* D é¡¹ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½ Hzï¼Œ0 è¡¨ç¤ºæ—è·¯ */
+    float pitch_angle_d_lpf; /* D ÏîµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î» Hz£¬0 ±íÊ¾ÅÔÂ· */
 
-    /* ===== Yaw è½´è§’åº¦ç¯å‚æ•° ===== */
+    /* ===== Yaw Öá½Ç¶È»·²ÎÊı ===== */
     float yaw_angle_kp;
     float yaw_angle_ki;
     float yaw_angle_kd;
-    float yaw_angle_kff;     /* å‰é¦ˆå¢ç›Š */
+    float yaw_angle_kff;     /* Ç°À¡ÔöÒæ */
     float yaw_angle_i_limit;
-    float yaw_angle_d_lpf;   /* D é¡¹ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½ Hzï¼Œ0 è¡¨ç¤ºæ—è·¯ */
+    float yaw_angle_d_lpf;   /* D ÏîµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î» Hz£¬0 ±íÊ¾ÅÔÂ· */
 
-    /* ===== Z è½´ä½ç½®ç¯å‚æ•° ===== */
+    /* ===== Z ÖáÎ»ÖÃ»·²ÎÊı ===== */
     float pos_z_kp;
     float pos_z_ki;
     float pos_z_kd;
-    float pos_z_kff;         /* å‰é¦ˆå¢ç›Š */
+    float pos_z_kff;         /* Ç°À¡ÔöÒæ */
     float pos_z_i_limit;
-    float pos_z_d_lpf;       /* D é¡¹ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½ Hzï¼Œ0 è¡¨ç¤ºæ—è·¯ */
+    float pos_z_d_lpf;       /* D ÏîµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î» Hz£¬0 ±íÊ¾ÅÔÂ· */
 
-    /* ===== Z è½´é€Ÿåº¦ç¯å‚æ•° ===== */
+    /* ===== Z ÖáËÙ¶È»·²ÎÊı ===== */
     float vel_z_kp;
     float vel_z_ki;
     float vel_z_kd;
-    float vel_z_kff;         /* å‰é¦ˆå¢ç›Š */
+    float vel_z_kff;         /* Ç°À¡ÔöÒæ */
     float vel_z_i_limit;
-    float vel_z_d_lpf;       /* D é¡¹ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½ Hzï¼Œ0 è¡¨ç¤ºæ—è·¯ */
+    float vel_z_d_lpf;       /* D ÏîµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î» Hz£¬0 ±íÊ¾ÅÔÂ· */
 
-    /* ===== æ¨¡å¼ 1 ç›´æ¥å›¾åƒ PD ä¸è§’åº¦å‰é¦ˆå‚æ•° ===== */
-    float mode1_img_kp;                     /* æ¨¡å¼1å›¾åƒPå¢ç›Šï¼Œå•ä½deg/px */
-    float mode1_img_kd;                     /* æ¨¡å¼1å›¾åƒDå¢ç›Šï¼Œå•ä½deg/(px/s) */
-    float mode1_img_d_lpf_hz;               /* æ¨¡å¼1å›¾åƒDé¡¹ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½Hz */
-    float mode1_car_vel_error_lpf_hz;       /* æ¨¡å¼1è½¦é€Ÿè¯¯å·®ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½Hz */
-    float mode1_car_accel_gain_pos;         /* æ¨¡å¼1æ­£å‘è½¦é€Ÿè¯¯å·®åŠ é€Ÿåº¦å¢ç›Š */
-    float mode1_car_accel_gain_neg;         /* æ¨¡å¼1è´Ÿå‘è½¦é€Ÿè¯¯å·®åŠ é€Ÿåº¦å¢ç›Š */
-    float mode1_car_accel_ff;               /* æ¨¡å¼1è½¦åŠ é€Ÿåº¦è§’åº¦å‰é¦ˆï¼Œå•ä½deg/(m/s^2) */
-    float mode1_car_turn_accel_ff;          /* æ¨¡å¼1å‘å¿ƒåŠ é€Ÿåº¦è§’åº¦å‰é¦ˆï¼Œå•ä½deg/(m/s^2) */
-    float mode1_car_turn_accel_lpf_hz;      /* æ¨¡å¼1å‘å¿ƒåŠ é€Ÿåº¦ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½Hz */
+    /* ===== Ä£Ê½ 1 Ö±½ÓÍ¼Ïñ PD Óë½Ç¶ÈÇ°À¡²ÎÊı ===== */
+    float mode1_img_kp;                     /* Ä£Ê½1Í¼ÏñPÔöÒæ£¬µ¥Î»deg/px */
+    float mode1_img_kd;                     /* Ä£Ê½1Í¼ÏñDÔöÒæ£¬µ¥Î»deg/(px/s) */
+    float mode1_img_d_lpf_hz;               /* Ä£Ê½1Í¼ÏñDÏîµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î»Hz */
+    float mode1_car_vel_error_lpf_hz;       /* Ä£Ê½1³µËÙÎó²îµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î»Hz */
+    float mode1_car_accel_gain_pos;         /* Ä£Ê½1ÕıÏò³µËÙÎó²î¼ÓËÙ¶ÈÔöÒæ */
+    float mode1_car_accel_gain_neg;         /* Ä£Ê½1¸ºÏò³µËÙÎó²î¼ÓËÙ¶ÈÔöÒæ */
+    float mode1_car_accel_ff;               /* Ä£Ê½1³µ¼ÓËÙ¶È½Ç¶ÈÇ°À¡£¬µ¥Î»deg/(m/s^2) */
+    float mode1_car_turn_accel_ff;          /* Ä£Ê½1ÏòĞÄ¼ÓËÙ¶È½Ç¶ÈÇ°À¡£¬µ¥Î»deg/(m/s^2) */
+    float mode1_car_turn_accel_lpf_hz;      /* Ä£Ê½1ÏòĞÄ¼ÓËÙ¶ÈµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î»Hz */
 
-    /* ===== ä½ç½®ä¼°è®¡å‚æ•° ===== */
-    float pos_est_k_flow;              /* å…‰æµé€Ÿåº¦èåˆæƒé‡ï¼ŒèŒƒå›´ 0~1 */
-    /* ===== æ¨¡å¼ 8 å›¾åƒä½ç½®ç¯å‚æ•° ===== */
-    float mode8_img_x_kp;              /* æ¨¡å¼8å›¾åƒXä½ç½®ç¯På¢ç›Š */
-    float mode8_img_x_ki;              /* æ¨¡å¼8å›¾åƒXä½ç½®ç¯Iå¢ç›Š */
-    float mode8_img_x_kd;              /* æ¨¡å¼8å›¾åƒXä½ç½®ç¯Då¢ç›Š */
-    float mode8_img_x_kff;             /* æ¨¡å¼8å›¾åƒXä½ç½®ç¯å‰é¦ˆå¢ç›Š */
-    float mode8_img_x_i_limit;         /* æ¨¡å¼8å›¾åƒXä½ç½®ç¯ç§¯åˆ†é™å¹… */
-    float mode8_img_x_d_lpf;           /* æ¨¡å¼8å›¾åƒXä½ç½®ç¯Dé¡¹ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½Hz */
-    float mode8_img_y_kp;              /* æ¨¡å¼8å›¾åƒYä½ç½®ç¯På¢ç›Š */
-    float mode8_img_y_ki;              /* æ¨¡å¼8å›¾åƒYä½ç½®ç¯Iå¢ç›Š */
-    float mode8_img_y_kd;              /* æ¨¡å¼8å›¾åƒYä½ç½®ç¯Då¢ç›Š */
-    float mode8_img_y_kff;             /* æ¨¡å¼8å›¾åƒYä½ç½®ç¯å‰é¦ˆå¢ç›Š */
-    float mode8_img_y_i_limit;         /* æ¨¡å¼8å›¾åƒYä½ç½®ç¯ç§¯åˆ†é™å¹… */
-    float mode8_img_y_d_lpf;           /* æ¨¡å¼8å›¾åƒYä½ç½®ç¯Dé¡¹ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½Hz */
-    /* ===== æ¨¡å¼ 2 ç›´æ¥å›¾åƒ PD ä¸è§’åº¦å‰é¦ˆå‚æ•° ===== */
-    float mode2_img_kp;                     /* æ¨¡å¼2å›¾åƒPå¢ç›Šï¼Œå•ä½deg/px */
-    float mode2_img_kd;                     /* æ¨¡å¼2å›¾åƒDå¢ç›Šï¼Œå•ä½deg/(px/s) */
-    float mode2_img_d_lpf_hz;               /* æ¨¡å¼2å›¾åƒDé¡¹ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½Hz */
-    float mode2_car_vel_error_lpf_hz;       /* æ¨¡å¼2è½¦é€Ÿè¯¯å·®ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½Hz */
-    float mode2_car_accel_gain_pos;         /* æ¨¡å¼2æ­£å‘è½¦é€Ÿè¯¯å·®åŠ é€Ÿåº¦å¢ç›Š */
-    float mode2_car_accel_gain_neg;         /* æ¨¡å¼2è´Ÿå‘è½¦é€Ÿè¯¯å·®åŠ é€Ÿåº¦å¢ç›Š */
-    float mode2_car_accel_ff;               /* æ¨¡å¼2è½¦åŠ é€Ÿåº¦è§’åº¦å‰é¦ˆï¼Œå•ä½deg/(m/s^2) */
-    float mode2_car_turn_accel_ff;          /* æ¨¡å¼2å‘å¿ƒåŠ é€Ÿåº¦è§’åº¦å‰é¦ˆï¼Œå•ä½deg/(m/s^2) */
-    float mode2_car_turn_accel_lpf_hz;      /* æ¨¡å¼2å‘å¿ƒåŠ é€Ÿåº¦ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½Hz */
-    /* ===== æ¨¡å¼ 5 ç›´æ¥å›¾åƒ PD ä¸è§’åº¦å‰é¦ˆå‚æ•° ===== */
-    float mode5_img_kp;                     /* æ¨¡å¼5å›¾åƒPå¢ç›Šï¼Œå•ä½deg/px */
-    float mode5_img_kd;                     /* æ¨¡å¼5å›¾åƒDå¢ç›Šï¼Œå•ä½deg/(px/s) */
-    float mode5_img_d_lpf_hz;               /* æ¨¡å¼5å›¾åƒDé¡¹ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½Hz */
-    float mode5_car_vel_error_lpf_hz;       /* æ¨¡å¼5è½¦é€Ÿè¯¯å·®ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½Hz */
-    float mode5_car_accel_gain_pos;         /* æ¨¡å¼5æ­£å‘è½¦é€Ÿè¯¯å·®åŠ é€Ÿåº¦å¢ç›Š */
-    float mode5_car_accel_gain_neg;         /* æ¨¡å¼5è´Ÿå‘è½¦é€Ÿè¯¯å·®åŠ é€Ÿåº¦å¢ç›Š */
-    float mode5_car_accel_ff;               /* æ¨¡å¼5è½¦åŠ é€Ÿåº¦è§’åº¦å‰é¦ˆï¼Œå•ä½deg/(m/s^2) */
-    float mode5_car_turn_accel_ff;          /* æ¨¡å¼5å‘å¿ƒåŠ é€Ÿåº¦è§’åº¦å‰é¦ˆï¼Œå•ä½deg/(m/s^2) */
-    float mode5_car_turn_accel_lpf_hz;      /* æ¨¡å¼5å‘å¿ƒåŠ é€Ÿåº¦ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½Hz */
+    /* ===== Î»ÖÃ¹À¼Æ²ÎÊı ===== */
+    float pos_est_k_flow;              /* ¹âÁ÷ËÙ¶ÈÈÚºÏÈ¨ÖØ£¬·¶Î§ 0~1 */
+    /* ===== Ä£Ê½ 8 Í¼ÏñÎ»ÖÃ»·²ÎÊı ===== */
+    float mode8_img_x_kp;              /* Ä£Ê½8Í¼ÏñXÎ»ÖÃ»·PÔöÒæ */
+    float mode8_img_x_ki;              /* Ä£Ê½8Í¼ÏñXÎ»ÖÃ»·IÔöÒæ */
+    float mode8_img_x_kd;              /* Ä£Ê½8Í¼ÏñXÎ»ÖÃ»·DÔöÒæ */
+    float mode8_img_x_kff;             /* Ä£Ê½8Í¼ÏñXÎ»ÖÃ»·Ç°À¡ÔöÒæ */
+    float mode8_img_x_i_limit;         /* Ä£Ê½8Í¼ÏñXÎ»ÖÃ»·»ı·ÖÏŞ·ù */
+    float mode8_img_x_d_lpf;           /* Ä£Ê½8Í¼ÏñXÎ»ÖÃ»·DÏîµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î»Hz */
+    float mode8_img_y_kp;              /* Ä£Ê½8Í¼ÏñYÎ»ÖÃ»·PÔöÒæ */
+    float mode8_img_y_ki;              /* Ä£Ê½8Í¼ÏñYÎ»ÖÃ»·IÔöÒæ */
+    float mode8_img_y_kd;              /* Ä£Ê½8Í¼ÏñYÎ»ÖÃ»·DÔöÒæ */
+    float mode8_img_y_kff;             /* Ä£Ê½8Í¼ÏñYÎ»ÖÃ»·Ç°À¡ÔöÒæ */
+    float mode8_img_y_i_limit;         /* Ä£Ê½8Í¼ÏñYÎ»ÖÃ»·»ı·ÖÏŞ·ù */
+    float mode8_img_y_d_lpf;           /* Ä£Ê½8Í¼ÏñYÎ»ÖÃ»·DÏîµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î»Hz */
+    /* ===== Ä£Ê½ 2 Ö±½ÓÍ¼Ïñ PD Óë½Ç¶ÈÇ°À¡²ÎÊı ===== */
+    float mode2_img_kp;                     /* Ä£Ê½2Í¼ÏñPÔöÒæ£¬µ¥Î»deg/px */
+    float mode2_img_kd;                     /* Ä£Ê½2Í¼ÏñDÔöÒæ£¬µ¥Î»deg/(px/s) */
+    float mode2_img_d_lpf_hz;               /* Ä£Ê½2Í¼ÏñDÏîµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î»Hz */
+    float mode2_car_vel_error_lpf_hz;       /* Ä£Ê½2³µËÙÎó²îµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î»Hz */
+    float mode2_car_accel_gain_pos;         /* Ä£Ê½2ÕıÏò³µËÙÎó²î¼ÓËÙ¶ÈÔöÒæ */
+    float mode2_car_accel_gain_neg;         /* Ä£Ê½2¸ºÏò³µËÙÎó²î¼ÓËÙ¶ÈÔöÒæ */
+    float mode2_car_accel_ff;               /* Ä£Ê½2³µ¼ÓËÙ¶È½Ç¶ÈÇ°À¡£¬µ¥Î»deg/(m/s^2) */
+    float mode2_car_turn_accel_ff;          /* Ä£Ê½2ÏòĞÄ¼ÓËÙ¶È½Ç¶ÈÇ°À¡£¬µ¥Î»deg/(m/s^2) */
+    float mode2_car_turn_accel_lpf_hz;      /* Ä£Ê½2ÏòĞÄ¼ÓËÙ¶ÈµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î»Hz */
+    /* ===== Ä£Ê½ 5 Ö±½ÓÍ¼Ïñ PD Óë½Ç¶ÈÇ°À¡²ÎÊı ===== */
+    float mode5_img_kp;                     /* Ä£Ê½5Í¼ÏñPÔöÒæ£¬µ¥Î»deg/px */
+    float mode5_img_kd;                     /* Ä£Ê½5Í¼ÏñDÔöÒæ£¬µ¥Î»deg/(px/s) */
+    float mode5_img_d_lpf_hz;               /* Ä£Ê½5Í¼ÏñDÏîµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î»Hz */
+    float mode5_car_vel_error_lpf_hz;       /* Ä£Ê½5³µËÙÎó²îµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î»Hz */
+    float mode5_car_accel_gain_pos;         /* Ä£Ê½5ÕıÏò³µËÙÎó²î¼ÓËÙ¶ÈÔöÒæ */
+    float mode5_car_accel_gain_neg;         /* Ä£Ê½5¸ºÏò³µËÙÎó²î¼ÓËÙ¶ÈÔöÒæ */
+    float mode5_car_accel_ff;               /* Ä£Ê½5³µ¼ÓËÙ¶È½Ç¶ÈÇ°À¡£¬µ¥Î»deg/(m/s^2) */
+    float mode5_car_turn_accel_ff;          /* Ä£Ê½5ÏòĞÄ¼ÓËÙ¶È½Ç¶ÈÇ°À¡£¬µ¥Î»deg/(m/s^2) */
+    float mode5_car_turn_accel_lpf_hz;      /* Ä£Ê½5ÏòĞÄ¼ÓËÙ¶ÈµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î»Hz */
     float mode8_vel_x_kp;
     float mode8_vel_x_ki;
     float mode8_vel_x_kd;
@@ -159,16 +159,16 @@ typedef struct
     float mode8_vel_y_d_lpf;
     float mode8_kp_car_x;
     float mode8_kp_car_y;
-    /* ===== æ¨¡å¼ 4 ç›´æ¥å›¾åƒ PD ä¸è§’åº¦å‰é¦ˆå‚æ•° ===== */
-    float mode4_img_kp;                     /* æ¨¡å¼4å›¾åƒPå¢ç›Šï¼Œå•ä½deg/px */
-    float mode4_img_kd;                     /* æ¨¡å¼4å›¾åƒDå¢ç›Šï¼Œå•ä½deg/(px/s) */
-    float mode4_img_d_lpf_hz;               /* æ¨¡å¼4å›¾åƒDé¡¹ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½Hz */
-    float mode4_car_vel_error_lpf_hz;       /* æ¨¡å¼4è½¦é€Ÿè¯¯å·®ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½Hz */
-    float mode4_car_accel_gain_pos;         /* æ¨¡å¼4æ­£å‘è½¦é€Ÿè¯¯å·®åŠ é€Ÿåº¦å¢ç›Š */
-    float mode4_car_accel_gain_neg;         /* æ¨¡å¼4è´Ÿå‘è½¦é€Ÿè¯¯å·®åŠ é€Ÿåº¦å¢ç›Š */
-    float mode4_car_accel_ff;               /* æ¨¡å¼4è½¦åŠ é€Ÿåº¦è§’åº¦å‰é¦ˆï¼Œå•ä½deg/(m/s^2) */
-    float mode4_car_turn_accel_ff;          /* æ¨¡å¼4å‘å¿ƒåŠ é€Ÿåº¦è§’åº¦å‰é¦ˆï¼Œå•ä½deg/(m/s^2) */
-    float mode4_car_turn_accel_lpf_hz;      /* æ¨¡å¼4å‘å¿ƒåŠ é€Ÿåº¦ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½Hz */
+    /* ===== Ä£Ê½ 4 Ö±½ÓÍ¼Ïñ PD Óë½Ç¶ÈÇ°À¡²ÎÊı ===== */
+    float mode4_img_kp;                     /* Ä£Ê½4Í¼ÏñPÔöÒæ£¬µ¥Î»deg/px */
+    float mode4_img_kd;                     /* Ä£Ê½4Í¼ÏñDÔöÒæ£¬µ¥Î»deg/(px/s) */
+    float mode4_img_d_lpf_hz;               /* Ä£Ê½4Í¼ÏñDÏîµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î»Hz */
+    float mode4_car_vel_error_lpf_hz;       /* Ä£Ê½4³µËÙÎó²îµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î»Hz */
+    float mode4_car_accel_gain_pos;         /* Ä£Ê½4ÕıÏò³µËÙÎó²î¼ÓËÙ¶ÈÔöÒæ */
+    float mode4_car_accel_gain_neg;         /* Ä£Ê½4¸ºÏò³µËÙÎó²î¼ÓËÙ¶ÈÔöÒæ */
+    float mode4_car_accel_ff;               /* Ä£Ê½4³µ¼ÓËÙ¶È½Ç¶ÈÇ°À¡£¬µ¥Î»deg/(m/s^2) */
+    float mode4_car_turn_accel_ff;          /* Ä£Ê½4ÏòĞÄ¼ÓËÙ¶È½Ç¶ÈÇ°À¡£¬µ¥Î»deg/(m/s^2) */
+    float mode4_car_turn_accel_lpf_hz;      /* Ä£Ê½4ÏòĞÄ¼ÓËÙ¶ÈµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î»Hz */
     float mode7_vel_x_kp;
     float mode7_vel_x_ki;
     float mode7_vel_x_kd;
@@ -181,7 +181,7 @@ typedef struct
     float mode7_vel_y_kff;
     float mode7_vel_y_i_limit;
     float mode7_vel_y_d_lpf;
-    /* ===== å„æ¨¡å¼èˆªå‘æ§åˆ¶ï¼š0=å›ºå®š0åº¦ï¼Œ1=ä¿¡æ ‡å¯¹å‡†ï¼Œ2=æ­¥è¿›æœç´¢ ===== */
+    /* ===== ¸÷Ä£Ê½º½Ïò¿ØÖÆ£º0=¹Ì¶¨0¶È£¬1=ĞÅ±ê¶Ô×¼£¬2=²½½øËÑË÷ ===== */
     float yaw_change_mode1;
     float yaw_change_mode2;
     float yaw_change_mode4;
@@ -189,40 +189,40 @@ typedef struct
     float yaw_change_mode8;
 } fc_params_t;
 
-/* é£æ§å‚æ•°å…¨å±€å®ä¾‹ï¼šè¿è¡Œæ—¶è°ƒå‚åªä¼šä¿®æ”¹è¿™ä»½ RAM å˜é‡ */
+/* ·É¿Ø²ÎÊıÈ«¾ÖÊµÀı£ºÔËĞĞÊ±µ÷²ÎÖ»»áĞŞ¸ÄÕâ·İ RAM ±äÁ¿ */
 extern fc_params_t g_fc_params;
-/* 2BL3 å›¾ä¼ å‘é€å¼€å…³ï¼š0=å…³é—­ï¼Œ1=ä»…éé£è¡Œå‘é€ï¼Œ2=å§‹ç»ˆå‘é€ */
+/* 2BL3 Í¼´«·¢ËÍ¿ª¹Ø£º0=¹Ø±Õ£¬1=½ö·Ç·ÉĞĞ·¢ËÍ£¬2=Ê¼ÖÕ·¢ËÍ */
 extern volatile uint8_t g_2bl3_image_send_enable;
 
 /*
- * å‡½æ•°å: FC_Params_Init
- * åŠŸèƒ½: è£…è½½é£æ§å‚æ•°é»˜è®¤å€¼
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: FC_Params_Init
+ * ¹¦ÄÜ: ×°ÔØ·É¿Ø²ÎÊıÄ¬ÈÏÖµ
+ * ÊäÈë²ÎÊı: ÎŞ
+ * ·µ»ØÖµ: ÎŞ
  */
 void FC_Params_Init(void);
 
 /*
- * å‡½æ•°å: FC_Params_LoadFromFlash
- * åŠŸèƒ½: ä» Flash è¯»å–å‚æ•°å¹¶è¦†ç›–å½“å‰è¿è¡Œæ—¶å‚æ•°
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›å€¼: 1=è¯»å–æˆåŠŸï¼Œ0=Flash ä¸­æ— æœ‰æ•ˆå‚æ•°
+ * º¯ÊıÃû: FC_Params_LoadFromFlash
+ * ¹¦ÄÜ: ´Ó Flash ¶ÁÈ¡²ÎÊı²¢¸²¸Çµ±Ç°ÔËĞĞÊ±²ÎÊı
+ * ÊäÈë²ÎÊı: ÎŞ
+ * ·µ»ØÖµ: 1=¶ÁÈ¡³É¹¦£¬0=Flash ÖĞÎŞÓĞĞ§²ÎÊı
  */
 uint8_t FC_Params_LoadFromFlash(void);
 
 /*
- * å‡½æ•°å: FC_Params_SaveToFlash
- * åŠŸèƒ½: å°†å½“å‰è¿è¡Œæ—¶å‚æ•°ä¿å­˜åˆ° Flash
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›å€¼: 1=ä¿å­˜æˆåŠŸï¼Œ0=ä¿å­˜å¤±è´¥
+ * º¯ÊıÃû: FC_Params_SaveToFlash
+ * ¹¦ÄÜ: ½«µ±Ç°ÔËĞĞÊ±²ÎÊı±£´æµ½ Flash
+ * ÊäÈë²ÎÊı: ÎŞ
+ * ·µ»ØÖµ: 1=±£´æ³É¹¦£¬0=±£´æÊ§°Ü
  */
 uint8_t FC_Params_SaveToFlash(void);
 
 /*
- * å‡½æ•°å: FC_Params_ClearFlash
- * åŠŸèƒ½: æ“¦é™¤é£æ§å‚æ•° Flash é¡µ
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›å€¼: 1=æ“¦é™¤æˆåŠŸï¼Œ0=æ“¦é™¤å¤±è´¥
+ * º¯ÊıÃû: FC_Params_ClearFlash
+ * ¹¦ÄÜ: ²Á³ı·É¿Ø²ÎÊı Flash Ò³
+ * ÊäÈë²ÎÊı: ÎŞ
+ * ·µ»ØÖµ: 1=²Á³ı³É¹¦£¬0=²Á³ıÊ§°Ü
  */
 uint8_t FC_Params_ClearFlash(void);
 

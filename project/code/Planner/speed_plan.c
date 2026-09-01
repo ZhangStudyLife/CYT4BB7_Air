@@ -13,7 +13,7 @@
 #define SPEED_PLAN_EXIT_ANGLE_DEG        (30.0f)
 #define SPEED_PLAN_EXIT_YAWRATE_DPS      (100.0f)
 #define SPEED_PLAN_EXIT_ATTITUDE_DEG     (30.0f)
-#define SPEED_PLAN_CONFIRM_TICKS         (6U) /* 100Hzä¸‹è¿žç»­çº¦60msã€‚ */
+#define SPEED_PLAN_CONFIRM_TICKS         (6U) /* 100HzÏÂÁ¬ÐøÔ¼60ms¡£ */
 
 extern float g_car_vel_y;
 extern float g_car_yaw_rate_dps;

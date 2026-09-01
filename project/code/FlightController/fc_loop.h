@@ -1,4 +1,4 @@
-ï»¿#ifndef FC_LOOP_H
+#ifndef FC_LOOP_H
 #define FC_LOOP_H
 
 #include "fc_params.h"
@@ -17,9 +17,9 @@ extern float yaw_gyro_target;
 extern float roll_angle_target;
 extern float pitch_angle_target;
 extern float yaw_angle_target;
-/* æ°´å¹³é€Ÿåº¦æ§åˆ¶å…è®¸è¾“å‡ºçš„æœ€å¤§ Roll/Pitch ç›®æ ‡è§’ï¼Œå•ä½ deg */
+/* Ë®Æ½ËÙ¶È¿ØÖÆÔÊĞíÊä³öµÄ×î´ó Roll/Pitch Ä¿±ê½Ç£¬µ¥Î» deg */
 extern float angle_target_max;
-/* æ­£å¸¸é£è¡Œç›®æ ‡é«˜åº¦ï¼Œå•ä½ m */
+/* Õı³£·ÉĞĞÄ¿±ê¸ß¶È£¬µ¥Î» m */
 extern float g_fc_target_height_m;
 
 typedef struct
@@ -40,14 +40,14 @@ typedef struct
 } fc_height_debug_t;
 
 /*
- * ä¸»è¦æ˜¯PIDå¾ªç¯æ§åˆ¶å‡½æ•°çš„å£°æ˜ï¼Œåˆ†åˆ«å¯¹åº”ä¸åŒé¢‘ç‡çš„æ§åˆ¶ç¯
+ * Ö÷ÒªÊÇPIDÑ­»·¿ØÖÆº¯ÊıµÄÉùÃ÷£¬·Ö±ğ¶ÔÓ¦²»Í¬ÆµÂÊµÄ¿ØÖÆ»·
  */
-void FC_Loop_Init(void);  /* PIDå¾ªç¯ç›¸å…³èµ„æºåˆå§‹åŒ– */
-void FC_Loop_Reset(void); /* PIDå¾ªç¯çŠ¶æ€é‡ç½®ï¼Œé€šå¸¸åœ¨è§£é”æˆ–æ¨¡å¼åˆ‡æ¢æ—¶è°ƒç”¨ */
+void FC_Loop_Init(void);  /* PIDÑ­»·Ïà¹Ø×ÊÔ´³õÊ¼»¯ */
+void FC_Loop_Reset(void); /* PIDÑ­»·×´Ì¬ÖØÖÃ£¬Í¨³£ÔÚ½âËø»òÄ£Ê½ÇĞ»»Ê±µ÷ÓÃ */
 void FC_Loop_50Hz(void);  /* 50Hz */
 void FC_Loop_100Hz(void);  /* 100Hz*/
-void FC_Loop_500Hz(void); /* 500Hzè§’åº¦å¤–ç¯ï¼Œè¾“å‡ºè§’é€Ÿåº¦ç›®æ ‡ */
-void FC_Loop_1000Hz(void);  /* 1kHzä¸»å¾ªç¯ï¼Œå¤„ç†é™€èºä»ªæ•°æ®å’Œè§’é€Ÿåº¦æ§åˆ¶ */
+void FC_Loop_500Hz(void); /* 500Hz½Ç¶ÈÍâ»·£¬Êä³ö½ÇËÙ¶ÈÄ¿±ê */
+void FC_Loop_1000Hz(void);  /* 1kHzÖ÷Ñ­»·£¬´¦ÀíÍÓÂİÒÇÊı¾İºÍ½ÇËÙ¶È¿ØÖÆ */
 void FC_Loop_GetHeightDebug(fc_height_debug_t *debug);
 
 #endif /* FC_LOOP_H */

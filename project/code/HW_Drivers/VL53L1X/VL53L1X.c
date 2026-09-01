@@ -2,23 +2,23 @@
 #include "zf_device_config.h"
 #include <string.h>
 
-#define VL53L1X_IIC_ADDR                 (0x52 >> 1) /* VL53L1X çš„ 7 ä½ IIC åœ°å€ */
-#define VL53L1X_IIC_DELAY                (100U)      /* è½¯ IIC å»¶æ—¶å‚æ•° */
-#define VL53L1X_BUS_RECOVERY_PULSE       (9U)        /* æ€»çº¿æ¢å¤è„‰å†²æ•° */
-#define VL53L1X_PROBE_RETRY              (3U)        /* åœ°å€æ¢æµ‹é‡è¯•æ¬¡æ•° */
-#define VL53L1X_FW_RETRY                 (5U)        /* å›ºä»¶çŠ¶æ€è¯»å–é‡è¯•æ¬¡æ•° */
-#define VL53L1X_BUS_RETRY                (5U)        /* æ€»çº¿æ¢å¤é‡è¯•æ¬¡æ•° */
-#define VL53L1X_READY_TIMEOUT            (1000U)     /* åˆå§‹åŒ–æ—¶ç­‰å¾… ready è¶…æ—¶è®¡æ•° */
+#define VL53L1X_IIC_ADDR                 (0x52 >> 1) /* VL53L1X µÄ 7 Î» IIC µØÖ· */
+#define VL53L1X_IIC_DELAY                (100U)      /* Èí IIC ÑÓÊ±²ÎÊı */
+#define VL53L1X_BUS_RECOVERY_PULSE       (9U)        /* ×ÜÏß»Ö¸´Âö³åÊı */
+#define VL53L1X_PROBE_RETRY              (3U)        /* µØÖ·Ì½²âÖØÊÔ´ÎÊı */
+#define VL53L1X_FW_RETRY                 (5U)        /* ¹Ì¼ş×´Ì¬¶ÁÈ¡ÖØÊÔ´ÎÊı */
+#define VL53L1X_BUS_RETRY                (5U)        /* ×ÜÏß»Ö¸´ÖØÊÔ´ÎÊı */
+#define VL53L1X_READY_TIMEOUT            (1000U)     /* ³õÊ¼»¯Ê±µÈ´ı ready ³¬Ê±¼ÆÊı */
 
-#define VL53L1X_REG_DEVICE_ADDRESS       (0x0001U)   /* è®¾å¤‡åœ°å€å¯„å­˜å™¨ */
-#define VL53L1X_REG_GPIO_MUX_CTRL        (0x0030U)   /* GPIO ä¸­æ–­ææ€§æ§åˆ¶å¯„å­˜å™¨ */
-#define VL53L1X_REG_GPIO_STATUS          (0x0031U)   /* æ•°æ® ready çŠ¶æ€å¯„å­˜å™¨ */
-#define VL53L1X_REG_INTERRUPT_CLEAR      (0x0086U)   /* ä¸­æ–­æ¸…é™¤å¯„å­˜å™¨ */
-#define VL53L1X_REG_RANGE_STATUS         (0x0089U)   /* æµ‹è·çŠ¶æ€å¯„å­˜å™¨ */
-#define VL53L1X_REG_DISTANCE_MM          (0x0096U)   /* è·ç¦»ç»“æœå¯„å­˜å™¨ */
-#define VL53L1X_REG_FW_STATUS            (0x00E5U)   /* å›ºä»¶çŠ¶æ€å¯„å­˜å™¨ */
-#define VL53L1X_GPIO_READY_MASK          (0x01U)     /* GPIO çŠ¶æ€å¯„å­˜å™¨çš„æ•°æ® ready ä½ */
-#define VL53L1X_GPIO_ACTIVE_LOW_MASK     (0x10U)     /* GPIO ææ€§æ§åˆ¶å¯„å­˜å™¨çš„ä½æœ‰æ•ˆä½ */
+#define VL53L1X_REG_DEVICE_ADDRESS       (0x0001U)   /* Éè±¸µØÖ·¼Ä´æÆ÷ */
+#define VL53L1X_REG_GPIO_MUX_CTRL        (0x0030U)   /* GPIO ÖĞ¶Ï¼«ĞÔ¿ØÖÆ¼Ä´æÆ÷ */
+#define VL53L1X_REG_GPIO_STATUS          (0x0031U)   /* Êı¾İ ready ×´Ì¬¼Ä´æÆ÷ */
+#define VL53L1X_REG_INTERRUPT_CLEAR      (0x0086U)   /* ÖĞ¶ÏÇå³ı¼Ä´æÆ÷ */
+#define VL53L1X_REG_RANGE_STATUS         (0x0089U)   /* ²â¾à×´Ì¬¼Ä´æÆ÷ */
+#define VL53L1X_REG_DISTANCE_MM          (0x0096U)   /* ¾àÀë½á¹û¼Ä´æÆ÷ */
+#define VL53L1X_REG_FW_STATUS            (0x00E5U)   /* ¹Ì¼ş×´Ì¬¼Ä´æÆ÷ */
+#define VL53L1X_GPIO_READY_MASK          (0x01U)     /* GPIO ×´Ì¬¼Ä´æÆ÷µÄÊı¾İ ready Î» */
+#define VL53L1X_GPIO_ACTIVE_LOW_MASK     (0x10U)     /* GPIO ¼«ĞÔ¿ØÖÆ¼Ä´æÆ÷µÄµÍÓĞĞ§Î» */
 
 typedef enum
 {
@@ -29,25 +29,25 @@ typedef enum
     VL53L1X_STATE_CLEAR_PUBLISH
 } VL53L1X_state_enum;
 
-/* å››è·¯ TOF çš„è½¯ IIC å¥æŸ„ */
+/* ËÄÂ· TOF µÄÈí IIC ¾ä±ú */
 static soft_iic_info_struct s_vl53l1x_iic[VL53L1X_SENSOR_COUNT];
-/* å·²åˆå§‹åŒ–æˆåŠŸå¹¶å…è®¸åŒæ­¥è®¿é—®çš„ TOF é€šé“æ©ç  */
+/* ÒÑ³õÊ¼»¯³É¹¦²¢ÔÊĞíÍ¬²½·ÃÎÊµÄ TOF Í¨µÀÑÚÂë */
 static uint8 s_vl53l1x_init_mask = 0U;
-/* å››è·¯ TOF çš„æ•°æ® ready æœ‰æ•ˆç”µå¹³ */
+/* ËÄÂ· TOF µÄÊı¾İ ready ÓĞĞ§µçÆ½ */
 static uint8 s_vl53l1x_ready_level[VL53L1X_SENSOR_COUNT] = {0U, 0U, 0U, 0U};
-/* å½“å‰ TOF åˆ†æ­¥æ›´æ–°çŠ¶æ€ */
+/* µ±Ç° TOF ·Ö²½¸üĞÂ×´Ì¬ */
 static VL53L1X_state_enum s_vl53l1x_state = VL53L1X_STATE_IDLE;
-/* å½“å‰æ›´æ–°å‘¨æœŸæ£€æµ‹åˆ°çš„æ•°æ® ready é€šé“æ©ç  */
+/* µ±Ç°¸üĞÂÖÜÆÚ¼ì²âµ½µÄÊı¾İ ready Í¨µÀÑÚÂë */
 static uint8 s_vl53l1x_pending_ready_mask = 0U;
-/* å½“å‰æ›´æ–°å‘¨æœŸçš„çŠ¶æ€å¯„å­˜å™¨ ACK æ©ç  */
+/* µ±Ç°¸üĞÂÖÜÆÚµÄ×´Ì¬¼Ä´æÆ÷ ACK ÑÚÂë */
 static uint8 s_vl53l1x_ack_status = 0U;
-/* å½“å‰æ›´æ–°å‘¨æœŸçš„è·ç¦»å¯„å­˜å™¨ ACK æ©ç  */
+/* µ±Ç°¸üĞÂÖÜÆÚµÄ¾àÀë¼Ä´æÆ÷ ACK ÑÚÂë */
 static uint8 s_vl53l1x_ack_distance = 0U;
-/* å½“å‰æ›´æ–°å‘¨æœŸçš„å››è·¯çŠ¶æ€å¯„å­˜å™¨ç¼“å­˜ */
+/* µ±Ç°¸üĞÂÖÜÆÚµÄËÄÂ·×´Ì¬¼Ä´æÆ÷»º´æ */
 static uint8 s_vl53l1x_status_buf[VL53L1X_SENSOR_COUNT][2];
-/* å½“å‰æ›´æ–°å‘¨æœŸçš„å››è·¯è·ç¦»å¯„å­˜å™¨ç¼“å­˜ */
+/* µ±Ç°¸üĞÂÖÜÆÚµÄËÄÂ·¾àÀë¼Ä´æÆ÷»º´æ */
 static uint8 s_vl53l1x_distance_buf[VL53L1X_SENSOR_COUNT][2];
-/* å››è·¯ TOF çš„æœ€æ–°ç¼“å­˜æ•°æ® */
+/* ËÄÂ· TOF µÄ×îĞÂ»º´æÊı¾İ */
 static VL53L1X_data_struct s_vl53l1x_data =
 {
     {
@@ -61,7 +61,7 @@ static VL53L1X_data_struct s_vl53l1x_data =
     0U
 };
 
-/* å››è·¯ TOF çš„ SCL å¼•è„šè¡¨ï¼Œé¡ºåºä¸º TOF1ã€TOF2ã€TOF3ã€TOF4 */
+/* ËÄÂ· TOF µÄ SCL Òı½Å±í£¬Ë³ĞòÎª TOF1¡¢TOF2¡¢TOF3¡¢TOF4 */
 static const gpio_pin_enum s_vl53l1x_scl_pins[VL53L1X_SENSOR_COUNT] =
 {
     VL53L1X_TOF1_SCL_PIN,
@@ -70,7 +70,7 @@ static const gpio_pin_enum s_vl53l1x_scl_pins[VL53L1X_SENSOR_COUNT] =
     VL53L1X_TOF4_SCL_PIN
 };
 
-/* å››è·¯ TOF çš„ SDA å¼•è„šè¡¨ï¼Œé¡ºåºä¸º TOF1ã€TOF2ã€TOF3ã€TOF4 */
+/* ËÄÂ· TOF µÄ SDA Òı½Å±í£¬Ë³ĞòÎª TOF1¡¢TOF2¡¢TOF3¡¢TOF4 */
 static const gpio_pin_enum s_vl53l1x_sda_pins[VL53L1X_SENSOR_COUNT] =
 {
     VL53L1X_TOF1_SDA_PIN,
@@ -80,12 +80,12 @@ static const gpio_pin_enum s_vl53l1x_sda_pins[VL53L1X_SENSOR_COUNT] =
 };
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šå°†è½¯ IIC å¼•è„šé…ç½®ä¸ºå¼€æ¼è¾“å‡ºå¹¶æ‹‰é«˜ç©ºé—²ã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   scl_pinï¼šSCL å¼•è„š
- *   sda_pinï¼šSDA å¼•è„š
- * è¿”å›å€¼ï¼š
- *   æ— 
+ * º¯Êı¹¦ÄÜ£º½«Èí IIC Òı½ÅÅäÖÃÎª¿ªÂ©Êä³ö²¢À­¸ß¿ÕÏĞ¡£
+ * ÊäÈë²ÎÊı£º
+ *   scl_pin£ºSCL Òı½Å
+ *   sda_pin£ºSDA Òı½Å
+ * ·µ»ØÖµ£º
+ *   ÎŞ
  */
 static void VL53L1X_PinConfig(gpio_pin_enum scl_pin, gpio_pin_enum sda_pin)
 {
@@ -96,12 +96,12 @@ static void VL53L1X_PinConfig(gpio_pin_enum scl_pin, gpio_pin_enum sda_pin)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šå‡†å¤‡æ€»çº¿ä¸ºä¸Šæ‹‰è¾“å…¥çŠ¶æ€ã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   scl_pinï¼šSCL å¼•è„š
- *   sda_pinï¼šSDA å¼•è„š
- * è¿”å›å€¼ï¼š
- *   æ— 
+ * º¯Êı¹¦ÄÜ£º×¼±¸×ÜÏßÎªÉÏÀ­ÊäÈë×´Ì¬¡£
+ * ÊäÈë²ÎÊı£º
+ *   scl_pin£ºSCL Òı½Å
+ *   sda_pin£ºSDA Òı½Å
+ * ·µ»ØÖµ£º
+ *   ÎŞ
  */
 static void VL53L1X_PrepareBus(gpio_pin_enum scl_pin, gpio_pin_enum sda_pin)
 {
@@ -113,12 +113,12 @@ static void VL53L1X_PrepareBus(gpio_pin_enum scl_pin, gpio_pin_enum sda_pin)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šåœ¨æŒ‡å®šæ€»çº¿ä¸Šæ‰§è¡Œæ¢å¤è„‰å†²ã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   scl_pinï¼šSCL å¼•è„š
- *   sda_pinï¼šSDA å¼•è„š
- * è¿”å›å€¼ï¼š
- *   æ— 
+ * º¯Êı¹¦ÄÜ£ºÔÚÖ¸¶¨×ÜÏßÉÏÖ´ĞĞ»Ö¸´Âö³å¡£
+ * ÊäÈë²ÎÊı£º
+ *   scl_pin£ºSCL Òı½Å
+ *   sda_pin£ºSDA Òı½Å
+ * ·µ»ØÖµ£º
+ *   ÎŞ
  */
 static void VL53L1X_BusRecovery(gpio_pin_enum scl_pin, gpio_pin_enum sda_pin)
 {
@@ -145,11 +145,11 @@ static void VL53L1X_BusRecovery(gpio_pin_enum scl_pin, gpio_pin_enum sda_pin)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šæ‰«æå½“å‰æ€»çº¿ç¬¬ä¸€ä¸ªæœ‰ ACK çš„åœ°å€ã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   iic_objï¼šè½¯ IIC å¥æŸ„
- * è¿”å›å€¼ï¼š
- *   æ‰«æåˆ°çš„åœ°å€ï¼Œå¤±è´¥è¿”å› 0xFF
+ * º¯Êı¹¦ÄÜ£ºÉ¨Ãèµ±Ç°×ÜÏßµÚÒ»¸öÓĞ ACK µÄµØÖ·¡£
+ * ÊäÈë²ÎÊı£º
+ *   iic_obj£ºÈí IIC ¾ä±ú
+ * ·µ»ØÖµ£º
+ *   É¨Ãèµ½µÄµØÖ·£¬Ê§°Ü·µ»Ø 0xFF
  */
 static uint8 VL53L1X_ScanFirstAckAddr(soft_iic_info_struct *iic_obj)
 {
@@ -167,13 +167,13 @@ static uint8 VL53L1X_ScanFirstAckAddr(soft_iic_info_struct *iic_obj)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šè¯»å– 8 ä½å¯„å­˜å™¨ã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   iic_objï¼šè½¯ IIC å¥æŸ„
- *   reg_addrï¼š16 ä½å¯„å­˜å™¨åœ°å€
- *   reg_dataï¼šè¾“å‡ºå¯„å­˜å™¨å€¼æŒ‡é’ˆ
- * è¿”å›å€¼ï¼š
- *   æ— 
+ * º¯Êı¹¦ÄÜ£º¶ÁÈ¡ 8 Î»¼Ä´æÆ÷¡£
+ * ÊäÈë²ÎÊı£º
+ *   iic_obj£ºÈí IIC ¾ä±ú
+ *   reg_addr£º16 Î»¼Ä´æÆ÷µØÖ·
+ *   reg_data£ºÊä³ö¼Ä´æÆ÷ÖµÖ¸Õë
+ * ·µ»ØÖµ£º
+ *   ÎŞ
  */
 static void VL53L1X_ReadReg8(soft_iic_info_struct *iic_obj, uint16 reg_addr, uint8 *reg_data)
 {
@@ -182,11 +182,11 @@ static void VL53L1X_ReadReg8(soft_iic_info_struct *iic_obj, uint16 reg_addr, uin
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šé‡è¯•è¯»å–å›ºä»¶çŠ¶æ€å¯„å­˜å™¨ã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   iic_objï¼šè½¯ IIC å¥æŸ„
- * è¿”å›å€¼ï¼š
- *   å›ºä»¶çŠ¶æ€å€¼ï¼Œå¤±è´¥è¿”å› 0xFF
+ * º¯Êı¹¦ÄÜ£ºÖØÊÔ¶ÁÈ¡¹Ì¼ş×´Ì¬¼Ä´æÆ÷¡£
+ * ÊäÈë²ÎÊı£º
+ *   iic_obj£ºÈí IIC ¾ä±ú
+ * ·µ»ØÖµ£º
+ *   ¹Ì¼ş×´Ì¬Öµ£¬Ê§°Ü·µ»Ø 0xFF
  */
 static uint8 VL53L1X_ReadFwStatus(soft_iic_info_struct *iic_obj)
 {
@@ -207,11 +207,11 @@ static uint8 VL53L1X_ReadFwStatus(soft_iic_info_struct *iic_obj)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šè½»é‡åŒæ­¥å»¶æ—¶ã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   delayï¼šå»¶æ—¶è®¡æ•°
- * è¿”å›å€¼ï¼š
- *   æ— 
+ * º¯Êı¹¦ÄÜ£ºÇáÁ¿Í¬²½ÑÓÊ±¡£
+ * ÊäÈë²ÎÊı£º
+ *   delay£ºÑÓÊ±¼ÆÊı
+ * ·µ»ØÖµ£º
+ *   ÎŞ
  */
 static void VL53L1X_SyncDelay(uint32 delay)
 {
@@ -223,12 +223,12 @@ static void VL53L1X_SyncDelay(uint32 delay)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šåŒæ­¥è®¾ç½®æŒ‡å®š TOF æ€»çº¿çš„ SCL ç”µå¹³ã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   bus_maskï¼šå‚ä¸æ“ä½œçš„ TOF é€šé“æ©ç 
- *   levelï¼šç›®æ ‡ç”µå¹³ï¼Œ0=ä½ç”µå¹³ï¼Œé 0=é«˜ç”µå¹³
- * è¿”å›å€¼ï¼š
- *   æ— 
+ * º¯Êı¹¦ÄÜ£ºÍ¬²½ÉèÖÃÖ¸¶¨ TOF ×ÜÏßµÄ SCL µçÆ½¡£
+ * ÊäÈë²ÎÊı£º
+ *   bus_mask£º²ÎÓë²Ù×÷µÄ TOF Í¨µÀÑÚÂë
+ *   level£ºÄ¿±êµçÆ½£¬0=µÍµçÆ½£¬·Ç 0=¸ßµçÆ½
+ * ·µ»ØÖµ£º
+ *   ÎŞ
  */
 static void VL53L1X_SetAllScl(uint8 bus_mask, uint8 level)
 {
@@ -253,12 +253,12 @@ static void VL53L1X_SetAllScl(uint8 bus_mask, uint8 level)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šåŒæ­¥è®¾ç½®æŒ‡å®š TOF æ€»çº¿çš„ SDA ç”µå¹³ã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   bus_maskï¼šå‚ä¸æ“ä½œçš„ TOF é€šé“æ©ç 
- *   levelï¼šç›®æ ‡ç”µå¹³ï¼Œ0=ä½ç”µå¹³ï¼Œé 0=é«˜ç”µå¹³
- * è¿”å›å€¼ï¼š
- *   æ— 
+ * º¯Êı¹¦ÄÜ£ºÍ¬²½ÉèÖÃÖ¸¶¨ TOF ×ÜÏßµÄ SDA µçÆ½¡£
+ * ÊäÈë²ÎÊı£º
+ *   bus_mask£º²ÎÓë²Ù×÷µÄ TOF Í¨µÀÑÚÂë
+ *   level£ºÄ¿±êµçÆ½£¬0=µÍµçÆ½£¬·Ç 0=¸ßµçÆ½
+ * ·µ»ØÖµ£º
+ *   ÎŞ
  */
 static void VL53L1X_SetAllSda(uint8 bus_mask, uint8 level)
 {
@@ -283,13 +283,13 @@ static void VL53L1X_SetAllSda(uint8 bus_mask, uint8 level)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šåŒæ­¥è®¾ç½®æŒ‡å®š TOF æ€»çº¿çš„ SDA è¾“å…¥è¾“å‡ºæ–¹å‘ã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   bus_maskï¼šå‚ä¸æ“ä½œçš„ TOF é€šé“æ©ç 
- *   dirï¼šGPIO æ–¹å‘
- *   modeï¼šGPIO æ¨¡å¼
- * è¿”å›å€¼ï¼š
- *   æ— 
+ * º¯Êı¹¦ÄÜ£ºÍ¬²½ÉèÖÃÖ¸¶¨ TOF ×ÜÏßµÄ SDA ÊäÈëÊä³ö·½Ïò¡£
+ * ÊäÈë²ÎÊı£º
+ *   bus_mask£º²ÎÓë²Ù×÷µÄ TOF Í¨µÀÑÚÂë
+ *   dir£ºGPIO ·½Ïò
+ *   mode£ºGPIO Ä£Ê½
+ * ·µ»ØÖµ£º
+ *   ÎŞ
  */
 static void VL53L1X_SetAllSdaDir(uint8 bus_mask, gpio_dir_enum dir, gpio_mode_enum mode)
 {
@@ -305,12 +305,12 @@ static void VL53L1X_SetAllSdaDir(uint8 bus_mask, gpio_dir_enum dir, gpio_mode_en
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šæŒ‡å®š TOF æ€»çº¿åŒæ—¶å‘èµ· STARTã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   bus_maskï¼šå‚ä¸æ“ä½œçš„ TOF é€šé“æ©ç 
- *   delayï¼šæ—¶åºå»¶æ—¶å‚æ•°
- * è¿”å›å€¼ï¼š
- *   æ— 
+ * º¯Êı¹¦ÄÜ£ºÖ¸¶¨ TOF ×ÜÏßÍ¬Ê±·¢Æğ START¡£
+ * ÊäÈë²ÎÊı£º
+ *   bus_mask£º²ÎÓë²Ù×÷µÄ TOF Í¨µÀÑÚÂë
+ *   delay£ºÊ±ĞòÑÓÊ±²ÎÊı
+ * ·µ»ØÖµ£º
+ *   ÎŞ
  */
 static void VL53L1X_SyncStart(uint8 bus_mask, uint32 delay)
 {
@@ -325,12 +325,12 @@ static void VL53L1X_SyncStart(uint8 bus_mask, uint32 delay)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šæŒ‡å®š TOF æ€»çº¿åŒæ—¶å‘èµ· STOPã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   bus_maskï¼šå‚ä¸æ“ä½œçš„ TOF é€šé“æ©ç 
- *   delayï¼šæ—¶åºå»¶æ—¶å‚æ•°
- * è¿”å›å€¼ï¼š
- *   æ— 
+ * º¯Êı¹¦ÄÜ£ºÖ¸¶¨ TOF ×ÜÏßÍ¬Ê±·¢Æğ STOP¡£
+ * ÊäÈë²ÎÊı£º
+ *   bus_mask£º²ÎÓë²Ù×÷µÄ TOF Í¨µÀÑÚÂë
+ *   delay£ºÊ±ĞòÑÓÊ±²ÎÊı
+ * ·µ»ØÖµ£º
+ *   ÎŞ
  */
 static void VL53L1X_SyncStop(uint8 bus_mask, uint32 delay)
 {
@@ -345,13 +345,13 @@ static void VL53L1X_SyncStop(uint8 bus_mask, uint32 delay)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šæŒ‡å®š TOF æ€»çº¿åŒæ—¶å‘é€åŒä¸€ä¸ªå­—èŠ‚ï¼Œå¹¶è¿”å› ACK æ©ç ã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   bus_maskï¼šå‚ä¸æ“ä½œçš„ TOF é€šé“æ©ç 
- *   dataï¼šå¾…å‘é€å­—èŠ‚
- *   delayï¼šæ—¶åºå»¶æ—¶å‚æ•°
- * è¿”å›å€¼ï¼š
- *   ACK æ©ç ï¼Œbit0~bit3 å¯¹åº” TOF1~TOF4
+ * º¯Êı¹¦ÄÜ£ºÖ¸¶¨ TOF ×ÜÏßÍ¬Ê±·¢ËÍÍ¬Ò»¸ö×Ö½Ú£¬²¢·µ»Ø ACK ÑÚÂë¡£
+ * ÊäÈë²ÎÊı£º
+ *   bus_mask£º²ÎÓë²Ù×÷µÄ TOF Í¨µÀÑÚÂë
+ *   data£º´ı·¢ËÍ×Ö½Ú
+ *   delay£ºÊ±ĞòÑÓÊ±²ÎÊı
+ * ·µ»ØÖµ£º
+ *   ACK ÑÚÂë£¬bit0~bit3 ¶ÔÓ¦ TOF1~TOF4
  */
 static uint8 VL53L1X_SyncSendByte(uint8 bus_mask, uint8 data, uint32 delay)
 {
@@ -403,14 +403,14 @@ static uint8 VL53L1X_SyncSendByte(uint8 bus_mask, uint8 data, uint32 delay)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šæŒ‡å®š TOF æ€»çº¿åŒæ—¶è¯»å–ä¸€ä¸ªå­—èŠ‚ã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   bus_maskï¼šå‚ä¸æ“ä½œçš„ TOF é€šé“æ©ç 
- *   out_dataï¼šè¾“å‡ºæ•°ç»„ï¼Œé•¿åº¦ä¸º VL53L1X_SENSOR_COUNT
- *   nackï¼š1 è¡¨ç¤ºæœ€åä¸€ä¸ªå­—èŠ‚å‘é€ NACKï¼Œ0 è¡¨ç¤ºå‘é€ ACK
- *   delayï¼šæ—¶åºå»¶æ—¶å‚æ•°
- * è¿”å›å€¼ï¼š
- *   æ— 
+ * º¯Êı¹¦ÄÜ£ºÖ¸¶¨ TOF ×ÜÏßÍ¬Ê±¶ÁÈ¡Ò»¸ö×Ö½Ú¡£
+ * ÊäÈë²ÎÊı£º
+ *   bus_mask£º²ÎÓë²Ù×÷µÄ TOF Í¨µÀÑÚÂë
+ *   out_data£ºÊä³öÊı×é£¬³¤¶ÈÎª VL53L1X_SENSOR_COUNT
+ *   nack£º1 ±íÊ¾×îºóÒ»¸ö×Ö½Ú·¢ËÍ NACK£¬0 ±íÊ¾·¢ËÍ ACK
+ *   delay£ºÊ±ĞòÑÓÊ±²ÎÊı
+ * ·µ»ØÖµ£º
+ *   ÎŞ
  */
 static void VL53L1X_SyncReadByte(uint8 bus_mask,
                                  uint8 out_data[VL53L1X_SENSOR_COUNT],
@@ -467,14 +467,14 @@ static void VL53L1X_SyncReadByte(uint8 bus_mask,
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šå››è·¯ TOF åŒæ—¶è¯»å–åŒä¸€ä¸ªå¯„å­˜å™¨å—ã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   bus_maskï¼šå‚ä¸æ“ä½œçš„ TOF é€šé“æ©ç 
- *   reg_addrï¼š16 ä½å¯„å­˜å™¨åœ°å€
- *   bufï¼šè¾“å‡ºç¼“å†²åŒºï¼Œç¬¬ä¸€ç»´ä¸ºå››è·¯ TOF
- *   lenï¼šè¯»å–å­—èŠ‚æ•°
- * è¿”å›å€¼ï¼š
- *   ACK æ©ç ï¼Œbit0~bit3 å¯¹åº” TOF1~TOF4
+ * º¯Êı¹¦ÄÜ£ºËÄÂ· TOF Í¬Ê±¶ÁÈ¡Í¬Ò»¸ö¼Ä´æÆ÷¿é¡£
+ * ÊäÈë²ÎÊı£º
+ *   bus_mask£º²ÎÓë²Ù×÷µÄ TOF Í¨µÀÑÚÂë
+ *   reg_addr£º16 Î»¼Ä´æÆ÷µØÖ·
+ *   buf£ºÊä³ö»º³åÇø£¬µÚÒ»Î¬ÎªËÄÂ· TOF
+ *   len£º¶ÁÈ¡×Ö½ÚÊı
+ * ·µ»ØÖµ£º
+ *   ACK ÑÚÂë£¬bit0~bit3 ¶ÔÓ¦ TOF1~TOF4
  */
 static uint8 VL53L1X_SyncReadRegArray(uint8 bus_mask,
                                       uint16 reg_addr,
@@ -512,13 +512,13 @@ static uint8 VL53L1X_SyncReadRegArray(uint8 bus_mask,
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šå››è·¯ TOF åŒæ—¶å†™å…¥åŒä¸€ä¸ª 8 ä½å¯„å­˜å™¨ã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   bus_maskï¼šå‚ä¸æ“ä½œçš„ TOF é€šé“æ©ç 
- *   reg_addrï¼š16 ä½å¯„å­˜å™¨åœ°å€
- *   valueï¼šå¾…å†™å…¥çš„ 8 ä½å€¼
- * è¿”å›å€¼ï¼š
- *   ACK æ©ç ï¼Œbit0~bit3 å¯¹åº” TOF1~TOF4
+ * º¯Êı¹¦ÄÜ£ºËÄÂ· TOF Í¬Ê±Ğ´ÈëÍ¬Ò»¸ö 8 Î»¼Ä´æÆ÷¡£
+ * ÊäÈë²ÎÊı£º
+ *   bus_mask£º²ÎÓë²Ù×÷µÄ TOF Í¨µÀÑÚÂë
+ *   reg_addr£º16 Î»¼Ä´æÆ÷µØÖ·
+ *   value£º´ıĞ´ÈëµÄ 8 Î»Öµ
+ * ·µ»ØÖµ£º
+ *   ACK ÑÚÂë£¬bit0~bit3 ¶ÔÓ¦ TOF1~TOF4
  */
 static uint8 VL53L1X_SyncWriteReg8(uint8 bus_mask, uint16 reg_addr, uint8 value)
 {
@@ -536,12 +536,12 @@ static uint8 VL53L1X_SyncWriteReg8(uint8 bus_mask, uint16 reg_addr, uint8 value)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šåˆå§‹åŒ–æŒ‡å®šä¸€è·¯ TOFã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   indexï¼šé€šé“ç´¢å¼•ï¼Œ0=TOF1ï¼Œ1=TOF2ï¼Œ2=TOF3ï¼Œ3=TOF4
- * è¿”å›å€¼ï¼š
- *   1ï¼šåˆå§‹åŒ–æˆåŠŸ
- *   0ï¼šåˆå§‹åŒ–å¤±è´¥
+ * º¯Êı¹¦ÄÜ£º³õÊ¼»¯Ö¸¶¨Ò»Â· TOF¡£
+ * ÊäÈë²ÎÊı£º
+ *   index£ºÍ¨µÀË÷Òı£¬0=TOF1£¬1=TOF2£¬2=TOF3£¬3=TOF4
+ * ·µ»ØÖµ£º
+ *   1£º³õÊ¼»¯³É¹¦
+ *   0£º³õÊ¼»¯Ê§°Ü
  */
 static uint8 VL53L1X_InitSingle(uint8 index)
 {
@@ -617,7 +617,7 @@ static uint8 VL53L1X_InitSingle(uint8 index)
                                  data_buffer,
                                  0U);
 
-    /* æ ¹æ® GPIO ææ€§é…ç½®ä¿å­˜è¯¥è·¯ä¼ æ„Ÿå™¨çš„æ•°æ® ready æœ‰æ•ˆç”µå¹³ã€‚ */
+    /* ¸ù¾İ GPIO ¼«ĞÔÅäÖÃ±£´æ¸ÃÂ·´«¸ĞÆ÷µÄÊı¾İ ready ÓĞĞ§µçÆ½¡£ */
     VL53L1X_ReadReg8(&s_vl53l1x_iic[index], VL53L1X_REG_GPIO_MUX_CTRL, &gpio_mux_ctrl);
     s_vl53l1x_ready_level[index] =
         (0U != (gpio_mux_ctrl & VL53L1X_GPIO_ACTIVE_LOW_MASK)) ? 0U : 1U;
@@ -643,11 +643,11 @@ static uint8 VL53L1X_InitSingle(uint8 index)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šåˆå§‹åŒ–å››è·¯ VL53L1Xã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   æ— 
- * è¿”å›å€¼ï¼š
- *   æ— 
+ * º¯Êı¹¦ÄÜ£º³õÊ¼»¯ËÄÂ· VL53L1X¡£
+ * ÊäÈë²ÎÊı£º
+ *   ÎŞ
+ * ·µ»ØÖµ£º
+ *   ÎŞ
  */
 void VL53L1X_Init(void)
 {
@@ -671,11 +671,11 @@ void VL53L1X_Init(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šè¯·æ±‚å¯åŠ¨ä¸€æ¬¡å››è·¯ VL53L1X æµ‹è·æ›´æ–°ã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   æ— 
- * è¿”å›å€¼ï¼š
- *   æ— 
+ * º¯Êı¹¦ÄÜ£ºÇëÇóÆô¶¯Ò»´ÎËÄÂ· VL53L1X ²â¾à¸üĞÂ¡£
+ * ÊäÈë²ÎÊı£º
+ *   ÎŞ
+ * ·µ»ØÖµ£º
+ *   ÎŞ
  */
 void VL53L1X_RequestUpdate(void)
 {
@@ -691,11 +691,11 @@ void VL53L1X_RequestUpdate(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šæ‰§è¡Œ VL53L1X æ›´æ–°çŠ¶æ€æœºçš„ä¸€ä¸ªå®Œæ•´å¯„å­˜å™¨äº‹åŠ¡ã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   æ— 
- * è¿”å›å€¼ï¼š
- *   æ— 
+ * º¯Êı¹¦ÄÜ£ºÖ´ĞĞ VL53L1X ¸üĞÂ×´Ì¬»úµÄÒ»¸öÍêÕû¼Ä´æÆ÷ÊÂÎñ¡£
+ * ÊäÈë²ÎÊı£º
+ *   ÎŞ
+ * ·µ»ØÖµ£º
+ *   ÎŞ
  */
 void VL53L1X_TaskStep(void)
 {
@@ -812,11 +812,11 @@ void VL53L1X_TaskStep(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šåŒæ­¥å®Œæˆä¸€æ¬¡å››è·¯ VL53L1X æ›´æ–°ï¼Œä¿ç•™æ—§è°ƒç”¨æ¥å£å…¼å®¹æ€§ã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   æ— 
- * è¿”å›å€¼ï¼š
- *   æ— 
+ * º¯Êı¹¦ÄÜ£ºÍ¬²½Íê³ÉÒ»´ÎËÄÂ· VL53L1X ¸üĞÂ£¬±£Áô¾Éµ÷ÓÃ½Ó¿Ú¼æÈİĞÔ¡£
+ * ÊäÈë²ÎÊı£º
+ *   ÎŞ
+ * ·µ»ØÖµ£º
+ *   ÎŞ
  */
 void VL53L1X_Update(void)
 {
@@ -828,11 +828,11 @@ void VL53L1X_Update(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šè·å–å››è·¯ VL53L1X æœ€æ–°ç¼“å­˜æ•°æ®ã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   æ— 
- * è¿”å›å€¼ï¼š
- *   æŒ‡å‘å†…éƒ¨ç¼“å­˜çš„åªè¯»æŒ‡é’ˆ
+ * º¯Êı¹¦ÄÜ£º»ñÈ¡ËÄÂ· VL53L1X ×îĞÂ»º´æÊı¾İ¡£
+ * ÊäÈë²ÎÊı£º
+ *   ÎŞ
+ * ·µ»ØÖµ£º
+ *   Ö¸ÏòÄÚ²¿»º´æµÄÖ»¶ÁÖ¸Õë
  */
 const VL53L1X_data_struct *VL53L1X_GetData(void)
 {

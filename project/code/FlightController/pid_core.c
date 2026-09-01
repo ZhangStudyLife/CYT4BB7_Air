@@ -5,18 +5,18 @@
 #define PID_FILTER_PI             (3.14159265359f)
 #define PID_BUTTERWORTH_Q         (0.70710678f)
 #define PID_LPF_MIN_HZ            (0.0f)
-#define PID_LPF_DT_REINIT_RATIO   (0.25f) /* dtå˜åŒ–è¶…è¿‡25%æ—¶æ‰é‡å»ºDé¡¹æ»¤æ³¢å™¨ */
-#define PID_PT3_MIN_HZ            (0.0f) /* PT3 æˆªæ­¢é¢‘ç‡æ—è·¯é˜ˆå€¼ï¼Œå•ä½ Hz */
-#define PID_PT3_MIN_MS            (0.0f) /* PT3 å¹³æ»‘æ—¶é—´æ—è·¯é˜ˆå€¼ï¼Œå•ä½ ms */
+#define PID_LPF_DT_REINIT_RATIO   (0.25f) /* dt±ä»¯³¬¹ı25%Ê±²ÅÖØ½¨DÏîÂË²¨Æ÷ */
+#define PID_PT3_MIN_HZ            (0.0f) /* PT3 ½ØÖ¹ÆµÂÊÅÔÂ·ãĞÖµ£¬µ¥Î» Hz */
+#define PID_PT3_MIN_MS            (0.0f) /* PT3 Æ½»¬Ê±¼äÅÔÂ·ãĞÖµ£¬µ¥Î» ms */
 
 /**
- * å‡½æ•°åŠŸèƒ½: å°†æµ®ç‚¹å€¼é™åˆ¶åœ¨æŒ‡å®šèŒƒå›´å†…ã€‚
- * è¾“å…¥å‚æ•°:
- *   v     - å¾…é™åˆ¶å€¼ã€‚
- *   min_v - ä¸‹é™ã€‚
- *   max_v - ä¸Šé™ã€‚
- * è¿”å›å€¼:
- *   é™å¹…åçš„å€¼ã€‚
+ * º¯Êı¹¦ÄÜ: ½«¸¡µãÖµÏŞÖÆÔÚÖ¸¶¨·¶Î§ÄÚ¡£
+ * ÊäÈë²ÎÊı:
+ *   v     - ´ıÏŞÖÆÖµ¡£
+ *   min_v - ÏÂÏŞ¡£
+ *   max_v - ÉÏÏŞ¡£
+ * ·µ»ØÖµ:
+ *   ÏŞ·ùºóµÄÖµ¡£
  */
 static inline float pid_clampf(float v, float min_v, float max_v)
 {
@@ -32,11 +32,11 @@ static inline float pid_clampf(float v, float min_v, float max_v)
 }
 
 /**
- * å‡½æ•°åŠŸèƒ½: è®¡ç®—æµ®ç‚¹ç»å¯¹å€¼ã€‚
- * è¾“å…¥å‚æ•°:
- *   v - è¾“å…¥å€¼ã€‚
- * è¿”å›å€¼:
- *   ç»å¯¹å€¼ç»“æœã€‚
+ * º¯Êı¹¦ÄÜ: ¼ÆËã¸¡µã¾ø¶ÔÖµ¡£
+ * ÊäÈë²ÎÊı:
+ *   v - ÊäÈëÖµ¡£
+ * ·µ»ØÖµ:
+ *   ¾ø¶ÔÖµ½á¹û¡£
  */
 static inline float pid_absf(float v)
 {
@@ -44,11 +44,11 @@ static inline float pid_absf(float v)
 }
 
 /**
- * å‡½æ•°åŠŸèƒ½: å…œåº•æ§åˆ¶å‘¨æœŸï¼Œé˜²æ­¢å‡ºç°éæ­£ dtã€‚
- * è¾“å…¥å‚æ•°:
- *   dt - å¤–éƒ¨ä¼ å…¥æ§åˆ¶å‘¨æœŸï¼Œå•ä½ sã€‚
- * è¿”å›å€¼:
- *   å¤§äº 0 çš„æœ‰æ•ˆæ§åˆ¶å‘¨æœŸï¼Œå•ä½ sã€‚
+ * º¯Êı¹¦ÄÜ: ¶µµ×¿ØÖÆÖÜÆÚ£¬·ÀÖ¹³öÏÖ·ÇÕı dt¡£
+ * ÊäÈë²ÎÊı:
+ *   dt - Íâ²¿´«Èë¿ØÖÆÖÜÆÚ£¬µ¥Î» s¡£
+ * ·µ»ØÖµ:
+ *   ´óÓÚ 0 µÄÓĞĞ§¿ØÖÆÖÜÆÚ£¬µ¥Î» s¡£
  */
 static inline float pid_safe_dt(float dt)
 {
@@ -56,10 +56,10 @@ static inline float pid_safe_dt(float dt)
 }
 
 /**
- * å‡½æ•°åŠŸèƒ½: æ¸…é›¶äºŒé˜¶æ»¤æ³¢å™¨å†…éƒ¨çŠ¶æ€ã€‚
- * è¾“å…¥å‚æ•°:
- *   filt - ç›®æ ‡æ»¤æ³¢å™¨çŠ¶æ€ã€‚
- * è¿”å›å€¼: æ— ã€‚
+ * º¯Êı¹¦ÄÜ: ÇåÁã¶ş½×ÂË²¨Æ÷ÄÚ²¿×´Ì¬¡£
+ * ÊäÈë²ÎÊı:
+ *   filt - Ä¿±êÂË²¨Æ÷×´Ì¬¡£
+ * ·µ»ØÖµ: ÎŞ¡£
  */
 static void pid_biquad_reset(pid_biquad_t *filt)
 {
@@ -73,10 +73,10 @@ static void pid_biquad_reset(pid_biquad_t *filt)
 }
 
 /**
- * å‡½æ•°åŠŸèƒ½: æ¸…é›¶ PT3 æ»¤æ³¢å™¨çŠ¶æ€ã€‚
- * è¾“å…¥å‚æ•°:
- *   filt - ç›®æ ‡ PT3 æ»¤æ³¢å™¨ã€‚
- * è¿”å›å€¼: æ— ã€‚
+ * º¯Êı¹¦ÄÜ: ÇåÁã PT3 ÂË²¨Æ÷×´Ì¬¡£
+ * ÊäÈë²ÎÊı:
+ *   filt - Ä¿±ê PT3 ÂË²¨Æ÷¡£
+ * ·µ»ØÖµ: ÎŞ¡£
  */
 static void pid_pt3_reset(pid_pt3_t *filt)
 {
@@ -91,12 +91,12 @@ static void pid_pt3_reset(pid_pt3_t *filt)
 }
 
 /**
- * å‡½æ•°åŠŸèƒ½: é…ç½® PT3 ä½é€šæ»¤æ³¢å™¨ç³»æ•°ã€‚
- * è¾“å…¥å‚æ•°:
- *   filt - ç›®æ ‡ PT3 æ»¤æ³¢å™¨ã€‚
- *   dt   - æ§åˆ¶å‘¨æœŸï¼Œå•ä½ sã€‚
- *   hz   - æˆªæ­¢é¢‘ç‡ï¼Œå•ä½ Hzã€‚
- * è¿”å›å€¼: æ— ã€‚
+ * º¯Êı¹¦ÄÜ: ÅäÖÃ PT3 µÍÍ¨ÂË²¨Æ÷ÏµÊı¡£
+ * ÊäÈë²ÎÊı:
+ *   filt - Ä¿±ê PT3 ÂË²¨Æ÷¡£
+ *   dt   - ¿ØÖÆÖÜÆÚ£¬µ¥Î» s¡£
+ *   hz   - ½ØÖ¹ÆµÂÊ£¬µ¥Î» Hz¡£
+ * ·µ»ØÖµ: ÎŞ¡£
  */
 static void pid_pt3_init_lpf(pid_pt3_t *filt, float dt, float hz)
 {
@@ -123,12 +123,12 @@ static void pid_pt3_init_lpf(pid_pt3_t *filt, float dt, float hz)
 }
 
 /**
- * å‡½æ•°åŠŸèƒ½: æ‰§è¡Œä¸€æ¬¡ PT3 ä½é€šæ»¤æ³¢ã€‚
- * è¾“å…¥å‚æ•°:
- *   filt - ç›®æ ‡ PT3 æ»¤æ³¢å™¨ã€‚
- *   in   - å½“å‰è¾“å…¥æ ·æœ¬ã€‚
- * è¿”å›å€¼:
- *   æœ¬æ¬¡æ»¤æ³¢è¾“å‡ºã€‚
+ * º¯Êı¹¦ÄÜ: Ö´ĞĞÒ»´Î PT3 µÍÍ¨ÂË²¨¡£
+ * ÊäÈë²ÎÊı:
+ *   filt - Ä¿±ê PT3 ÂË²¨Æ÷¡£
+ *   in   - µ±Ç°ÊäÈëÑù±¾¡£
+ * ·µ»ØÖµ:
+ *   ±¾´ÎÂË²¨Êä³ö¡£
  */
 static float pid_pt3_apply(pid_pt3_t *filt, float in)
 {
@@ -147,12 +147,12 @@ static float pid_pt3_apply(pid_pt3_t *filt, float in)
 }
 
 /**
- * å‡½æ•°åŠŸèƒ½: åˆå§‹åŒ–äºŒé˜¶ Butterworth ä½é€šæ»¤æ³¢å™¨ã€‚
- * è¾“å…¥å‚æ•°:
- *   filt - ç›®æ ‡æ»¤æ³¢å™¨çŠ¶æ€ã€‚
- *   fs   - é‡‡æ ·é¢‘ç‡ï¼Œå•ä½ Hzã€‚
- *   fc   - æˆªæ­¢é¢‘ç‡ï¼Œå•ä½ Hzã€‚
- * è¿”å›å€¼: æ— ã€‚
+ * º¯Êı¹¦ÄÜ: ³õÊ¼»¯¶ş½× Butterworth µÍÍ¨ÂË²¨Æ÷¡£
+ * ÊäÈë²ÎÊı:
+ *   filt - Ä¿±êÂË²¨Æ÷×´Ì¬¡£
+ *   fs   - ²ÉÑùÆµÂÊ£¬µ¥Î» Hz¡£
+ *   fc   - ½ØÖ¹ÆµÂÊ£¬µ¥Î» Hz¡£
+ * ·µ»ØÖµ: ÎŞ¡£
  */
 static void pid_biquad_init_lpf(pid_biquad_t *filt, float fs, float fc)
 {
@@ -186,12 +186,12 @@ static void pid_biquad_init_lpf(pid_biquad_t *filt, float fs, float fc)
 }
 
 /**
- * å‡½æ•°åŠŸèƒ½: æ‰§è¡Œä¸€æ¬¡äºŒé˜¶ IIR ä½é€šæ»¤æ³¢ã€‚
- * è¾“å…¥å‚æ•°:
- *   filt - ç›®æ ‡æ»¤æ³¢å™¨çŠ¶æ€ã€‚
- *   in   - å½“å‰è¾“å…¥æ ·æœ¬ã€‚
- * è¿”å›å€¼:
- *   æœ¬æ¬¡æ»¤æ³¢è¾“å‡ºã€‚
+ * º¯Êı¹¦ÄÜ: Ö´ĞĞÒ»´Î¶ş½× IIR µÍÍ¨ÂË²¨¡£
+ * ÊäÈë²ÎÊı:
+ *   filt - Ä¿±êÂË²¨Æ÷×´Ì¬¡£
+ *   in   - µ±Ç°ÊäÈëÑù±¾¡£
+ * ·µ»ØÖµ:
+ *   ±¾´ÎÂË²¨Êä³ö¡£
  */
 static float pid_biquad_apply(pid_biquad_t *filt, float in)
 {
@@ -209,10 +209,10 @@ static float pid_biquad_apply(pid_biquad_t *filt, float in)
 }
 
 /**
- * å‡½æ•°åŠŸèƒ½: æŒ‰å½“å‰å‘¨æœŸé‡å»º D é¡¹ä½é€šæ»¤æ³¢å™¨ã€‚
- * è¾“å…¥å‚æ•°:
- *   pid - PID æ§åˆ¶å™¨å®ä¾‹æŒ‡é’ˆã€‚
- * è¿”å›å€¼: æ— ã€‚
+ * º¯Êı¹¦ÄÜ: °´µ±Ç°ÖÜÆÚÖØ½¨ D ÏîµÍÍ¨ÂË²¨Æ÷¡£
+ * ÊäÈë²ÎÊı:
+ *   pid - PID ¿ØÖÆÆ÷ÊµÀıÖ¸Õë¡£
+ * ·µ»ØÖµ: ÎŞ¡£
  */
 static void pid_refresh_dterm_filter(pid_t *pid)
 {
@@ -228,10 +228,10 @@ static void pid_refresh_dterm_filter(pid_t *pid)
 }
 
 /**
- * å‡½æ•°åŠŸèƒ½: æŒ‰å½“å‰å‘¨æœŸé‡å»º PT3 æ»¤æ³¢å™¨ã€‚
- * è¾“å…¥å‚æ•°:
- *   pid - PID æ§åˆ¶å™¨å®ä¾‹æŒ‡é’ˆã€‚
- * è¿”å›å€¼: æ— ã€‚
+ * º¯Êı¹¦ÄÜ: °´µ±Ç°ÖÜÆÚÖØ½¨ PT3 ÂË²¨Æ÷¡£
+ * ÊäÈë²ÎÊı:
+ *   pid - PID ¿ØÖÆÆ÷ÊµÀıÖ¸Õë¡£
+ * ·µ»ØÖµ: ÎŞ¡£
  */
 static void pid_refresh_pt3_filters(pid_t *pid)
 {
@@ -263,17 +263,17 @@ static void pid_refresh_pt3_filters(pid_t *pid)
 }
 
 /**
- * å‡½æ•°åŠŸèƒ½: åˆå§‹åŒ– PID æ§åˆ¶å™¨å‚æ•°å’Œ D é¡¹æ»¤æ³¢å™¨ã€‚
- * è¾“å…¥å‚æ•°:
- *   pid     - PID æ§åˆ¶å™¨å®ä¾‹æŒ‡é’ˆã€‚
- *   kp      - æ¯”ä¾‹å¢ç›Šã€‚
- *   ki      - ç§¯åˆ†å¢ç›Šã€‚
- *   kd      - å¾®åˆ†å¢ç›Šã€‚
- *   kff     - å‰é¦ˆå¢ç›Šã€‚
- *   dt      - æ§åˆ¶å‘¨æœŸï¼Œå•ä½ sã€‚
- *   i_limit - ç§¯åˆ†é™å¹…ç»å¯¹å€¼ã€‚
- *   d_lpf   - D é¡¹ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½ Hzï¼Œ0 è¡¨ç¤ºæ—è·¯ã€‚
- * è¿”å›å€¼: æ— ã€‚
+ * º¯Êı¹¦ÄÜ: ³õÊ¼»¯ PID ¿ØÖÆÆ÷²ÎÊıºÍ D ÏîÂË²¨Æ÷¡£
+ * ÊäÈë²ÎÊı:
+ *   pid     - PID ¿ØÖÆÆ÷ÊµÀıÖ¸Õë¡£
+ *   kp      - ±ÈÀıÔöÒæ¡£
+ *   ki      - »ı·ÖÔöÒæ¡£
+ *   kd      - Î¢·ÖÔöÒæ¡£
+ *   kff     - Ç°À¡ÔöÒæ¡£
+ *   dt      - ¿ØÖÆÖÜÆÚ£¬µ¥Î» s¡£
+ *   i_limit - »ı·ÖÏŞ·ù¾ø¶ÔÖµ¡£
+ *   d_lpf   - D ÏîµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î» Hz£¬0 ±íÊ¾ÅÔÂ·¡£
+ * ·µ»ØÖµ: ÎŞ¡£
  */
 void PID_Init(pid_t *pid, float kp, float ki, float kd, float kff,
               float dt, float i_limit, float d_lpf)
@@ -295,7 +295,7 @@ void PID_Init(pid_t *pid, float kp, float ki, float kd, float kff,
     pid->output_lpf_hz = 0.0f;
     pid->iterm_relax_threshold = 100.0f;
 
-    /* anti-windup é»˜è®¤å…³é—­ï¼Œä¿è¯å†å²è°ƒç”¨è¡Œä¸ºä¸å˜ */
+    /* anti-windup Ä¬ÈÏ¹Ø±Õ£¬±£Ö¤ÀúÊ·µ÷ÓÃĞĞÎª²»±ä */
     pid->output_min = -1000000000.0f;
     pid->output_max = 1000000000.0f;
     pid->aw_gain = 0.0f;
@@ -307,13 +307,13 @@ void PID_Init(pid_t *pid, float kp, float ki, float kd, float kff,
 }
 
 /**
- * å‡½æ•°åŠŸèƒ½: é…ç½® PID å‰é¦ˆå’Œè¾“å‡º PT3 æ»¤æ³¢ã€‚
- * è¾“å…¥å‚æ•°:
- *   pid             - PID æ§åˆ¶å™¨å®ä¾‹æŒ‡é’ˆã€‚
- *   ff_smoothing_ms - å‰é¦ˆå¹³æ»‘æ—¶é—´ï¼Œå•ä½ msï¼Œ0 è¡¨ç¤ºæ—è·¯ã€‚
- *   output_lpf_hz   - è¾“å‡ºä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½ Hzï¼Œ0 è¡¨ç¤ºæ—è·¯ã€‚
- *   ff_limit        - å‰é¦ˆé¡¹é™å¹…ç»å¯¹å€¼ï¼Œ0 è¡¨ç¤ºä¸é™åˆ¶ã€‚
- * è¿”å›å€¼: æ— ã€‚
+ * º¯Êı¹¦ÄÜ: ÅäÖÃ PID Ç°À¡ºÍÊä³ö PT3 ÂË²¨¡£
+ * ÊäÈë²ÎÊı:
+ *   pid             - PID ¿ØÖÆÆ÷ÊµÀıÖ¸Õë¡£
+ *   ff_smoothing_ms - Ç°À¡Æ½»¬Ê±¼ä£¬µ¥Î» ms£¬0 ±íÊ¾ÅÔÂ·¡£
+ *   output_lpf_hz   - Êä³öµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î» Hz£¬0 ±íÊ¾ÅÔÂ·¡£
+ *   ff_limit        - Ç°À¡ÏîÏŞ·ù¾ø¶ÔÖµ£¬0 ±íÊ¾²»ÏŞÖÆ¡£
+ * ·µ»ØÖµ: ÎŞ¡£
  */
 void PID_SetFeedforwardFilter(pid_t *pid, float ff_smoothing_ms, float output_lpf_hz, float ff_limit)
 {
@@ -329,14 +329,14 @@ void PID_SetFeedforwardFilter(pid_t *pid, float ff_smoothing_ms, float output_lp
 }
 
 /**
- * å‡½æ•°åŠŸèƒ½: ä½¿ç”¨å½“å‰è®¾å®šå€¼å’Œæµ‹é‡å€¼æ›´æ–° PID è¾“å‡ºã€‚
- * è¾“å…¥å‚æ•°:
- *   pid         - PID æ§åˆ¶å™¨å®ä¾‹æŒ‡é’ˆã€‚
- *   setpoint    - ç›®æ ‡å€¼ã€‚
- *   measurement - æµ‹é‡å€¼ã€‚
- *   dt          - æœ¬æ¬¡æ›´æ–°å‘¨æœŸï¼Œå•ä½ sï¼›è‹¥éæ­£å€¼åˆ™æ²¿ç”¨ä¸Šæ¬¡æœ‰æ•ˆå‘¨æœŸã€‚
- * è¿”å›å€¼:
- *   PID å½“å‰è¾“å‡ºå€¼ã€‚
+ * º¯Êı¹¦ÄÜ: Ê¹ÓÃµ±Ç°Éè¶¨ÖµºÍ²âÁ¿Öµ¸üĞÂ PID Êä³ö¡£
+ * ÊäÈë²ÎÊı:
+ *   pid         - PID ¿ØÖÆÆ÷ÊµÀıÖ¸Õë¡£
+ *   setpoint    - Ä¿±êÖµ¡£
+ *   measurement - ²âÁ¿Öµ¡£
+ *   dt          - ±¾´Î¸üĞÂÖÜÆÚ£¬µ¥Î» s£»Èô·ÇÕıÖµÔòÑØÓÃÉÏ´ÎÓĞĞ§ÖÜÆÚ¡£
+ * ·µ»ØÖµ:
+ *   PID µ±Ç°Êä³öÖµ¡£
  */
 float PID_Update(pid_t *pid, float setpoint, float measurement, float dt)
 {
@@ -445,7 +445,7 @@ float PID_Update(pid_t *pid, float setpoint, float measurement, float dt)
         push_high = (pid->error > 0.0f) ? 1U : 0U;
         push_low = (pid->error < 0.0f) ? 1U : 0U;
 
-        /* é¥±å’Œä¸”è¯¯å·®ç»§ç»­åŒå‘æ¨åŠ¨æ—¶ï¼Œå†»ç»“æœ¬å‘¨æœŸç§¯åˆ†å¢é‡ */
+        /* ±¥ºÍÇÒÎó²î¼ÌĞøÍ¬ÏòÍÆ¶¯Ê±£¬¶³½á±¾ÖÜÆÚ»ı·ÖÔöÁ¿ */
         if (((0U != sat_high) && (0U != push_high)) || ((0U != sat_low) && (0U != push_low)))
         {
             i_candidate = pid->integral;
@@ -453,7 +453,7 @@ float PID_Update(pid_t *pid, float setpoint, float measurement, float dt)
             out_sat = pid_clampf(out_unsat, out_min, out_max);
         }
 
-        /* å›ç®— anti-windup: I += Kaw * (u_sat - u_unsat) * dt */
+        /* »ØËã anti-windup: I += Kaw * (u_sat - u_unsat) * dt */
         if (pid->aw_gain > 0.0f)
         {
             i_candidate += pid->aw_gain * (out_sat - out_unsat) * effective_dt;
@@ -496,10 +496,10 @@ float PID_Update(pid_t *pid, float setpoint, float measurement, float dt)
 }
 
 /**
- * å‡½æ•°åŠŸèƒ½: æ¸…é›¶ PID ç§¯åˆ†é¡¹ã€D é¡¹çŠ¶æ€å’Œè°ƒè¯•è¾“å‡ºã€‚
- * è¾“å…¥å‚æ•°:
- *   pid - PID æ§åˆ¶å™¨å®ä¾‹æŒ‡é’ˆã€‚
- * è¿”å›å€¼: æ— ã€‚
+ * º¯Êı¹¦ÄÜ: ÇåÁã PID »ı·ÖÏî¡¢D Ïî×´Ì¬ºÍµ÷ÊÔÊä³ö¡£
+ * ÊäÈë²ÎÊı:
+ *   pid - PID ¿ØÖÆÆ÷ÊµÀıÖ¸Õë¡£
+ * ·µ»ØÖµ: ÎŞ¡£
  */
 void PID_Reset(pid_t *pid)
 {

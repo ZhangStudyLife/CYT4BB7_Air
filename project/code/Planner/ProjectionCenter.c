@@ -1,13 +1,13 @@
 #include "ProjectionCenter.h"
 #include "../Estimation/Attitude/IMU_TOP.h"
 
-#define PROJECTION_CENTER_X_BIAS                 (-0.20f) /* xè½´é›¶å§¿æ€åç½®ï¼Œå•ä½pxã€‚ */
-#define PROJECTION_CENTER_X_ROLL_K               (1.325f) /* xè½´å¯¹rollçš„çµæ•åº¦ï¼Œå•ä½px/degã€‚ */
-#define PROJECTION_CENTER_Y_BIAS                 (-4.63f) /* yè½´é›¶å§¿æ€åç½®ï¼Œå•ä½pxã€‚ */
-#define PROJECTION_CENTER_Y_PITCH_K              (1.334f) /* yè½´å¯¹pitchçš„çµæ•åº¦ï¼Œå•ä½px/degã€‚ */
+#define PROJECTION_CENTER_X_BIAS                 (-0.20f) /* xÖáÁã×ËÌ¬Æ«ÖÃ£¬µ¥Î»px¡£ */
+#define PROJECTION_CENTER_X_ROLL_K               (1.325f) /* xÖá¶ÔrollµÄÁéÃô¶È£¬µ¥Î»px/deg¡£ */
+#define PROJECTION_CENTER_Y_BIAS                 (-4.63f) /* yÖáÁã×ËÌ¬Æ«ÖÃ£¬µ¥Î»px¡£ */
+#define PROJECTION_CENTER_Y_PITCH_K              (1.334f) /* yÖá¶ÔpitchµÄÁéÃô¶È£¬µ¥Î»px/deg¡£ */
 
-static float s_projection_roll_history[4]; /* æœ€è¿‘çº¦40msçš„100Hzå‘¨æœŸrollï¼Œå•ä½degã€‚ */
-static float s_projection_pitch_history[4]; /* æœ€è¿‘çº¦40msçš„100Hzå‘¨æœŸpitchï¼Œå•ä½degã€‚ */
+static float s_projection_roll_history[4]; /* ×î½üÔ¼40msµÄ100HzÖÜÆÚroll£¬µ¥Î»deg¡£ */
+static float s_projection_pitch_history[4]; /* ×î½üÔ¼40msµÄ100HzÖÜÆÚpitch£¬µ¥Î»deg¡£ */
 
 projection_center_result_t g_projection_center;
 

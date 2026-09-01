@@ -1,7 +1,7 @@
 /*****************************************************************************
- * æ–‡ä»¶: wifi_params.h
- * æ¨¡å—: WiFi å‚æ•°è°ƒèŠ‚
- * èŒè´£: å¤„ç†å‚æ•°æ³¨å†Œã€æŸ¥è¯¢ã€ä¿®æ”¹ã€ä¿å­˜ã€åŠ è½½ä¸Žå¾…æœºæ€é¥æµ‹å¼€å…³å‘½ä»¤
+ * ÎÄ¼þ: wifi_params.h
+ * Ä£¿é: WiFi ²ÎÊýµ÷½Ú
+ * Ö°Ôð: ´¦Àí²ÎÊý×¢²á¡¢²éÑ¯¡¢ÐÞ¸Ä¡¢±£´æ¡¢¼ÓÔØÓë´ý»úÌ¬Ò£²â¿ª¹ØÃüÁî
  *****************************************************************************/
 
 #ifndef WIFI_PARAMS_H
@@ -9,22 +9,22 @@
 
 #include "zf_common_headfile.h"
 
-/* WiFi å‚æ•°æœ€è¿‘ä¸€æ¬¡å¤„ç†ç»“æžœç  */
+/* WiFi ²ÎÊý×î½üÒ»´Î´¦Àí½á¹ûÂë */
 typedef enum
 {
-    WIFI_PARAMS_RESULT_OK = 0,             /* æ‰§è¡ŒæˆåŠŸ */
-    WIFI_PARAMS_RESULT_ERR_FORMAT = 1,     /* å‘½ä»¤æ ¼å¼é”™è¯¯ */
-    WIFI_PARAMS_RESULT_ERR_UNKNOWN_CMD = 2,/* æœªçŸ¥å‘½ä»¤ */
-    WIFI_PARAMS_RESULT_ERR_UNKNOWN_PARAM = 3,/* æœªçŸ¥å‚æ•° */
-    WIFI_PARAMS_RESULT_ERR_RANGE = 4,      /* å‚æ•°è¶…èŒƒå›´ */
-    WIFI_PARAMS_RESULT_ERR_STATE = 5,      /* å½“å‰çŠ¶æ€ä¸å…è®¸ */
-    WIFI_PARAMS_RESULT_ERR_FLASH = 6       /* Flash æ“ä½œå¤±è´¥ */
+    WIFI_PARAMS_RESULT_OK = 0,             /* Ö´ÐÐ³É¹¦ */
+    WIFI_PARAMS_RESULT_ERR_FORMAT = 1,     /* ÃüÁî¸ñÊ½´íÎó */
+    WIFI_PARAMS_RESULT_ERR_UNKNOWN_CMD = 2,/* Î´ÖªÃüÁî */
+    WIFI_PARAMS_RESULT_ERR_UNKNOWN_PARAM = 3,/* Î´Öª²ÎÊý */
+    WIFI_PARAMS_RESULT_ERR_RANGE = 4,      /* ²ÎÊý³¬·¶Î§ */
+    WIFI_PARAMS_RESULT_ERR_STATE = 5,      /* µ±Ç°×´Ì¬²»ÔÊÐí */
+    WIFI_PARAMS_RESULT_ERR_FLASH = 6       /* Flash ²Ù×÷Ê§°Ü */
 } wifi_params_result_e;
 
-/* WiFi å‚æ•°æœ€è¿‘ä¸€æ¬¡å¤„ç†å‘½ä»¤ç  */
+/* WiFi ²ÎÊý×î½üÒ»´Î´¦ÀíÃüÁîÂë */
 typedef enum
 {
-    WIFI_PARAMS_COMMAND_NONE = 0,          /* æ— å‘½ä»¤ */
+    WIFI_PARAMS_COMMAND_NONE = 0,          /* ÎÞÃüÁî */
     WIFI_PARAMS_COMMAND_PING = 1,          /* ping */
     WIFI_PARAMS_COMMAND_HELP = 2,          /* help */
     WIFI_PARAMS_COMMAND_GET = 3,           /* get */
@@ -36,38 +36,38 @@ typedef enum
     WIFI_PARAMS_COMMAND_STOP = 9           /* stop */
 } wifi_params_command_e;
 
-/* WiFi å‚æ•°è¯Šæ–­ç»“æž„ä½“ï¼šç”¨äºŽä¸Šä½æœºæŸ¥çœ‹æœ€è¿‘ä¸€æ¬¡å‘½ä»¤å¤„ç†ç»“æžœ */
+/* WiFi ²ÎÊýÕï¶Ï½á¹¹Ìå£ºÓÃÓÚÉÏÎ»»ú²é¿´×î½üÒ»´ÎÃüÁî´¦Àí½á¹û */
 typedef struct
 {
-    uint8_t last_command_code;  /* æœ€è¿‘ä¸€æ¬¡å‘½ä»¤ç  */
-    uint8_t last_result_code;   /* æœ€è¿‘ä¸€æ¬¡ç»“æžœç  */
-    uint16_t last_param_index;  /* æœ€è¿‘ä¸€æ¬¡å‚æ•°ç´¢å¼•ï¼Œ0 è¡¨ç¤ºæ— å…·ä½“å‚æ•° */
-    float last_value;           /* æœ€è¿‘ä¸€æ¬¡ç›¸å…³å‚æ•°å€¼ */
+    uint8_t last_command_code;  /* ×î½üÒ»´ÎÃüÁîÂë */
+    uint8_t last_result_code;   /* ×î½üÒ»´Î½á¹ûÂë */
+    uint16_t last_param_index;  /* ×î½üÒ»´Î²ÎÊýË÷Òý£¬0 ±íÊ¾ÎÞ¾ßÌå²ÎÊý */
+    float last_value;           /* ×î½üÒ»´ÎÏà¹Ø²ÎÊýÖµ */
 } wifi_params_diag_t;
 
 /*
- * å‡½æ•°å: wifi_params_Init
- * åŠŸèƒ½: åˆå§‹åŒ– WiFi å‚æ•°æ¨¡å—å†…éƒ¨çŠ¶æ€
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›žå€¼: æ— 
+ * º¯ÊýÃû: wifi_params_Init
+ * ¹¦ÄÜ: ³õÊ¼»¯ WiFi ²ÎÊýÄ£¿éÄÚ²¿×´Ì¬
+ * ÊäÈë²ÎÊý: ÎÞ
+ * ·µ»ØÖµ: ÎÞ
  */
 void wifi_params_Init(void);
 
 /*
- * å‡½æ•°å: wifi_params_ProcessLine
- * åŠŸèƒ½: å¤„ç†ä¸€æ¡å®Œæ•´æ–‡æœ¬å‘½ä»¤
- * è¾“å…¥å‚æ•°:
- *   line - å®Œæ•´æ–‡æœ¬å‘½ä»¤ï¼Œå‡½æ•°å†…éƒ¨å…è®¸åŽŸåœ°åˆ‡åˆ†
- * è¿”å›žå€¼: æ— 
+ * º¯ÊýÃû: wifi_params_ProcessLine
+ * ¹¦ÄÜ: ´¦ÀíÒ»ÌõÍêÕûÎÄ±¾ÃüÁî
+ * ÊäÈë²ÎÊý:
+ *   line - ÍêÕûÎÄ±¾ÃüÁî£¬º¯ÊýÄÚ²¿ÔÊÐíÔ­µØÇÐ·Ö
+ * ·µ»ØÖµ: ÎÞ
  */
 void wifi_params_ProcessLine(char *line);
 
 /*
- * å‡½æ•°å: wifi_params_GetDiag
- * åŠŸèƒ½: èŽ·å–æœ€è¿‘ä¸€æ¬¡å‚æ•°å‘½ä»¤å¤„ç†è¯Šæ–­ä¿¡æ¯
- * è¾“å…¥å‚æ•°:
- *   diag - è¾“å‡ºè¯Šæ–­ç»“æž„ä½“æŒ‡é’ˆ
- * è¿”å›žå€¼: æ— 
+ * º¯ÊýÃû: wifi_params_GetDiag
+ * ¹¦ÄÜ: »ñÈ¡×î½üÒ»´Î²ÎÊýÃüÁî´¦ÀíÕï¶ÏÐÅÏ¢
+ * ÊäÈë²ÎÊý:
+ *   diag - Êä³öÕï¶Ï½á¹¹ÌåÖ¸Õë
+ * ·µ»ØÖµ: ÎÞ
  */
 void wifi_params_GetDiag(wifi_params_diag_t *diag);
 

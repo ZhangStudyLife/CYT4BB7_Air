@@ -7,49 +7,49 @@
 extern "C" {
 #endif
 
-/* BMI088 åŸå§‹é‡‡æ ·ç¼“å­˜ï¼Œå•ä½å‡ä¸ºå¯„å­˜å™¨ç›´æ¥è¾“å‡ºçš„ LSB å€¼ */
+/* BMI088 Ô­Ê¼²ÉÑù»º´æ£¬µ¥Î»¾ùÎª¼Ä´æÆ÷Ö±½ÓÊä³öµÄ LSB Öµ */
 typedef struct
 {
-    int16 acc_x_lsb;   /* X è½´åŠ é€Ÿåº¦åŸå§‹å€¼ï¼Œå•ä½ LSB */
-    int16 acc_y_lsb;   /* Y è½´åŠ é€Ÿåº¦åŸå§‹å€¼ï¼Œå•ä½ LSB */
-    int16 acc_z_lsb;   /* Z è½´åŠ é€Ÿåº¦åŸå§‹å€¼ï¼Œå•ä½ LSB */
-    int16 gyro_x_lsb;  /* X è½´è§’é€Ÿåº¦åŸå§‹å€¼ï¼Œå•ä½ LSB */
-    int16 gyro_y_lsb;  /* Y è½´è§’é€Ÿåº¦åŸå§‹å€¼ï¼Œå•ä½ LSB */
-    int16 gyro_z_lsb;  /* Z è½´è§’é€Ÿåº¦åŸå§‹å€¼ï¼Œå•ä½ LSB */
-    int16 temp_lsb;    /* æ¸©åº¦åŸå§‹å€¼ï¼Œå½“å‰æœªå¯ç”¨ï¼Œå›ºå®šä¸º 0 */
-    uint32 tick_us;    /* æœ¬å¸§é‡‡æ ·å¯¹åº”çš„ 1kHz æ—¶é—´æˆ³ï¼Œå•ä½ us */
+    int16 acc_x_lsb;   /* X Öá¼ÓËÙ¶ÈÔ­Ê¼Öµ£¬µ¥Î» LSB */
+    int16 acc_y_lsb;   /* Y Öá¼ÓËÙ¶ÈÔ­Ê¼Öµ£¬µ¥Î» LSB */
+    int16 acc_z_lsb;   /* Z Öá¼ÓËÙ¶ÈÔ­Ê¼Öµ£¬µ¥Î» LSB */
+    int16 gyro_x_lsb;  /* X Öá½ÇËÙ¶ÈÔ­Ê¼Öµ£¬µ¥Î» LSB */
+    int16 gyro_y_lsb;  /* Y Öá½ÇËÙ¶ÈÔ­Ê¼Öµ£¬µ¥Î» LSB */
+    int16 gyro_z_lsb;  /* Z Öá½ÇËÙ¶ÈÔ­Ê¼Öµ£¬µ¥Î» LSB */
+    int16 temp_lsb;    /* ÎÂ¶ÈÔ­Ê¼Öµ£¬µ±Ç°Î´ÆôÓÃ£¬¹Ì¶¨Îª 0 */
+    uint32 tick_us;    /* ±¾Ö¡²ÉÑù¶ÔÓ¦µÄ 1kHz Ê±¼ä´Á£¬µ¥Î» us */
 } bmi088_raw_t;
 
-/* BMI088 ç‰©ç†é‡ç¼“å­˜ï¼Œè§’é€Ÿåº¦å•ä½ dpsï¼ŒåŠ é€Ÿåº¦å•ä½ g */
+/* BMI088 ÎïÀíÁ¿»º´æ£¬½ÇËÙ¶Èµ¥Î» dps£¬¼ÓËÙ¶Èµ¥Î» g */
 typedef struct
 {
-    float acc_x;       /* X è½´åŠ é€Ÿåº¦ï¼Œå•ä½ g */
-    float acc_y;       /* Y è½´åŠ é€Ÿåº¦ï¼Œå•ä½ g */
-    float acc_z;       /* Z è½´åŠ é€Ÿåº¦ï¼Œå•ä½ g */
-    float gyro_x;      /* X è½´è§’é€Ÿåº¦ï¼Œå•ä½ dps */
-    float gyro_y;      /* Y è½´è§’é€Ÿåº¦ï¼Œå•ä½ dps */
-    float gyro_z;      /* Z è½´è§’é€Ÿåº¦ï¼Œå•ä½ dps */
-    float temp;        /* æ¸©åº¦å ä½ï¼Œå½“å‰å›ºå®šä¸º 0.0f */
+    float acc_x;       /* X Öá¼ÓËÙ¶È£¬µ¥Î» g */
+    float acc_y;       /* Y Öá¼ÓËÙ¶È£¬µ¥Î» g */
+    float acc_z;       /* Z Öá¼ÓËÙ¶È£¬µ¥Î» g */
+    float gyro_x;      /* X Öá½ÇËÙ¶È£¬µ¥Î» dps */
+    float gyro_y;      /* Y Öá½ÇËÙ¶È£¬µ¥Î» dps */
+    float gyro_z;      /* Z Öá½ÇËÙ¶È£¬µ¥Î» dps */
+    float temp;        /* ÎÂ¶ÈÕ¼Î»£¬µ±Ç°¹Ì¶¨Îª 0.0f */
 } bmi088_real_t;
 
-extern volatile bmi088_raw_t g_bmi088_raw;    /* BMI088 åŸå§‹ LSB æ•°æ®ç¼“å­˜ */
-extern volatile bmi088_real_t g_bmi088;       /* BMI088 ç‰©ç†é‡æ•°æ®ç¼“å­˜ */
-extern volatile uint8 g_bmi088_ready;         /* BMI088 åˆå§‹åŒ–æˆåŠŸæ ‡å¿— */
-extern volatile uint8 g_bmi088_acc_chip_id;   /* BMI088 åŠ é€Ÿåº¦è®¡èŠ¯ç‰‡ ID */
-extern volatile uint8 g_bmi088_gyro_chip_id;  /* BMI088 é™€èºä»ªèŠ¯ç‰‡ ID */
+extern volatile bmi088_raw_t g_bmi088_raw;    /* BMI088 Ô­Ê¼ LSB Êı¾İ»º´æ */
+extern volatile bmi088_real_t g_bmi088;       /* BMI088 ÎïÀíÁ¿Êı¾İ»º´æ */
+extern volatile uint8 g_bmi088_ready;         /* BMI088 ³õÊ¼»¯³É¹¦±êÖ¾ */
+extern volatile uint8 g_bmi088_acc_chip_id;   /* BMI088 ¼ÓËÙ¶È¼ÆĞ¾Æ¬ ID */
+extern volatile uint8 g_bmi088_gyro_chip_id;  /* BMI088 ÍÓÂİÒÇĞ¾Æ¬ ID */
 
 /*
- * å‡½æ•°åŠŸèƒ½: åˆå§‹åŒ– SPI1 BMI088ï¼Œå¹¶å†™å…¥é»˜è®¤é‡ç¨‹ã€ODR å’Œç”µæºé…ç½®
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›å€¼: 1=åˆå§‹åŒ–æˆåŠŸï¼Œ0=åˆå§‹åŒ–å¤±è´¥
+ * º¯Êı¹¦ÄÜ: ³õÊ¼»¯ SPI1 BMI088£¬²¢Ğ´ÈëÄ¬ÈÏÁ¿³Ì¡¢ODR ºÍµçÔ´ÅäÖÃ
+ * ÊäÈë²ÎÊı: ÎŞ
+ * ·µ»ØÖµ: 1=³õÊ¼»¯³É¹¦£¬0=³õÊ¼»¯Ê§°Ü
  */
 uint8 BMI088_Init(void);
 
 /*
- * å‡½æ•°åŠŸèƒ½: åœ¨ 1kHz è°ƒåº¦ä¸­è¯»å–ä¸€æ¬¡ BMI088 åŠ é€Ÿåº¦è®¡å’Œé™€èºä»ªæ•°æ®ï¼Œå¹¶åˆ·æ–°ç¼“å­˜
- * è¾“å…¥å‚æ•°:
- *   tick_us - å½“å‰ 1kHz è°ƒåº¦æ—¶é—´æˆ³ï¼Œå•ä½ us
- * è¿”å›å€¼: æ— 
+ * º¯Êı¹¦ÄÜ: ÔÚ 1kHz µ÷¶ÈÖĞ¶ÁÈ¡Ò»´Î BMI088 ¼ÓËÙ¶È¼ÆºÍÍÓÂİÒÇÊı¾İ£¬²¢Ë¢ĞÂ»º´æ
+ * ÊäÈë²ÎÊı:
+ *   tick_us - µ±Ç° 1kHz µ÷¶ÈÊ±¼ä´Á£¬µ¥Î» us
+ * ·µ»ØÖµ: ÎŞ
  */
 void BMI088_Update_1000Hz(uint32 tick_us);
 

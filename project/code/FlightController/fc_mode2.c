@@ -192,7 +192,7 @@ void FC_Mode2_Control100Hz(float dt)
         g_mode2_car_body_accel_x_mps2 = car_accel_x_mps2;
         g_mode2_car_body_accel_y_mps2 = car_accel_y_mps2;
 
-        /* æ»¤æ³¢è½¦æ¨¡å‘å¿ƒåŠ é€Ÿåº¦ï¼Œå†æŒ‰å®æ—¶è½¦æœºèˆªå‘å·®æŠ•å½±åˆ° Roll/Pitchã€‚ */
+        /* ÂË²¨³µÄ£ÏòĞÄ¼ÓËÙ¶È£¬ÔÙ°´ÊµÊ±³µ»úº½Ïò²îÍ¶Ó°µ½ Roll/Pitch¡£ */
         alpha = s_mode2_two_pi * g_fc_params.mode2_car_turn_accel_lpf_hz * dt;
         alpha /= 1.0f + alpha;
         g_mode2_car_turn_accel_mps2 += alpha *

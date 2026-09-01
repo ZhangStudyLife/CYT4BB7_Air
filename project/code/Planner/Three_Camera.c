@@ -1,13 +1,13 @@
 #include "Three_Camera.h"
 #include <math.h>
 
-#define THREE_CAMERA_DEG_TO_RAD              (0.017453292519943295f) /* è§’åº¦è½¬å¼§åº¦ç³»æ•°ã€‚ */
-#define THREE_CAMERA_YAW_BIAS_RAD             (0.4068566800f) /* æ ‡å®šå…¨å±€èˆªå‘åç½®ï¼Œå•ä½ radã€‚ */
-#define THREE_CAMERA_BEACON_MERGE_DIST_M      (0.35f) /* è·¨æ‘„ç›¸åŒä¿¡æ ‡çš„Centeré”šç‚¹åˆå¹¶åŠå¾„ï¼Œå•ä½ mã€‚ */
-#define THREE_CAMERA_MAX_GROUND_DISTANCE_M    (15.0f) /* å°„çº¿åœ°é¢æ±‚äº¤å…è®¸çš„æœ€å¤§è·ç¦»ï¼Œå•ä½ mã€‚ */
-#define THREE_CAMERA_MIN_TARGET_DISTANCE_M    (0.20f) /* å¯ä¿¡è½¦ç¯åˆ°ä¿¡æ ‡çš„æœ€å°æ°´å¹³è·ç¦»ï¼Œå•ä½ mã€‚ */
-#define THREE_CAMERA_MAX_TARGET_DISTANCE_M    (6.00f) /* å¯ä¿¡è½¦ç¯åˆ°ä¿¡æ ‡çš„æœ€å¤§æ°´å¹³è·ç¦»ï¼Œå•ä½ mã€‚ */
-#define THREE_CAMERA_MODEL_EPSILON            (1.0e-9f) /* Double Sphere åæŠ•å½±æ•°å€¼æœ‰æ•ˆä¸‹é™ã€‚ */
+#define THREE_CAMERA_DEG_TO_RAD              (0.017453292519943295f) /* ½Ç¶È×ª»¡¶ÈÏµÊı¡£ */
+#define THREE_CAMERA_YAW_BIAS_RAD             (0.4068566800f) /* ±ê¶¨È«¾Öº½ÏòÆ«ÖÃ£¬µ¥Î» rad¡£ */
+#define THREE_CAMERA_BEACON_MERGE_DIST_M      (0.35f) /* ¿çÉãÏàÍ¬ĞÅ±êµÄCenterÃªµãºÏ²¢°ë¾¶£¬µ¥Î» m¡£ */
+#define THREE_CAMERA_MAX_GROUND_DISTANCE_M    (15.0f) /* ÉäÏßµØÃæÇó½»ÔÊĞíµÄ×î´ó¾àÀë£¬µ¥Î» m¡£ */
+#define THREE_CAMERA_MIN_TARGET_DISTANCE_M    (0.20f) /* ¿ÉĞÅ³µµÆµ½ĞÅ±êµÄ×îĞ¡Ë®Æ½¾àÀë£¬µ¥Î» m¡£ */
+#define THREE_CAMERA_MAX_TARGET_DISTANCE_M    (6.00f) /* ¿ÉĞÅ³µµÆµ½ĞÅ±êµÄ×î´óË®Æ½¾àÀë£¬µ¥Î» m¡£ */
+#define THREE_CAMERA_MODEL_EPSILON            (1.0e-9f) /* Double Sphere ·´Í¶Ó°ÊıÖµÓĞĞ§ÏÂÏŞ¡£ */
 
 typedef struct
 {
@@ -37,7 +37,7 @@ typedef struct
     float angle_deg;
 } three_camera_lamp_candidate_t;
 
-static const three_camera_model_t s_camera_model[IMAGE_CAMERA_COUNT] = /* å…¨éƒ¨åå››ä»½æ—¥å¿—æ‹Ÿåˆçš„ä¸‰æ‘„ Double Sphere å†…å‚ä¸å¤–å‚ã€‚ */
+static const three_camera_model_t s_camera_model[IMAGE_CAMERA_COUNT] = /* È«²¿Ê®ËÄ·İÈÕÖ¾ÄâºÏµÄÈıÉã Double Sphere ÄÚ²ÎÓëÍâ²Î¡£ */
 {
     {
         71.7570054f, 70.0177938f, 5.8066460f, -2.5659040f,
@@ -72,9 +72,9 @@ static const three_camera_model_t s_camera_model[IMAGE_CAMERA_COUNT] = /* å…¨éƒ¨
 };
 
 /*
- * å‡½æ•°åŠŸèƒ½: æ¸…é›¶ä¸‰æ‘„èåˆè¾“å‡ºã€‚
- * è¾“å…¥å‚æ•°: result - å¾…æ¸…é›¶è¾“å‡ºç»“æ„ä½“ã€‚
- * è¾“å‡ºå‚æ•°/è¿”å›å€¼: æ— ã€‚
+ * º¯Êı¹¦ÄÜ: ÇåÁãÈıÉãÈÚºÏÊä³ö¡£
+ * ÊäÈë²ÎÊı: result - ´ıÇåÁãÊä³ö½á¹¹Ìå¡£
+ * Êä³ö²ÎÊı/·µ»ØÖµ: ÎŞ¡£
  */
 static void Three_Camera_ClearResult(three_camera_result_t *result)
 {
@@ -102,9 +102,9 @@ static void Three_Camera_ClearResult(three_camera_result_t *result)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: ç”Ÿæˆæœºä½“ç³» FRD åˆ°æ°´å¹³å…¨å±€åæ ‡ç³»çš„æ—‹è½¬çŸ©é˜µã€‚
- * è¾“å…¥å‚æ•°: roll_rad/pitch_rad/yaw_rad - é£æœºæ¬§æ‹‰è§’ï¼Œå•ä½ radã€‚
- * è¾“å‡ºå‚æ•°/è¿”å›å€¼: out - è¾“å‡º 3x3 æ—‹è½¬çŸ©é˜µã€‚
+ * º¯Êı¹¦ÄÜ: Éú³É»úÌåÏµ FRD µ½Ë®Æ½È«¾Ö×ø±êÏµµÄĞı×ª¾ØÕó¡£
+ * ÊäÈë²ÎÊı: roll_rad/pitch_rad/yaw_rad - ·É»úÅ·À­½Ç£¬µ¥Î» rad¡£
+ * Êä³ö²ÎÊı/·µ»ØÖµ: out - Êä³ö 3x3 Ğı×ª¾ØÕó¡£
  */
 static void Three_Camera_BuildWorldRotation(float roll_rad,
                                              float pitch_rad,
@@ -130,9 +130,9 @@ static void Three_Camera_BuildWorldRotation(float roll_rad,
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: ä½¿ç”¨ Double Sphere å°†å•ä¸ªåƒç´ åæŠ•å½±ï¼Œå¹¶ä¸ z=0 åœ°é¢æ±‚äº¤å¾—åˆ°æ°´å¹³å…¨å±€åæ ‡ã€‚
- * è¾“å…¥å‚æ•°: camera - ç›¸æœºç¼–å·ï¼›x/y - ä¸­å¿ƒåŒ–åƒç´ åæ ‡ï¼›air_height_m - é£æœºé«˜åº¦ï¼›world - å§¿æ€æ—‹è½¬çŸ©é˜µã€‚
- * è¾“å‡ºå‚æ•°/è¿”å›å€¼: æˆåŠŸæ—¶é€šè¿‡ out_x/out_y è¿”å›åæ ‡ï¼Œè¿”å› 1ï¼›æ¨¡å‹æ— è§£ã€å°„çº¿ä¸æœå‘åœ°é¢æˆ–è¶…é‡ç¨‹æ—¶è¿”å› 0ã€‚
+ * º¯Êı¹¦ÄÜ: Ê¹ÓÃ Double Sphere ½«µ¥¸öÏñËØ·´Í¶Ó°£¬²¢Óë z=0 µØÃæÇó½»µÃµ½Ë®Æ½È«¾Ö×ø±ê¡£
+ * ÊäÈë²ÎÊı: camera - Ïà»ú±àºÅ£»x/y - ÖĞĞÄ»¯ÏñËØ×ø±ê£»air_height_m - ·É»ú¸ß¶È£»world - ×ËÌ¬Ğı×ª¾ØÕó¡£
+ * Êä³ö²ÎÊı/·µ»ØÖµ: ³É¹¦Ê±Í¨¹ı out_x/out_y ·µ»Ø×ø±ê£¬·µ»Ø 1£»Ä£ĞÍÎŞ½â¡¢ÉäÏß²»³¯ÏòµØÃæ»ò³¬Á¿³ÌÊ±·µ»Ø 0¡£
  */
 static uint8 Three_Camera_ProjectPoint(uint8 camera,
                                        float x,
@@ -219,9 +219,9 @@ static uint8 Three_Camera_ProjectPoint(uint8 camera,
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: å°†æŒ‡å®šç›¸æœºè½¦ç¯é•¿è½´æŠ•å½±ä¸ºæ°´å¹³å…¨å±€åæ ‡ç³»ä¸­çš„æ— å‘è§’åº¦ã€‚
- * è¾“å…¥å‚æ•°: camera - ç›¸æœºç¼–å·ï¼›lamp - åŸå§‹è½¦ç¯ï¼›air_height_m - é£æœºé«˜åº¦ï¼›world - å§¿æ€æ—‹è½¬çŸ©é˜µã€‚
- * è¾“å‡ºå‚æ•°/è¿”å›å€¼: æˆåŠŸæ—¶é€šè¿‡ out_angle_deg è¿”å›è§’åº¦å¹¶è¿”å› 1ï¼ŒæŠ•å½±å¤±è´¥æ—¶è¿”å› 0ã€‚
+ * º¯Êı¹¦ÄÜ: ½«Ö¸¶¨Ïà»ú³µµÆ³¤ÖáÍ¶Ó°ÎªË®Æ½È«¾Ö×ø±êÏµÖĞµÄÎŞÏò½Ç¶È¡£
+ * ÊäÈë²ÎÊı: camera - Ïà»ú±àºÅ£»lamp - Ô­Ê¼³µµÆ£»air_height_m - ·É»ú¸ß¶È£»world - ×ËÌ¬Ğı×ª¾ØÕó¡£
+ * Êä³ö²ÎÊı/·µ»ØÖµ: ³É¹¦Ê±Í¨¹ı out_angle_deg ·µ»Ø½Ç¶È²¢·µ»Ø 1£¬Í¶Ó°Ê§°ÜÊ±·µ»Ø 0¡£
  */
 static uint8 Three_Camera_ProjectLampAngle(uint8 camera,
                                            const car_lamp_data *lamp,
@@ -260,9 +260,9 @@ static uint8 Three_Camera_ProjectLampAngle(uint8 camera,
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: èåˆä¸‰è·¯è½¦ç¯çš„ä¸–ç•Œåæ ‡ä¸æ— å‘é•¿è½´è§’åº¦ã€‚
- * è¾“å…¥å‚æ•°: image - ä¸‰è·¯åŸå§‹å›¾åƒæ£€æµ‹ç»“æœï¼›air_height_m - é£æœºé«˜åº¦ï¼›world - å§¿æ€æ—‹è½¬çŸ©é˜µï¼›lamp_candidate - å„æ‘„åƒå¤´è½¦ç¯æŠ•å½±ï¼›result - èåˆè¾“å‡ºã€‚
- * è¾“å‡ºå‚æ•°/è¿”å›å€¼: æ— ã€‚
+ * º¯Êı¹¦ÄÜ: ÈÚºÏÈıÂ·³µµÆµÄÊÀ½ç×ø±êÓëÎŞÏò³¤Öá½Ç¶È¡£
+ * ÊäÈë²ÎÊı: image - ÈıÂ·Ô­Ê¼Í¼Ïñ¼ì²â½á¹û£»air_height_m - ·É»ú¸ß¶È£»world - ×ËÌ¬Ğı×ª¾ØÕó£»lamp_candidate - ¸÷ÉãÏñÍ·³µµÆÍ¶Ó°£»result - ÈÚºÏÊä³ö¡£
+ * Êä³ö²ÎÊı/·µ»ØÖµ: ÎŞ¡£
  */
 static void Three_Camera_BuildLamp(const struct image_data image[IMAGE_CAMERA_COUNT],
                                    float air_height_m,
@@ -315,9 +315,9 @@ static void Three_Camera_BuildLamp(const struct image_data image[IMAGE_CAMERA_CO
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: ä¸ºèåˆä¿¡æ ‡æ›´æ–°åŒæ‘„ä¼˜å…ˆã€è·ç¦»æœ€è¿‘çš„è½¦ç¯ç›¸å¯¹å‘é‡ã€‚
- * è¾“å…¥å‚æ•°: candidate - å½“å‰ä¿¡æ ‡æŠ•å½±ï¼›lamp_candidate - å„æ‘„åƒå¤´è½¦ç¯æŠ•å½±ï¼›beacon - å¾…æ›´æ–°èåˆä¿¡æ ‡ã€‚
- * è¾“å‡ºå‚æ•°/è¿”å›å€¼: æ— ï¼›ä»…æ¥å— 0.20-6.00 m çš„å¯ä¿¡ç»„åˆã€‚
+ * º¯Êı¹¦ÄÜ: ÎªÈÚºÏĞÅ±ê¸üĞÂÍ¬ÉãÓÅÏÈ¡¢¾àÀë×î½üµÄ³µµÆÏà¶ÔÏòÁ¿¡£
+ * ÊäÈë²ÎÊı: candidate - µ±Ç°ĞÅ±êÍ¶Ó°£»lamp_candidate - ¸÷ÉãÏñÍ·³µµÆÍ¶Ó°£»beacon - ´ı¸üĞÂÈÚºÏĞÅ±ê¡£
+ * Êä³ö²ÎÊı/·µ»ØÖµ: ÎŞ£»½ö½ÓÊÜ 0.20-6.00 m µÄ¿ÉĞÅ×éºÏ¡£
  */
 static void Three_Camera_UpdateBeaconPair(
     const three_camera_beacon_candidate_t *candidate,
@@ -367,9 +367,9 @@ static void Three_Camera_UpdateBeaconPair(
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: å°†ä¸€ä¸ªç›¸æœºä¿¡æ ‡æˆå‘˜åŠ å…¥èåˆä¿¡æ ‡ï¼Œå¹¶æ›´æ–°ä¼˜é€‰è½¦ç¯ç›¸å¯¹å‘é‡ã€‚
- * è¾“å…¥å‚æ•°: candidate - å½“å‰ä¿¡æ ‡æŠ•å½±ï¼›lamp_candidate - å„æ‘„åƒå¤´è½¦ç¯æŠ•å½±ï¼›camera - å½“å‰ç›¸æœºï¼›result - èåˆè¾“å‡ºï¼›result_index - èåˆä¿¡æ ‡ä¸‹æ ‡ï¼›member_count - æˆå‘˜è®¡æ•°ã€‚
- * è¾“å‡ºå‚æ•°/è¿”å›å€¼: æ— ã€‚
+ * º¯Êı¹¦ÄÜ: ½«Ò»¸öÏà»úĞÅ±ê³ÉÔ±¼ÓÈëÈÚºÏĞÅ±ê£¬²¢¸üĞÂÓÅÑ¡³µµÆÏà¶ÔÏòÁ¿¡£
+ * ÊäÈë²ÎÊı: candidate - µ±Ç°ĞÅ±êÍ¶Ó°£»lamp_candidate - ¸÷ÉãÏñÍ·³µµÆÍ¶Ó°£»camera - µ±Ç°Ïà»ú£»result - ÈÚºÏÊä³ö£»result_index - ÈÚºÏĞÅ±êÏÂ±ê£»member_count - ³ÉÔ±¼ÆÊı¡£
+ * Êä³ö²ÎÊı/·µ»ØÖµ: ÎŞ¡£
  */
 static void Three_Camera_AddBeacon(const three_camera_beacon_candidate_t *candidate,
                                    const three_camera_lamp_candidate_t lamp_candidate[IMAGE_CAMERA_COUNT],
@@ -396,9 +396,9 @@ static void Three_Camera_AddBeacon(const three_camera_beacon_candidate_t *candid
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: å°†ä¸‰æ‘„ä¿¡æ ‡å€™é€‰æŒ‰ä¸–ç•Œåæ ‡åˆå¹¶ä¸ºç‰©ç†ä¿¡æ ‡ã€‚
- * è¾“å…¥å‚æ•°: image - ä¸‰è·¯åŸå§‹å›¾åƒæ£€æµ‹ç»“æœï¼›air_height_m - é£æœºé«˜åº¦ï¼›world - å§¿æ€æ—‹è½¬çŸ©é˜µï¼›lamp_candidate - å„æ‘„åƒå¤´è½¦ç¯æŠ•å½±ï¼›result - èåˆè¾“å‡ºã€‚
- * è¾“å‡ºå‚æ•°/è¿”å›å€¼: æ— ã€‚
+ * º¯Êı¹¦ÄÜ: ½«ÈıÉãĞÅ±êºòÑ¡°´ÊÀ½ç×ø±êºÏ²¢ÎªÎïÀíĞÅ±ê¡£
+ * ÊäÈë²ÎÊı: image - ÈıÂ·Ô­Ê¼Í¼Ïñ¼ì²â½á¹û£»air_height_m - ·É»ú¸ß¶È£»world - ×ËÌ¬Ğı×ª¾ØÕó£»lamp_candidate - ¸÷ÉãÏñÍ·³µµÆÍ¶Ó°£»result - ÈÚºÏÊä³ö¡£
+ * Êä³ö²ÎÊı/·µ»ØÖµ: ÎŞ¡£
  */
 static void Three_Camera_BuildBeacons(const struct image_data image[IMAGE_CAMERA_COUNT],
                                       float air_height_m,
@@ -499,10 +499,10 @@ static void Three_Camera_BuildBeacons(const struct image_data image[IMAGE_CAMERA
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: ä½¿ç”¨ä¸‰æ‘„ Double Sphere æ¨¡å‹å°†åŸå§‹æ£€æµ‹æŠ•å½±åˆ°æ°´å¹³å…¨å±€åæ ‡ç³»ï¼Œèåˆç‰©ç†ä¿¡æ ‡å¹¶ç”ŸæˆåŒæ‘„ä¼˜å…ˆç›¸å¯¹å‘é‡ã€‚
- * è¾“å…¥å‚æ•°: image - ä¸‰è·¯åŸå§‹æ£€æµ‹ï¼›roll_deg/pitch_deg/yaw_deg - é£æœºæ¬§æ‹‰è§’ï¼Œå•ä½ degï¼›
- *           height_mm - é£æœºç¦»åœ°é«˜åº¦ï¼Œå•ä½ mmï¼›height_valid - é«˜åº¦æœ‰æ•ˆæ ‡å¿—ï¼›result - èåˆè¾“å‡ºã€‚
- * è¾“å‡ºå‚æ•°/è¿”å›å€¼: é€šè¿‡ result è¾“å‡ºèåˆåæ ‡å’Œä¼˜é€‰ç›¸å¯¹å‘é‡ï¼›æŠ•å½±è¾“å…¥æœ‰æ•ˆæ—¶è¿”å› 1ï¼Œé«˜åº¦æ— æ•ˆã€è¾“å…¥ä¸ºç©ºæˆ–è¾“å‡ºä¸ºç©ºæ—¶è¿”å› 0ã€‚
+ * º¯Êı¹¦ÄÜ: Ê¹ÓÃÈıÉã Double Sphere Ä£ĞÍ½«Ô­Ê¼¼ì²âÍ¶Ó°µ½Ë®Æ½È«¾Ö×ø±êÏµ£¬ÈÚºÏÎïÀíĞÅ±ê²¢Éú³ÉÍ¬ÉãÓÅÏÈÏà¶ÔÏòÁ¿¡£
+ * ÊäÈë²ÎÊı: image - ÈıÂ·Ô­Ê¼¼ì²â£»roll_deg/pitch_deg/yaw_deg - ·É»úÅ·À­½Ç£¬µ¥Î» deg£»
+ *           height_mm - ·É»úÀëµØ¸ß¶È£¬µ¥Î» mm£»height_valid - ¸ß¶ÈÓĞĞ§±êÖ¾£»result - ÈÚºÏÊä³ö¡£
+ * Êä³ö²ÎÊı/·µ»ØÖµ: Í¨¹ı result Êä³öÈÚºÏ×ø±êºÍÓÅÑ¡Ïà¶ÔÏòÁ¿£»Í¶Ó°ÊäÈëÓĞĞ§Ê±·µ»Ø 1£¬¸ß¶ÈÎŞĞ§¡¢ÊäÈëÎª¿Õ»òÊä³öÎª¿ÕÊ±·µ»Ø 0¡£
  */
 uint8 Three_Camera_Update(const struct image_data image[IMAGE_CAMERA_COUNT],
                           float roll_deg,

@@ -12,7 +12,7 @@ extern pull_detect_result_t g_pull_detect_result;
 
 void PullDetect_Init(void);
 
-/* å›ºå®š50 Hzè°ƒç”¨ï¼Œdangerä¸º1è¡¨ç¤ºè½¦è¾†ä¸é£æœºçš„ç›¸å¯¹è·ç¦»å­˜åœ¨å¿«é€Ÿå¢å¤§é£é™©ã€‚ */
+/* ¹Ì¶¨50 Hzµ÷ÓÃ£¬dangerÎª1±íÊ¾³µÁ¾Óë·É»úµÄÏà¶Ô¾àÀë´æÔÚ¿ìËÙÔö´ó·çÏÕ¡£ */
 void PullDetect_Update100Hz(uint8 image_valid, float x_cm, float y_cm);
 
 #endif /* PULL_DETECT_H */

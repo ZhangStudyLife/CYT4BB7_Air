@@ -13,7 +13,7 @@
 #define BEACON_MAX_BEACON_COUNT 8
 #define BEACON_MAX_CAR_LAMP_COUNT IMAGE_MAX_CAR_LAMP_COUNT
 
-/* Core1å®é™…åœ°å¹³çº¿å¼€å…³ï¼›Core0åŒåå˜é‡ä»…ä½œä¸ºç©ºåœ°èœå•é•œåƒã€‚ */
+/* Core1Êµ¼ÊµØÆ½Ïß¿ª¹Ø£»Core0Í¬Ãû±äÁ¿½ö×÷Îª¿ÕµØ²Ëµ¥¾µÏñ¡£ */
 int32 c1_horizon_enable = 1;
 
 typedef struct
@@ -32,7 +32,7 @@ typedef struct
 
 #define LAMP_MASK_PAD                   7
 
-/* Core1å›¾åƒç®—æ³•è¿è¡Œæ—¶å‚æ•°ã€‚ */
+/* Core1Í¼ÏñËã·¨ÔËĞĞÊ±²ÎÊı¡£ */
 int32 g_image_down_car_lamp_binary_threshold = 200;
 int32 g_image_down_car_lamp_max_area = 1200;
 float g_image_down_match_distance = 18.0f;
@@ -40,25 +40,25 @@ float g_image_down_gate_distance = 24.0f;
 float g_image_down_new_target_distance = 36.0f;
 int32 g_image_down_confirm_frames = 4;
 int32 g_image_down_max_misses = 6;
-int32 g_image_down_beacon_coast_frames = 4; /* ä¿¡æ ‡çŸ­æš‚ä¸¢å¤±åçš„æœ€å¤§ä¿ç•™å¸§æ•°ã€‚ */
+int32 g_image_down_beacon_coast_frames = 4; /* ĞÅ±ê¶ÌÔİ¶ªÊ§ºóµÄ×î´ó±£ÁôÖ¡Êı¡£ */
 float g_image_down_filter_pos_alpha = 0.408392f;
 float g_image_down_filter_vel_alpha = 0.163340f;
 float g_image_down_beacon_boundary_clearance = 9.0f;
 float g_image_down_gray_dedup_distance = 5.0f;
 int32 g_image_down_gray_edge_min_peak = 200;
 float g_image_down_gray_edge_max_occupancy = 0.25f;
-int32 g_image_down_beacon_scan_delta = 25; /* ä¿¡æ ‡æ‰«æé˜ˆå€¼ç›¸å¯¹åœºæ™¯å‡å€¼çš„å¢é‡ã€‚ */
-int32 g_image_down_beacon_scan_floor = 90; /* ä¿¡æ ‡æ‰«æé˜ˆå€¼çš„æœ€ä½ç°åº¦ã€‚ */
-int32 g_image_down_beacon_response_min = 0; /* ä¿¡æ ‡å€™é€‰çš„æœ€ä½ç°åº¦å“åº”ã€‚ */
-int32 g_image_down_beacon_normal_peak = 200; /* æ™®é€šä¿¡æ ‡çš„æœ€ä½å³°å€¼ç°åº¦ã€‚ */
-int32 g_image_down_beacon_normal_min_area = 4; /* æ™®é€šä¿¡æ ‡çš„æœ€å°åŠå³°é¢ç§¯ã€‚ */
-int32 g_image_down_beacon_normal_max_area = 32; /* æ™®é€šä¿¡æ ‡çš„æœ€å¤§åŠå³°é¢ç§¯ã€‚ */
-int32 g_image_down_beacon_medium_peak = 235; /* ä¸­ç­‰ä¿¡æ ‡çš„æœ€ä½å³°å€¼ç°åº¦ã€‚ */
-int32 g_image_down_beacon_medium_min_area = 15; /* ä¸­ç­‰ä¿¡æ ‡çš„æœ€å°åŠå³°é¢ç§¯ã€‚ */
-int32 g_image_down_beacon_medium_max_area = 42; /* ä¸­ç­‰ä¿¡æ ‡çš„æœ€å¤§åŠå³°é¢ç§¯ã€‚ */
-int32 g_image_down_beacon_large_peak = 248; /* å¤§ä¿¡æ ‡çš„æœ€ä½å³°å€¼ç°åº¦ã€‚ */
-int32 g_image_down_beacon_large_min_area = 24; /* å¤§ä¿¡æ ‡çš„æœ€å°åŠå³°é¢ç§¯ã€‚ */
-int32 g_image_down_beacon_large_max_area = 84; /* å¤§ä¿¡æ ‡çš„æœ€å¤§åŠå³°é¢ç§¯ã€‚ */
+int32 g_image_down_beacon_scan_delta = 25; /* ĞÅ±êÉ¨ÃèãĞÖµÏà¶Ô³¡¾°¾ùÖµµÄÔöÁ¿¡£ */
+int32 g_image_down_beacon_scan_floor = 90; /* ĞÅ±êÉ¨ÃèãĞÖµµÄ×îµÍ»Ò¶È¡£ */
+int32 g_image_down_beacon_response_min = 0; /* ĞÅ±êºòÑ¡µÄ×îµÍ»Ò¶ÈÏìÓ¦¡£ */
+int32 g_image_down_beacon_normal_peak = 200; /* ÆÕÍ¨ĞÅ±êµÄ×îµÍ·åÖµ»Ò¶È¡£ */
+int32 g_image_down_beacon_normal_min_area = 4; /* ÆÕÍ¨ĞÅ±êµÄ×îĞ¡°ë·åÃæ»ı¡£ */
+int32 g_image_down_beacon_normal_max_area = 32; /* ÆÕÍ¨ĞÅ±êµÄ×î´ó°ë·åÃæ»ı¡£ */
+int32 g_image_down_beacon_medium_peak = 235; /* ÖĞµÈĞÅ±êµÄ×îµÍ·åÖµ»Ò¶È¡£ */
+int32 g_image_down_beacon_medium_min_area = 15; /* ÖĞµÈĞÅ±êµÄ×îĞ¡°ë·åÃæ»ı¡£ */
+int32 g_image_down_beacon_medium_max_area = 42; /* ÖĞµÈĞÅ±êµÄ×î´ó°ë·åÃæ»ı¡£ */
+int32 g_image_down_beacon_large_peak = 248; /* ´óĞÅ±êµÄ×îµÍ·åÖµ»Ò¶È¡£ */
+int32 g_image_down_beacon_large_min_area = 24; /* ´óĞÅ±êµÄ×îĞ¡°ë·åÃæ»ı¡£ */
+int32 g_image_down_beacon_large_max_area = 84; /* ´óĞÅ±êµÄ×î´ó°ë·åÃæ»ı¡£ */
 float g_image_down_gray_weak_peak_delta = 70.0f;
 int32 g_image_down_gray_weak_peak_floor = 140;
 int32 g_image_down_gray_weak_min_area = 3;
@@ -69,7 +69,7 @@ float g_image_down_car_score_track = 0.47f;
 float g_image_down_car_score_margin = 0.02f;
 
 static uint8 s_mt9v03x_initialized;
-static uint32 s_image_down_latched_frame_sequence;                 /* æœ€è¿‘æˆåŠŸé”å­˜å¹¶å¤„ç†çš„æ‘„åƒå¤´æ¥æºå¸§å·ã€‚ */
+static uint32 s_image_down_latched_frame_sequence;                 /* ×î½ü³É¹¦Ëø´æ²¢´¦ÀíµÄÉãÏñÍ·À´Ô´Ö¡ºÅ¡£ */
 
 #define CAR_LAMP_EDGE_MAX_MISSES        6
 #define CAR_LAMP_CENTER_MAX_MISSES      48
@@ -236,21 +236,21 @@ static unsigned char g_beacon_binary_snapshot[BEACON_IMAGE_H][BEACON_IMAGE_W];
 static unsigned char g_car_lamp_binary_snapshot[BEACON_IMAGE_H][BEACON_IMAGE_W];
 static unsigned char g_visit_stamp[IMAGE_QUEUE_SIZE];
 static unsigned char g_current_stamp = 0;
-/* è¿é€šåŸŸé˜Ÿåˆ—ï¼šä½8ä½ä¸ºXï¼Œé«˜8ä½ä¸ºYã€‚ */
+/* Á¬Í¨Óò¶ÓÁĞ£ºµÍ8Î»ÎªX£¬¸ß8Î»ÎªY¡£ */
 static unsigned short g_queue[IMAGE_QUEUE_SIZE];
 static const unsigned char (*g_current_image)[BEACON_IMAGE_W] = 0;
 static temporal_track_t g_b0_track;
 static temporal_track_t g_car_track;
 static component_t g_current_lamp_masks[DOWN_CAR_MAX_MASKS];
-/* å½“å‰å¸§è½¦ç¯å±è”½åŒºçš„å‡ ä½•ç¼“å­˜ï¼Œé¿å…å€™é€‰æ‰«æé‡å¤è®¡ç®—ä¸‰è§’å‡½æ•°ã€‚ */
+/* µ±Ç°Ö¡³µµÆÆÁ±ÎÇøµÄ¼¸ºÎ»º´æ£¬±ÜÃâºòÑ¡É¨ÃèÖØ¸´¼ÆËãÈı½Çº¯Êı¡£ */
 static down_lamp_geometry_t g_current_lamp_geometries[DOWN_CAR_MAX_MASKS];
 static component_t g_weak_car_pending;
 static unsigned char g_current_lamp_mask_count;
 static unsigned char g_weak_car_pending_hits;
 static unsigned char g_weak_car_pending_misses;
-/* Box3åˆ—æ–¹å‘æ»‘åŠ¨å’Œï¼Œå‰åé¢„ç•™é•œåƒè¾¹ç•Œæ§½ã€‚ */
+/* Box3ÁĞ·½Ïò»¬¶¯ºÍ£¬Ç°ºóÔ¤Áô¾µÏñ±ß½ç²Û¡£ */
 static unsigned short g_gray_box3_storage[BEACON_IMAGE_W + 3];
-/* Box9åˆ—æ–¹å‘æ»‘åŠ¨å’Œï¼Œå‰åé¢„ç•™é•œåƒè¾¹ç•Œæ§½ã€‚ */
+/* Box9ÁĞ·½Ïò»¬¶¯ºÍ£¬Ç°ºóÔ¤Áô¾µÏñ±ß½ç²Û¡£ */
 static unsigned short g_gray_box9_storage[BEACON_IMAGE_W + 8];
 static signed short g_gray_response_rows[3][BEACON_IMAGE_W];
 
@@ -1390,7 +1390,7 @@ static unsigned char component_from_temporal_car(
     half_len = track->length * 0.5f + (float)CAR_LAMP_TEMPORAL_MASK_PAD;
     half_wid = track->width * 0.5f + (float)CAR_LAMP_TEMPORAL_MASK_PAD;
     radius = sqrtf(half_len * half_len + half_wid * half_wid);
-    /* é¢„æµ‹æ¡†å®Œå…¨ç¦»å¼€ç”»é¢æ—¶ç«‹å³å¤±æ•ˆï¼Œé¿å…è´Ÿè¾¹ç•Œè¿›å…¥æ— ç¬¦å·åƒç´ å¾ªç¯ã€‚ */
+    /* Ô¤²â¿òÍêÈ«Àë¿ª»­ÃæÊ±Á¢¼´Ê§Ğ§£¬±ÜÃâ¸º±ß½ç½øÈëÎŞ·ûºÅÏñËØÑ­»·¡£ */
     if ((isfinite(image_cx) == 0) ||
         (isfinite(image_cy) == 0) ||
         (isfinite(radius) == 0) ||
@@ -1539,7 +1539,7 @@ static unsigned char down_gray_point_in_range(int x, int y)
     return 1U;
 }
 
-/* åˆ·æ–°åˆ—æ»‘åŠ¨å’Œçš„é•œåƒè¾¹ç•Œæ§½ã€‚è¾“å…¥å’Œè¾“å‡ºå‡ä¸ºå½“å‰è¡Œçš„Boxåˆ—å’Œç¼“å­˜ã€‚ */
+/* Ë¢ĞÂÁĞ»¬¶¯ºÍµÄ¾µÏñ±ß½ç²Û¡£ÊäÈëºÍÊä³ö¾ùÎªµ±Ç°ĞĞµÄBoxÁĞºÍ»º´æ¡£ */
 static void down_gray_vertical_box_sum_reflect_edges(void)
 {
     unsigned short *box3_sum = &g_gray_box3_storage[2];
@@ -1556,7 +1556,7 @@ static void down_gray_vertical_box_sum_reflect_edges(void)
     }
 }
 
-/* åˆå§‹åŒ–æŒ‡å®šä¸­å¿ƒè¡Œçš„Box3å’ŒBox9åˆ—æ–¹å‘æ»‘åŠ¨å’Œã€‚ */
+/* ³õÊ¼»¯Ö¸¶¨ÖĞĞÄĞĞµÄBox3ºÍBox9ÁĞ·½Ïò»¬¶¯ºÍ¡£ */
 static void down_gray_vertical_box_sum_init_at(
     const unsigned char image[BEACON_IMAGE_H][BEACON_IMAGE_W],
     int center_y)
@@ -1661,7 +1661,7 @@ static void down_gray_vertical_box_sum_init_at(
     down_gray_vertical_box_sum_reflect_edges();
 }
 
-/* å°†å››åˆ—Boxåˆ—å’Œæ¨è¿›ä¸€è¡Œï¼›M7è·¯å¾„ä½¿ç”¨åŒåŠå­—å¹¶è¡ŒåŠ å‡ã€‚ */
+/* ½«ËÄÁĞBoxÁĞºÍÍÆ½øÒ»ĞĞ£»M7Â·¾¶Ê¹ÓÃË«°ë×Ö²¢ĞĞ¼Ó¼õ¡£ */
 static void down_gray_vertical_box_sum_update4(
     unsigned short *sum,
     const unsigned char *sub_row,
@@ -1694,7 +1694,7 @@ static void down_gray_vertical_box_sum_update4(
 #endif
 }
 
-/* ç¼“å­˜é—­åˆè¾¹ç•Œå†…æ¯åˆ—çš„æ•´æ•°è¡ŒåŒºé—´ï¼Œå¹¶ç”Ÿæˆå„è¡Œçš„å€™é€‰æ‰«æè·¨åº¦ã€‚ */
+/* »º´æ±ÕºÏ±ß½çÄÚÃ¿ÁĞµÄÕûÊıĞĞÇø¼ä£¬²¢Éú³É¸÷ĞĞµÄºòÑ¡É¨Ãè¿ç¶È¡£ */
 static void down_gray_build_range_cache(
     unsigned char minimum_y[BEACON_IMAGE_W],
     unsigned char maximum_y[BEACON_IMAGE_W],
@@ -3166,15 +3166,15 @@ static void beacon_image_process(
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: åŸºäºæ‘„åƒå¤´æ¥æºå¸§å·é”å­˜ä¸€å¸§ç¨³å®šå›¾åƒï¼Œå¹¶è·³è¿‡å·²å¤„ç†çš„æ—§å¸§ã€‚
- * è¾“å…¥å‚æ•°: æ— ã€‚
- * è¿”å›å€¼: 1è¡¨ç¤ºé”å­˜åˆ°çœŸå®æ–°å¸§ï¼›0è¡¨ç¤ºå½“å‰æ²¡æœ‰å°šæœªå¤„ç†çš„æ–°å¸§ã€‚
+ * º¯Êı¹¦ÄÜ: »ùÓÚÉãÏñÍ·À´Ô´Ö¡ºÅËø´æÒ»Ö¡ÎÈ¶¨Í¼Ïñ£¬²¢Ìø¹ıÒÑ´¦ÀíµÄ¾ÉÖ¡¡£
+ * ÊäÈë²ÎÊı: ÎŞ¡£
+ * ·µ»ØÖµ: 1±íÊ¾Ëø´æµ½ÕæÊµĞÂÖ¡£»0±íÊ¾µ±Ç°Ã»ÓĞÉĞÎ´´¦ÀíµÄĞÂÖ¡¡£
  */
 static uint8 image_down_latch_frame(void)
 {
     uint32 frame_sequence;
 
-    /* å¤åˆ¶æœŸé—´è‹¥ä¸­æ–­å‘å¸ƒäº†æ–°å¸§ï¼Œåˆ™é‡æ–°é”å­˜ï¼Œé¿å…ç®—æ³•è¯»å–æ’•è£‚å›¾åƒã€‚ */
+    /* ¸´ÖÆÆÚ¼äÈôÖĞ¶Ï·¢²¼ÁËĞÂÖ¡£¬ÔòÖØĞÂËø´æ£¬±ÜÃâËã·¨¶ÁÈ¡ËºÁÑÍ¼Ïñ¡£ */
     do
     {
         frame_sequence = mt9v03x_frame_sequence;
@@ -3233,7 +3233,7 @@ static void image_down_store_result(const beacon_result_t *result)
     }
 }
 
-/* åˆå§‹åŒ–ä¸‹æ‘„å›¾åƒç®—æ³•å’Œæ‘„åƒå¤´æ¥å£ã€‚ */
+/* ³õÊ¼»¯ÏÂÉãÍ¼ÏñËã·¨ºÍÉãÏñÍ·½Ó¿Ú¡£ */
 void image_down_init(void)
 {
     memset(g_image_frame, 0, MT9V03X_IMAGE_SIZE);
@@ -3246,9 +3246,9 @@ void image_down_init(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: ä»…åœ¨æ‘„åƒå¤´å‘å¸ƒçœŸå®æ–°å¸§æ—¶é”å­˜å›¾åƒå¹¶æ‰§è¡Œç®—æ³•ã€‚
- * è¾“å…¥å‚æ•°: æ— ã€‚
- * è¿”å›å€¼: 1è¡¨ç¤ºæœ¬æ¬¡å®Œæˆäº†ä¸€å¸§å¤„ç†ï¼›0è¡¨ç¤ºæ²¡æœ‰å¯å¤„ç†çš„æ–°å¸§ã€‚
+ * º¯Êı¹¦ÄÜ: ½öÔÚÉãÏñÍ··¢²¼ÕæÊµĞÂÖ¡Ê±Ëø´æÍ¼Ïñ²¢Ö´ĞĞËã·¨¡£
+ * ÊäÈë²ÎÊı: ÎŞ¡£
+ * ·µ»ØÖµ: 1±íÊ¾±¾´ÎÍê³ÉÁËÒ»Ö¡´¦Àí£»0±íÊ¾Ã»ÓĞ¿É´¦ÀíµÄĞÂÖ¡¡£
  */
 uint8 image_down_update(void)
 {
@@ -3280,9 +3280,9 @@ const uint8 *image_down_get_car_lamp_binary_buffer(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: åœ¨æ ¸1å›¾åƒå¸§è¾¹ç•Œæ‰§è¡Œå›¾åƒå‚æ•°SET/GETï¼Œå¹¶è¿”å›å®é™…è¯»å›å€¼ã€‚
- * è¾“å…¥å‚æ•°: opæ“ä½œç ï¼›typeæ•°å€¼ç±»å‹ï¼›param_idå‚æ•°IDï¼›value_bitsç›®æ ‡å€¼ä½æ¨¡å¼ï¼›actual_bitså®é™…å€¼ä½æ¨¡å¼è¾“å‡ºã€‚
- * è¿”å›å€¼: IPC_REMOTE_PARAM_STATUS_*ç»Ÿä¸€çŠ¶æ€ç ã€‚
+ * º¯Êı¹¦ÄÜ: ÔÚºË1Í¼ÏñÖ¡±ß½çÖ´ĞĞÍ¼Ïñ²ÎÊıSET/GET£¬²¢·µ»ØÊµ¼Ê¶Á»ØÖµ¡£
+ * ÊäÈë²ÎÊı: op²Ù×÷Âë£»typeÊıÖµÀàĞÍ£»param_id²ÎÊıID£»value_bitsÄ¿±êÖµÎ»Ä£Ê½£»actual_bitsÊµ¼ÊÖµÎ»Ä£Ê½Êä³ö¡£
+ * ·µ»ØÖµ: IPC_REMOTE_PARAM_STATUS_*Í³Ò»×´Ì¬Âë¡£
  */
 typedef uint8 (*image_down_param_handler_t)(uint8 op,
                                             uint32 requested_bits,

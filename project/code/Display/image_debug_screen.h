@@ -13,16 +13,16 @@ extern "C" {
 #define IMAGE_DEBUG_SCREEN_MODE_LAMP_BINARY    (3U)
 #define IMAGE_DEBUG_SCREEN_MODE_OVERLAY        (4U)
 
-/* åŒæ­¥åˆå§‹åŒ–IPS114ç¡¬ä»¶å¹¶ç»˜åˆ¶Dataæ¨¡å¼é™æ€å¯åŠ¨é¡µé¢ã€‚ */
+/* Í¬²½³õÊ¼»¯IPS114Ó²¼ş²¢»æÖÆDataÄ£Ê½¾²Ì¬Æô¶¯Ò³Ãæ¡£ */
 void ImageDebugScreen_Init(void);
 
-/* ä¸»å¾ªç¯æ¯æ¶ˆè´¹ä¸€ä¸ª10 msä»»åŠ¡èŠ‚æ‹è°ƒç”¨ä¸€æ¬¡ï¼Œä»…æ¨è¿›æ˜¾ç¤ºè°ƒåº¦æ—¶é’Ÿã€‚ */
+/* Ö÷Ñ­»·Ã¿Ïû·ÑÒ»¸ö10 msÈÎÎñ½ÚÅÄµ÷ÓÃÒ»´Î£¬½öÍÆ½øÏÔÊ¾µ÷¶ÈÊ±ÖÓ¡£ */
 void ImageDebugScreen_Tick10ms(void);
 
 uint8 ImageDebugScreen_SetMode(uint8 mode);
 uint8 ImageDebugScreen_GetMode(void);
 
-/* æ–°å¸§åˆ°è¾¾ä¸”æ— ä»»åŠ¡ç§¯å‹æ—¶æ•´å¸§åˆ·æ–°ï¼›OverlayåŒ…å«å½©è‰²æ£€æµ‹ç»“æœå’Œä¸‹æ‘„é—­åˆè¾¹ç•Œã€‚ */
+/* ĞÂÖ¡µ½´ïÇÒÎŞÈÎÎñ»ıÑ¹Ê±ÕûÖ¡Ë¢ĞÂ£»Overlay°üº¬²ÊÉ«¼ì²â½á¹ûºÍÏÂÉã±ÕºÏ±ß½ç¡£ */
 void ImageDebugScreen_Update(uint8 image_frame_updated);
 
 #ifdef __cplusplus

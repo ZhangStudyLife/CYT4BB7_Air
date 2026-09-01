@@ -4,51 +4,51 @@
 #include "zf_common_headfile.h"
 #include <math.h>
 
-/* === çª—å£å¤§å°å® === */
+/* === ´°¿Ú´óĞ¡ºê === */
 #define FILT_MA_WIN_MAX     (32U)
 #define FILT_MEDIAN_WIN_MAX (9U)
 
-/* === LPF1 ä¸€é˜¶ä½é€š === */
+/* === LPF1 Ò»½×µÍÍ¨ === */
 typedef struct {
-    float alpha;  /* å¹³æ»‘ç³»æ•° 0,1ï¼Œè¶Šå°è¶Šå¹³æ»‘ */
-    float state;  /* ä¸Šä¸€å¸§è¾“å‡º */
+    float alpha;  /* Æ½»¬ÏµÊı 0,1£¬Ô½Ğ¡Ô½Æ½»¬ */
+    float state;  /* ÉÏÒ»Ö¡Êä³ö */
 } LPF1_t;
 
 void  LPF1_Init(LPF1_t *f, float alpha);
 float LPF1_Update(LPF1_t *f, float z);
 void  LPF1_Reset(LPF1_t *f);
 
-/* === Kalman1D ä¸€ç»´å¡å°”æ›¼ === */
+/* === Kalman1D Ò»Î¬¿¨¶ûÂü === */
 typedef struct {
-    float q;   /* è¿‡ç¨‹å™ªå£°æ–¹å·® */
-    float r;   /* æµ‹é‡å™ªå£°æ–¹å·® */
-    float x;   /* çŠ¶æ€ä¼°è®¡ */
-    float p;   /* ä¼°è®¡è¯¯å·®åæ–¹å·® */
-    float p0;  /* åˆå§‹åæ–¹å·®ï¼ˆResetç”¨ï¼‰ */
-    float x0;  /* åˆå§‹çŠ¶æ€ï¼ˆResetç”¨ï¼‰ */
+    float q;   /* ¹ı³ÌÔëÉù·½²î */
+    float r;   /* ²âÁ¿ÔëÉù·½²î */
+    float x;   /* ×´Ì¬¹À¼Æ */
+    float p;   /* ¹À¼ÆÎó²îĞ­·½²î */
+    float p0;  /* ³õÊ¼Ğ­·½²î£¨ResetÓÃ£© */
+    float x0;  /* ³õÊ¼×´Ì¬£¨ResetÓÃ£© */
 } Kalman1D_t;
 
 void  Kalman1D_Init(Kalman1D_t *f, float q, float r, float p0, float x0);
 float Kalman1D_Update(Kalman1D_t *f, float z);
 void  Kalman1D_Reset(Kalman1D_t *f);
 
-/* === MovAvg æ»‘åŠ¨å‡å€¼ === */
+/* === MovAvg »¬¶¯¾ùÖµ === */
 typedef struct {
     float buf[FILT_MA_WIN_MAX];
     float sum;
-    uint8 win;    /* å®é™…çª—å£å¤§å° */
-    uint8 idx;    /* å†™æŒ‡é’ˆ */
-    uint8 count;  /* å·²å¡«å……æ ·æœ¬æ•° */
+    uint8 win;    /* Êµ¼Ê´°¿Ú´óĞ¡ */
+    uint8 idx;    /* Ğ´Ö¸Õë */
+    uint8 count;  /* ÒÑÌî³äÑù±¾Êı */
 } MovAvg_t;
 
 void  MovAvg_Init(MovAvg_t *f, uint8 window);
 float MovAvg_Update(MovAvg_t *f, float z);
 void  MovAvg_Reset(MovAvg_t *f);
 
-/* === Median ä¸­å€¼æ»¤æ³¢ === */
+/* === Median ÖĞÖµÂË²¨ === */
 typedef struct {
     float buf[FILT_MEDIAN_WIN_MAX];
-    float tmp[FILT_MEDIAN_WIN_MAX];  /* æ’åºä¸´æ—¶æ•°ç»„ */
+    float tmp[FILT_MEDIAN_WIN_MAX];  /* ÅÅĞòÁÙÊ±Êı×é */
     uint8 win;
     uint8 idx;
     uint8 count;
@@ -58,18 +58,18 @@ void  Median_Init(Median_t *f, uint8 window);
 float Median_Update(Median_t *f, float z);
 void  Median_Reset(Median_t *f);
 
-/* === StepLim æ­¥è¿›é™å¹… === */
+/* === StepLim ²½½øÏŞ·ù === */
 typedef struct {
-    float step;   /* æ¯å¸§æœ€å¤§å…è®¸å˜åŒ–é‡ï¼ˆç»å¯¹å€¼ï¼‰ */
-    float state;  /* ä¸Šä¸€å¸§è¾“å‡º */
-    uint8 seeded; /* æ˜¯å¦å·²æœ‰ç¬¬ä¸€æ¬¡æœ‰æ•ˆè¾“å‡ºï¼Œ0æ—¶ç›´é€šç¬¬ä¸€ä¸ªå€¼ */
+    float step;   /* Ã¿Ö¡×î´óÔÊĞí±ä»¯Á¿£¨¾ø¶ÔÖµ£© */
+    float state;  /* ÉÏÒ»Ö¡Êä³ö */
+    uint8 seeded; /* ÊÇ·ñÒÑÓĞµÚÒ»´ÎÓĞĞ§Êä³ö£¬0Ê±Ö±Í¨µÚÒ»¸öÖµ */
 } StepLim_t;
 
 void  StepLim_Init(StepLim_t *f, float step);
 float StepLim_Update(StepLim_t *f, float z);
 void  StepLim_Reset(StepLim_t *f);
 
-/* === Biquad äºŒé˜¶IIR === */
+/* === Biquad ¶ş½×IIR === */
 typedef enum {
     BIQUAD_LPF   = 0,
     BIQUAD_HPF   = 1,
@@ -77,9 +77,9 @@ typedef enum {
 } BiquadType_e;
 
 typedef struct {
-    float b0, b1, b2;  /* åˆ†å­ç³»æ•° */
-    float a1, a2;       /* åˆ†æ¯ç³»æ•°ï¼ˆå·²å½’ä¸€åŒ–ï¼Œç¬¦å·ï¼šy = b*x - a*y_prevï¼‰ */
-    float d1, d2;       /* Direct Form II Transposed å†…éƒ¨çŠ¶æ€ */
+    float b0, b1, b2;  /* ·Ö×ÓÏµÊı */
+    float a1, a2;       /* ·ÖÄ¸ÏµÊı£¨ÒÑ¹éÒ»»¯£¬·ûºÅ£ºy = b*x - a*y_prev£© */
+    float d1, d2;       /* Direct Form II Transposed ÄÚ²¿×´Ì¬ */
 } Biquad_t;
 
 void  Biquad_Init(Biquad_t *f, BiquadType_e type, float fs, float fc, float q);

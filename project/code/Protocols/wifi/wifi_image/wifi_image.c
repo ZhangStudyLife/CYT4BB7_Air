@@ -1,28 +1,28 @@
 /*****************************************************************************
- * æ–‡ä»¶: wifi_image.c
- * æ¨¡å—: WiFi å›¾åƒä¼ è¾“
- * èŒè´£: é€šè¿‡ç°æœ‰ WiFi-UDP é“¾è·¯å‘ VOFA+ å‘é€å›¾åƒæ•°æ®åŒ…
+ * ÎÄ¼ş: wifi_image.c
+ * Ä£¿é: WiFi Í¼Ïñ´«Êä
+ * Ö°Ôğ: Í¨¹ıÏÖÓĞ WiFi-UDP Á´Â·Ïò VOFA+ ·¢ËÍÍ¼ÏñÊı¾İ°ü
  *****************************************************************************/
 
 #include "wifi_image.h"
 
 #include <string.h>
 
-#define WIFI_IMAGE_PRE_FRAME_WORD_COUNT    (7U)           /* VOFA+ å›¾åƒå‰å¯¼å¸§å­—æ•° */
-#define WIFI_IMAGE_PRE_FRAME_TAIL          (0x7F800000UL) /* VOFA+ å›¾åƒå‰å¯¼å¸§ç»“æŸæ ‡è®° */
+#define WIFI_IMAGE_PRE_FRAME_WORD_COUNT    (7U)           /* VOFA+ Í¼ÏñÇ°µ¼Ö¡×ÖÊı */
+#define WIFI_IMAGE_PRE_FRAME_TAIL          (0x7F800000UL) /* VOFA+ Í¼ÏñÇ°µ¼Ö¡½áÊø±ê¼Ç */
 
-extern volatile uint32 tick_1000us_cnt;                   /* 1msç³»ç»ŸèŠ‚æ‹è®¡æ•° */
+extern volatile uint32 tick_1000us_cnt;                   /* 1msÏµÍ³½ÚÅÄ¼ÆÊı */
 
-/* å›¾åƒå‘é€ç»Ÿè®¡ä¿¡æ¯ */
+/* Í¼Ïñ·¢ËÍÍ³¼ÆĞÅÏ¢ */
 static wifi_image_tx_stats_t s_wifi_image_stats = {0};
-static uint8_t s_wifi_image_assistant_inited = 0U;        /* é€é£åŠ©æ‰‹æ¥å£æ˜¯å¦å·²åˆå§‹åŒ– */
-static uint16_t s_wifi_image_cfg_width = 0U;              /* å½“å‰é€é£åŠ©æ‰‹å›¾åƒå®½åº¦é…ç½® */
-static uint16_t s_wifi_image_cfg_height = 0U;             /* å½“å‰é€é£åŠ©æ‰‹å›¾åƒé«˜åº¦é…ç½® */
+static uint8_t s_wifi_image_assistant_inited = 0U;        /* Öğ·ÉÖúÊÖ½Ó¿ÚÊÇ·ñÒÑ³õÊ¼»¯ */
+static uint16_t s_wifi_image_cfg_width = 0U;              /* µ±Ç°Öğ·ÉÖúÊÖÍ¼Ïñ¿í¶ÈÅäÖÃ */
+static uint16_t s_wifi_image_cfg_height = 0U;             /* µ±Ç°Öğ·ÉÖúÊÖÍ¼Ïñ¸ß¶ÈÅäÖÃ */
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šåˆå§‹åŒ–å›¾åƒå‘é€æ¨¡å—é»˜è®¤é…ç½®å’Œç»Ÿè®¡ä¿¡æ¯ã€‚
- * è¾“å…¥å‚æ•°ï¼šæ— ã€‚
- * è¿”å›å€¼ï¼šæ— ã€‚
+ * º¯Êı¹¦ÄÜ£º³õÊ¼»¯Í¼Ïñ·¢ËÍÄ£¿éÄ¬ÈÏÅäÖÃºÍÍ³¼ÆĞÅÏ¢¡£
+ * ÊäÈë²ÎÊı£ºÎŞ¡£
+ * ·µ»ØÖµ£ºÎŞ¡£
  */
 void wifi_image_Init(void)
 {
@@ -33,10 +33,10 @@ void wifi_image_Init(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šå‘é€ä¸€å¸§ VOFA+ å›¾åƒæ•°æ®åŒ…ã€‚
- * è¾“å…¥å‚æ•°ï¼šimage-å›¾åƒæ•°æ®é¦–åœ°å€ï¼›image_size-å›¾åƒå­—èŠ‚æ•°ï¼›width-å›¾åƒå®½åº¦ï¼›height-å›¾åƒé«˜åº¦ï¼›
- *           image_format-VOFA+ å›¾åƒæ ¼å¼ï¼›image_id-å›¾åƒé€šé“IDã€‚
- * è¿”å›å€¼ï¼š1-å‘é€æˆåŠŸï¼›0-å‘é€å¤±è´¥ã€‚
+ * º¯Êı¹¦ÄÜ£º·¢ËÍÒ»Ö¡ VOFA+ Í¼ÏñÊı¾İ°ü¡£
+ * ÊäÈë²ÎÊı£ºimage-Í¼ÏñÊı¾İÊ×µØÖ·£»image_size-Í¼Ïñ×Ö½ÚÊı£»width-Í¼Ïñ¿í¶È£»height-Í¼Ïñ¸ß¶È£»
+ *           image_format-VOFA+ Í¼Ïñ¸ñÊ½£»image_id-Í¼ÏñÍ¨µÀID¡£
+ * ·µ»ØÖµ£º1-·¢ËÍ³É¹¦£»0-·¢ËÍÊ§°Ü¡£
  */
 uint8_t wifi_image_SendFrame(const uint8_t *image,
                              uint32_t image_size,
@@ -99,7 +99,7 @@ uint8_t wifi_image_SendFrame(const uint8_t *image,
 
     start_tick_ms = tick_1000us_cnt;
 
-    /* å…ˆå‘å›¾ç‰‡å‰å¯¼å¸§ï¼Œå†å‘å›¾åƒæœ¬ä½“ï¼Œæœ€åç»Ÿä¸€è§¦å‘ä¸€æ¬¡UDPç«‹å³å‘é€ */
+    /* ÏÈ·¢Í¼Æ¬Ç°µ¼Ö¡£¬ÔÙ·¢Í¼Ïñ±¾Ìå£¬×îºóÍ³Ò»´¥·¢Ò»´ÎUDPÁ¢¼´·¢ËÍ */
     seekfree_assistant_camera_send();
 
     end_tick_ms = tick_1000us_cnt;
@@ -112,9 +112,9 @@ uint8_t wifi_image_SendFrame(const uint8_t *image,
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šè¯»å–å›¾åƒå‘é€ç»Ÿè®¡ä¿¡æ¯ã€‚
- * è¾“å…¥å‚æ•°ï¼šstats-ç»Ÿè®¡ä¿¡æ¯è¾“å‡ºæŒ‡é’ˆã€‚
- * è¿”å›å€¼ï¼šæ— ã€‚
+ * º¯Êı¹¦ÄÜ£º¶ÁÈ¡Í¼Ïñ·¢ËÍÍ³¼ÆĞÅÏ¢¡£
+ * ÊäÈë²ÎÊı£ºstats-Í³¼ÆĞÅÏ¢Êä³öÖ¸Õë¡£
+ * ·µ»ØÖµ£ºÎŞ¡£
  */
 void wifi_image_GetTxStats(wifi_image_tx_stats_t *stats)
 {

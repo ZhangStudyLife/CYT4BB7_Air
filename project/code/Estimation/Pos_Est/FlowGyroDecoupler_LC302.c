@@ -1,45 +1,45 @@
 #include "FlowGyroDecoupler_LC302.h"
 
-/* 1000Hz 积分步长，单位 s */
+/* 1000Hz ���ֲ�������λ s */
 #define FLOW_GYRO_LC302_DT_S       (0.001f)
-/* LC302 X 轴当前窗口角速度积分系数 */
+/* LC302 X �ᵱǰ���ڽ��ٶȻ���ϵ�� */
 #define FLOW_GYRO_LC302_KX0        (10.177451f)
-/* LC302 X 轴上一窗口角速度积分系数 */
+/* LC302 X ����һ���ڽ��ٶȻ���ϵ�� */
 #define FLOW_GYRO_LC302_KX1        (50.349200f)
-/* LC302 X 轴上二窗口角速度积分系数 */
+/* LC302 X ���϶����ڽ��ٶȻ���ϵ�� */
 #define FLOW_GYRO_LC302_KX2        (70.427565f)
-/* LC302 X 轴上三窗口角速度积分系数 */
+/* LC302 X ���������ڽ��ٶȻ���ϵ�� */
 #define FLOW_GYRO_LC302_KX3        (56.809830f)
-/* LC302 Y 轴当前窗口角速度积分系数 */
+/* LC302 Y �ᵱǰ���ڽ��ٶȻ���ϵ�� */
 #define FLOW_GYRO_LC302_KY0        (-10.408851f)
-/* LC302 Y 轴上一窗口角速度积分系数 */
+/* LC302 Y ����һ���ڽ��ٶȻ���ϵ�� */
 #define FLOW_GYRO_LC302_KY1        (65.870257f)
-/* LC302 Y 轴上二窗口角速度积分系数 */
+/* LC302 Y ���϶����ڽ��ٶȻ���ϵ�� */
 #define FLOW_GYRO_LC302_KY2        (95.571516f)
-/* LC302 Y 轴上三窗口角速度积分系数 */
+/* LC302 Y ���������ڽ��ٶȻ���ϵ�� */
 #define FLOW_GYRO_LC302_KY3        (38.557333f)
-/* LC302 X 轴静态偏置补偿量，单位像素/帧 */
+/* LC302 X �ᾲ̬ƫ�ò���������λ����/֡ */
 #define FLOW_GYRO_LC302_BIAS_X     (-0.106741f)
-/* LC302 Y 轴静态偏置补偿量，单位像素/帧 */
+/* LC302 Y �ᾲ̬ƫ�ò���������λ����/֡ */
 #define FLOW_GYRO_LC302_BIAS_Y     (-1.022975f)
 
-/* LC302 X 轴当前 50Hz 窗口角速度积分量，单位 deg */
+/* LC302 X �ᵱǰ 50Hz ���ڽ��ٶȻ���������λ deg */
 static float s_window_gyro_x = 0.0f;
-/* LC302 Y 轴当前 50Hz 窗口角速度积分量，单位 deg */
+/* LC302 Y �ᵱǰ 50Hz ���ڽ��ٶȻ���������λ deg */
 static float s_window_gyro_y = 0.0f;
-/* LC302 X 轴最近 4 个 50Hz 窗口角速度积分历史，单位 deg */
+/* LC302 X ����� 4 �� 50Hz ���ڽ��ٶȻ�����ʷ����λ deg */
 static float s_gyro_hist_x[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-/* LC302 Y 轴最近 4 个 50Hz 窗口角速度积分历史，单位 deg */
+/* LC302 Y ����� 4 �� 50Hz ���ڽ��ٶȻ�����ʷ����λ deg */
 static float s_gyro_hist_y[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-/* LC302 X 轴解耦后的光流增量，单位像素/帧 */
+/* LC302 X ������Ĺ�����������λ����/֡ */
 static float s_dec_x = 0.0f;
-/* LC302 Y 轴解耦后的光流增量，单位像素/帧 */
+/* LC302 Y ������Ĺ�����������λ����/֡ */
 static float s_dec_y = 0.0f;
 
 /*
- * 函数功能：初始化 LC302 专用光流解耦模块
- * 输入参数：无
- * 返回值：无
+ * �������ܣ���ʼ�� LC302 ר�ù�������ģ��
+ * �����������
+ * ����ֵ����
  */
 void FlowGyroDecoupler_LC302_Init(void)
 {
@@ -58,9 +58,9 @@ void FlowGyroDecoupler_LC302_Init(void)
 }
 
 /*
- * 函数功能：重置 LC302 专用光流解耦模块内部状态
- * 输入参数：无
- * 返回值：无
+ * �������ܣ����� LC302 ר�ù�������ģ���ڲ�״̬
+ * �����������
+ * ����ֵ����
  */
 void FlowGyroDecoupler_LC302_Reinit(void)
 {
@@ -68,23 +68,23 @@ void FlowGyroDecoupler_LC302_Reinit(void)
 }
 
 /*
- * 函数功能：在 1000Hz 下推入陀螺数据，并累计本个 50Hz 窗口内的角速度积分量
- * 输入参数：t_ms-当前毫秒时间戳；gyro_x-X 轴角速度，单位 deg/s；gyro_y-Y 轴角速度，单位 deg/s
- * 返回值：无
+ * �������ܣ��� 1000Hz �������������ݣ����ۼƱ��� 50Hz �����ڵĽ��ٶȻ�����
+ * ���������t_ms-��ǰ����ʱ�����gyro_x-X ����ٶȣ���λ deg/s��gyro_y-Y ����ٶȣ���λ deg/s
+ * ����ֵ����
  */
 void FlowGyroDecoupler_LC302_Push1000Hz(uint32 t_ms, float gyro_x, float gyro_y)
 {
     (void)t_ms;
 
-    /* 累计当前 50Hz 光流帧内的角速度积分量 */
+    /* �ۼƵ�ǰ 50Hz ����֡�ڵĽ��ٶȻ����� */
     s_window_gyro_x += gyro_x * FLOW_GYRO_LC302_DT_S;
     s_window_gyro_y += gyro_y * FLOW_GYRO_LC302_DT_S;
 }
 
 /*
- * 函数功能：在 50Hz 下根据对角 FIR4 角速度模型更新 LC302 解耦结果
- * 输入参数：t_read_ms-当前光流读取时刻；delta_x-X 轴原始光流增量；delta_y-Y 轴原始光流增量；valid-LC302 数据有效标志
- * 返回值：1 表示本次已完成更新，0 表示数据无效未更新解耦结果
+ * �������ܣ��� 50Hz �¸��ݶԽ� FIR4 ���ٶ�ģ�͸��� LC302 ������
+ * ���������t_read_ms-��ǰ������ȡʱ�̣�delta_x-X ��ԭʼ����������delta_y-Y ��ԭʼ����������valid-LC302 ������Ч��־
+ * ����ֵ��1 ��ʾ��������ɸ��£�0 ��ʾ������Чδ���½�����
  */
 uint8 FlowGyroDecoupler_LC302_Update50Hz(uint32 t_read_ms, int16_t delta_x, int16_t delta_y, uint8 valid)
 {
@@ -93,7 +93,7 @@ uint8 FlowGyroDecoupler_LC302_Update50Hz(uint32 t_read_ms, int16_t delta_x, int1
 
     (void)t_read_ms;
 
-    /* 更新最近 4 帧角速度积分历史，补偿 LC302 光流积分链路的时间滞后 */
+    /* ������� 4 ֡���ٶȻ�����ʷ������ LC302 ����������·��ʱ���ͺ� */
     s_gyro_hist_x[3] = s_gyro_hist_x[2];
     s_gyro_hist_x[2] = s_gyro_hist_x[1];
     s_gyro_hist_x[1] = s_gyro_hist_x[0];
@@ -103,7 +103,7 @@ uint8 FlowGyroDecoupler_LC302_Update50Hz(uint32 t_read_ms, int16_t delta_x, int1
     s_gyro_hist_y[1] = s_gyro_hist_y[0];
     s_gyro_hist_y[0] = s_window_gyro_y;
 
-    /* LC302 数据无效时只推进时间窗口，不使用清零的光流积分污染解耦结果 */
+    /* LC302 ������Чʱֻ�ƽ�ʱ�䴰�ڣ���ʹ������Ĺ���������Ⱦ������ */
     if (valid == 0U)
     {
         s_window_gyro_x = 0.0f;
@@ -111,7 +111,7 @@ uint8 FlowGyroDecoupler_LC302_Update50Hz(uint32 t_read_ms, int16_t delta_x, int1
         return 0U;
     }
 
-    /* 用对角 FIR4 模型估计旋转造成的光流分量 */
+    /* �öԽ� FIR4 ģ�͹�����ת��ɵĹ������� */
     comp_x = FLOW_GYRO_LC302_BIAS_X +
              FLOW_GYRO_LC302_KX0 * s_gyro_hist_x[0] +
              FLOW_GYRO_LC302_KX1 * s_gyro_hist_x[1] +
@@ -126,7 +126,7 @@ uint8 FlowGyroDecoupler_LC302_Update50Hz(uint32 t_read_ms, int16_t delta_x, int1
     s_dec_x = (float)delta_x - comp_x;
     s_dec_y = (float)delta_y - comp_y;
 
-    /* 清空当前窗口积分，等待下一帧重新累计 */
+    /* ��յ�ǰ���ڻ��֣��ȴ���һ֡�����ۼ� */
     s_window_gyro_x = 0.0f;
     s_window_gyro_y = 0.0f;
 
@@ -134,9 +134,9 @@ uint8 FlowGyroDecoupler_LC302_Update50Hz(uint32 t_read_ms, int16_t delta_x, int1
 }
 
 /*
- * 函数功能：获取 LC302 X 轴解耦后的光流增量
- * 输入参数：无
- * 返回值：X 轴解耦后的光流增量
+ * �������ܣ���ȡ LC302 X ������Ĺ�������
+ * �����������
+ * ����ֵ��X ������Ĺ�������
  */
 float FlowGyroDecoupler_LC302_GetDecX(void)
 {
@@ -144,9 +144,9 @@ float FlowGyroDecoupler_LC302_GetDecX(void)
 }
 
 /*
- * 函数功能：获取 LC302 Y 轴解耦后的光流增量
- * 输入参数：无
- * 返回值：Y 轴解耦后的光流增量
+ * �������ܣ���ȡ LC302 Y ������Ĺ�������
+ * �����������
+ * ����ֵ��Y ������Ĺ�������
  */
 float FlowGyroDecoupler_LC302_GetDecY(void)
 {

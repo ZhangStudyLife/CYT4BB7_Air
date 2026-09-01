@@ -9,20 +9,20 @@
 #define AIR_COMM_MSG_GET_PARAM               (0x07U)
 #define AIR_COMM_MSG_ACK_GET_PARAM           (0x08U)
 
-/* å¸§å¤´ 4 å­—èŠ‚ï¼š0xAA 0xAA 0x55 0x55ï¼Œé€‰è¿™ä¸ªæ˜¯ä¸ºäº†åœ¨ä¸²å£å™ªå£°ä¸­å®¹æ˜“è¯†åˆ« */
+/* Ö¡Í· 4 ×Ö½Ú£º0xAA 0xAA 0x55 0x55£¬Ñ¡Õâ¸öÊÇÎªÁËÔÚ´®¿ÚÔëÉùÖĞÈİÒ×Ê¶±ğ */
 #define AIR_COMM_HEADER_0                    (0xAAU)
 #define AIR_COMM_HEADER_1                    (0xAAU)
 #define AIR_COMM_HEADER_2                    (0x55U)
 #define AIR_COMM_HEADER_3                    (0x55U)
 
-#define AIR_COMM_MAX_PAYLOAD                 (250U)  /* å•å¸§ payload æœ€å¤§å­—èŠ‚æ•° */
-#define AIR_COMM_FRAME_OVERHEAD              (9U)    /* å¸§å¼€é”€ï¼š4å¸§å¤´ + type + seq + len + 2crc */
+#define AIR_COMM_MAX_PAYLOAD                 (250U)  /* µ¥Ö¡ payload ×î´ó×Ö½ÚÊı */
+#define AIR_COMM_FRAME_OVERHEAD              (9U)    /* Ö¡¿ªÏú£º4Ö¡Í· + type + seq + len + 2crc */
 #define AIR_COMM_MAX_FRAME                   (AIR_COMM_MAX_PAYLOAD + AIR_COMM_FRAME_OVERHEAD)
-#define AIR_COMM_RX_QUEUE_SIZE               (512U)  /* æ¥æ”¶ç¯å½¢é˜Ÿåˆ—å¤§å°ï¼ˆå­—èŠ‚ï¼‰ */
-#define AIR_COMM_TX_QUEUE_SIZE               (4U)    /* å‘é€é˜Ÿåˆ—å›ºå®šå¸§æ§½æ•°é‡ */
-#define AIR_COMM_TX_RUN_DATA_LIMIT           (3U)    /* RUN_DATAæœ€å¤šå ç”¨çš„å‘é€å¸§æ§½æ•°é‡ */
-#define AIR_COMM_TX_FIFO_LEVEL               (64U)   /* SCB4å‘é€FIFOè§¦å‘æ°´ä½ */
-#define AIR_COMM_PARAM_TABLE_MAX             (384U)  /* æœ€å¤šæ³¨å†Œå‚æ•°ä¸ªæ•° */
+#define AIR_COMM_RX_QUEUE_SIZE               (512U)  /* ½ÓÊÕ»·ĞÎ¶ÓÁĞ´óĞ¡£¨×Ö½Ú£© */
+#define AIR_COMM_TX_QUEUE_SIZE               (4U)    /* ·¢ËÍ¶ÓÁĞ¹Ì¶¨Ö¡²ÛÊıÁ¿ */
+#define AIR_COMM_TX_RUN_DATA_LIMIT           (3U)    /* RUN_DATA×î¶àÕ¼ÓÃµÄ·¢ËÍÖ¡²ÛÊıÁ¿ */
+#define AIR_COMM_TX_FIFO_LEVEL               (64U)   /* SCB4·¢ËÍFIFO´¥·¢Ë®Î» */
+#define AIR_COMM_PARAM_TABLE_MAX             (384U)  /* ×î¶à×¢²á²ÎÊı¸öÊı */
 #define AIR_COMM_DEFAULT_PARAM_COUNT         (256U)
 #define AIR_COMM_REMOTE_CANCEL_MS            (400U)
 #define AIR_COMM_REMOTE_TIMEOUT_MS           (700U)
@@ -30,23 +30,23 @@
 #define AIR_COMM_REMOTE_EXP_TIMEOUT_MS       (2600U)
 #define AIR_COMM_PARAM_ACK_CACHE_MS          (1000U)
 #define AIR_COMM_PARAM_TARGET_LOCAL          (0U)
-#define AIR_COMM_COMMAND_TABLE_MAX           (8U)    /* æœ€å¤šæ³¨å†Œè¿œç¨‹å‘½ä»¤ä¸ªæ•° */
+#define AIR_COMM_COMMAND_TABLE_MAX           (8U)    /* ×î¶à×¢²áÔ¶³ÌÃüÁî¸öÊı */
 
 typedef char air_comm_default_param_count_must_fit_table[
     (AIR_COMM_DEFAULT_PARAM_COUNT <= AIR_COMM_PARAM_TABLE_MAX) ? 1 : -1];
 
-/* æ¶ˆæ¯ç±»å‹å®šä¹‰ */
-#define AIR_COMM_MSG_SET_PARAM               (0x01U) /* å°è½¦â†’æ— äººæœºï¼šè®¾ç½®å‚æ•° */
-#define AIR_COMM_MSG_ACK_PARAM               (0x02U) /* æ— äººæœºâ†’å°è½¦ï¼šå‚æ•°è®¾ç½®å›æ‰§ */
-#define AIR_COMM_MSG_EXEC_COMMAND            (0x03U) /* å°è½¦â†’æ— äººæœºï¼šæ‰§è¡Œè¿œç¨‹å‘½ä»¤ */
-#define AIR_COMM_MSG_ACK_COMMAND             (0x04U) /* æ— äººæœºâ†’å°è½¦ï¼šè¿œç¨‹å‘½ä»¤å›æ‰§ */
-#define AIR_COMM_MSG_HEARTBEAT               (0x05U) /* åŒå‘ï¼šå¿ƒè·³ */
-#define AIR_COMM_MSG_RUN_DATA                (0x06U) /* åŒå‘ï¼šå®æ—¶æ•°æ® */
+/* ÏûÏ¢ÀàĞÍ¶¨Òå */
+#define AIR_COMM_MSG_SET_PARAM               (0x01U) /* Ğ¡³µ¡úÎŞÈË»ú£ºÉèÖÃ²ÎÊı */
+#define AIR_COMM_MSG_ACK_PARAM               (0x02U) /* ÎŞÈË»ú¡úĞ¡³µ£º²ÎÊıÉèÖÃ»ØÖ´ */
+#define AIR_COMM_MSG_EXEC_COMMAND            (0x03U) /* Ğ¡³µ¡úÎŞÈË»ú£ºÖ´ĞĞÔ¶³ÌÃüÁî */
+#define AIR_COMM_MSG_ACK_COMMAND             (0x04U) /* ÎŞÈË»ú¡úĞ¡³µ£ºÔ¶³ÌÃüÁî»ØÖ´ */
+#define AIR_COMM_MSG_HEARTBEAT               (0x05U) /* Ë«Ïò£ºĞÄÌø */
+#define AIR_COMM_MSG_RUN_DATA                (0x06U) /* Ë«Ïò£ºÊµÊ±Êı¾İ */
 
-#define AIR_COMM_HEARTBEAT_MS                (200U)  /* å¿ƒè·³å‘é€é—´éš”ï¼ˆmsï¼‰ */
-#define AIR_COMM_OFFLINE_MS                  (600U)  /* è¶…è¿‡æ­¤æ—¶é—´æ²¡æ”¶åˆ°å¿ƒè·³åˆ¤å®šç¦»çº¿ */
+#define AIR_COMM_HEARTBEAT_MS                (200U)  /* ĞÄÌø·¢ËÍ¼ä¸ô£¨ms£© */
+#define AIR_COMM_OFFLINE_MS                  (600U)  /* ³¬¹ı´ËÊ±¼äÃ»ÊÕµ½ĞÄÌøÅĞ¶¨ÀëÏß */
 
-/* å‚æ•°è¡¨æ¡ç›®ï¼šåå­—ã€ç»‘å®šå˜é‡æŒ‡é’ˆã€å…è®¸èŒƒå›´ */
+/* ²ÎÊı±íÌõÄ¿£ºÃû×Ö¡¢°ó¶¨±äÁ¿Ö¸Õë¡¢ÔÊĞí·¶Î§ */
 typedef struct
 {
     const char *name;
@@ -117,7 +117,7 @@ typedef struct
         }                                                                                  \
     } while(0)
 
-/* æ³¨å†Œç”±ä¸¤é¢—2BL3å…±åŒæ‰§è¡Œçš„è¿œç«¯æµ®ç‚¹å‚æ•°ã€‚ */
+/* ×¢²áÓÉÁ½¿Å2BL3¹²Í¬Ö´ĞĞµÄÔ¶¶Ë¸¡µã²ÎÊı¡£ */
 #define AIR_COMM_REGISTER_BL3_FLOAT(name, variable, min_v, max_v, id_v)                     \
     do                                                                                     \
     {                                                                                      \
@@ -130,7 +130,7 @@ typedef struct
         }                                                                                  \
     } while(0)
 
-/* æ³¨å†Œç”±ä¸¤é¢—2BL3å…±åŒæ‰§è¡Œçš„è¿œç«¯æ•´å‹å‚æ•°ã€‚ */
+/* ×¢²áÓÉÁ½¿Å2BL3¹²Í¬Ö´ĞĞµÄÔ¶¶ËÕûĞÍ²ÎÊı¡£ */
 #define AIR_COMM_REGISTER_BL3_INT32(name, variable, min_v, max_v, id_v)                     \
     do                                                                                     \
     {                                                                                      \
@@ -168,77 +168,77 @@ typedef struct
     } while(0)
 
 /*
- * æ¥æ”¶è§£æå™¨çŠ¶æ€æœºã€‚
- * state=0: æ‰¾å¸§å¤´ï¼ˆé€å­—èŠ‚åŒ¹é… 4 å­—èŠ‚ headerï¼‰
- * state=1: è¯» info å­—æ®µï¼ˆtype, seq, lenï¼‰
- * state=2: æ”¶ payloadï¼ˆlen ä¸ªå­—èŠ‚ï¼‰
- * state=3: æ”¶ CRCï¼ˆ2 å­—èŠ‚ï¼Œä½å­—èŠ‚åœ¨å‰ï¼‰
+ * ½ÓÊÕ½âÎöÆ÷×´Ì¬»ú¡£
+ * state=0: ÕÒÖ¡Í·£¨Öğ×Ö½ÚÆ¥Åä 4 ×Ö½Ú header£©
+ * state=1: ¶Á info ×Ö¶Î£¨type, seq, len£©
+ * state=2: ÊÕ payload£¨len ¸ö×Ö½Ú£©
+ * state=3: ÊÕ CRC£¨2 ×Ö½Ú£¬µÍ×Ö½ÚÔÚÇ°£©
  */
 typedef struct
 {
-    uint8 state;            /* å½“å‰çŠ¶æ€ 0~3 */
-    uint8 header_count;     /* å·²åŒ¹é…çš„å¸§å¤´å­—èŠ‚æ•° */
-    uint8 info_count;       /* å·²è¯»å–çš„ info å­—æ®µæ•°ï¼ˆ0=type, 1=seq, 2=lenï¼‰ */
-    uint8 type;             /* æ¶ˆæ¯ç±»å‹ */
-    uint8 seq;              /* åºåˆ—å· */
-    uint8 len;              /* payload é•¿åº¦ */
-    uint8 payload_count;    /* å·²æ¥æ”¶çš„ payload å­—èŠ‚æ•° */
-    uint8 payload[AIR_COMM_MAX_PAYLOAD]; /* payload ç¼“å†² */
-    uint16 crc;             /* æ¥æ”¶åˆ°çš„ CRC å€¼ */
-    uint8 crc_count;        /* å·²æ¥æ”¶çš„ CRC å­—èŠ‚æ•° */
+    uint8 state;            /* µ±Ç°×´Ì¬ 0~3 */
+    uint8 header_count;     /* ÒÑÆ¥ÅäµÄÖ¡Í·×Ö½ÚÊı */
+    uint8 info_count;       /* ÒÑ¶ÁÈ¡µÄ info ×Ö¶ÎÊı£¨0=type, 1=seq, 2=len£© */
+    uint8 type;             /* ÏûÏ¢ÀàĞÍ */
+    uint8 seq;              /* ĞòÁĞºÅ */
+    uint8 len;              /* payload ³¤¶È */
+    uint8 payload_count;    /* ÒÑ½ÓÊÕµÄ payload ×Ö½ÚÊı */
+    uint8 payload[AIR_COMM_MAX_PAYLOAD]; /* payload »º³å */
+    uint16 crc;             /* ½ÓÊÕµ½µÄ CRC Öµ */
+    uint8 crc_count;        /* ÒÑ½ÓÊÕµÄ CRC ×Ö½ÚÊı */
 } air_comm_air_rx_parser_t;
 
-/* æ¥æ”¶ç¯å½¢é˜Ÿåˆ—ï¼Œä¸­æ–­å…¥é˜Ÿï¼Œpoll å‡ºé˜Ÿ */
+/* ½ÓÊÕ»·ĞÎ¶ÓÁĞ£¬ÖĞ¶ÏÈë¶Ó£¬poll ³ö¶Ó */
 typedef struct
 {
     uint8 data[AIR_COMM_RX_QUEUE_SIZE];
-    volatile uint16 head;   /* å†™æŒ‡é’ˆï¼Œä¸­æ–­æ›´æ–° */
-    volatile uint16 tail;   /* è¯»æŒ‡é’ˆï¼Œpoll æ›´æ–° */
+    volatile uint16 head;   /* Ğ´Ö¸Õë£¬ÖĞ¶Ï¸üĞÂ */
+    volatile uint16 tail;   /* ¶ÁÖ¸Õë£¬poll ¸üĞÂ */
 } air_comm_air_rx_queue_t;
 
-/* å‘é€å¸§é˜Ÿåˆ—ï¼Œä¸»å¾ªç¯å…¥é˜Ÿï¼ŒUART2ä¸­æ–­å‡ºé˜Ÿã€‚ */
+/* ·¢ËÍÖ¡¶ÓÁĞ£¬Ö÷Ñ­»·Èë¶Ó£¬UART2ÖĞ¶Ï³ö¶Ó¡£ */
 typedef struct
 {
     uint8 data[AIR_COMM_TX_QUEUE_SIZE][AIR_COMM_MAX_FRAME];
     uint16 len[AIR_COMM_TX_QUEUE_SIZE];
     uint8 type[AIR_COMM_TX_QUEUE_SIZE];
-    volatile uint8 head;           /* UART2ä¸­æ–­è¯»å–çš„å¸§ç´¢å¼• */
-    volatile uint8 tail;           /* ä¸»å¾ªç¯å†™å…¥çš„å¸§ç´¢å¼• */
-    volatile uint8 count;          /* å°šæœªå®Œå…¨å†™å…¥ç¡¬ä»¶FIFOçš„å¸§æ•° */
-    uint16 offset;                 /* é˜Ÿå¤´å¸§å·²å†™å…¥ç¡¬ä»¶FIFOçš„å­—èŠ‚æ•° */
+    volatile uint8 head;           /* UART2ÖĞ¶Ï¶ÁÈ¡µÄÖ¡Ë÷Òı */
+    volatile uint8 tail;           /* Ö÷Ñ­»·Ğ´ÈëµÄÖ¡Ë÷Òı */
+    volatile uint8 count;          /* ÉĞÎ´ÍêÈ«Ğ´ÈëÓ²¼şFIFOµÄÖ¡Êı */
+    uint16 offset;                 /* ¶ÓÍ·Ö¡ÒÑĞ´ÈëÓ²¼şFIFOµÄ×Ö½ÚÊı */
 } air_comm_air_tx_queue_t;
 
-/* å¯è¢«å°è½¦è¿œç¨‹è®¾ç½®çš„æ— äººæœºå‚æ•°ï¼ˆé»˜è®¤å€¼åœ¨ init é‡Œé‡ç½®ï¼‰ */
-float air_min_area = 5.0f;   /* ä¿¡æ ‡æ£€æµ‹æœ€å°é¢ç§¯ */
-float air_hold_ms = 30.0f;   /* è·Ÿè¸ªä¿æŒæ—¶é—´ï¼ˆmsï¼‰ */
-float air_x_bias = 0.0f;     /* X åå·®è¡¥å¿ */
-float air_y_bias = 0.0f;     /* Y åå·®è¡¥å¿ */
+/* ¿É±»Ğ¡³µÔ¶³ÌÉèÖÃµÄÎŞÈË»ú²ÎÊı£¨Ä¬ÈÏÖµÔÚ init ÀïÖØÖÃ£© */
+float air_min_area = 5.0f;   /* ĞÅ±ê¼ì²â×îĞ¡Ãæ»ı */
+float air_hold_ms = 30.0f;   /* ¸ú×Ù±£³ÖÊ±¼ä£¨ms£© */
+float air_x_bias = 0.0f;     /* X Æ«²î²¹³¥ */
+float air_y_bias = 0.0f;     /* Y Æ«²î²¹³¥ */
 
-/* æ¨¡å—ç§æœ‰çŠ¶æ€ */
-static uint8 s_air_comm_initialized = 0U;       /* init å®Œæˆæ ‡å¿— */
-static uint8 s_air_comm_seq = 0U;               /* å‘é€å¸§åºåˆ—å·ï¼Œæ¯å‘ä¸€å¸§è‡ªå¢ */
-static uint32 s_air_comm_tick_ms = 0U;          /* 1ms ç´¯åŠ è®¡æ•°å™¨ */
-static uint32 s_air_comm_last_heartbeat_ms = 0U; /* ä¸Šæ¬¡å‘å¿ƒè·³çš„ tick */
-static uint32 s_air_comm_last_car_ms = 0U;      /* ä¸Šæ¬¡æ”¶åˆ°å°è½¦å¿ƒè·³çš„ tick */
-static uint32 s_air_comm_last_run_data_ms = 0U; /* ä¸Šæ¬¡æ”¶åˆ°å°è½¦è¿è¡Œæ•°æ®çš„ tickï¼Œå•ä½ ms */
+/* Ä£¿éË½ÓĞ×´Ì¬ */
+static uint8 s_air_comm_initialized = 0U;       /* init Íê³É±êÖ¾ */
+static uint8 s_air_comm_seq = 0U;               /* ·¢ËÍÖ¡ĞòÁĞºÅ£¬Ã¿·¢Ò»Ö¡×ÔÔö */
+static uint32 s_air_comm_tick_ms = 0U;          /* 1ms ÀÛ¼Ó¼ÆÊıÆ÷ */
+static uint32 s_air_comm_last_heartbeat_ms = 0U; /* ÉÏ´Î·¢ĞÄÌøµÄ tick */
+static uint32 s_air_comm_last_car_ms = 0U;      /* ÉÏ´ÎÊÕµ½Ğ¡³µĞÄÌøµÄ tick */
+static uint32 s_air_comm_last_run_data_ms = 0U; /* ÉÏ´ÎÊÕµ½Ğ¡³µÔËĞĞÊı¾İµÄ tick£¬µ¥Î» ms */
 
-static air_comm_air_rx_parser_t s_air_comm_rx;          /* æ¥æ”¶è§£æå™¨ */
-static air_comm_air_rx_queue_t s_air_comm_rx_queue;     /* æ¥æ”¶ç¯å½¢é˜Ÿåˆ— */
-static air_comm_air_tx_queue_t s_air_comm_tx_queue;     /* å‘é€å¸§é˜Ÿåˆ— */
-static air_comm_air_stats_t s_air_comm_stats;           /* ç»Ÿè®¡è®¡æ•°å™¨ */
-static air_comm_air_param_t s_air_comm_params[AIR_COMM_PARAM_TABLE_MAX]; /* å‚æ•°è¡¨ */
-/* è¿œç«¯é•œåƒç»Ÿä¸€ä»0å¼€å§‹ï¼Œä»…åœ¨ç›®æ ‡ç«¯æˆåŠŸè¯»å›åæ›´æ–°ä¸ºæœ‰æ•ˆå€¼ã€‚ */
-/* ä¸¤é¢—2BL3å…±åŒé˜ˆå€¼åœ¨æ ¸0çš„èœå•é•œåƒï¼Œä»…åœ¨ä¸¤æ¿ç¡®è®¤ä¸€è‡´åæ›´æ–°ã€‚ */
+static air_comm_air_rx_parser_t s_air_comm_rx;          /* ½ÓÊÕ½âÎöÆ÷ */
+static air_comm_air_rx_queue_t s_air_comm_rx_queue;     /* ½ÓÊÕ»·ĞÎ¶ÓÁĞ */
+static air_comm_air_tx_queue_t s_air_comm_tx_queue;     /* ·¢ËÍÖ¡¶ÓÁĞ */
+static air_comm_air_stats_t s_air_comm_stats;           /* Í³¼Æ¼ÆÊıÆ÷ */
+static air_comm_air_param_t s_air_comm_params[AIR_COMM_PARAM_TABLE_MAX]; /* ²ÎÊı±í */
+/* Ô¶¶Ë¾µÏñÍ³Ò»´Ó0¿ªÊ¼£¬½öÔÚÄ¿±ê¶Ë³É¹¦¶Á»Øºó¸üĞÂÎªÓĞĞ§Öµ¡£ */
+/* Á½¿Å2BL3¹²Í¬ãĞÖµÔÚºË0µÄ²Ëµ¥¾µÏñ£¬½öÔÚÁ½°åÈ·ÈÏÒ»ÖÂºó¸üĞÂ¡£ */
 int32 bl3_beacon_thr = 0;
-/* æ ¸1æ‘„åƒå¤´æ›å…‰æ—¶é—´çš„æ ¸0èœå•é•œåƒï¼Œä»…åœ¨ä¸‹æ¸¸ç¡®è®¤æˆåŠŸåæ›´æ–°ã€‚ */
+/* ºË1ÉãÏñÍ·ÆØ¹âÊ±¼äµÄºË0²Ëµ¥¾µÏñ£¬½öÔÚÏÂÓÎÈ·ÈÏ³É¹¦ºó¸üĞÂ¡£ */
 int32 c1_exp_time = 0;
-/* ä¸¤é¢—2BL3å…±åŒæ›å…‰æ—¶é—´çš„æ ¸0èœå•é•œåƒï¼Œä»…åœ¨ä¸¤æ¿ç¡®è®¤ä¸€è‡´åæ›´æ–°ã€‚ */
+/* Á½¿Å2BL3¹²Í¬ÆØ¹âÊ±¼äµÄºË0²Ëµ¥¾µÏñ£¬½öÔÚÁ½°åÈ·ÈÏÒ»ÖÂºó¸üĞÂ¡£ */
 int32 bl3_exp_time = 0;
 int32 c1_fps = 0;
 int32 c1_gain = 0;
 int32 bl3_fps = 0;
 int32 bl3_gain = 0;
-/* æ ¸1å±å¹•æ˜¾ç¤ºæ¨¡å¼çš„æ ¸0èœå•é•œåƒï¼Œä»…åœ¨æ ¸1è¯»å›æˆåŠŸåæ›´æ–°ã€‚ */
+/* ºË1ÆÁÄ»ÏÔÊ¾Ä£Ê½µÄºË0²Ëµ¥¾µÏñ£¬½öÔÚºË1¶Á»Ø³É¹¦ºó¸üĞÂ¡£ */
 int32 c1_screen_mode = 0;
 int32 c1_horizon_enable = 1;
 float c1_horizon_height_offset = 0.0f;
@@ -247,18 +247,18 @@ float c1_beacon_boundary_px = 0;
 float c1_gray_dedup_dist = 0;
 int32 c1_edge_peak_min = 0;
 float c1_edge_occupancy_max = 0;
-int32 c1_beacon_scan_delta = 0; /* æ ¸1ä¿¡æ ‡æ‰«æé˜ˆå€¼åœºæ™¯å¢é‡çš„èœå•é•œåƒã€‚ */
-int32 c1_beacon_scan_floor = 0; /* æ ¸1ä¿¡æ ‡æ‰«æé˜ˆå€¼ä¸‹é™çš„èœå•é•œåƒã€‚ */
-int32 c1_beacon_response_min = 0; /* æ ¸1ä¿¡æ ‡æœ€ä½ç°åº¦å“åº”çš„èœå•é•œåƒã€‚ */
-int32 c1_beacon_normal_peak = 0; /* æ ¸1æ™®é€šä¿¡æ ‡æœ€ä½å³°å€¼çš„èœå•é•œåƒã€‚ */
-int32 c1_beacon_normal_min_area = 0; /* æ ¸1æ™®é€šä¿¡æ ‡æœ€å°é¢ç§¯çš„èœå•é•œåƒã€‚ */
-int32 c1_beacon_normal_max_area = 0; /* æ ¸1æ™®é€šä¿¡æ ‡æœ€å¤§é¢ç§¯çš„èœå•é•œåƒã€‚ */
-int32 c1_beacon_medium_peak = 0; /* æ ¸1ä¸­ç­‰ä¿¡æ ‡æœ€ä½å³°å€¼çš„èœå•é•œåƒã€‚ */
-int32 c1_beacon_medium_min_area = 0; /* æ ¸1ä¸­ç­‰ä¿¡æ ‡æœ€å°é¢ç§¯çš„èœå•é•œåƒã€‚ */
-int32 c1_beacon_medium_max_area = 0; /* æ ¸1ä¸­ç­‰ä¿¡æ ‡æœ€å¤§é¢ç§¯çš„èœå•é•œåƒã€‚ */
-int32 c1_beacon_large_peak = 0; /* æ ¸1å¤§ä¿¡æ ‡æœ€ä½å³°å€¼çš„èœå•é•œåƒã€‚ */
-int32 c1_beacon_large_min_area = 0; /* æ ¸1å¤§ä¿¡æ ‡æœ€å°é¢ç§¯çš„èœå•é•œåƒã€‚ */
-int32 c1_beacon_large_max_area = 0; /* æ ¸1å¤§ä¿¡æ ‡æœ€å¤§é¢ç§¯çš„èœå•é•œåƒã€‚ */
+int32 c1_beacon_scan_delta = 0; /* ºË1ĞÅ±êÉ¨ÃèãĞÖµ³¡¾°ÔöÁ¿µÄ²Ëµ¥¾µÏñ¡£ */
+int32 c1_beacon_scan_floor = 0; /* ºË1ĞÅ±êÉ¨ÃèãĞÖµÏÂÏŞµÄ²Ëµ¥¾µÏñ¡£ */
+int32 c1_beacon_response_min = 0; /* ºË1ĞÅ±ê×îµÍ»Ò¶ÈÏìÓ¦µÄ²Ëµ¥¾µÏñ¡£ */
+int32 c1_beacon_normal_peak = 0; /* ºË1ÆÕÍ¨ĞÅ±ê×îµÍ·åÖµµÄ²Ëµ¥¾µÏñ¡£ */
+int32 c1_beacon_normal_min_area = 0; /* ºË1ÆÕÍ¨ĞÅ±ê×îĞ¡Ãæ»ıµÄ²Ëµ¥¾µÏñ¡£ */
+int32 c1_beacon_normal_max_area = 0; /* ºË1ÆÕÍ¨ĞÅ±ê×î´óÃæ»ıµÄ²Ëµ¥¾µÏñ¡£ */
+int32 c1_beacon_medium_peak = 0; /* ºË1ÖĞµÈĞÅ±ê×îµÍ·åÖµµÄ²Ëµ¥¾µÏñ¡£ */
+int32 c1_beacon_medium_min_area = 0; /* ºË1ÖĞµÈĞÅ±ê×îĞ¡Ãæ»ıµÄ²Ëµ¥¾µÏñ¡£ */
+int32 c1_beacon_medium_max_area = 0; /* ºË1ÖĞµÈĞÅ±ê×î´óÃæ»ıµÄ²Ëµ¥¾µÏñ¡£ */
+int32 c1_beacon_large_peak = 0; /* ºË1´óĞÅ±ê×îµÍ·åÖµµÄ²Ëµ¥¾µÏñ¡£ */
+int32 c1_beacon_large_min_area = 0; /* ºË1´óĞÅ±ê×îĞ¡Ãæ»ıµÄ²Ëµ¥¾µÏñ¡£ */
+int32 c1_beacon_large_max_area = 0; /* ºË1´óĞÅ±ê×î´óÃæ»ıµÄ²Ëµ¥¾µÏñ¡£ */
 float c1_gray_weak_peak_delta = 0;
 int32 c1_gray_weak_peak_floor = 0;
 int32 c1_gray_weak_min_area = 0;
@@ -274,70 +274,70 @@ float c1_gate_dist = 0;
 float c1_new_dist = 0;
 int32 c1_confirm = 0;
 int32 c1_misses = 0;
-int32 c1_beacon_coast_frames = 0; /* æ ¸1ä¿¡æ ‡ä¸¢å¤±ä¿ç•™å¸§æ•°çš„èœå•é•œåƒã€‚ */
+int32 c1_beacon_coast_frames = 0; /* ºË1ĞÅ±ê¶ªÊ§±£ÁôÖ¡ÊıµÄ²Ëµ¥¾µÏñ¡£ */
 float c1_pos_alpha = 0;
 float c1_vel_alpha = 0;
-/* ä¸¤é¢—2BL3è¾¹ç¼˜åŒºåŸŸäºŒå€¼åŒ–é˜ˆå€¼çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3±ßÔµÇøÓò¶şÖµ»¯ãĞÖµµÄºË0²Ëµ¥¾µÏñ¡£ */
 int32 bl3_edge_thr = 0;
-/* ä¸¤é¢—2BL3è·Ÿè¸ªè¡¥å¼ºäºŒå€¼åŒ–é˜ˆå€¼çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3¸ú×Ù²¹Ç¿¶şÖµ»¯ãĞÖµµÄºË0²Ëµ¥¾µÏñ¡£ */
 int32 bl3_track_thr = 0;
-/* ä¸¤é¢—2BL3è½¦ç¯æ™®é€šåŒºåŸŸäºŒå€¼åŒ–é˜ˆå€¼çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3³µµÆÆÕÍ¨ÇøÓò¶şÖµ»¯ãĞÖµµÄºË0²Ëµ¥¾µÏñ¡£ */
 int32 bl3_lamp_thr = 0;
-/* ä¸¤é¢—2BL3è½¦ç¯ä¸Šéƒ¨åŒºåŸŸäºŒå€¼åŒ–é˜ˆå€¼çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3³µµÆÉÏ²¿ÇøÓò¶şÖµ»¯ãĞÖµµÄºË0²Ëµ¥¾µÏñ¡£ */
 int32 bl3_lamp_up_thr = 0;
-/* ä¸¤é¢—2BL3è½¦ç¯ä¸Šéƒ¨åŒºåŸŸçºµå‘è¾¹ç•Œçš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3³µµÆÉÏ²¿ÇøÓò×İÏò±ß½çµÄºË0²Ëµ¥¾µÏñ¡£ */
 float bl3_lamp_up_y = 0;
-/* ä¸¤é¢—2BL3è½¦ç¯æ¨ªå‘æš—ç¼æœ€å¤§è¿æ¥å®½åº¦çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3³µµÆºáÏò°µ·ì×î´óÁ¬½Ó¿í¶ÈµÄºË0²Ëµ¥¾µÏñ¡£ */
 float bl3_bridge_gap = 0;
-/* ä¸¤é¢—2BL3æ™®é€šä¿¡æ ‡æœ€å°é¢ç§¯çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3ÆÕÍ¨ĞÅ±ê×îĞ¡Ãæ»ıµÄºË0²Ëµ¥¾µÏñ¡£ */
 int32 bl3_beacon_min = 0;
-/* ä¸¤é¢—2BL3è¾¹ç¼˜ä¿¡æ ‡æœ€å°é¢ç§¯çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3±ßÔµĞÅ±ê×îĞ¡Ãæ»ıµÄºË0²Ëµ¥¾µÏñ¡£ */
 int32 bl3_edge_min = 0;
-/* ä¸¤é¢—2BL3é¡¶éƒ¨ä¿¡æ ‡æœ€å¤§é¢ç§¯çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3¶¥²¿ĞÅ±ê×î´óÃæ»ıµÄºË0²Ëµ¥¾µÏñ¡£ */
 int32 bl3_top_max = 0;
-/* ä¸¤é¢—2BL3ä¾§è¾¹ä¿¡æ ‡æœ€å¤§é¢ç§¯çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3²à±ßĞÅ±ê×î´óÃæ»ıµÄºË0²Ëµ¥¾µÏñ¡£ */
 int32 bl3_edge_max = 0;
-/* ä¸¤é¢—2BL3è½¦ç¯æœ€å°é¢ç§¯çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3³µµÆ×îĞ¡Ãæ»ıµÄºË0²Ëµ¥¾µÏñ¡£ */
 int32 bl3_lamp_min = 0;
-/* ä¸¤é¢—2BL3è½¦ç¯æ™®é€šæœ€å¤§é¢ç§¯çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3³µµÆÆÕÍ¨×î´óÃæ»ıµÄºË0²Ëµ¥¾µÏñ¡£ */
 int32 bl3_lamp_max = 0;
-/* ä¸¤é¢—2BL3å‰æ‘„è½¦ç¯æ”¾å®½æœ€å¤§é¢ç§¯çš„æ ¸0èœå•é•œåƒã€‚ */
-/* ä¸¤é¢—2BL3è½¦ç¯æœ€å°é•¿å®½æ¯”çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3Ç°Éã³µµÆ·Å¿í×î´óÃæ»ıµÄºË0²Ëµ¥¾µÏñ¡£ */
+/* Á½¿Å2BL3³µµÆ×îĞ¡³¤¿í±ÈµÄºË0²Ëµ¥¾µÏñ¡£ */
 float bl3_lamp_elong = 0;
-/* ä¸¤é¢—2BL3å‰æ‘„è½¦ç¯æœ€å°é•¿è½´çš„æ ¸0èœå•é•œåƒï¼Œå•ä½åƒç´ ã€‚ */
-/* ä¸¤é¢—2BL3åæ‘„è½¦ç¯æœ€å°é•¿è½´çš„æ ¸0èœå•é•œåƒï¼Œå•ä½åƒç´ ã€‚ */
+/* Á½¿Å2BL3Ç°Éã³µµÆ×îĞ¡³¤ÖáµÄºË0²Ëµ¥¾µÏñ£¬µ¥Î»ÏñËØ¡£ */
+/* Á½¿Å2BL3ºóÉã³µµÆ×îĞ¡³¤ÖáµÄºË0²Ëµ¥¾µÏñ£¬µ¥Î»ÏñËØ¡£ */
 float bl3_back_len = 0;
-/* ä¸¤é¢—2BL3å­¤ç«‹å°ä¿¡æ ‡æœ€å°å³°å€¼ç°åº¦çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3¹ÂÁ¢Ğ¡ĞÅ±ê×îĞ¡·åÖµ»Ò¶ÈµÄºË0²Ëµ¥¾µÏñ¡£ */
 int32 bl3_iso_gray = 0;
-/* ä¸¤é¢—2BL3å­¤ç«‹å°ä¿¡æ ‡æœ€å¤§èƒŒæ™¯ç°åº¦çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3¹ÂÁ¢Ğ¡ĞÅ±ê×î´ó±³¾°»Ò¶ÈµÄºË0²Ëµ¥¾µÏñ¡£ */
 int32 bl3_iso_bg = 0;
-/* ä¸¤é¢—2BL3å±€éƒ¨èƒŒæ™¯æ–¹ç¯å†…åŠå¾„çš„æ ¸0èœå•é•œåƒï¼Œå•ä½åƒç´ ã€‚ */
+/* Á½¿Å2BL3¾Ö²¿±³¾°·½»·ÄÚ°ë¾¶µÄºË0²Ëµ¥¾µÏñ£¬µ¥Î»ÏñËØ¡£ */
 float bl3_ring_in = 0;
-/* ä¸¤é¢—2BL3å±€éƒ¨èƒŒæ™¯æ–¹ç¯å¤–åŠå¾„çš„æ ¸0èœå•é•œåƒï¼Œå•ä½åƒç´ ã€‚ */
+/* Á½¿Å2BL3¾Ö²¿±³¾°·½»·Íâ°ë¾¶µÄºË0²Ëµ¥¾µÏñ£¬µ¥Î»ÏñËØ¡£ */
 float bl3_ring_out = 0;
-/* ä¸¤é¢—2BL3è½¦ç¯é™„è¿‘ä¿¡æ ‡å¤–æ‰©è·ç¦»çš„æ ¸0èœå•é•œåƒï¼Œå•ä½åƒç´ ã€‚ */
+/* Á½¿Å2BL3³µµÆ¸½½üĞÅ±êÍâÀ©¾àÀëµÄºË0²Ëµ¥¾µÏñ£¬µ¥Î»ÏñËØ¡£ */
 float bl3_near_pad = 0;
-/* ä¸¤é¢—2BL3è½¦ç¯é™„è¿‘ä¿¡æ ‡æœ€å°é¢ç§¯çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3³µµÆ¸½½üĞÅ±ê×îĞ¡Ãæ»ıµÄºË0²Ëµ¥¾µÏñ¡£ */
 int32 bl3_near_min = 0;
-/* ä¸¤é¢—2BL3è½¦ç¯é™„è¿‘å­¤ç«‹ä¿¡æ ‡æœ€å°å³°å€¼ç°åº¦çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3³µµÆ¸½½ü¹ÂÁ¢ĞÅ±ê×îĞ¡·åÖµ»Ò¶ÈµÄºË0²Ëµ¥¾µÏñ¡£ */
 int32 bl3_near_gray = 0;
-/* ä¸¤é¢—2BL3è½¦ç¯é™„è¿‘å­¤ç«‹ä¿¡æ ‡æœ€å¤§èƒŒæ™¯ç°åº¦çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3³µµÆ¸½½ü¹ÂÁ¢ĞÅ±ê×î´ó±³¾°»Ò¶ÈµÄºË0²Ëµ¥¾µÏñ¡£ */
 int32 bl3_near_bg = 0;
-/* ä¸¤é¢—2BL3ä¿¡æ ‡è·Ÿè¸ªåŒ¹é…è·ç¦»çš„æ ¸0èœå•é•œåƒï¼Œå•ä½åƒç´ ã€‚ */
+/* Á½¿Å2BL3ĞÅ±ê¸ú×ÙÆ¥Åä¾àÀëµÄºË0²Ëµ¥¾µÏñ£¬µ¥Î»ÏñËØ¡£ */
 float bl3_match_dist = 0;
-/* ä¸¤é¢—2BL3å·²ç¡®è®¤ç›®æ ‡åŒ¹é…é—¨è·ç¦»çš„æ ¸0èœå•é•œåƒï¼Œå•ä½åƒç´ ã€‚ */
+/* Á½¿Å2BL3ÒÑÈ·ÈÏÄ¿±êÆ¥ÅäÃÅ¾àÀëµÄºË0²Ëµ¥¾µÏñ£¬µ¥Î»ÏñËØ¡£ */
 float bl3_gate_dist = 0;
-/* ä¸¤é¢—2BL3æ–°ç›®æ ‡é‡å»ºè·ç¦»çš„æ ¸0èœå•é•œåƒï¼Œå•ä½åƒç´ ã€‚ */
+/* Á½¿Å2BL3ĞÂÄ¿±êÖØ½¨¾àÀëµÄºË0²Ëµ¥¾µÏñ£¬µ¥Î»ÏñËØ¡£ */
 float bl3_new_dist = 0;
-/* ä¸¤é¢—2BL3ç›®æ ‡åˆå§‹åŒ–ç¡®è®¤å¸§æ•°çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3Ä¿±ê³õÊ¼»¯È·ÈÏÖ¡ÊıµÄºË0²Ëµ¥¾µÏñ¡£ */
 int32 bl3_confirm = 0;
-/* ä¸¤é¢—2BL3ä¿¡æ ‡æœ€å¤§è¿ç»­ä¸¢å¤±å¸§æ•°çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3ĞÅ±ê×î´óÁ¬Ğø¶ªÊ§Ö¡ÊıµÄºË0²Ëµ¥¾µÏñ¡£ */
 int32 bl3_misses = 0;
-/* ä¸¤é¢—2BL3ä½ç½®æ»¤æ³¢å½“å‰æµ‹é‡æƒé‡çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3Î»ÖÃÂË²¨µ±Ç°²âÁ¿È¨ÖØµÄºË0²Ëµ¥¾µÏñ¡£ */
 float bl3_pos_alpha = 0;
-/* ä¸¤é¢—2BL3é€Ÿåº¦æ»¤æ³¢å½“å‰æµ‹é‡æƒé‡çš„æ ¸0èœå•é•œåƒã€‚ */
+/* Á½¿Å2BL3ËÙ¶ÈÂË²¨µ±Ç°²âÁ¿È¨ÖØµÄºË0²Ëµ¥¾µÏñ¡£ */
 float bl3_vel_alpha = 0;
-/* ä¸¤é¢—2BL3å›¾ä¼ å†…å®¹æ¨¡å¼çš„æ ¸0èœå•é•œåƒï¼š0åŸå›¾ï¼Œ1è½¦ç¯äºŒå€¼å›¾ï¼Œ2ä¿¡æ ‡äºŒå€¼å›¾ã€‚ */
+/* Á½¿Å2BL3Í¼´«ÄÚÈİÄ£Ê½µÄºË0²Ëµ¥¾µÏñ£º0Ô­Í¼£¬1³µµÆ¶şÖµÍ¼£¬2ĞÅ±ê¶şÖµÍ¼¡£ */
 int32 bl3_stream_mode = 0;
 int32 bl3_screen_enable = 0;
 int32 bl3_horizon_enable = 1;
@@ -400,7 +400,7 @@ static uint8 s_air_comm_active_seq;
 static uint8 s_air_comm_screen_ready;
 static uint8 s_air_comm_last_done_valid;
 static uint8 s_air_comm_last_done_seq;
-static uint16 s_air_comm_param_count = 0U; /* å›ºå®šå‚æ•°è¡¨è®¡æ•°ï¼Œä½¿ç”¨uint16ä¾¿äºç»§ç»­æ‰©å±•ã€‚ */
+static uint16 s_air_comm_param_count = 0U; /* ¹Ì¶¨²ÎÊı±í¼ÆÊı£¬Ê¹ÓÃuint16±ãÓÚ¼ÌĞøÀ©Õ¹¡£ */
 static uint8 s_air_comm_registration_ok;
 static air_comm_remote_param_pending_t s_air_comm_remote_pending;
 static air_comm_param_ack_cache_t s_air_comm_param_ack_cache;
@@ -414,9 +414,9 @@ static uint8 air_comm_register_remote_param(const char *name,
                                             uint16 param_id);
 
 /*
- * CRC-16/CCITT-FALSE è®¡ç®—ã€‚
- * å¤šé¡¹å¼ 0x1021ï¼Œåˆå€¼ 0xFFFFï¼Œè¦†ç›– type + seq + len + payloadï¼ˆä¸å«å¸§å¤´ï¼‰ã€‚
- * å‘é€æ—¶ç®—å®Œ CRC è¿½åŠ åˆ°å¸§å°¾ï¼Œæ¥æ”¶æ—¶é‡æ–°ç®—ä¸€éæ¯”å¯¹ã€‚
+ * CRC-16/CCITT-FALSE ¼ÆËã¡£
+ * ¶àÏîÊ½ 0x1021£¬³õÖµ 0xFFFF£¬¸²¸Ç type + seq + len + payload£¨²»º¬Ö¡Í·£©¡£
+ * ·¢ËÍÊ±ËãÍê CRC ×·¼Óµ½Ö¡Î²£¬½ÓÊÕÊ±ÖØĞÂËãÒ»±é±È¶Ô¡£
  */
 static uint16 air_comm_crc16(const uint8 *data, uint16 len)
 {
@@ -443,7 +443,7 @@ static uint16 air_comm_crc16(const uint8 *data, uint16 len)
     return crc;
 }
 
-/* ä»å­—èŠ‚ç¼“å†²åŒºæŒ‰å°ç«¯åºè¯»å– float */
+/* ´Ó×Ö½Ú»º³åÇø°´Ğ¡¶ËĞò¶ÁÈ¡ float */
 static float air_comm_read_float(const uint8 *buffer)
 {
     float value;
@@ -457,7 +457,7 @@ static float air_comm_read_float(const uint8 *buffer)
     return value;
 }
 
-/* æŒ‰å°ç«¯åºå°† float å†™å…¥å­—èŠ‚ç¼“å†²åŒº */
+/* °´Ğ¡¶ËĞò½« float Ğ´Èë×Ö½Ú»º³åÇø */
 static void air_comm_write_float(uint8 *buffer, float value)
 {
     uint8 *ptr = (uint8 *)&value;
@@ -468,7 +468,7 @@ static void air_comm_write_float(uint8 *buffer, float value)
     buffer[3] = ptr[3];
 }
 
-/* æŒ‰å°ç«¯åºå°† uint32 å†™å…¥å­—èŠ‚ç¼“å†²åŒº */
+/* °´Ğ¡¶ËĞò½« uint32 Ğ´Èë×Ö½Ú»º³åÇø */
 static void air_comm_write_u32(uint8 *buffer, uint32 value)
 {
     buffer[0] = (uint8)(value & 0xFFU);
@@ -547,9 +547,9 @@ static uint8 air_comm_register_default_commands(void)
 }
 
 /*
- * æ¯”è¾ƒå‚æ•°åå’Œæ¥æ”¶åˆ°çš„å­—èŠ‚åºåˆ—æ˜¯å¦å®Œå…¨ç›¸ç­‰ã€‚
- * name æ˜¯ C å­—ç¬¦ä¸²ï¼ˆä»¥ '\0' ç»“å°¾ï¼‰ï¼Œbytes æ˜¯ä¸å¸¦ç»“å°¾çš„å­—èŠ‚æ•°ç»„ã€‚
- * é•¿åº¦å’Œå†…å®¹éƒ½å¿…é¡»ä¸€è‡´æ‰è¿”å› 1ã€‚
+ * ±È½Ï²ÎÊıÃûºÍ½ÓÊÕµ½µÄ×Ö½ÚĞòÁĞÊÇ·ñÍêÈ«ÏàµÈ¡£
+ * name ÊÇ C ×Ö·û´®£¨ÒÔ '\0' ½áÎ²£©£¬bytes ÊÇ²»´ø½áÎ²µÄ×Ö½ÚÊı×é¡£
+ * ³¤¶ÈºÍÄÚÈİ¶¼±ØĞëÒ»ÖÂ²Å·µ»Ø 1¡£
  */
 static uint8 air_comm_name_equal(const char *name, const uint8 *bytes, uint8 len)
 {
@@ -576,14 +576,14 @@ static uint8 air_comm_name_equal(const char *name, const uint8 *bytes, uint8 len
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šå°†å®Œæ•´AirCommå¸§æ”¾å…¥UART2å¼‚æ­¥å‘é€é˜Ÿåˆ—ã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   dataï¼šå®Œæ•´å¸§é¦–åœ°å€
- *   lenï¼šå®Œæ•´å¸§å­—èŠ‚æ•°
- *   typeï¼šAirCommæ¶ˆæ¯ç±»å‹
- * è¿”å›å€¼ï¼š
- *   1ï¼šæˆåŠŸå…¥é˜Ÿ
- *   0ï¼šå‚æ•°æ— æ•ˆæˆ–å‘é€é˜Ÿåˆ—å·²æ»¡
+ * º¯Êı¹¦ÄÜ£º½«ÍêÕûAirCommÖ¡·ÅÈëUART2Òì²½·¢ËÍ¶ÓÁĞ¡£
+ * ÊäÈë²ÎÊı£º
+ *   data£ºÍêÕûÖ¡Ê×µØÖ·
+ *   len£ºÍêÕûÖ¡×Ö½ÚÊı
+ *   type£ºAirCommÏûÏ¢ÀàĞÍ
+ * ·µ»ØÖµ£º
+ *   1£º³É¹¦Èë¶Ó
+ *   0£º²ÎÊıÎŞĞ§»ò·¢ËÍ¶ÓÁĞÒÑÂú
  */
 static uint8 air_comm_send_uart(const uint8 *data, uint16 len, uint8 type)
 {
@@ -658,13 +658,13 @@ static uint8 air_comm_send_uart(const uint8 *data, uint16 len, uint8 type)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šæ‰¹é‡æŠŠå‘é€é˜Ÿåˆ—æ•°æ®å†™å…¥SCB4ç¡¬ä»¶TX FIFOã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   æ— 
- * è¿”å›å€¼ï¼š
- *   æ— 
- * å¤‡æ³¨ï¼š
- *   ä»…åœ¨UART2ä¸­æ–­ä¸Šä¸‹æ–‡è°ƒç”¨ï¼Œä¸ç­‰å¾…ç‰©ç†å‘é€å®Œæˆã€‚
+ * º¯Êı¹¦ÄÜ£ºÅúÁ¿°Ñ·¢ËÍ¶ÓÁĞÊı¾İĞ´ÈëSCB4Ó²¼şTX FIFO¡£
+ * ÊäÈë²ÎÊı£º
+ *   ÎŞ
+ * ·µ»ØÖµ£º
+ *   ÎŞ
+ * ±¸×¢£º
+ *   ½öÔÚUART2ÖĞ¶ÏÉÏÏÂÎÄµ÷ÓÃ£¬²»µÈ´ıÎïÀí·¢ËÍÍê³É¡£
  */
 void air_comm_air_uart_tx_isr(void)
 {
@@ -713,10 +713,10 @@ void air_comm_air_uart_tx_isr(void)
 }
 
 /*
- * ç»„è£…å¹¶å‘é€ä¸€å¸§å®Œæ•´æ•°æ®ã€‚
- * å¸§ç»“æ„ï¼š4å¸§å¤´ + type + seq + len + payload + 2crc
- * CRC è¦†ç›–ä»å¸§å¤´åˆ° payload çš„å…¨éƒ¨å­—èŠ‚ï¼ˆå³ frame[0..pos-1]ï¼‰ã€‚
- * å‘é€æˆåŠŸåæ›´æ–°ç»Ÿè®¡è®¡æ•°ã€‚
+ * ×é×°²¢·¢ËÍÒ»Ö¡ÍêÕûÊı¾İ¡£
+ * Ö¡½á¹¹£º4Ö¡Í· + type + seq + len + payload + 2crc
+ * CRC ¸²¸Ç´ÓÖ¡Í·µ½ payload µÄÈ«²¿×Ö½Ú£¨¼´ frame[0..pos-1]£©¡£
+ * ·¢ËÍ³É¹¦ºó¸üĞÂÍ³¼Æ¼ÆÊı¡£
  */
 static uint8 air_comm_send_frame(uint8 type, uint8 seq, const uint8 *payload, uint8 len)
 {
@@ -729,7 +729,7 @@ static uint8 air_comm_send_frame(uint8 type, uint8 seq, const uint8 *payload, ui
         return 0U;
     }
 
-    /* ç»„å¸§å¤´ */
+    /* ×éÖ¡Í· */
     frame[pos++] = AIR_COMM_HEADER_0;
     frame[pos++] = AIR_COMM_HEADER_1;
     frame[pos++] = AIR_COMM_HEADER_2;
@@ -738,14 +738,14 @@ static uint8 air_comm_send_frame(uint8 type, uint8 seq, const uint8 *payload, ui
     frame[pos++] = seq;
     frame[pos++] = len;
 
-    /* æ‹·è´ payload */
+    /* ¿½±´ payload */
     if(len > 0U)
     {
         memcpy(&frame[pos], payload, len);
         pos = (uint16)(pos + len);
     }
 
-    /* è®¡ç®— CRC å¹¶è¿½åŠ åˆ°å¸§å°¾ */
+    /* ¼ÆËã CRC ²¢×·¼Óµ½Ö¡Î² */
     crc = air_comm_crc16(frame, pos);
     frame[pos++] = (uint8)(crc & 0xFFU);
     frame[pos++] = (uint8)((crc >> 8) & 0xFFU);
@@ -766,13 +766,13 @@ static uint8 air_comm_send_frame(uint8 type, uint8 seq, const uint8 *payload, ui
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šå‘é€å¿ƒè·³åŒ…ã€‚
- * è¾“å…¥å‚æ•°ï¼š
- *   æ— 
- * è¿”å›å€¼ï¼š
- *   1ï¼šæˆåŠŸè¿›å…¥å‘é€é˜Ÿåˆ—
- *   0ï¼šå‘é€é˜Ÿåˆ—å·²æ»¡
- * å¤‡æ³¨ï¼špayload ä¸º2å­—èŠ‚ä¿ç•™å­—æ®µå’Œ4å­—èŠ‚å½“å‰ tick_msï¼Œå‘é€æˆåŠŸæ‰è‡ªå¢ seqã€‚
+ * º¯Êı¹¦ÄÜ£º·¢ËÍĞÄÌø°ü¡£
+ * ÊäÈë²ÎÊı£º
+ *   ÎŞ
+ * ·µ»ØÖµ£º
+ *   1£º³É¹¦½øÈë·¢ËÍ¶ÓÁĞ
+ *   0£º·¢ËÍ¶ÓÁĞÒÑÂú
+ * ±¸×¢£ºpayload Îª2×Ö½Ú±£Áô×Ö¶ÎºÍ4×Ö½Úµ±Ç° tick_ms£¬·¢ËÍ³É¹¦²Å×ÔÔö seq¡£
  */
 static uint8 air_comm_send_heartbeat(void)
 {
@@ -791,7 +791,7 @@ static uint8 air_comm_send_heartbeat(void)
     return 0U;
 }
 
-/* å‘é€å‚æ•°è®¾ç½®å›æ‰§ï¼Œå‘ŠçŸ¥å°è½¦è®¾ç½®ç»“æœå’Œå®é™…å†™å…¥å€¼ */
+/* ·¢ËÍ²ÎÊıÉèÖÃ»ØÖ´£¬¸æÖªĞ¡³µÉèÖÃ½á¹ûºÍÊµ¼ÊĞ´ÈëÖµ */
 static uint8 air_comm_send_ack_param(uint8 seq,
                                      uint8 status,
                                      const uint8 *name,
@@ -848,7 +848,7 @@ static uint8 air_comm_send_ack_get_param(uint8 seq,
     return air_comm_send_frame(AIR_COMM_MSG_ACK_GET_PARAM, seq, payload, pos);
 }
 
-/* æ”¶åˆ°å°è½¦å¿ƒè·³åï¼Œåˆ·æ–°åœ¨çº¿çŠ¶æ€å’Œæœ€åé€šä¿¡æ—¶é—´ */
+/* ÊÕµ½Ğ¡³µĞÄÌøºó£¬Ë¢ĞÂÔÚÏß×´Ì¬ºÍ×îºóÍ¨ĞÅÊ±¼ä */
 static void air_comm_mark_car_online(void)
 {
     s_air_comm_last_car_ms = s_air_comm_tick_ms;
@@ -856,16 +856,16 @@ static void air_comm_mark_car_online(void)
 }
 
 /**
- * @brief å°†ä¸€ä¸ªåå…­è¿›åˆ¶å­—ç¬¦è½¬æ¢ä¸ºæ•°å€¼ã€‚
- * @param byte å¾…è½¬æ¢çš„ ASCII å­—ç¬¦ï¼Œå…è®¸ 0-9ã€a-fã€A-Fã€‚
- * @return æˆåŠŸè¿”å› 0~15ï¼Œå­—ç¬¦éæ³•è¿”å› -1ã€‚
+ * @brief ½«Ò»¸öÊ®Áù½øÖÆ×Ö·û×ª»»ÎªÊıÖµ¡£
+ * @param byte ´ı×ª»»µÄ ASCII ×Ö·û£¬ÔÊĞí 0-9¡¢a-f¡¢A-F¡£
+ * @return ³É¹¦·µ»Ø 0~15£¬×Ö·û·Ç·¨·µ»Ø -1¡£
  */
 /**
- * @brief æŒ‰åå­—æŸ¥æ‰¾å›ºå®šå‚æ•°ï¼Œå¹¶åœ¨éœ€è¦æ—¶è§£æåŠ¨æ€é¢ç§¯å‚æ•°ã€‚
- * @param name ä¸å¸¦å­—ç¬¦ä¸²ç»“å°¾çš„å‚æ•°åå­—èŠ‚åºåˆ—ã€‚
- * @param name_len å‚æ•°åé•¿åº¦ï¼ŒèŒƒå›´ 1~AIR_COMM_AIR_PARAM_NAME_MAXã€‚
- * @param allow_command éé›¶æ—¶å…è®¸æŸ¥æ‰¾ä»…SETçš„é¢ç§¯è¡¨å‘½ä»¤ã€‚
- * @return æ‰¾åˆ°è¿”å›å‚æ•°æè¿°ç¬¦åœ°å€ï¼Œæœªæ‰¾åˆ°è¿”å› NULLã€‚
+ * @brief °´Ãû×Ö²éÕÒ¹Ì¶¨²ÎÊı£¬²¢ÔÚĞèÒªÊ±½âÎö¶¯Ì¬Ãæ»ı²ÎÊı¡£
+ * @param name ²»´ø×Ö·û´®½áÎ²µÄ²ÎÊıÃû×Ö½ÚĞòÁĞ¡£
+ * @param name_len ²ÎÊıÃû³¤¶È£¬·¶Î§ 1~AIR_COMM_AIR_PARAM_NAME_MAX¡£
+ * @param allow_command ·ÇÁãÊ±ÔÊĞí²éÕÒ½öSETµÄÃæ»ı±íÃüÁî¡£
+ * @return ÕÒµ½·µ»Ø²ÎÊıÃèÊö·ûµØÖ·£¬Î´ÕÒµ½·µ»Ø NULL¡£
  */
 static air_comm_air_param_t *air_comm_find_param(const uint8 *name,
                                                  uint8 name_len)
@@ -915,7 +915,7 @@ static void air_comm_param_write(air_comm_air_param_t *param, float value)
     }
 }
 
-/* å°†å‚æ•°å€¼è½¬æ¢ä¸ºè·¨æ ¸åè®®çš„32ä½ä½æ¨¡å¼ã€‚ */
+/* ½«²ÎÊıÖµ×ª»»Îª¿çºËĞ­ÒéµÄ32Î»Î»Ä£Ê½¡£ */
 static uint32 air_comm_param_value_bits(const air_comm_air_param_t *param, float value)
 {
     uint32 bits;
@@ -928,7 +928,7 @@ static uint32 air_comm_param_value_bits(const air_comm_air_param_t *param, float
     return bits;
 }
 
-/* å°†ç›®æ ‡ç«¯è¯»å›ä½æ¨¡å¼è½¬æ¢ä¸ºç©ºåœ°åè®®ä½¿ç”¨çš„floatæ•°å€¼ã€‚ */
+/* ½«Ä¿±ê¶Ë¶Á»ØÎ»Ä£Ê½×ª»»Îª¿ÕµØĞ­ÒéÊ¹ÓÃµÄfloatÊıÖµ¡£ */
 static float air_comm_param_bits_value(const air_comm_air_param_t *param, uint32 bits)
 {
     float value;
@@ -941,7 +941,7 @@ static float air_comm_param_bits_value(const air_comm_air_param_t *param, uint32
     return value;
 }
 
-/* åˆ¤æ–­æ”¶åˆ°çš„å‚æ•°å¸§æ˜¯å¦ä¸ºæœ€è¿‘ä¸€ç¬”å·²å®Œæˆå¸§çš„UARTé‡ä¼ ã€‚ */
+/* ÅĞ¶ÏÊÕµ½µÄ²ÎÊıÖ¡ÊÇ·ñÎª×î½üÒ»±ÊÒÑÍê³ÉÖ¡µÄUARTÖØ´«¡£ */
 static uint8 air_comm_param_cache_match(uint8 message_type,
                                         uint8 seq,
                                         const uint8 *name,
@@ -962,7 +962,7 @@ static uint8 air_comm_param_cache_match(uint8 message_type,
     return (memcmp(s_air_comm_param_ack_cache.name, name, name_len) == 0) ? 1U : 0U;
 }
 
-/* é‡æ–°å‘é€ç¼“å­˜ACKï¼Œé¿å…åŒåºå·é‡ä¼ é‡å¤ä¿®æ”¹ä¸‹æ¸¸å‚æ•°ã€‚ */
+/* ÖØĞÂ·¢ËÍ»º´æACK£¬±ÜÃâÍ¬ĞòºÅÖØ´«ÖØ¸´ĞŞ¸ÄÏÂÓÎ²ÎÊı¡£ */
 static void air_comm_param_cache_send(void)
 {
     if(s_air_comm_param_ack_cache.message_type == AIR_COMM_MSG_SET_PARAM)
@@ -983,7 +983,7 @@ static void air_comm_param_cache_send(void)
     }
 }
 
-/* ä¿å­˜æœ€è¿‘ä¸€ç¬”æœ€ç»ˆACKï¼Œç¼“å­˜çª—å£å†…ç›¸åŒUARTå¸§ç›´æ¥å¤ç”¨ã€‚ */
+/* ±£´æ×î½üÒ»±Ê×îÖÕACK£¬»º´æ´°¿ÚÄÚÏàÍ¬UARTÖ¡Ö±½Ó¸´ÓÃ¡£ */
 static void air_comm_param_cache_store(uint8 message_type,
                                        uint8 seq,
                                        const uint8 *name,
@@ -1005,7 +1005,7 @@ static void air_comm_param_cache_store(uint8 message_type,
     s_air_comm_param_ack_cache.name[name_len] = '\0';
 }
 
-/* åˆ¤æ–­UARTé‡ä¼ æ˜¯å¦å¯¹åº”å½“å‰ä»åœ¨æ‰§è¡Œçš„è¿œç«¯äº‹åŠ¡ã€‚ */
+/* ÅĞ¶ÏUARTÖØ´«ÊÇ·ñ¶ÔÓ¦µ±Ç°ÈÔÔÚÖ´ĞĞµÄÔ¶¶ËÊÂÎñ¡£ */
 static uint8 air_comm_remote_pending_match(uint8 message_type,
                                            uint8 seq,
                                            const uint8 *name,
@@ -1024,7 +1024,7 @@ static uint8 air_comm_remote_pending_match(uint8 message_type,
     return (memcmp(s_air_comm_remote_pending.name, name, name_len) == 0) ? 1U : 0U;
 }
 
-/* å¯åŠ¨æ ¸0åˆ°æ ¸1çš„å¼‚æ­¥è¯·æ±‚ï¼Œæœ€ç»ˆACKç”±é«˜é¢‘è½®è¯¢æ”¶åˆ°ç›®æ ‡è¯»å›å€¼åå‘é€ã€‚ */
+/* Æô¶¯ºË0µ½ºË1µÄÒì²½ÇëÇó£¬×îÖÕACKÓÉ¸ßÆµÂÖÑ¯ÊÕµ½Ä¿±ê¶Á»ØÖµºó·¢ËÍ¡£ */
 static uint8 air_comm_remote_start(uint8 message_type,
                                    uint8 seq,
                                    const uint8 *name,
@@ -1068,7 +1068,7 @@ static uint8 air_comm_remote_start(uint8 message_type,
     return 1U;
 }
 
-/* é«˜é¢‘è½®è¯¢è¿œç«¯äº‹åŠ¡ï¼›ä»…ç›®æ ‡ç«¯æœ€ç»ˆè¯»å›ä¸€è‡´åæ›´æ–°ä»£ç†å˜é‡å¹¶å›å¤è½¦ç«¯ã€‚ */
+/* ¸ßÆµÂÖÑ¯Ô¶¶ËÊÂÎñ£»½öÄ¿±ê¶Ë×îÖÕ¶Á»ØÒ»ÖÂºó¸üĞÂ´úÀí±äÁ¿²¢»Ø¸´³µ¶Ë¡£ */
 static void air_comm_remote_poll(void)
 {
     ipc_remote_param_mailbox_t response;
@@ -1085,7 +1085,7 @@ static void air_comm_remote_poll(void)
     }
 
     pending = s_air_comm_remote_pending;
-    /* æ‘„åƒå¤´å‚æ•°ä¼šè§¦å‘é‡æ–°åˆå§‹åŒ–ï¼Œç»Ÿä¸€ä½¿ç”¨è¾ƒé•¿å–æ¶ˆå’Œç¡¬è¶…æ—¶ã€‚ */
+    /* ÉãÏñÍ·²ÎÊı»á´¥·¢ÖØĞÂ³õÊ¼»¯£¬Í³Ò»Ê¹ÓÃ½Ï³¤È¡ÏûºÍÓ²³¬Ê±¡£ */
     slow_operation = ((pending.param->param_id == IPC_REMOTE_PARAM_ID_C1_EXP_TIME) ||
                       (pending.param->param_id == IPC_REMOTE_PARAM_ID_BL3_EXP_TIME) ||
                       (pending.param->param_id == IPC_REMOTE_PARAM_ID_C1_FPS) ||
@@ -1114,7 +1114,7 @@ static void air_comm_remote_poll(void)
         }
         else if(status == AIR_COMM_AIR_STATUS_OUT_OF_RANGE)
         {
-            /* æ ¸0å·²å®Œæˆé™å¹…ï¼Œä¸‹æ¸¸å†æ¬¡æŠ¥è¶Šç•Œè¯´æ˜å›ºä»¶çº¦æŸä¸ä¸€è‡´ã€‚ */
+            /* ºË0ÒÑÍê³ÉÏŞ·ù£¬ÏÂÓÎÔÙ´Î±¨Ô½½çËµÃ÷¹Ì¼şÔ¼Êø²»Ò»ÖÂ¡£ */
             status = AIR_COMM_AIR_STATUS_MISMATCH;
         }
         else if((status == AIR_COMM_AIR_STATUS_OK) &&
@@ -1178,10 +1178,10 @@ static void air_comm_remote_poll(void)
 }
 
 /*
- * å¤„ç† SET_PARAM æ¶ˆæ¯ã€‚
- * payload æ ¼å¼ï¼šname_len(1B) + name(name_len B) + value(4B float, å°ç«¯)
- * æµç¨‹ï¼šè§£æå‚æ•°åâ†’æŸ¥è¡¨â†’æ£€æŸ¥èŒƒå›´â†’å†™å…¥å˜é‡â†’å‘é€ ACKã€‚
- * å€¼è¶…å‡º [min, max] æ—¶è‡ªåŠ¨é™å¹…åˆ°è¾¹ç•Œï¼Œè¿”å› OUT_OF_RANGEã€‚
+ * ´¦Àí SET_PARAM ÏûÏ¢¡£
+ * payload ¸ñÊ½£ºname_len(1B) + name(name_len B) + value(4B float, Ğ¡¶Ë)
+ * Á÷³Ì£º½âÎö²ÎÊıÃû¡ú²é±í¡ú¼ì²é·¶Î§¡úĞ´Èë±äÁ¿¡ú·¢ËÍ ACK¡£
+ * Öµ³¬³ö [min, max] Ê±×Ô¶¯ÏŞ·ùµ½±ß½ç£¬·µ»Ø OUT_OF_RANGE¡£
  */
 static void air_comm_handle_set_param(uint8 seq, const uint8 *payload, uint8 len)
 {
@@ -1193,7 +1193,7 @@ static void air_comm_handle_set_param(uint8 seq, const uint8 *payload, uint8 len
     uint32 request_value_bits = 0U;
     air_comm_air_param_t *param = NULL;
 
-    /* payload é•¿åº¦ä¸å¤Ÿè‡³å°‘ 5 å­—èŠ‚ï¼ˆname_len + nameè‡³å°‘0 + 4å­—èŠ‚floatï¼‰ï¼Œç›´æ¥æŠ¥é”™ */
+    /* payload ³¤¶È²»¹»ÖÁÉÙ 5 ×Ö½Ú£¨name_len + nameÖÁÉÙ0 + 4×Ö½Úfloat£©£¬Ö±½Ó±¨´í */
     if((payload == NULL) || (len < 5U))
     {
         s_air_comm_stats.set_param_fail_count++;
@@ -1201,7 +1201,7 @@ static void air_comm_handle_set_param(uint8 seq, const uint8 *payload, uint8 len
         return;
     }
 
-    /* è§£æå‚æ•°åé•¿åº¦å’ŒæŒ‡é’ˆï¼Œæ£€æŸ¥åˆæ³•æ€§ */
+    /* ½âÎö²ÎÊıÃû³¤¶ÈºÍÖ¸Õë£¬¼ì²éºÏ·¨ĞÔ */
     name_len = payload[0];
     name = &payload[1];
     if((name_len == 0U) ||
@@ -1213,7 +1213,7 @@ static void air_comm_handle_set_param(uint8 seq, const uint8 *payload, uint8 len
         return;
     }
 
-    /* è¯»å–è¦è®¾ç½®çš„å€¼ï¼ŒæŒ‰åå­—æŸ¥æ‰¾å‚æ•°ï¼Œç„¶åæ£€æŸ¥èŒƒå›´å¹¶å†™å…¥ */
+    /* ¶ÁÈ¡ÒªÉèÖÃµÄÖµ£¬°´Ãû×Ö²éÕÒ²ÎÊı£¬È»ºó¼ì²é·¶Î§²¢Ğ´Èë */
     value = air_comm_read_float(&payload[1U + name_len]);
     memcpy(&request_value_bits, &payload[1U + name_len], sizeof(request_value_bits));
     if(air_comm_param_cache_match(AIR_COMM_MSG_SET_PARAM,
@@ -1429,9 +1429,9 @@ static void air_comm_handle_get_param(uint8 seq, const uint8 *payload, uint8 len
 }
 
 /*
- * å¤„ç† EXEC_COMMAND æ¶ˆæ¯ã€‚
- * payload æ ¼å¼ï¼š[name_len][name...]ï¼ŒæŒ‰å‘½ä»¤åæŸ¥è¡¨å¹¶è¿”å›æ–‡æœ¬ ACKã€‚
- * æ³¨æ„ï¼šå‘½ä»¤å…¥å£åœ¨ä¸»å¾ªç¯ä¸Šä¸‹æ–‡æ‰§è¡Œï¼Œä¸èƒ½é•¿æ—¶é—´é˜»å¡ã€‚
+ * ´¦Àí EXEC_COMMAND ÏûÏ¢¡£
+ * payload ¸ñÊ½£º[name_len][name...]£¬°´ÃüÁîÃû²é±í²¢·µ»ØÎÄ±¾ ACK¡£
+ * ×¢Òâ£ºÃüÁîÈë¿ÚÔÚÖ÷Ñ­»·ÉÏÏÂÎÄÖ´ĞĞ£¬²»ÄÜ³¤Ê±¼ä×èÈû¡£
  */
 static void air_comm_handle_exec_command(uint8 seq, const uint8 *payload, uint8 len)
 {
@@ -1530,7 +1530,7 @@ static void air_comm_handle_exec_command(uint8 seq, const uint8 *payload, uint8 
     (void)air_comm_air_send_command_ack_text(seq, ack);
     s_air_comm_stats.command_ok_count++;
 
-    /* ç«‹å³å‹å‘½ä»¤ä¹Ÿäº¤ç»™ 100Hz è°ƒåº¦æ‰§è¡Œï¼Œé¿å…åœ¨ä¸²å£å¸§è§£æè¿‡ç¨‹ä¸­è¿è¡Œç”¨æˆ·ä»£ç ã€‚ */
+    /* Á¢¼´ĞÍÃüÁîÒ²½»¸ø 100Hz µ÷¶ÈÖ´ĞĞ£¬±ÜÃâÔÚ´®¿ÚÖ¡½âÎö¹ı³ÌÖĞÔËĞĞÓÃ»§´úÂë¡£ */
 }
 
 static void air_comm_handle_run_data(const uint8 *payload, uint8 len)
@@ -1576,7 +1576,7 @@ static void air_comm_handle_run_data(const uint8 *payload, uint8 len)
     }
 }
 
-/* å¸§åˆ†å‘ï¼šæ ¹æ®æ¶ˆæ¯ç±»å‹è°ƒç”¨å¯¹åº”çš„å¤„ç†å‡½æ•° */
+/* Ö¡·Ö·¢£º¸ù¾İÏûÏ¢ÀàĞÍµ÷ÓÃ¶ÔÓ¦µÄ´¦Àíº¯Êı */
 static void air_comm_handle_frame(uint8 type, uint8 seq, const uint8 *payload, uint8 len)
 {
     switch(type)
@@ -1608,9 +1608,9 @@ static void air_comm_handle_frame(uint8 type, uint8 seq, const uint8 *payload, u
 }
 
 /*
- * æ”¶åˆ°å®Œæ•´å¸§åï¼Œé‡æ–°ç»„è£…å¸§æ•°æ®å¹¶æ ¡éªŒ CRCã€‚
- * CRC æ­£ç¡®åˆ™æ›´æ–°ç»Ÿè®¡å¹¶åˆ†å‘å¤„ç†ï¼›CRC é”™è¯¯åˆ™ç´¯è®¡é”™è¯¯è®¡æ•°å¹¶ä¸¢å¼ƒã€‚
- * ä¸ºä»€ä¹ˆä¸ç›´æ¥ç”¨è§£æå™¨ç®—å¥½çš„ CRCï¼Ÿå› ä¸ºè¦è¦†ç›–å¸§å¤´å­—èŠ‚ä¸€èµ·ç®—ï¼Œè§£æå™¨é˜¶æ®µæ²¡å­˜å®Œæ•´å¸§ã€‚
+ * ÊÕµ½ÍêÕûÖ¡ºó£¬ÖØĞÂ×é×°Ö¡Êı¾İ²¢Ğ£Ñé CRC¡£
+ * CRC ÕıÈ·Ôò¸üĞÂÍ³¼Æ²¢·Ö·¢´¦Àí£»CRC ´íÎóÔòÀÛ¼Æ´íÎó¼ÆÊı²¢¶ªÆú¡£
+ * ÎªÊ²Ã´²»Ö±½ÓÓÃ½âÎöÆ÷ËãºÃµÄ CRC£¿ÒòÎªÒª¸²¸ÇÖ¡Í·×Ö½ÚÒ»ÆğËã£¬½âÎöÆ÷½×¶ÎÃ»´æÍêÕûÖ¡¡£
  */
 static void air_comm_process_rx_frame(void)
 {
@@ -1618,7 +1618,7 @@ static void air_comm_process_rx_frame(void)
     uint16 pos = 0U;
     uint16 crc_calc;
 
-    /* é‡æ–°ç»„è£…å¸§ï¼ˆå¸§å¤´ + info + payloadï¼‰ï¼Œç„¶åç®— CRC æ¯”å¯¹ */
+    /* ÖØĞÂ×é×°Ö¡£¨Ö¡Í· + info + payload£©£¬È»ºóËã CRC ±È¶Ô */
     frame[pos++] = AIR_COMM_HEADER_0;
     frame[pos++] = AIR_COMM_HEADER_1;
     frame[pos++] = AIR_COMM_HEADER_2;
@@ -1649,7 +1649,7 @@ static void air_comm_process_rx_frame(void)
                           s_air_comm_rx.len);
 }
 
-/* é‡ç½®æ¥æ”¶è§£æå™¨åˆ°åˆå§‹çŠ¶æ€ï¼Œå‡†å¤‡æ¥æ”¶ä¸‹ä¸€å¸§ */
+/* ÖØÖÃ½ÓÊÕ½âÎöÆ÷µ½³õÊ¼×´Ì¬£¬×¼±¸½ÓÊÕÏÂÒ»Ö¡ */
 static void air_comm_rx_parser_reset(void)
 {
     s_air_comm_rx.state = 0U;
@@ -1664,19 +1664,19 @@ static void air_comm_rx_parser_reset(void)
 }
 
 /*
- * é€å­—èŠ‚æ¥æ”¶çŠ¶æ€æœºã€‚
- * æ¯æ”¶åˆ°ä¸€ä¸ªå­—èŠ‚æ¨è¿›ä¸€æ¬¡çŠ¶æ€ï¼š
- *   state 0: åŒ¹é… 4 å­—èŠ‚å¸§å¤´ï¼Œä»»ä½•ä¸åŒ¹é…éƒ½å›åˆ°ç­‰å¾…ç¬¬ä¸€ä¸ª 0xAA
- *   state 1: è¯» typeã€seqã€len ä¸‰ä¸ªå­—æ®µï¼›len è¶…é™ç›´æ¥é‡ç½®
- *   state 2: æ”¶ payload å­—èŠ‚ï¼Œæ”¶å¤Ÿ len ä¸ªåè½¬åˆ°æ”¶ CRC
- *   state 3: æ”¶ 2 å­—èŠ‚ CRCï¼Œæ”¶å®Œåè°ƒç”¨ process_rx_frame å¤„ç†
- * å¼‚å¸¸å­—èŠ‚ä¼šå¯¼è‡´çŠ¶æ€å›é€€åˆ° state 0 é‡æ–°æ‰¾å¸§å¤´ã€‚
+ * Öğ×Ö½Ú½ÓÊÕ×´Ì¬»ú¡£
+ * Ã¿ÊÕµ½Ò»¸ö×Ö½ÚÍÆ½øÒ»´Î×´Ì¬£º
+ *   state 0: Æ¥Åä 4 ×Ö½ÚÖ¡Í·£¬ÈÎºÎ²»Æ¥Åä¶¼»Øµ½µÈ´ıµÚÒ»¸ö 0xAA
+ *   state 1: ¶Á type¡¢seq¡¢len Èı¸ö×Ö¶Î£»len ³¬ÏŞÖ±½ÓÖØÖÃ
+ *   state 2: ÊÕ payload ×Ö½Ú£¬ÊÕ¹» len ¸öºó×ªµ½ÊÕ CRC
+ *   state 3: ÊÕ 2 ×Ö½Ú CRC£¬ÊÕÍêºóµ÷ÓÃ process_rx_frame ´¦Àí
+ * Òì³£×Ö½Ú»áµ¼ÖÂ×´Ì¬»ØÍËµ½ state 0 ÖØĞÂÕÒÖ¡Í·¡£
  */
 static void air_comm_rx_byte_parser(uint8 byte)
 {
     switch(s_air_comm_rx.state)
     {
-        /* state 0: é€å­—èŠ‚åŒ¹é…å¸§å¤´ 0xAA 0xAA 0x55 0x55 */
+        /* state 0: Öğ×Ö½ÚÆ¥ÅäÖ¡Í· 0xAA 0xAA 0x55 0x55 */
         case 0:
             if((s_air_comm_rx.header_count == 0U) && (byte == AIR_COMM_HEADER_0))
             {
@@ -1697,12 +1697,12 @@ static void air_comm_rx_byte_parser(uint8 byte)
             }
             else
             {
-                /* ä¸åŒ¹é…æ—¶ï¼Œå¦‚æœå½“å‰å­—èŠ‚æ˜¯ 0xAA åˆ™ä»å¤´å¼€å§‹åŒ¹é…ï¼Œå¦åˆ™å½’é›¶ */
+                /* ²»Æ¥ÅäÊ±£¬Èç¹ûµ±Ç°×Ö½ÚÊÇ 0xAA Ôò´ÓÍ·¿ªÊ¼Æ¥Åä£¬·ñÔò¹éÁã */
                 s_air_comm_rx.header_count = (byte == AIR_COMM_HEADER_0) ? 1U : 0U;
             }
             break;
 
-        /* state 1: è¯»å– typeã€seqã€len ä¸‰ä¸ª info å­—æ®µ */
+        /* state 1: ¶ÁÈ¡ type¡¢seq¡¢len Èı¸ö info ×Ö¶Î */
         case 1:
             if(s_air_comm_rx.info_count == 0U)
             {
@@ -1716,7 +1716,7 @@ static void air_comm_rx_byte_parser(uint8 byte)
             }
             else
             {
-                /* len å­—æ®µï¼špayload é•¿åº¦ï¼Œè¶…è¿‡æœ€å¤§å€¼è¯´æ˜å¸§æœ‰é—®é¢˜ï¼Œä¸¢å¼ƒ */
+                /* len ×Ö¶Î£ºpayload ³¤¶È£¬³¬¹ı×î´óÖµËµÃ÷Ö¡ÓĞÎÊÌâ£¬¶ªÆú */
                 if(byte > AIR_COMM_MAX_PAYLOAD)
                 {
                     s_air_comm_stats.rx_oversize_count++;
@@ -1727,12 +1727,12 @@ static void air_comm_rx_byte_parser(uint8 byte)
                 s_air_comm_rx.payload_count = 0U;
                 s_air_comm_rx.crc = 0U;
                 s_air_comm_rx.crc_count = 0U;
-                /* len=0 çš„å¸§æ²¡æœ‰ payloadï¼Œç›´æ¥è·³åˆ°æ”¶ CRC */
+                /* len=0 µÄÖ¡Ã»ÓĞ payload£¬Ö±½ÓÌøµ½ÊÕ CRC */
                 s_air_comm_rx.state = (byte == 0U) ? 3U : 2U;
             }
             break;
 
-        /* state 2: æ”¶ payload å­—èŠ‚ */
+        /* state 2: ÊÕ payload ×Ö½Ú */
         case 2:
             if(s_air_comm_rx.payload_count < AIR_COMM_MAX_PAYLOAD)
             {
@@ -1751,7 +1751,7 @@ static void air_comm_rx_byte_parser(uint8 byte)
             }
             break;
 
-        /* state 3: æ”¶ 2 å­—èŠ‚ CRCï¼ˆä½å­—èŠ‚åœ¨å‰ï¼‰ï¼Œæ”¶å®Œåæ ¡éªŒå¹¶å¤„ç† */
+        /* state 3: ÊÕ 2 ×Ö½Ú CRC£¨µÍ×Ö½ÚÔÚÇ°£©£¬ÊÕÍêºóĞ£Ñé²¢´¦Àí */
         case 3:
             if(s_air_comm_rx.crc_count == 0U)
             {
@@ -1772,7 +1772,7 @@ static void air_comm_rx_byte_parser(uint8 byte)
     }
 }
 
-/* ä»ç¯å½¢é˜Ÿåˆ—å¼¹å‡ºä¸€ä¸ªå­—èŠ‚ï¼Œé˜Ÿåˆ—ç©ºè¿”å› 0 */
+/* ´Ó»·ĞÎ¶ÓÁĞµ¯³öÒ»¸ö×Ö½Ú£¬¶ÓÁĞ¿Õ·µ»Ø 0 */
 static uint8 air_comm_rx_queue_pop(uint8 *byte)
 {
     uint16 tail;
@@ -1800,10 +1800,10 @@ static uint8 air_comm_rx_queue_pop(uint8 *byte)
 }
 
 /*
- * åœ¨çº¿è¶…æ—¶æ£€æµ‹ã€‚
- * å¦‚æœä¹‹å‰æ ‡è®°è¿‡åœ¨çº¿ï¼ˆonline_status=1ï¼‰ï¼Œä¸”è·ç¦»ä¸Šæ¬¡æ”¶åˆ°å°è½¦å¿ƒè·³è¶…è¿‡ 600msï¼Œ
- * åˆ™æ ‡è®°ä¸ºç¦»çº¿ï¼ˆonline_status=2ï¼‰ã€‚
- * æ³¨æ„ï¼šonline_status=0 è¡¨ç¤ºä»æœªè¿æ¥è¿‡ï¼Œä¸ä¼šè¢«è¿™ä¸ªå‡½æ•°æ”¹æˆ 2ã€‚
+ * ÔÚÏß³¬Ê±¼ì²â¡£
+ * Èç¹ûÖ®Ç°±ê¼Ç¹ıÔÚÏß£¨online_status=1£©£¬ÇÒ¾àÀëÉÏ´ÎÊÕµ½Ğ¡³µĞÄÌø³¬¹ı 600ms£¬
+ * Ôò±ê¼ÇÎªÀëÏß£¨online_status=2£©¡£
+ * ×¢Òâ£ºonline_status=0 ±íÊ¾´ÓÎ´Á¬½Ó¹ı£¬²»»á±»Õâ¸öº¯Êı¸Ä³É 2¡£
  */
 static void air_comm_task_online(void)
 {
@@ -1816,7 +1816,7 @@ static void air_comm_task_online(void)
 
 void air_comm_air_init(void)
 {
-    /* æ¸…é›¶æ‰€æœ‰çŠ¶æ€å’Œè¡¨ */
+    /* ÇåÁãËùÓĞ×´Ì¬ºÍ±í */
     memset(&s_air_comm_rx, 0, sizeof(s_air_comm_rx));
     memset(&s_air_comm_rx_queue, 0, sizeof(s_air_comm_rx_queue));
     memset(&s_air_comm_tx_queue, 0, sizeof(s_air_comm_tx_queue));
@@ -2414,7 +2414,7 @@ void air_comm_air_init(void)
         return;
     }
 
-    /* é…ç½® UART_2ï¼šæ³¢ç‰¹ç‡ 1152000ï¼ŒTX=P10_1ï¼ŒRX=P10_0ï¼Œå¼€æ¥æ”¶ä¸­æ–­ */
+    /* ÅäÖÃ UART_2£º²¨ÌØÂÊ 1152000£¬TX=P10_1£¬RX=P10_0£¬¿ª½ÓÊÕÖĞ¶Ï */
     uart_init(UART_2, AIR_COMM_AIR_BAUDRATE, UART2_TX_P10_1, UART2_RX_P10_0);
     Cy_SCB_SetTxFifoLevel(SCB4, AIR_COMM_TX_FIFO_LEVEL);
     Cy_SCB_ClearTxInterrupt(SCB4, CY_SCB_UART_TX_TRIGGER);
@@ -2436,10 +2436,10 @@ void air_comm_air_tick_1MS(void)
 }
 
 /*
- * ä¸»å¾ªç¯è½®è¯¢å…¥å£ã€‚
- * ä»ç¯å½¢é˜Ÿåˆ—å–å‡ºå­—èŠ‚å–‚ç»™çŠ¶æ€æœºè§£æå™¨ï¼Œæ¯è½®æœ€å¤šå¤„ç†é˜Ÿåˆ—å¤§å°ä¸ªå­—èŠ‚ï¼ˆé˜²æ­»å¾ªç¯ï¼‰ã€‚
- * è§£æå‡ºå®Œæ•´å¸§åä¼šè§¦å‘ CRC æ ¡éªŒå’Œæ¶ˆæ¯åˆ†å‘ã€‚
- * å¤„ç†å®Œå­—èŠ‚åæ£€æŸ¥å°è½¦åœ¨çº¿è¶…æ—¶ã€‚
+ * Ö÷Ñ­»·ÂÖÑ¯Èë¿Ú¡£
+ * ´Ó»·ĞÎ¶ÓÁĞÈ¡³ö×Ö½ÚÎ¹¸ø×´Ì¬»ú½âÎöÆ÷£¬Ã¿ÂÖ×î¶à´¦Àí¶ÓÁĞ´óĞ¡¸ö×Ö½Ú£¨·ÀËÀÑ­»·£©¡£
+ * ½âÎö³öÍêÕûÖ¡ºó»á´¥·¢ CRC Ğ£ÑéºÍÏûÏ¢·Ö·¢¡£
+ * ´¦ÀíÍê×Ö½Úºó¼ì²éĞ¡³µÔÚÏß³¬Ê±¡£
  */
 void air_comm_air_poll(void)
 {
@@ -2469,7 +2469,7 @@ void air_comm_air_update_200HZ(void)
         return;
     }
 
-    /* æ¯ 200ms å‘ä¸€æ¬¡å¿ƒè·³ï¼Œç”¨å·®å€¼åˆ¤æ–­é¿å… tick æº¢å‡ºé—®é¢˜ */
+    /* Ã¿ 200ms ·¢Ò»´ÎĞÄÌø£¬ÓÃ²îÖµÅĞ¶Ï±ÜÃâ tick Òç³öÎÊÌâ */
     if((s_air_comm_tick_ms - s_air_comm_last_heartbeat_ms) >= AIR_COMM_HEARTBEAT_MS)
     {
         if(air_comm_send_heartbeat() != 0U)
@@ -2526,9 +2526,9 @@ uint8 air_comm_air_remote_param_busy(void)
 }
 
 /*
- * UART ä¸­æ–­å›è°ƒï¼šæ”¶åˆ°ä¸€ä¸ªå­—èŠ‚å°±å…¥é˜Ÿã€‚
- * åªåšå…¥é˜Ÿæ“ä½œï¼Œä¸è§£æã€ä¸é˜»å¡ï¼Œä¸­æ–­å®‰å…¨ã€‚
- * é˜Ÿåˆ—æ»¡äº†å°±ä¸¢å¼ƒæ–°å­—èŠ‚å¹¶ç´¯è®¡æº¢å‡ºè®¡æ•°ã€‚
+ * UART ÖĞ¶Ï»Øµ÷£ºÊÕµ½Ò»¸ö×Ö½Ú¾ÍÈë¶Ó¡£
+ * Ö»×öÈë¶Ó²Ù×÷£¬²»½âÎö¡¢²»×èÈû£¬ÖĞ¶Ï°²È«¡£
+ * ¶ÓÁĞÂúÁË¾Í¶ªÆúĞÂ×Ö½Ú²¢ÀÛ¼ÆÒç³ö¼ÆÊı¡£
  */
 void air_comm_air_rx_byte(uint8 byte)
 {
@@ -2545,7 +2545,7 @@ void air_comm_air_rx_byte(uint8 byte)
         next_head = 0U;
     }
 
-    /* é˜Ÿåˆ—æ»¡ï¼šhead è¿½ä¸Š tailï¼Œä¸¢å¼ƒè¿™ä¸ªå­—èŠ‚ */
+    /* ¶ÓÁĞÂú£ºhead ×·ÉÏ tail£¬¶ªÆúÕâ¸ö×Ö½Ú */
     if(next_head == s_air_comm_rx_queue.tail)
     {
         s_air_comm_stats.rx_queue_overflow_count++;
@@ -2563,9 +2563,9 @@ uint8 air_comm_air_is_car_online(void)
 }
 
 /**
- * @brief æŸ¥è¯¢å°è½¦è¿è¡Œæ•°æ®æ˜¯å¦ä»åœ¨æŒ‡å®šè¶…æ—¶èŒƒå›´å†…ã€‚
- * @param timeout_ms æœ€å¤§å…è®¸æœªæ›´æ–°æ—¶é—´ï¼Œå•ä½ msã€‚
- * @return 1 è¡¨ç¤ºè¿è¡Œæ•°æ®æœ‰æ•ˆä¸”æœªè¶…æ—¶ï¼Œ0 è¡¨ç¤ºä»æœªæ”¶åˆ°æˆ–å·²ç»è¶…æ—¶ã€‚
+ * @brief ²éÑ¯Ğ¡³µÔËĞĞÊı¾İÊÇ·ñÈÔÔÚÖ¸¶¨³¬Ê±·¶Î§ÄÚ¡£
+ * @param timeout_ms ×î´óÔÊĞíÎ´¸üĞÂÊ±¼ä£¬µ¥Î» ms¡£
+ * @return 1 ±íÊ¾ÔËĞĞÊı¾İÓĞĞ§ÇÒÎ´³¬Ê±£¬0 ±íÊ¾´ÓÎ´ÊÕµ½»òÒÑ¾­³¬Ê±¡£
  */
 uint8 air_comm_air_is_run_data_fresh(uint32 timeout_ms)
 {
@@ -2574,9 +2574,9 @@ uint8 air_comm_air_is_run_data_fresh(uint32 timeout_ms)
 }
 
 /*
- * æ³¨å†Œå¯è¿œç¨‹è®¾ç½®çš„å‚æ•°ã€‚
- * åŒåå‚æ•°ä¼šæ›´æ–°ç»‘å®šçš„å˜é‡å’ŒèŒƒå›´ï¼ˆä¸ä¼šé‡å¤å ä½ï¼‰ã€‚
- * åå­—é•¿åº¦è¶…è¿‡ 32 å­—èŠ‚ï¼ˆä¸å« '\0'ï¼‰ä¼šå¤±è´¥ã€‚
+ * ×¢²á¿ÉÔ¶³ÌÉèÖÃµÄ²ÎÊı¡£
+ * Í¬Ãû²ÎÊı»á¸üĞÂ°ó¶¨µÄ±äÁ¿ºÍ·¶Î§£¨²»»áÖØ¸´Õ¼Î»£©¡£
+ * Ãû×Ö³¤¶È³¬¹ı 32 ×Ö½Ú£¨²»º¬ '\0'£©»áÊ§°Ü¡£
  */
 uint8 air_comm_air_register_param(const char *name, void *var, uint8 type, float min, float max)
 {
@@ -2587,7 +2587,7 @@ uint8 air_comm_air_register_param(const char *name, void *var, uint8 type, float
         return 0U;
     }
 
-    /* åŒåå‚æ•°æ›´æ–°ï¼Œä¸é‡å¤å ä½ */
+    /* Í¬Ãû²ÎÊı¸üĞÂ£¬²»ÖØ¸´Õ¼Î» */
     for(i = 0U; i < s_air_comm_param_count; i++)
     {
         if(strcmp(s_air_comm_params[i].name, name) == 0)
@@ -2624,7 +2624,7 @@ uint8 air_comm_air_register_param(const char *name, void *var, uint8 type, float
     return 1U;
 }
 
-/* æ³¨å†Œåªä½œä¸ºæ ¸0èœå•é•œåƒã€å®é™…ç”±æ ¸1æˆ–2BL3æ‰§è¡Œçš„å‚æ•°ã€‚ */
+/* ×¢²áÖ»×÷ÎªºË0²Ëµ¥¾µÏñ¡¢Êµ¼ÊÓÉºË1»ò2BL3Ö´ĞĞµÄ²ÎÊı¡£ */
 static uint8 air_comm_register_remote_param(const char *name,
                                             void *var,
                                             uint8 type,
@@ -2657,10 +2657,10 @@ static uint8 air_comm_register_remote_param(const char *name,
 }
 
 /*
- * å‘å°è½¦ä¸ŠæŠ¥è¿è¡Œæ•°æ®ã€‚
- * payload æ ¼å¼ï¼šcount(1B) + float0(4B) + float1(4B) + ...
- * æœ€å¤š 32 ä¸ª floatï¼Œæ¯ä¸ª 4 å­—èŠ‚ï¼Œå°ç«¯åºã€‚
- * å‘é€æˆåŠŸæ‰è‡ªå¢ seqã€‚
+ * ÏòĞ¡³µÉÏ±¨ÔËĞĞÊı¾İ¡£
+ * payload ¸ñÊ½£ºcount(1B) + float0(4B) + float1(4B) + ...
+ * ×î¶à 32 ¸ö float£¬Ã¿¸ö 4 ×Ö½Ú£¬Ğ¡¶ËĞò¡£
+ * ·¢ËÍ³É¹¦²Å×ÔÔö seq¡£
  */
 uint8 air_comm_send_run_data(const float *data, uint8 count)
 {
@@ -2676,7 +2676,7 @@ uint8 air_comm_send_run_data(const float *data, uint8 count)
         return 0U;
     }
 
-    /* ç¬¬ä¸€ä¸ªå­—èŠ‚æ˜¯ float ä¸ªæ•°ï¼Œåé¢é€ä¸ªå†™å…¥ */
+    /* µÚÒ»¸ö×Ö½ÚÊÇ float ¸öÊı£¬ºóÃæÖğ¸öĞ´Èë */
     payload[pos++] = count;
     for(i = 0U; i < count; i++)
     {
@@ -2802,7 +2802,7 @@ uint8 air_comm_get_last_run_data(float *data, uint8 max_count, uint8 *count)
     return 1U;
 }
 
-/* è·å–ç»Ÿè®¡å¿«ç…§ï¼ŒæŠŠå½“å‰ tick_ms ä¹Ÿå†™è¿›å» */
+/* »ñÈ¡Í³¼Æ¿ìÕÕ£¬°Ñµ±Ç° tick_ms Ò²Ğ´½øÈ¥ */
 void air_comm_air_get_stats(air_comm_air_stats_t *stats)
 {
     if(stats == NULL)

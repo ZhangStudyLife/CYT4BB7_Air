@@ -1,45 +1,45 @@
 /*********************************************************************************************************************
- * LC302 UPixels å…‰æµæ¨¡å—é©±åŠ¨å®ç°
+ * LC302 UPixels ¹âÁ÷Ä£¿éÇı¶¯ÊµÏÖ
  *
- * å¸§æ ¼å¼ (å…± 14 å­—èŠ‚):
- *   [0]  0xFE  å¸§å¤´ 1
- *   [1]  0x0A  å¸§å¤´ 2
- *   [2]  flow_x_integral    ä½å­—èŠ‚
- *   [3]  flow_x_integral    é«˜å­—èŠ‚
- *   [4]  flow_y_integral    ä½å­—èŠ‚
- *   [5]  flow_y_integral    é«˜å­—èŠ‚
- *   [6]  integration_timespan ä½å­—èŠ‚
- *   [7]  integration_timespan é«˜å­—èŠ‚
- *   [8]  ground_distance    ä½å­—èŠ‚
- *   [9]  ground_distance    é«˜å­—èŠ‚
+ * Ö¡¸ñÊ½ (¹² 14 ×Ö½Ú):
+ *   [0]  0xFE  Ö¡Í· 1
+ *   [1]  0x0A  Ö¡Í· 2
+ *   [2]  flow_x_integral    µÍ×Ö½Ú
+ *   [3]  flow_x_integral    ¸ß×Ö½Ú
+ *   [4]  flow_y_integral    µÍ×Ö½Ú
+ *   [5]  flow_y_integral    ¸ß×Ö½Ú
+ *   [6]  integration_timespan µÍ×Ö½Ú
+ *   [7]  integration_timespan ¸ß×Ö½Ú
+ *   [8]  ground_distance    µÍ×Ö½Ú
+ *   [9]  ground_distance    ¸ß×Ö½Ú
  *   [10] valid
  *   [11] version
- *   [12] XOR æ ¡éªŒï¼ˆå­—èŠ‚ 2~11 å¼‚æˆ–ï¼‰
- *   [13] 0x55  å¸§å°¾
+ *   [12] XOR Ğ£Ñé£¨×Ö½Ú 2~11 Òì»ò£©
+ *   [13] 0x55  Ö¡Î²
  ********************************************************************************************************************/
 
 #include "LC302.h"
 
-// -------------------- å…¨å±€å˜é‡ --------------------
+// -------------------- È«¾Ö±äÁ¿ --------------------
 OpticalFlowData lc302_data    = {0};
 
 
-// -------------------- å†…éƒ¨å¸¸é‡ --------------------
-#define LC302_HEADER1      0xFEu    // å¸§å¤´ 1
-#define LC302_HEADER2      0x0Au    // å¸§å¤´ 2
-#define LC302_TAIL         0x55u    // å¸§å°¾
-#define LC302_FRAME_LEN    14u      // å®Œæ•´å¸§å­—èŠ‚æ•°
-#define LC302_CRC_INDEX    12u      // XOR æ ¡éªŒå­—èŠ‚ä¸‹æ ‡
-#define LC302_TAIL_INDEX   13u      // å¸§å°¾å­—èŠ‚ä¸‹æ ‡
+// -------------------- ÄÚ²¿³£Á¿ --------------------
+#define LC302_HEADER1      0xFEu    // Ö¡Í· 1
+#define LC302_HEADER2      0x0Au    // Ö¡Í· 2
+#define LC302_TAIL         0x55u    // Ö¡Î²
+#define LC302_FRAME_LEN    14u      // ÍêÕûÖ¡×Ö½ÚÊı
+#define LC302_CRC_INDEX    12u      // XOR Ğ£Ñé×Ö½ÚÏÂ±ê
+#define LC302_TAIL_INDEX   13u      // Ö¡Î²×Ö½ÚÏÂ±ê
 
-// -------------------- å†…éƒ¨çŠ¶æ€å˜é‡ --------------------
-static uint8        s_receiver_data[LC302_FRAME_LEN] = {0};   // æ¥æ”¶å®Œæ•´åŸå§‹å¸§
-static uint8        s_receiver_len = 0;                       // å½“å‰å·²æ¥æ”¶å­—èŠ‚æ•°
+// -------------------- ÄÚ²¿×´Ì¬±äÁ¿ --------------------
+static uint8        s_receiver_data[LC302_FRAME_LEN] = {0};   // ½ÓÊÕÍêÕûÔ­Ê¼Ö¡
+static uint8        s_receiver_len = 0;                       // µ±Ç°ÒÑ½ÓÊÕ×Ö½ÚÊı
 
-static OpticalFlowData s_isr_data  = {0};   // ISR å½±å­ç¼“å†²
-static volatile uint8  s_isr_ready = 0;     // ISR æ–°å¸§æ ‡å¿—
+static OpticalFlowData s_isr_data  = {0};   // ISR Ó°×Ó»º³å
+static volatile uint8  s_isr_ready = 0;     // ISR ĞÂÖ¡±êÖ¾
 
-// -------------------- ä¸²å£æ¥æ”¶æ ¸å¿ƒï¼ˆå•å­—èŠ‚å¤„ç†ï¼‰--------------------
+// -------------------- ´®¿Ú½ÓÊÕºËĞÄ£¨µ¥×Ö½Ú´¦Àí£©--------------------
 static void lc302_feed_byte(uint8 byte)
 {
     uint8 parity_bit_sum = 0;
@@ -70,7 +70,7 @@ static void lc302_feed_byte(uint8 byte)
         if ((s_receiver_data[LC302_TAIL_INDEX] == LC302_TAIL) &&
             (parity_bit_sum == s_receiver_data[LC302_CRC_INDEX]))
         {
-            // æ ¡éªŒé€šè¿‡ï¼Œè§£æå®Œæ•´ receiver_data[14] ä¸­çš„ payload
+            // Ğ£ÑéÍ¨¹ı£¬½âÎöÍêÕû receiver_data[14] ÖĞµÄ payload
             s_isr_data.flow_x_integral      = (int16)((uint16)s_receiver_data[2] | ((uint16)s_receiver_data[3] << 8));
             s_isr_data.flow_y_integral      = (int16)((uint16)s_receiver_data[4] | ((uint16)s_receiver_data[5] << 8));
             s_isr_data.integration_timespan = (uint16)s_receiver_data[6] | ((uint16)s_receiver_data[7] << 8);
@@ -84,11 +84,11 @@ static void lc302_feed_byte(uint8 byte)
     }
 }
 
-// -------------------- å¯¹å¤–æ¥å£ --------------------
+// -------------------- ¶ÔÍâ½Ó¿Ú --------------------
 
 /**
- * @brief  åˆå§‹åŒ– LC302 é©±åŠ¨ï¼ˆUART åˆå§‹åŒ–ï¼‰
- *         éœ€åœ¨ç³»ç»Ÿåˆå§‹åŒ–é˜¶æ®µè°ƒç”¨ï¼Œè°ƒç”¨å‰ç¡®ä¿æ—¶é’Ÿå·²å°±ç»ª
+ * @brief  ³õÊ¼»¯ LC302 Çı¶¯£¨UART ³õÊ¼»¯£©
+ *         ĞèÔÚÏµÍ³³õÊ¼»¯½×¶Îµ÷ÓÃ£¬µ÷ÓÃÇ°È·±£Ê±ÖÓÒÑ¾ÍĞ÷
  */
 void LC302_Init(void)
 {
@@ -104,14 +104,14 @@ void LC302_Init(void)
 
     system_delay_ms(100);
     uart_init(LC302_UART, LC302_BAUD, LC302_TX_PIN, LC302_RX_PIN);
-    uart_rx_interrupt(LC302_UART, 1);   // 1=ä½¿èƒ½ RX_TRIGGER ä¸­æ–­ï¼Œ0=ç¦ç”¨ï¼›uart_init é»˜è®¤ä¼ 0ç¦ç”¨ï¼Œæ­¤å¤„å¿…é¡»æ˜¾å¼ä¼ 1
+    uart_rx_interrupt(LC302_UART, 1);   // 1=Ê¹ÄÜ RX_TRIGGER ÖĞ¶Ï£¬0=½ûÓÃ£»uart_init Ä¬ÈÏ´«0½ûÓÃ£¬´Ë´¦±ØĞëÏÔÊ½´«1
 }
 
 /**
- * @brief  ä¸»å¾ªç¯ä¸­è°ƒç”¨ï¼Œå°† ISR å½±å­ç¼“å†²åŸå­æ‹·è´åˆ° lc302_data
- *         ISR ç‹¬å çŠ¶æ€æœºï¼Œæ­¤å‡½æ•°ä»…è´Ÿè´£å‘å¸ƒæ•°æ®
- * 
- * @note ZYZäº²è‡ªæµ‹è¯•,å‡ ä¹ä¸èŠ±è´¹ä»»ä½•æ€§èƒ½,å°±æ˜¯Copy
+ * @brief  Ö÷Ñ­»·ÖĞµ÷ÓÃ£¬½« ISR Ó°×Ó»º³åÔ­×Ó¿½±´µ½ lc302_data
+ *         ISR ¶ÀÕ¼×´Ì¬»ú£¬´Ëº¯Êı½ö¸ºÔğ·¢²¼Êı¾İ
+ *
+ * @note ZYZÇ××Ô²âÊÔ,¼¸ºõ²»»¨·ÑÈÎºÎĞÔÄÜ,¾ÍÊÇCopy
  */
 void LC302_Update_50HZ(void)
 {
@@ -127,8 +127,8 @@ void LC302_Update_50HZ(void)
 }
 
 /**
- * @brief  UART ISR ä¸­è°ƒç”¨ï¼Œä»ç¡¬ä»¶å–ä¸€å­—èŠ‚å¹¶å–‚å…¥çŠ¶æ€æœº
- *         ä¿æŒ ISR ä¸­å·¥ä½œé‡æœ€å°
+ * @brief  UART ISR ÖĞµ÷ÓÃ£¬´ÓÓ²¼şÈ¡Ò»×Ö½Ú²¢Î¹Èë×´Ì¬»ú
+ *         ±£³Ö ISR ÖĞ¹¤×÷Á¿×îĞ¡
  */
 void LC302_uart_handler(void)
 {

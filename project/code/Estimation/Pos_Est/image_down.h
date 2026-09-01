@@ -27,7 +27,7 @@ typedef struct
     uint8 valid;
 } beacon_rect_t;
 
-/* æ ¸1ä¿¡æ ‡äºŒå€¼åŒ–è¿è¡Œæ—¶é˜ˆå€¼ï¼ŒèŒƒå›´0..255ï¼Œä»ä¸‹ä¸€å¸§å›¾åƒå¼€å§‹ç”Ÿæ•ˆã€‚ */
+/* ºË1ĞÅ±ê¶şÖµ»¯ÔËĞĞÊ±ãĞÖµ£¬·¶Î§0..255£¬´ÓÏÂÒ»Ö¡Í¼Ïñ¿ªÊ¼ÉúĞ§¡£ */
 extern int32 g_image_down_car_lamp_binary_threshold;
 extern int32 g_image_down_car_lamp_max_area;
 extern float g_image_down_match_distance;
@@ -35,25 +35,25 @@ extern float g_image_down_gate_distance;
 extern float g_image_down_new_target_distance;
 extern int32 g_image_down_confirm_frames;
 extern int32 g_image_down_max_misses;
-extern int32 g_image_down_beacon_coast_frames; /* ä¿¡æ ‡çŸ­æš‚ä¸¢å¤±åçš„æœ€å¤§ä¿ç•™å¸§æ•°ã€‚ */
+extern int32 g_image_down_beacon_coast_frames; /* ĞÅ±ê¶ÌÔİ¶ªÊ§ºóµÄ×î´ó±£ÁôÖ¡Êı¡£ */
 extern float g_image_down_filter_pos_alpha;
 extern float g_image_down_filter_vel_alpha;
 extern float g_image_down_beacon_boundary_clearance;
 extern float g_image_down_gray_dedup_distance;
 extern int32 g_image_down_gray_edge_min_peak;
 extern float g_image_down_gray_edge_max_occupancy;
-extern int32 g_image_down_beacon_scan_delta; /* ä¿¡æ ‡æ‰«æé˜ˆå€¼ç›¸å¯¹åœºæ™¯å‡å€¼çš„å¢é‡ã€‚ */
-extern int32 g_image_down_beacon_scan_floor; /* ä¿¡æ ‡æ‰«æé˜ˆå€¼çš„æœ€ä½ç°åº¦ã€‚ */
-extern int32 g_image_down_beacon_response_min; /* ä¿¡æ ‡å€™é€‰çš„æœ€ä½ç°åº¦å“åº”ã€‚ */
-extern int32 g_image_down_beacon_normal_peak; /* æ™®é€šä¿¡æ ‡çš„æœ€ä½å³°å€¼ç°åº¦ã€‚ */
-extern int32 g_image_down_beacon_normal_min_area; /* æ™®é€šä¿¡æ ‡çš„æœ€å°åŠå³°é¢ç§¯ã€‚ */
-extern int32 g_image_down_beacon_normal_max_area; /* æ™®é€šä¿¡æ ‡çš„æœ€å¤§åŠå³°é¢ç§¯ã€‚ */
-extern int32 g_image_down_beacon_medium_peak; /* ä¸­ç­‰ä¿¡æ ‡çš„æœ€ä½å³°å€¼ç°åº¦ã€‚ */
-extern int32 g_image_down_beacon_medium_min_area; /* ä¸­ç­‰ä¿¡æ ‡çš„æœ€å°åŠå³°é¢ç§¯ã€‚ */
-extern int32 g_image_down_beacon_medium_max_area; /* ä¸­ç­‰ä¿¡æ ‡çš„æœ€å¤§åŠå³°é¢ç§¯ã€‚ */
-extern int32 g_image_down_beacon_large_peak; /* å¤§ä¿¡æ ‡çš„æœ€ä½å³°å€¼ç°åº¦ã€‚ */
-extern int32 g_image_down_beacon_large_min_area; /* å¤§ä¿¡æ ‡çš„æœ€å°åŠå³°é¢ç§¯ã€‚ */
-extern int32 g_image_down_beacon_large_max_area; /* å¤§ä¿¡æ ‡çš„æœ€å¤§åŠå³°é¢ç§¯ã€‚ */
+extern int32 g_image_down_beacon_scan_delta; /* ĞÅ±êÉ¨ÃèãĞÖµÏà¶Ô³¡¾°¾ùÖµµÄÔöÁ¿¡£ */
+extern int32 g_image_down_beacon_scan_floor; /* ĞÅ±êÉ¨ÃèãĞÖµµÄ×îµÍ»Ò¶È¡£ */
+extern int32 g_image_down_beacon_response_min; /* ĞÅ±êºòÑ¡µÄ×îµÍ»Ò¶ÈÏìÓ¦¡£ */
+extern int32 g_image_down_beacon_normal_peak; /* ÆÕÍ¨ĞÅ±êµÄ×îµÍ·åÖµ»Ò¶È¡£ */
+extern int32 g_image_down_beacon_normal_min_area; /* ÆÕÍ¨ĞÅ±êµÄ×îĞ¡°ë·åÃæ»ı¡£ */
+extern int32 g_image_down_beacon_normal_max_area; /* ÆÕÍ¨ĞÅ±êµÄ×î´ó°ë·åÃæ»ı¡£ */
+extern int32 g_image_down_beacon_medium_peak; /* ÖĞµÈĞÅ±êµÄ×îµÍ·åÖµ»Ò¶È¡£ */
+extern int32 g_image_down_beacon_medium_min_area; /* ÖĞµÈĞÅ±êµÄ×îĞ¡°ë·åÃæ»ı¡£ */
+extern int32 g_image_down_beacon_medium_max_area; /* ÖĞµÈĞÅ±êµÄ×î´ó°ë·åÃæ»ı¡£ */
+extern int32 g_image_down_beacon_large_peak; /* ´óĞÅ±êµÄ×îµÍ·åÖµ»Ò¶È¡£ */
+extern int32 g_image_down_beacon_large_min_area; /* ´óĞÅ±êµÄ×îĞ¡°ë·åÃæ»ı¡£ */
+extern int32 g_image_down_beacon_large_max_area; /* ´óĞÅ±êµÄ×î´ó°ë·åÃæ»ı¡£ */
 extern float g_image_down_gray_weak_peak_delta;
 extern int32 g_image_down_gray_weak_peak_floor;
 extern int32 g_image_down_gray_weak_min_area;
@@ -64,23 +64,23 @@ extern float g_image_down_car_score_track;
 extern float g_image_down_car_score_margin;
 
 /*
- * å‡½æ•°åŠŸèƒ½: åˆå§‹åŒ–ä¸‹æ‘„å›¾åƒç®—æ³•ã€æ‘„åƒå¤´æ¥å£åŠ5000å¸§æ€§èƒ½ç»Ÿè®¡çª—å£ã€‚
- * è¾“å…¥å‚æ•°: æ— ã€‚
- * è¿”å›å€¼: æ— ã€‚
+ * º¯Êı¹¦ÄÜ: ³õÊ¼»¯ÏÂÉãÍ¼ÏñËã·¨¡¢ÉãÏñÍ·½Ó¿Ú¼°5000Ö¡ĞÔÄÜÍ³¼Æ´°¿Ú¡£
+ * ÊäÈë²ÎÊı: ÎŞ¡£
+ * ·µ»ØÖµ: ÎŞ¡£
  */
 void image_down_init(void);
 
 /*
- * å‡½æ•°åŠŸèƒ½: ä»…åœ¨æ‘„åƒå¤´å‘å¸ƒçœŸå®æ–°å¸§æ—¶é”å­˜å›¾åƒå¹¶æ‰§è¡Œä¸‹æ‘„ç®—æ³•ã€‚
- * è¾“å…¥å‚æ•°: æ— ã€‚
- * è¿”å›å€¼: 1è¡¨ç¤ºæœ¬æ¬¡å®Œæˆäº†ä¸€å¸§å¤„ç†ï¼›0è¡¨ç¤ºæ²¡æœ‰å¯å¤„ç†çš„æ–°å¸§ã€‚
+ * º¯Êı¹¦ÄÜ: ½öÔÚÉãÏñÍ··¢²¼ÕæÊµĞÂÖ¡Ê±Ëø´æÍ¼Ïñ²¢Ö´ĞĞÏÂÉãËã·¨¡£
+ * ÊäÈë²ÎÊı: ÎŞ¡£
+ * ·µ»ØÖµ: 1±íÊ¾±¾´ÎÍê³ÉÁËÒ»Ö¡´¦Àí£»0±íÊ¾Ã»ÓĞ¿É´¦ÀíµÄĞÂÖ¡¡£
  */
 uint8 image_down_update(void);
 uint8 *image_down_get_frame_buffer(void);
 const uint8 *image_down_get_binary_buffer(void);
 const uint8 *image_down_get_car_lamp_binary_buffer(void);
 
-/* åœ¨æ ¸1å›¾åƒå¸§è¾¹ç•Œæ‰§è¡Œå‚æ•°SET/GETï¼Œå¹¶ç«‹å³è¯»å›å®é™…å€¼ã€‚ */
+/* ÔÚºË1Í¼ÏñÖ¡±ß½çÖ´ĞĞ²ÎÊıSET/GET£¬²¢Á¢¼´¶Á»ØÊµ¼ÊÖµ¡£ */
 uint8 image_down_remote_param_execute(uint8 op,
                                       uint8 type,
                                       uint16 param_id,

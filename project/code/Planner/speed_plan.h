@@ -6,11 +6,11 @@
 void SpeedPlan_Reset(void);
 
 /**
- * @brief æ ¹æ®ç›®æ ‡è·ç¦»ã€æ–¹å‘å’Œå½“å‰è·ŸéšçŠ¶æ€é€‰æ‹©è½¦æ¨¡é€Ÿåº¦æ¨¡é•¿ã€‚
- * @param target_valid ç›®æ ‡æ–¹å‘æœ‰æ•ˆæ—¶ä¸º1ï¼Œå¦åˆ™ä¸º0ã€‚
- * @param target_distance_m è½¦ç¯åˆ°ç›®æ ‡ä¿¡æ ‡çš„æ°´å¹³è·ç¦»ï¼Œå•ä½mã€‚
- * @param target_angle_deg ç›®æ ‡æ–¹å‘ä¸è½¦ä½“æ­£å‰æ–¹çš„å¤¹è§’ï¼ŒèŒƒå›´0è‡³180degã€‚
- * @return Car_Speedæˆ–Car_Speed_Fastã€‚
+ * @brief ¸ù¾İÄ¿±ê¾àÀë¡¢·½ÏòºÍµ±Ç°¸úËæ×´Ì¬Ñ¡Ôñ³µÄ£ËÙ¶ÈÄ£³¤¡£
+ * @param target_valid Ä¿±ê·½ÏòÓĞĞ§Ê±Îª1£¬·ñÔòÎª0¡£
+ * @param target_distance_m ³µµÆµ½Ä¿±êĞÅ±êµÄË®Æ½¾àÀë£¬µ¥Î»m¡£
+ * @param target_angle_deg Ä¿±ê·½ÏòÓë³µÌåÕıÇ°·½µÄ¼Ğ½Ç£¬·¶Î§0ÖÁ180deg¡£
+ * @return Car_Speed»òCar_Speed_Fast¡£
  */
 float SpeedPlan_Update(uint8 target_valid,
                        float target_distance_m,

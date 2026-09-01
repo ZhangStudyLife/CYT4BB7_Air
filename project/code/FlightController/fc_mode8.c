@@ -15,16 +15,16 @@ extern float g_car_sync_time_ms;
 extern uint32 g_car_last_update_time_ms;
 extern volatile uint32 tick_1000us_cnt;
 
-pid_t g_mode8_imgx_pid; /* æ¨¡å¼8å›¾åƒXè½´ä½ç½®ç¯PIDçŠ¶æ€ï¼Œä¾›æ§åˆ¶ä¸è°ƒè¯•è®¿é—®ã€‚ */
-pid_t g_mode8_imgy_pid; /* æ¨¡å¼8å›¾åƒYè½´ä½ç½®ç¯PIDçŠ¶æ€ï¼Œä¾›æ§åˆ¶ä¸è°ƒè¯•è®¿é—®ã€‚ */
+pid_t g_mode8_imgx_pid; /* Ä£Ê½8Í¼ÏñXÖáÎ»ÖÃ»·PID×´Ì¬£¬¹©¿ØÖÆÓëµ÷ÊÔ·ÃÎÊ¡£ */
+pid_t g_mode8_imgy_pid; /* Ä£Ê½8Í¼ÏñYÖáÎ»ÖÃ»·PID×´Ì¬£¬¹©¿ØÖÆÓëµ÷ÊÔ·ÃÎÊ¡£ */
 pid_t g_mode8_velx_pid;
 pid_t g_mode8_vely_pid;
 float g_mode8_velx_target = 0.0f;
 float g_mode8_vely_target = 0.0f;
-float g_mode8_turn_accel_ff_gain_x = 0.72f;      /* æ¨¡å¼8è½¬å¼¯åŠ é€Ÿåº¦Xè½´å‰é¦ˆæ¯”ä¾‹ï¼Œç”¨äºç›´æ¥è°ƒè¯•ã€‚ */
-float g_mode8_turn_accel_ff_gain_y = 0.30f;      /* æ¨¡å¼8è½¬å¼¯åŠ é€Ÿåº¦Yè½´å‰é¦ˆæ¯”ä¾‹ï¼Œç”¨äºç›´æ¥è°ƒè¯•ã€‚ */
-float g_mode8_turn_accel_ff_limit_x_deg = 18.0f; /* æ¨¡å¼8è½¬å¼¯åŠ é€Ÿåº¦Xè½´å‰é¦ˆé™å¹…ï¼Œå•ä½ degã€‚ */
-float g_mode8_turn_accel_ff_limit_y_deg = 14.0f; /* æ¨¡å¼8è½¬å¼¯åŠ é€Ÿåº¦Yè½´å‰é¦ˆé™å¹…ï¼Œå•ä½ degã€‚ */
+float g_mode8_turn_accel_ff_gain_x = 0.72f;      /* Ä£Ê½8×ªÍä¼ÓËÙ¶ÈXÖáÇ°À¡±ÈÀı£¬ÓÃÓÚÖ±½Óµ÷ÊÔ¡£ */
+float g_mode8_turn_accel_ff_gain_y = 0.30f;      /* Ä£Ê½8×ªÍä¼ÓËÙ¶ÈYÖáÇ°À¡±ÈÀı£¬ÓÃÓÚÖ±½Óµ÷ÊÔ¡£ */
+float g_mode8_turn_accel_ff_limit_x_deg = 18.0f; /* Ä£Ê½8×ªÍä¼ÓËÙ¶ÈXÖáÇ°À¡ÏŞ·ù£¬µ¥Î» deg¡£ */
+float g_mode8_turn_accel_ff_limit_y_deg = 14.0f; /* Ä£Ê½8×ªÍä¼ÓËÙ¶ÈYÖáÇ°À¡ÏŞ·ù£¬µ¥Î» deg¡£ */
 
 static float s_mode8_prev_velx_target = 0.0f;
 static float s_mode8_prev_vely_target = 0.0f;
@@ -164,7 +164,7 @@ void FC_Mode8_Control100Hz(float dt)
                          ? 1U
                          : 0U;
 
-    /* å°†è½¦æ¨¡å³/å‰é€Ÿåº¦æ—‹è½¬åˆ°é£æœºå³/åæ§åˆ¶åæ ‡ç³»ï¼Œè½¦ç«¯æ—¶é—´æˆ³è¶…æ—¶åˆ™ä¸å åŠ ã€‚ */
+    /* ½«³µÄ£ÓÒ/Ç°ËÙ¶ÈĞı×ªµ½·É»úÓÒ/ºó¿ØÖÆ×ø±êÏµ£¬³µ¶ËÊ±¼ä´Á³¬Ê±Ôò²»µş¼Ó¡£ */
     if (car_data_fresh != 0U)
     {
         yaw_diff_rad = g_car_yaw - g_euler.yaw;
@@ -184,7 +184,7 @@ void FC_Mode8_Control100Hz(float dt)
         car_ff_y = (g_car_vel_x * yaw_sin - g_car_vel_y * yaw_cos) *
                    g_fc_params.mode8_kp_car_y;
 
-        /* omega x velocity ç»™å‡ºè½¦ä½“ç³»è½¬å¼¯åŠ é€Ÿåº¦ï¼Œå†æ—‹è½¬ä¸ºé£æœº roll/pitch å‰é¦ˆã€‚ */
+        /* omega x velocity ¸ø³ö³µÌåÏµ×ªÍä¼ÓËÙ¶È£¬ÔÙĞı×ªÎª·É»ú roll/pitch Ç°À¡¡£ */
         car_turn_accel_x = g_car_yaw_rate_dps * 0.017453292519943295f * g_car_vel_y;
         car_turn_accel_y = -g_car_yaw_rate_dps * 0.017453292519943295f * g_car_vel_x;
         turn_ff_x = g_mode8_turn_accel_ff_gain_x * 57.29577951308232f *
@@ -210,7 +210,7 @@ void FC_Mode8_Control100Hz(float dt)
 
     roll_trim = FC_Mode_Get_Roll_Mech_Trim_Deg();
     pitch_trim = FC_Mode_Get_Pitch_Mech_Trim_Deg();
-    /* ä¸²å£è¶…æ—¶åŒæ—¶æ¸…ç©ºè§’åº¦KFFæ»¤æ³¢æ®‹é‡ï¼Œé¿å…æ–­é“¾ç¬é—´äº§ç”Ÿåå‘å‰é¦ˆã€‚ */
+    /* ´®¿Ú³¬Ê±Í¬Ê±Çå¿Õ½Ç¶ÈKFFÂË²¨²ĞÁ¿£¬±ÜÃâ¶ÏÁ´Ë²¼ä²úÉú·´ÏòÇ°À¡¡£ */
     if (car_data_fresh != 0U)
     {
         velx_ff = FC_Mode_Clamp(g_fc_params.mode8_vel_x_kff * velx_target_rate + turn_ff_x,

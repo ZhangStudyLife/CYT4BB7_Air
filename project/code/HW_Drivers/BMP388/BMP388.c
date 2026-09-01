@@ -1,6 +1,6 @@
-ï»¿#include "BMP388.h"
+#include "BMP388.h"
 
-// å‚è€ƒPX4 BMP388å¯„å­˜å™¨å®šä¹‰
+// ²Î¿¼PX4 BMP388¼Ä´æÆ÷¶¨Òå
 #define BMP3_CHIP_ID_ADDR                    (0x00U)
 #define BMP3_ERR_REG_ADDR                    (0x02U)
 #define BMP3_STATUS_REG_ADDR                 (0x03U)
@@ -15,21 +15,21 @@
 #define BMP3_CHIP_ID                         (0x50U)
 #define BMP3_SOFT_RESET_CMD                  (0xB6U)
 
-// SPIè¯»å†™æ§åˆ¶ä½
+// SPI¶ÁĞ´¿ØÖÆÎ»
 #define BMP388_SPI_READ_MASK                 (0x80U)
 #define BMP388_SPI_WRITE_MASK                (0x7FU)
 
-// æ•°æ®é•¿åº¦
+// Êı¾İ³¤¶È
 #define BMP3_P_T_DATA_LEN                    (6U)
 #define BMP3_CALIB_DATA_LEN                  (21U)
 
-// çŠ¶æ€ä½
+// ×´Ì¬Î»
 #define BMP3_CMD_RDY                         (0x10U)
 #define BMP3_DRDY_PRESS                      (0x20U)
 #define BMP3_DRDY_TEMP                       (0x40U)
 #define BMP3_CMD_ERR                         (0x02U)
 
-// PWR_CTRLä½åŸŸ
+// PWR_CTRLÎ»Óò
 #define BMP3_PRESS_EN_MSK                    (0x01U)
 #define BMP3_PRESS_EN_POS                    (0U)
 #define BMP3_TEMP_EN_MSK                     (0x02U)
@@ -37,7 +37,7 @@
 #define BMP3_OP_MODE_MSK                     (0x30U)
 #define BMP3_OP_MODE_POS                     (4U)
 
-// OSR ODR IIRä½åŸŸ
+// OSR ODR IIRÎ»Óò
 #define BMP3_PRESS_OS_MSK                    (0x07U)
 #define BMP3_PRESS_OS_POS                    (0U)
 #define BMP3_TEMP_OS_MSK                     (0x38U)
@@ -47,17 +47,17 @@
 #define BMP3_IIR_FILTER_MSK                  (0x0EU)
 #define BMP3_IIR_FILTER_POS                  (1U)
 
-// å·¥ä½œæ¨¡å¼
+// ¹¤×÷Ä£Ê½
 #define BMP3_OP_MODE_SLEEP                   (0U)
 #define BMP3_OP_MODE_FORCED                  (1U)
 
-// é»˜è®¤é…ç½® ä¸¥æ ¼å‚è€ƒPX4é»˜è®¤å€¼
+// Ä¬ÈÏÅäÖÃ ÑÏ¸ñ²Î¿¼PX4Ä¬ÈÏÖµ
 #define BMP3_OVERSAMPLING_2X                 (1U)
 #define BMP3_OVERSAMPLING_16X                (4U)
 #define BMP3_ODR_50_HZ                       (2U)
 #define BMP3_IIR_FILTER_DISABLE              (0U)
 
-// è½®è¯¢ä¸æ—¶åº
+// ÂÖÑ¯ÓëÊ±Ğò
 #define BMP388_SPI_DELAY_US                  (1U)
 #define BMP388_CS_GUARD_US                   (1U)
 #define BMP388_CMD_READY_TIMEOUT_US          (50000U)
@@ -94,7 +94,7 @@ volatile BMP388_data_t g_BMP388_data = {0};
 static uint8 s_bmp388_nonblock_waiting = 0U;
 static uint16 s_bmp388_nonblock_wait_calls = 0U;
 
-// è½¯ä»¶SPIå•å­—èŠ‚æ”¶å‘ CPOL=1 CPHA=1 æ¨¡å¼3
+// Èí¼şSPIµ¥×Ö½ÚÊÕ·¢ CPOL=1 CPHA=1 Ä£Ê½3
 static uint8 BMP388_spi_transfer_byte(uint8 tx)
 {
     uint8 i;
@@ -102,7 +102,7 @@ static uint8 BMP388_spi_transfer_byte(uint8 tx)
 
     for (i = 0U; i < 8U; ++i)
     {
-        // æ¨¡å¼3 å…ˆæ‹‰ä½æ—¶é’Ÿå‡†å¤‡æ•°æ® å†åœ¨ä¸Šå‡æ²¿é‡‡æ ·
+        // Ä£Ê½3 ÏÈÀ­µÍÊ±ÖÓ×¼±¸Êı¾İ ÔÙÔÚÉÏÉıÑØ²ÉÑù
         gpio_low(g_BMP388_dev.sck_pin);
         if ((tx & 0x80U) != 0U)
         {
@@ -146,7 +146,7 @@ static uint8 BMP388_read_reg(uint8 reg, uint8 *value)
 
     BMP388_spi_begin();
     (void)BMP388_spi_transfer_byte((uint8)(reg | BMP388_SPI_READ_MASK));
-    // BMP388 SPI è¯»å¯„å­˜å™¨åœ¨åœ°å€åå­˜åœ¨ 1 å­—èŠ‚ dummyï¼Œéœ€å…ˆä¸¢å¼ƒ
+    // BMP388 SPI ¶Á¼Ä´æÆ÷ÔÚµØÖ·ºó´æÔÚ 1 ×Ö½Ú dummy£¬ĞèÏÈ¶ªÆú
     (void)BMP388_spi_transfer_byte(0x00U);
     *value = BMP388_spi_transfer_byte(0x00U);
     BMP388_spi_end();
@@ -165,7 +165,7 @@ static uint8 BMP388_read_regs(uint8 reg, uint8 *buf, uint8 len)
 
     BMP388_spi_begin();
     (void)BMP388_spi_transfer_byte((uint8)(reg | BMP388_SPI_READ_MASK));
-    // è¿ç»­è¯»åŒæ ·å…ˆä¸¢å¼ƒ dummy å­—èŠ‚
+    // Á¬Ğø¶ÁÍ¬ÑùÏÈ¶ªÆú dummy ×Ö½Ú
     (void)BMP388_spi_transfer_byte(0x00U);
     for (i = 0U; i < len; ++i)
     {
@@ -185,7 +185,7 @@ static uint8 BMP388_write_reg(uint8 reg, uint8 value)
     return BMP388_RET_OK;
 }
 
-// PX4åŒæ¬¾CRC8è®¡ç®— å¤šé¡¹å¼0x1D
+// PX4Í¬¿îCRC8¼ÆËã ¶àÏîÊ½0x1D
 static int8 BMP388_cal_crc(uint8 seed, uint8 data)
 {
     int8 index;
@@ -210,7 +210,7 @@ static int8 BMP388_cal_crc(uint8 seed, uint8 data)
     return (int8)seed;
 }
 
-// æ ¡éªŒNVMæ ¡å‡†å‚æ•°CRC é¿å…å¼‚å¸¸æ ¡å‡†å¯¼è‡´è¡¥å¿å¤±çœŸ
+// Ğ£ÑéNVMĞ£×¼²ÎÊıCRC ±ÜÃâÒì³£Ğ£×¼µ¼ÖÂ²¹³¥Ê§Õæ
 static uint8 BMP388_validate_trim_crc(const uint8 *calib_raw)
 {
     uint8 i;
@@ -242,7 +242,7 @@ static uint8 BMP388_validate_trim_crc(const uint8 *calib_raw)
     return BMP388_RET_OK;
 }
 
-// å‚è€ƒPX4ç»„åˆå¾—åˆ°æµ‹é‡æ—¶é—´ å•ä½us ç”¨äºæ›´æ–°è½®è¯¢è¶…æ—¶
+// ²Î¿¼PX4×éºÏµÃµ½²âÁ¿Ê±¼ä µ¥Î»us ÓÃÓÚ¸üĞÂÂÖÑ¯³¬Ê±
 static uint32 BMP388_get_measurement_time_us(uint8 osr_t, uint8 osr_p)
 {
     uint32 temp_pow = 0U;
@@ -278,7 +278,7 @@ static uint32 BMP388_get_measurement_time_us(uint8 osr_t, uint8 osr_p)
     return (uint32)(2789U + (2000U << temp_pow) + (2000U << press_pow));
 }
 
-// è½¯å¤ä½å¹¶æ£€æŸ¥å‘½ä»¤é”™è¯¯ä½
+// Èí¸´Î»²¢¼ì²éÃüÁî´íÎóÎ»
 static uint8 BMP388_soft_reset(void)
 {
     uint32 waited_us = 0U;
@@ -292,7 +292,7 @@ static uint8 BMP388_soft_reset(void)
 
     system_delay_ms(BMP388_RESET_WAIT_MS);
 
-    // å¤ä½åè½®è¯¢ç­‰å¾…å‘½ä»¤å°±ç»ª
+    // ¸´Î»ºóÂÖÑ¯µÈ´ıÃüÁî¾ÍĞ÷
     while (waited_us < BMP388_CMD_READY_TIMEOUT_US)
     {
         if (BMP388_RET_OK != BMP388_read_reg(BMP3_STATUS_REG_ADDR, &status))
@@ -371,7 +371,7 @@ static uint8 BMP388_read_calib_data(void)
         system_delay_ms(2U);
     }
 
-    // éä¸¥æ ¼æ¨¡å¼ä¸‹ï¼ŒCRCå¤±è´¥ä½†æ•°æ®ä¸æ˜¯å…¨0/å…¨FFæ—¶å…è®¸ç»§ç»­ï¼Œé¿å…åˆå§‹åŒ–è¢«å¡æ­»
+    // ·ÇÑÏ¸ñÄ£Ê½ÏÂ£¬CRCÊ§°Üµ«Êı¾İ²»ÊÇÈ«0/È«FFÊ±ÔÊĞí¼ÌĞø£¬±ÜÃâ³õÊ¼»¯±»¿¨ËÀ
     all_zero = 1U;
     all_ff = 1U;
     for (i = 0U; i < BMP3_CALIB_DATA_LEN; ++i)
@@ -400,7 +400,7 @@ static uint8 BMP388_read_calib_data(void)
 #endif
 }
 
-// å‚è€ƒPX4 å†™å…¥PWR_CTRL OSR ODR IIR å¹¶è®°å½•æµ‹é‡æ—¶é—´
+// ²Î¿¼PX4 Ğ´ÈëPWR_CTRL OSR ODR IIR ²¢¼ÇÂ¼²âÁ¿Ê±¼ä
 static uint8 BMP388_set_sensor_settings(void)
 {
     uint8 reg_data;
@@ -411,7 +411,7 @@ static uint8 BMP388_set_sensor_settings(void)
         return BMP388_RET_ERR_CONFIG;
     }
 
-    // ä½¿èƒ½æ¸©åº¦å’Œæ°”å‹é€šé“ ä¿æŒsleep updateä¸­å†è§¦å‘forced
+    // Ê¹ÄÜÎÂ¶ÈºÍÆøÑ¹Í¨µÀ ±£³Ösleep updateÖĞÔÙ´¥·¢forced
     reg_data = BMP3_SET_BITS_POS_0(0U, BMP3_PRESS_EN, 1U);
     reg_data = BMP3_SET_BITS(reg_data, BMP3_TEMP_EN, 1U);
     if (BMP388_RET_OK != BMP388_write_reg(BMP3_PWR_CTRL_ADDR, reg_data))
@@ -419,7 +419,7 @@ static uint8 BMP388_set_sensor_settings(void)
         return BMP388_RET_ERR_CONFIG;
     }
 
-    // é…ç½®è¿‡é‡‡æ ·
+    // ÅäÖÃ¹ı²ÉÑù
     reg_data = BMP3_SET_BITS_POS_0(0U, BMP3_PRESS_OS, g_BMP388_dev.osr_p);
     reg_data = BMP3_SET_BITS(reg_data, BMP3_TEMP_OS, g_BMP388_dev.osr_t);
     if (BMP388_RET_OK != BMP388_write_reg(BMP3_OSR_ADDR, reg_data))
@@ -427,14 +427,14 @@ static uint8 BMP388_set_sensor_settings(void)
         return BMP388_RET_ERR_CONFIG;
     }
 
-    // é…ç½®è¾“å‡ºæ•°æ®ç‡
+    // ÅäÖÃÊä³öÊı¾İÂÊ
     reg_data = BMP3_SET_BITS_POS_0(0U, BMP3_ODR, g_BMP388_dev.odr);
     if (BMP388_RET_OK != BMP388_write_reg(BMP3_ODR_ADDR, reg_data))
     {
         return BMP388_RET_ERR_CONFIG;
     }
 
-    // é…ç½®IIRæ»¤æ³¢
+    // ÅäÖÃIIRÂË²¨
     reg_data = BMP3_SET_BITS(0U, BMP3_IIR_FILTER, g_BMP388_dev.iir_coef);
     if (BMP388_RET_OK != BMP388_write_reg(BMP3_CONFIG_ADDR, reg_data))
     {
@@ -444,7 +444,7 @@ static uint8 BMP388_set_sensor_settings(void)
     return BMP388_RET_OK;
 }
 
-// åˆ‡æ¢å·¥ä½œæ¨¡å¼ å‚è€ƒPX4 å…ˆå›sleep å†è¿›å…¥ç›®æ ‡æ¨¡å¼
+// ÇĞ»»¹¤×÷Ä£Ê½ ²Î¿¼PX4 ÏÈ»Øsleep ÔÙ½øÈëÄ¿±êÄ£Ê½
 static uint8 BMP388_set_op_mode(uint8 mode)
 {
     uint8 reg_data = 0U;
@@ -486,7 +486,7 @@ static void BMP388_parse_raw_data(const uint8 *reg_data, uint32 *uncomp_press, u
     *uncomp_temp  = (uint32)((uint32)reg_data[5] << 16 | (uint32)reg_data[4] << 8 | reg_data[3]);
 }
 
-// å‚è€ƒPX4å’ŒBosch æ•´æ•°æ¸©åº¦è¡¥å¿ è¾“å‡ºå•ä½0.01æ‘„æ°åº¦
+// ²Î¿¼PX4ºÍBosch ÕûÊıÎÂ¶È²¹³¥ Êä³öµ¥Î»0.01ÉãÊÏ¶È
 static int64 BMP388_compensate_temperature(uint32 uncomp_temp)
 {
     int64 partial_data1;
@@ -510,7 +510,7 @@ static int64 BMP388_compensate_temperature(uint32 uncomp_temp)
     return comp_temp;
 }
 
-// å‚è€ƒPX4å’ŒBosch æ•´æ•°æ°”å‹è¡¥å¿ è¾“å‡ºå•ä½0.01Pa
+// ²Î¿¼PX4ºÍBosch ÕûÊıÆøÑ¹²¹³¥ Êä³öµ¥Î»0.01Pa
 static uint64 BMP388_compensate_pressure(uint32 uncomp_press)
 {
     int64 partial_data1;
@@ -523,7 +523,7 @@ static uint64 BMP388_compensate_pressure(uint32 uncomp_press)
     int64 sensitivity;
     uint64 comp_press;
 
-    // è¯¥å®ç°ä¸¥æ ¼å¯¹é½ Bosch/PX4 çš„ BMP388 æ•´æ•°è¡¥å¿æµç¨‹ï¼Œè¾“å‡ºå•ä½ 0.01Pa
+    // ¸ÃÊµÏÖÑÏ¸ñ¶ÔÆë Bosch/PX4 µÄ BMP388 ÕûÊı²¹³¥Á÷³Ì£¬Êä³öµ¥Î» 0.01Pa
     partial_data1 = (int64)(g_BMP388_calib.t_lin * g_BMP388_calib.t_lin);
     partial_data2 = (int64)(partial_data1 / 64LL);
     partial_data3 = (int64)((partial_data2 * g_BMP388_calib.t_lin) / 256LL);
@@ -542,7 +542,7 @@ static uint64 BMP388_compensate_pressure(uint32 uncomp_press)
     partial_data3 = (int64)(partial_data2 + (65536LL * (int64)g_BMP388_calib.par_p9));
     partial_data4 = (int64)((partial_data3 * (int64)uncomp_press) / 8192LL);
 
-    // å…ˆé™¤åä¹˜ï¼Œè§„é¿ (uncomp_press * partial_data4) ä¸­é—´æº¢å‡º
+    // ÏÈ³ıºó³Ë£¬¹æ±Ü (uncomp_press * partial_data4) ÖĞ¼äÒç³ö
     partial_data5 = (int64)(((int64)uncomp_press * (partial_data4 / 10LL)) / 512LL);
     partial_data5 = (int64)(partial_data5 * 10LL);
 
@@ -591,7 +591,7 @@ uint8 BMP388_init(void)
     s_bmp388_nonblock_waiting = 0U;
     s_bmp388_nonblock_wait_calls = 0U;
 
-    // å›ºå®šå¼•è„šåˆå§‹åŒ– SCK CS MOSIè¾“å‡º MISOè¾“å…¥
+    // ¹Ì¶¨Òı½Å³õÊ¼»¯ SCK CS MOSIÊä³ö MISOÊäÈë
     gpio_init(g_BMP388_dev.sck_pin, GPO, GPIO_HIGH, GPO_PUSH_PULL);
     gpio_init(g_BMP388_dev.mosi_pin, GPO, GPIO_LOW, GPO_PUSH_PULL);
     gpio_init(g_BMP388_dev.cs_pin, GPO, GPIO_HIGH, GPO_PUSH_PULL);
@@ -614,7 +614,7 @@ uint8 BMP388_init(void)
         return BMP388_RET_ERR_CHIP_ID;
     }
 
-    // å‚è€ƒPX4å¤ä½åé¢å¤–ç­‰å¾…ï¼Œä¿è¯NVMå‚æ•°ç¨³å®šå¯è¯»
+    // ²Î¿¼PX4¸´Î»ºó¶îÍâµÈ´ı£¬±£Ö¤NVM²ÎÊıÎÈ¶¨¿É¶Á
     system_delay_us(BMP388_POST_INIT_WAIT_US);
 
     ret = BMP388_read_calib_data();
@@ -647,14 +647,14 @@ uint8 BMP388_update(void)
     s_bmp388_nonblock_waiting = 0U;
     s_bmp388_nonblock_wait_calls = 0U;
 
-    // è§¦å‘ä¸€æ¬¡forcedæµ‹é‡
+    // ´¥·¢Ò»´Îforced²âÁ¿
     ret = BMP388_set_op_mode(BMP3_OP_MODE_FORCED);
     if (BMP388_RET_OK != ret)
     {
         return ret;
     }
 
-    // è½®è¯¢ç­‰å¾…æ¸©åº¦å’Œæ°”å‹å°±ç»ª åŒæ—¶åšè¶…æ—¶ä¿æŠ¤
+    // ÂÖÑ¯µÈ´ıÎÂ¶ÈºÍÆøÑ¹¾ÍĞ÷ Í¬Ê±×ö³¬Ê±±£»¤
     timeout_us = g_BMP388_dev.measure_time_us + BMP388_DRDY_TIMEOUT_MARGIN_US;
     while (timeout_us > 0U)
     {

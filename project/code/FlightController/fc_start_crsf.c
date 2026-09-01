@@ -4,8 +4,8 @@
 
 #define FC_START_CRSF_TASK_PERIOD_MS (100U)
 #define FC_START_CRSF_LANDING_HOLD_TICKS_100HZ (20U)
-#define FC_START_CRSF_LANDING_REQUEST_HOLD_TICKS_100HZ (50U) /* CRSF_STD[3]ä½ä½è§¦å‘é™è½æ‰€éœ€è¿ç»­å‘¨æœŸæ•° */
-#define FC_START_CRSF_LANDING_CH3_LOW_THR (-333) /* CRSF_STD[3]æ ‡å‡†èŒƒå›´åº•éƒ¨ä¸‰åˆ†ä¹‹ä¸€é˜ˆå€¼ */
+#define FC_START_CRSF_LANDING_REQUEST_HOLD_TICKS_100HZ (50U) /* CRSF_STD[3]µÍÎ»´¥·¢½µÂäËùĞèÁ¬ĞøÖÜÆÚÊı */
+#define FC_START_CRSF_LANDING_CH3_LOW_THR (-333) /* CRSF_STD[3]±ê×¼·¶Î§µ×²¿Èı·ÖÖ®Ò»ãĞÖµ */
 #define FC_START_CRSF_LANDING_STOP_HEIGHT_MM (220.0f)
 #define FC_START_CRSF_LANDING_RESET_HEIGHT_MM (350.0f)
 #define FC_START_CRSF_TAKEOFF_PAIR1_RAMP_MS (800U)
@@ -14,10 +14,10 @@
 #define FC_START_CRSF_TAKEOFF_HOLD_2500_MS (2000U)
 #define FC_START_CRSF_TAKEOFF_THR_STAGE1 (1500)
 #define FC_START_CRSF_TAKEOFF_THR_STAGE2 (2500)
-#define FC_START_CRSF_EMERGENCY_STOP_HOLD_MS (500U) /* CH7ä½ä½è§¦å‘ç´§æ€¥åœæœºæ‰€éœ€æŒç»­æ—¶é—´ï¼Œå•ä½ms */
-#define FC_START_CRSF_EXIT_BEEP_DUTY (80U) /* é€€å‡ºé£è¡Œæ—¶èœ‚é¸£å™¨å“å£°å ç©ºæ¯” */
-#define FC_START_CRSF_EXIT_BEEP_CYCLE_S (0.5f) /* é€€å‡ºé£è¡Œæ—¶å•æ¬¡èœ‚é¸£å‘¨æœŸï¼Œå•ä½s */
-#define FC_START_CRSF_EXIT_BEEP_COUNT (3U) /* å¸¸è§„é€€å‡ºé£è¡Œæ—¶èœ‚é¸£æ¬¡æ•° */
+#define FC_START_CRSF_EMERGENCY_STOP_HOLD_MS (500U) /* CH7µÍÎ»´¥·¢½ô¼±Í£»úËùĞè³ÖĞøÊ±¼ä£¬µ¥Î»ms */
+#define FC_START_CRSF_EXIT_BEEP_DUTY (80U) /* ÍË³ö·ÉĞĞÊ±·äÃùÆ÷ÏìÉùÕ¼¿Õ±È */
+#define FC_START_CRSF_EXIT_BEEP_CYCLE_S (0.5f) /* ÍË³ö·ÉĞĞÊ±µ¥´Î·äÃùÖÜÆÚ£¬µ¥Î»s */
+#define FC_START_CRSF_EXIT_BEEP_COUNT (3U) /* ³£¹æÍË³ö·ÉĞĞÊ±·äÃù´ÎÊı */
 
 FC_START_CRSF_state_e s_fc_start_state = FC_START_CRSF_STATE_INIT;
 static FC_START_CRSF_flight_mode_e s_fc_flight_mode = FC_START_CRSF_FLIGHT_MODE_0;
@@ -27,7 +27,7 @@ static uint16_t s_takeoff_timer_tick = 0U;
 static uint8_t s_landing_button_tick = 0U;
 static uint8_t s_landing_low_tick = 0U;
 static uint8_t s_motor_armed = 0U;
-/* èµ·é£å‰æ ¡å‡†æ˜¯å¦å·²å®Œæˆï¼š0=æœªæ‰§è¡Œï¼Œ1=å·²æ‰§è¡Œï¼ˆè¿›å…¥TAKEOFFçŠ¶æ€æ—¶é¦–æ¬¡è§¦å‘æ ¡å‡†ï¼‰ */
+/* Æğ·ÉÇ°Ğ£×¼ÊÇ·ñÒÑÍê³É£º0=Î´Ö´ĞĞ£¬1=ÒÑÖ´ĞĞ£¨½øÈëTAKEOFF×´Ì¬Ê±Ê×´Î´¥·¢Ğ£×¼£© */
 static uint8_t s_takeoff_calib_done = 0U;
 
 static uint8_t FC_START_CRSF_IsUnlockStickCommand(void)
@@ -80,7 +80,7 @@ static void FC_START_CRSF_ForceStopToStandby(void)
     s_unlock_timer_tick = 0U;
     s_landing_button_tick = 0U;
     s_landing_low_tick = 0U;
-    s_takeoff_calib_done = 0U;   /* é‡ç½®æ ¡å‡†æ ‡å¿—ï¼Œä¸‹æ¬¡èµ·é£æ—¶é‡æ–°æ‰§è¡Œæ ¡å‡† */
+    s_takeoff_calib_done = 0U;   /* ÖØÖÃĞ£×¼±êÖ¾£¬ÏÂ´ÎÆğ·ÉÊ±ÖØĞÂÖ´ĞĞĞ£×¼ */
 
     Motor_EmergencyStop();
     Motor_Disable();
@@ -95,9 +95,9 @@ static void FC_START_CRSF_ForceStopToStandby(void)
 
 static uint8_t FC_START_CRSF_TakeoffState_Update(void)
 {
-    // æ–°èµ·é£é€»è¾‘ï¼šåˆå§‹4ç”µæœºæ²¹é—¨1000ï¼Œå¯¹è§’ç”µæœº1/4ä»1000çº¿æ€§åŠ é€Ÿåˆ°1500ï¼ˆ1ç§’ï¼‰ï¼Œå…¶ä½™ä¿æŒ1000ï¼ŒåŠ é€Ÿåå…¨éƒ¨1500ä¿æŒ2ç§’
-    const uint16_t ramp_ticks = 10U; // 1ç§’ï¼ˆ100ms*10ï¼‰
-    const uint16_t hold_ticks = 20U; // 2ç§’ï¼ˆ100ms*20ï¼‰
+    // ĞÂÆğ·ÉÂß¼­£º³õÊ¼4µç»úÓÍÃÅ1000£¬¶Ô½Çµç»ú1/4´Ó1000ÏßĞÔ¼ÓËÙµ½1500£¨1Ãë£©£¬ÆäÓà±£³Ö1000£¬¼ÓËÙºóÈ«²¿1500±£³Ö2Ãë
+    const uint16_t ramp_ticks = 10U; // 1Ãë£¨100ms*10£©
+    const uint16_t hold_ticks = 20U; // 2Ãë£¨100ms*20£©
     const uint16_t total_ticks = ramp_ticks + hold_ticks;
     int32_t motor_throttle[MOTOR_NUM] = {1000, 1000, 1000, 1000};
 
@@ -110,15 +110,15 @@ static uint8_t FC_START_CRSF_TakeoffState_Update(void)
     }
 
     if (s_takeoff_timer_tick <= ramp_ticks) {
-        // å¯¹è§’ç”µæœºM1/M4ä»1000çº¿æ€§åŠ é€Ÿåˆ°1500
+        // ¶Ô½Çµç»úM1/M4´Ó1000ÏßĞÔ¼ÓËÙµ½1500
         int32_t ramp = 1000 + (int32_t)((500 * s_takeoff_timer_tick) / ramp_ticks);
         motor_throttle[0] = ramp; // MOTOR_1
         motor_throttle[3] = ramp; // MOTOR_4
-        // å…¶ä½™ç”µæœºä¿æŒ1000
+        // ÆäÓàµç»ú±£³Ö1000
         motor_throttle[1] = 1000; // MOTOR_2
         motor_throttle[2] = 1000; // MOTOR_3
     } else {
-        // æ‰€æœ‰ç”µæœºä¿æŒ1500
+        // ËùÓĞµç»ú±£³Ö1500
         for (uint8_t i = 0U; i < MOTOR_NUM; i++) {
             motor_throttle[i] = 1500;
         }
@@ -185,7 +185,7 @@ static void FC_START_CRSF_StateMachine_Update(void)
 
         if (s_unlock_timer_tick >= (uint16_t)(FC_START_CRSF_UNLOCK_HOLD_TIME_MS / FC_START_CRSF_TASK_PERIOD_MS))
         {
-            
+
             FC_START_CRSF_PrepareTakeoff();
             s_takeoff_timer_tick = 0U;
             s_fc_start_state = FC_START_CRSF_STATE_TAKEOFF;
@@ -193,23 +193,23 @@ static void FC_START_CRSF_StateMachine_Update(void)
         break;
 
     case FC_START_CRSF_STATE_TAKEOFF:
-        /* é˜¶æ®µ1ï¼šèµ·é£å‰TOFæ ¡å‡†ï¼ˆä»…åœ¨ç”µæœºå¯åŠ¨å‰æ‰§è¡Œä¸€æ¬¡ï¼‰
-         * TOF_Calibrate()ä¼šé˜»å¡çº¦1.5ç§’ï¼ˆ500ms IMUé‡‡æ · + 1000ms TOFé‡‡æ ·ï¼‰ã€‚
-         * æ ¡å‡†å®Œæˆåæ£€æŸ¥å››è·¯TOFåå·®ï¼šè¶…è¿‡10cmåˆ™å›STANDBYæ‹’ç»èµ·é£ã€‚ */
+        /* ½×¶Î1£ºÆğ·ÉÇ°TOFĞ£×¼£¨½öÔÚµç»úÆô¶¯Ç°Ö´ĞĞÒ»´Î£©
+         * TOF_Calibrate()»á×èÈûÔ¼1.5Ãë£¨500ms IMU²ÉÑù + 1000ms TOF²ÉÑù£©¡£
+         * Ğ£×¼Íê³Éºó¼ì²éËÄÂ·TOFÆ«²î£º³¬¹ı10cmÔò»ØSTANDBY¾Ü¾øÆğ·É¡£ */
         if (0U == s_takeoff_calib_done)
         {
             // TOF_Calibrate();
             s_takeoff_calib_done = 1U;
             // if (0U == g_tof_calibration_ok)
             // {
-            //     /* å››è·¯TOFåå·®è¿‡å¤§ï¼ˆ>100mmï¼‰ï¼Œæ‹’ç»èµ·é£ï¼Œå›åˆ°å¾…æœºçŠ¶æ€ */
-            //     Beep_Play(50,2,3); /* 50%å ç©ºæ¯”ï¼Œ2så‘¨æœŸï¼Œ3æ¬¡å¾ªç¯çš„æŠ¥è­¦æç¤º */
+            //     /* ËÄÂ·TOFÆ«²î¹ı´ó£¨>100mm£©£¬¾Ü¾øÆğ·É£¬»Øµ½´ı»ú×´Ì¬ */
+            //     Beep_Play(50,2,3); /* 50%Õ¼¿Õ±È£¬2sÖÜÆÚ£¬3´ÎÑ­»·µÄ±¨¾¯ÌáÊ¾ */
             //     FC_START_CRSF_ForceStopToStandby();
             //     break;
             // }
             // break;
         }
-        /* é˜¶æ®µ2ï¼šæ­£å¸¸èµ·é£åºåˆ—ï¼ˆç”µæœºæ¸è¿›åŠ é€Ÿï¼‰ */
+        /* ½×¶Î2£ºÕı³£Æğ·ÉĞòÁĞ£¨µç»ú½¥½ø¼ÓËÙ£© */
         if (FC_START_CRSF_TakeoffState_Update() != 0U)
         {
             s_motor_armed = 1U;

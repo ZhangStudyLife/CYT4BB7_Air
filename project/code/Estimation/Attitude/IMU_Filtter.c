@@ -6,36 +6,36 @@
 #define IMU_FILTER_PI  (3.14159265359f)
 #define IMU_FILTER_PT2_CUTOFF_CORRECTION (1.553773974f)
 
-/* 1000Hz æŽ§åˆ¶å™¨è¾“å…¥é“¾è·¯æ»¤æ³¢è¾“å‡º */
+/* 1000Hz ¿ØÖÆÆ÷ÊäÈëÁ´Â·ÂË²¨Êä³ö */
 imudata_t g_imufilter_1000hz;
-/* 500Hz å§¿æ€é“¾è·¯æ»¤æ³¢è¾“å‡º */
+/* 500Hz ×ËÌ¬Á´Â·ÂË²¨Êä³ö */
 imudata_t g_imudata_500hz;
-/* 250Hz èžåˆé“¾è·¯æ»¤æ³¢è¾“å‡º */
+/* 250Hz ÈÚºÏÁ´Â·ÂË²¨Êä³ö */
 imudata_t g_imudata_250hz;
-/* IMU åŽŸå§‹è¾“å…¥å†²å‡»æ ‡å¿—ï¼š1=å½“å‰å¤„äºŽå†²å‡»ä¿æŒçª—å£ */
+/* IMU Ô­Ê¼ÊäÈë³å»÷±êÖ¾£º1=µ±Ç°´¦ÓÚ³å»÷±£³Ö´°¿Ú */
 uint8_t g_imu_shock_flag;
-/* IMU åŽŸå§‹è¾“å…¥åˆåŠ é€Ÿåº¦æ¨¡é•¿ï¼Œå•ä½ g */
+/* IMU Ô­Ê¼ÊäÈëºÏ¼ÓËÙ¶ÈÄ£³¤£¬µ¥Î» g */
 float g_imu_acc_norm_g;
 
-/* IMU å†…éƒ¨æ»¤æ³¢å™¨çŠ¶æ€ */
+/* IMU ÄÚ²¿ÂË²¨Æ÷×´Ì¬ */
 static struct
 {
-    IMUBiquad_t gyro_notch0[IMU_AXIS_NUM]; /* é™€èžºä»ª 300Hz é™·æ³¢ */
-    IMUBiquad_t gyro_lpf[IMU_AXIS_NUM];    /* é™€èžºä»ª 80Hz ä¸»ä½Žé€š */
+    IMUBiquad_t gyro_notch0[IMU_AXIS_NUM]; /* ÍÓÂÝÒÇ 300Hz ÏÝ²¨ */
+    IMUBiquad_t gyro_lpf[IMU_AXIS_NUM];    /* ÍÓÂÝÒÇ 80Hz Ö÷µÍÍ¨ */
 
-    IMUPt2_t accel_lpf[IMU_AXIS_NUM]; /* åŠ é€Ÿåº¦è®¡ 25Hz PT2 ä½Žé€š */
+    IMUPt2_t accel_lpf[IMU_AXIS_NUM]; /* ¼ÓËÙ¶È¼Æ 25Hz PT2 µÍÍ¨ */
 
-    uint8_t initialized; /* é¦–å¸§ç›´é€šæ ‡å¿— */
-    uint16_t shock_hold_count; /* IMU å†²å‡»ä¿æŒè®¡æ•°ï¼Œå•ä½ 1kHz é‡‡æ ·ç‚¹ */
+    uint8_t initialized; /* Ê×Ö¡Ö±Í¨±êÖ¾ */
+    uint16_t shock_hold_count; /* IMU ³å»÷±£³Ö¼ÆÊý£¬µ¥Î» 1kHz ²ÉÑùµã */
 } s_filt;
 
 /**
- * å‡½æ•°åŠŸèƒ½: æ‰§è¡Œä¸€æ¬¡äºŒé˜¶ IIR æ»¤æ³¢ã€‚
- * è¾“å…¥å‚æ•°:
- *   f  - ç›®æ ‡æ»¤æ³¢å™¨çŠ¶æ€ã€‚
- *   in - å½“å‰è¾“å…¥æ ·æœ¬ã€‚
- * è¿”å›žå€¼:
- *   æœ¬æ¬¡æ»¤æ³¢è¾“å‡ºå€¼ã€‚
+ * º¯Êý¹¦ÄÜ: Ö´ÐÐÒ»´Î¶þ½× IIR ÂË²¨¡£
+ * ÊäÈë²ÎÊý:
+ *   f  - Ä¿±êÂË²¨Æ÷×´Ì¬¡£
+ *   in - µ±Ç°ÊäÈëÑù±¾¡£
+ * ·µ»ØÖµ:
+ *   ±¾´ÎÂË²¨Êä³öÖµ¡£
  */
 static float IMUBiquad_Apply(IMUBiquad_t *f, float in)
 {
@@ -74,12 +74,12 @@ static float IMUPt2_Apply(IMUPt2_t *f, float in)
 }
 
 /**
- * å‡½æ•°åŠŸèƒ½: åˆå§‹åŒ–äºŒé˜¶ Butterworth ä½Žé€šæ»¤æ³¢å™¨ã€‚
- * è¾“å…¥å‚æ•°:
- *   f  - ç›®æ ‡æ»¤æ³¢å™¨çŠ¶æ€ã€‚
- *   fs - é‡‡æ ·é¢‘çŽ‡ï¼Œå•ä½ Hzã€‚
- *   fc - æˆªæ­¢é¢‘çŽ‡ï¼Œå•ä½ Hzã€‚
- * è¿”å›žå€¼: æ— ã€‚
+ * º¯Êý¹¦ÄÜ: ³õÊ¼»¯¶þ½× Butterworth µÍÍ¨ÂË²¨Æ÷¡£
+ * ÊäÈë²ÎÊý:
+ *   f  - Ä¿±êÂË²¨Æ÷×´Ì¬¡£
+ *   fs - ²ÉÑùÆµÂÊ£¬µ¥Î» Hz¡£
+ *   fc - ½ØÖ¹ÆµÂÊ£¬µ¥Î» Hz¡£
+ * ·µ»ØÖµ: ÎÞ¡£
  */
 static void IMUBiquad_InitLPF(IMUBiquad_t *f, float fs, float fc)
 {
@@ -105,13 +105,13 @@ static void IMUBiquad_InitLPF(IMUBiquad_t *f, float fs, float fc)
 }
 
 /**
- * å‡½æ•°åŠŸèƒ½: åˆå§‹åŒ–äºŒé˜¶é™·æ³¢æ»¤æ³¢å™¨ã€‚
- * è¾“å…¥å‚æ•°:
- *   f  - ç›®æ ‡æ»¤æ³¢å™¨çŠ¶æ€ã€‚
- *   fs - é‡‡æ ·é¢‘çŽ‡ï¼Œå•ä½ Hzã€‚
- *   fc - ä¸­å¿ƒé¢‘çŽ‡ï¼Œå•ä½ Hzã€‚
- *   q  - å“è´¨å› æ•°ã€‚
- * è¿”å›žå€¼: æ— ã€‚
+ * º¯Êý¹¦ÄÜ: ³õÊ¼»¯¶þ½×ÏÝ²¨ÂË²¨Æ÷¡£
+ * ÊäÈë²ÎÊý:
+ *   f  - Ä¿±êÂË²¨Æ÷×´Ì¬¡£
+ *   fs - ²ÉÑùÆµÂÊ£¬µ¥Î» Hz¡£
+ *   fc - ÖÐÐÄÆµÂÊ£¬µ¥Î» Hz¡£
+ *   q  - Æ·ÖÊÒòÊý¡£
+ * ·µ»ØÖµ: ÎÞ¡£
  */
 static void IMUBiquad_InitNotch(IMUBiquad_t *f, float fs, float fc, float q)
 {
@@ -137,9 +137,9 @@ static void IMUBiquad_InitNotch(IMUBiquad_t *f, float fs, float fc, float q)
 }
 
 /**
- * å‡½æ•°åŠŸèƒ½: åˆå§‹åŒ– IMU è¾“å…¥é“¾è·¯çš„å…¨éƒ¨æ»¤æ³¢å™¨ã€‚
- * è¾“å…¥å‚æ•°: æ— ã€‚
- * è¿”å›žå€¼: æ— ã€‚
+ * º¯Êý¹¦ÄÜ: ³õÊ¼»¯ IMU ÊäÈëÁ´Â·µÄÈ«²¿ÂË²¨Æ÷¡£
+ * ÊäÈë²ÎÊý: ÎÞ¡£
+ * ·µ»ØÖµ: ÎÞ¡£
  */
 void IMUFilter_Init(void)
 {
@@ -147,11 +147,11 @@ void IMUFilter_Init(void)
 
     for (axis = 0U; axis < IMU_AXIS_NUM; axis++)
     {
-        /* é™€èžºä»ªé“¾è·¯ï¼š300Hz é™·æ³¢ -> 80Hz äºŒé˜¶ä½Žé€š */
+        /* ÍÓÂÝÒÇÁ´Â·£º300Hz ÏÝ²¨ -> 80Hz ¶þ½×µÍÍ¨ */
         IMUBiquad_InitNotch(&s_filt.gyro_notch0[axis], IMU_SAMPLE_RATE_HZ, IMU_NOTCH0_HZ, IMU_NOTCH0_Q);
         IMUBiquad_InitLPF(&s_filt.gyro_lpf[axis], IMU_SAMPLE_RATE_HZ, IMU_GYRO_LPF_HZ);
 
-        /* åŠ é€Ÿåº¦è®¡é“¾è·¯ï¼š25Hz PT2 ä½Žé€š */
+        /* ¼ÓËÙ¶È¼ÆÁ´Â·£º25Hz PT2 µÍÍ¨ */
         IMUPt2_InitLPF(&s_filt.accel_lpf[axis], IMU_SAMPLE_RATE_HZ, IMU_ACCEL_LPF_HZ);
     }
 
@@ -165,12 +165,12 @@ void IMUFilter_Init(void)
 }
 
 /**
- * å‡½æ•°åŠŸèƒ½: ä»¥ 1kHz è¾“å…¥ IMU æ•°æ®ï¼Œæ‰§è¡Œé™€èžºä»ªå•é™·æ³¢ä¸Žä½Žé€šã€åŠ é€Ÿåº¦è®¡ PT2 ä½Žé€šï¼Œ
- *           å¹¶è¾“å‡º 1000Hzã€500Hzã€250Hz ä¸‰ä¸ªç»“æž„ä½“ã€‚
- * è¾“å…¥å‚æ•°:
- *   gx, gy, gz - é™€èžºä»ªä¸‰è½´è¾“å…¥ï¼Œå•ä½ dpsã€‚
- *   ax, ay, az - åŠ é€Ÿåº¦è®¡ä¸‰è½´è¾“å…¥ï¼Œå•ä½ gã€‚
- * è¿”å›žå€¼: æ— ã€‚
+ * º¯Êý¹¦ÄÜ: ÒÔ 1kHz ÊäÈë IMU Êý¾Ý£¬Ö´ÐÐÍÓÂÝÒÇµ¥ÏÝ²¨ÓëµÍÍ¨¡¢¼ÓËÙ¶È¼Æ PT2 µÍÍ¨£¬
+ *           ²¢Êä³ö 1000Hz¡¢500Hz¡¢250Hz Èý¸ö½á¹¹Ìå¡£
+ * ÊäÈë²ÎÊý:
+ *   gx, gy, gz - ÍÓÂÝÒÇÈýÖáÊäÈë£¬µ¥Î» dps¡£
+ *   ax, ay, az - ¼ÓËÙ¶È¼ÆÈýÖáÊäÈë£¬µ¥Î» g¡£
+ * ·µ»ØÖµ: ÎÞ¡£
  */
 void IMUFilter_Update(float gx, float gy, float gz,
                       float ax, float ay, float az)
@@ -190,7 +190,7 @@ void IMUFilter_Update(float gx, float gy, float gz,
     accel_in[1] = ay;
     accel_in[2] = az;
 
-    /* ç”¨åŽŸå§‹è¾“å…¥åˆ¤æ–­å†²å‡»ï¼ŒåŽç»­å§¿æ€/å…‰æµé“¾è·¯åªæ‹¿è¿™ä¸ªæ ‡å¿—åšé—¨æŽ§ */
+    /* ÓÃÔ­Ê¼ÊäÈëÅÐ¶Ï³å»÷£¬ºóÐø×ËÌ¬/¹âÁ÷Á´Â·Ö»ÄÃÕâ¸ö±êÖ¾×öÃÅ¿Ø */
     gyro_abs_max = fabsf(gx);
     if (fabsf(gy) > gyro_abs_max)
     {
@@ -242,7 +242,7 @@ void IMUFilter_Update(float gx, float gy, float gz,
     {
         float gyro_stage0;
 
-        /* é™€èžºä»ªæ‰§è¡Œå•é™·æ³¢ä¸Žä¸»ä½Žé€šï¼ŒåŠ é€Ÿåº¦è®¡åªæ‰§è¡Œ PT2 ä½Žé€šã€‚ */
+        /* ÍÓÂÝÒÇÖ´ÐÐµ¥ÏÝ²¨ÓëÖ÷µÍÍ¨£¬¼ÓËÙ¶È¼ÆÖ»Ö´ÐÐ PT2 µÍÍ¨¡£ */
         gyro_stage0 = IMUBiquad_Apply(&s_filt.gyro_notch0[axis], gyro_in[axis]);
         gyro_out[axis] = IMUBiquad_Apply(&s_filt.gyro_lpf[axis], gyro_stage0);
         accel_out[axis] = IMUPt2_Apply(&s_filt.accel_lpf[axis], accel_in[axis]);

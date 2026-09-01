@@ -1,8 +1,8 @@
 /**
  * @file    Motor_Drive.c
- * @brief   å››è½´é£è¡Œå™¨ç”µæœºé©±åŠ¨ä¸æ··æ§å®ç°
- * @note    é’ˆå¯¹Mark5 Proéå¯¹ç§°æœºæ¶è®¾è®¡
- *          æ‰€æœ‰æ¥å£ä½¿ç”¨æ•´æ•°ç±»å‹ï¼ˆ0~10000èŒƒå›´ï¼‰ï¼Œä¾¿äºè°ƒè¯•
+ * @brief   ËÄÖá·ÉĞĞÆ÷µç»úÇı¶¯Óë»ì¿ØÊµÏÖ
+ * @note    Õë¶ÔMark5 Pro·Ç¶Ô³Æ»ú¼ÜÉè¼Æ
+ *          ËùÓĞ½Ó¿ÚÊ¹ÓÃÕûÊıÀàĞÍ£¨0~10000·¶Î§£©£¬±ãÓÚµ÷ÊÔ
  */
 
 #include "Motor_Drive.h"
@@ -19,69 +19,69 @@
 #endif
 
 #if (MOTOR_DRIVER_BACKEND == MOTOR_DRIVER_BACKEND_UART)
-#define MOTOR_UART_SEND_RATE_HZ    (500U)    /* ä¸²å£ç”µæœºæ§åˆ¶å¸§å¹³å‡å‘é€é¢‘ç‡ï¼Œå•ä½Hz */
+#define MOTOR_UART_SEND_RATE_HZ    (500U)    /* ´®¿Úµç»ú¿ØÖÆÖ¡Æ½¾ù·¢ËÍÆµÂÊ£¬µ¥Î»Hz */
 extern volatile uint32 tick_1000us_cnt;
 #endif
 
-/* ======================== å¼•è„šæ˜ å°„é…ç½® ======================== */
+/* ======================== Òı½ÅÓ³ÉäÅäÖÃ ======================== */
 /*
- * ç”µæœºå¼•è„šåˆ†é…ï¼š
- * M1 = P05_0 â†’ TCPWM_CH09_P05_0
- * M2 = P05_1 â†’ TCPWM_CH10_P05_1
- * M3 = P9.0  â†’ TCPWM_CH24_P09_0
- * M4 = P9.1  â†’ TCPWM_CH25_P09_1
+ * µç»úÒı½Å·ÖÅä£º
+ * M1 = P05_0 ¡ú TCPWM_CH09_P05_0
+ * M2 = P05_1 ¡ú TCPWM_CH10_P05_1
+ * M3 = P9.0  ¡ú TCPWM_CH24_P09_0
+ * M4 = P9.1  ¡ú TCPWM_CH25_P09_1
  */
 static const pwm_channel_enum MOTOR_PWM_CH[MOTOR_NUM] = {
-    TCPWM_CH09_P05_0,   /* M1: å³å */
-    TCPWM_CH10_P05_1,   /* M2: å³å‰ */
-    TCPWM_CH24_P09_0,   /* M3: å·¦å */
-    TCPWM_CH25_P09_1    /* M4: å·¦å‰ */
+    TCPWM_CH09_P05_0,   /* M1: ÓÒºó */
+    TCPWM_CH10_P05_1,   /* M2: ÓÒÇ° */
+    TCPWM_CH24_P09_0,   /* M3: ×óºó */
+    TCPWM_CH25_P09_1    /* M4: ×óÇ° */
 };
 
 #if (MOTOR_DRIVER_BACKEND == MOTOR_DRIVER_BACKEND_UART)
 static const uint8 MOTOR_UART_CMD_SLOT_BY_REAL[MOTOR_NUM] = {2U, 0U, 3U, 1U};
-static uint32 g_motor_uart_last_tick = 0U;     /* ä¸²å£ç”µæœºå‘¨æœŸå‘é€ä¸Šæ¬¡èŠ‚æ‹ï¼Œå•ä½ms */
+static uint32 g_motor_uart_last_tick = 0U;     /* ´®¿Úµç»úÖÜÆÚ·¢ËÍÉÏ´Î½ÚÅÄ£¬µ¥Î»ms */
 #endif
 
-/* ======================== æ··æ§çŸ©é˜µå®šä¹‰ï¼ˆæ•´æ•°ç‰ˆæœ¬ï¼‰ ======================== */
+/* ======================== »ì¿Ø¾ØÕó¶¨Òå£¨ÕûÊı°æ±¾£© ======================== */
 /*
- * æ··æ§çŸ©é˜µï¼š[ROLL, PITCH, YAW]ï¼Œå•ä½ï¼šä¸‡åˆ†æ¯”ï¼ˆåŸºæ•°10000ï¼‰
+ * »ì¿Ø¾ØÕó£º[ROLL, PITCH, YAW]£¬µ¥Î»£ºÍò·Ö±È£¨»ùÊı10000£©
  *
- * æ–¹å‘å®šä¹‰ï¼ˆå³æ‰‹æ³•åˆ™ï¼‰ï¼š
- * - Rollæ­£ = å³å€¾ï¼ˆå³ä¾§ä¸‹æ²‰ï¼‰â†’ å·¦ä¾§ç”µæœºåŠ é€Ÿï¼Œå³ä¾§å‡é€Ÿ
- * - Pitchæ­£ = æŠ¬å¤´ï¼ˆæœºå¤´ä¸Šå‡ï¼‰â†’ åæ–¹ç”µæœºåŠ é€Ÿï¼Œå‰æ–¹å‡é€Ÿ
- * - Yawæ­£ = é€†æ—¶é’ˆæ—‹è½¬ â†’ CCWç”µæœºåŠ é€Ÿï¼ŒCWç”µæœºå‡é€Ÿ
+ * ·½Ïò¶¨Òå£¨ÓÒÊÖ·¨Ôò£©£º
+ * - RollÕı = ÓÒÇã£¨ÓÒ²àÏÂ³Á£©¡ú ×ó²àµç»ú¼ÓËÙ£¬ÓÒ²à¼õËÙ
+ * - PitchÕı = Ì§Í·£¨»úÍ·ÉÏÉı£©¡ú ºó·½µç»ú¼ÓËÙ£¬Ç°·½¼õËÙ
+ * - YawÕı = ÄæÊ±ÕëĞı×ª ¡ú CCWµç»ú¼ÓËÙ£¬CWµç»ú¼õËÙ
  *
- * ç”µæœºå¸ƒå±€ä¸æ—‹è½¬æ–¹å‘ï¼š
- * - M1: å³å, CW  â†’ Roll-, Pitch+, Yaw-
- * - M2: å³å‰, CCW â†’ Roll-, Pitch-, Yaw+
- * - M3: å·¦å, CCW â†’ Roll+, Pitch+, Yaw+
- * - M4: å·¦å‰, CW  â†’ Roll+, Pitch-, Yaw-
+ * µç»ú²¼¾ÖÓëĞı×ª·½Ïò£º
+ * - M1: ÓÒºó, CW  ¡ú Roll-, Pitch+, Yaw-
+ * - M2: ÓÒÇ°, CCW ¡ú Roll-, Pitch-, Yaw+
+ * - M3: ×óºó, CCW ¡ú Roll+, Pitch+, Yaw+
+ * - M4: ×óÇ°, CW  ¡ú Roll+, Pitch-, Yaw-
  *
- * åŠ›è‡‚è¡¥å¿ï¼ˆæ•´æ•°ç‰ˆæœ¬ï¼‰ï¼š
- * - Rollæ–¹å‘åŠ›è‡‚90mmï¼ŒPitchæ–¹å‘åŠ›è‡‚69mm
- * - Rollç³»æ•° = 10000ï¼ˆåŸºå‡†ï¼‰
- * - Pitchç³»æ•° = 90/69 Ã— 10000 â‰ˆ 13043ï¼ˆè¡¥å¿è¾ƒçŸ­åŠ›è‡‚ï¼‰
+ * Á¦±Û²¹³¥£¨ÕûÊı°æ±¾£©£º
+ * - Roll·½ÏòÁ¦±Û90mm£¬Pitch·½ÏòÁ¦±Û69mm
+ * - RollÏµÊı = 10000£¨»ù×¼£©
+ * - PitchÏµÊı = 90/69 ¡Á 10000 ¡Ö 13043£¨²¹³¥½Ï¶ÌÁ¦±Û£©
  */
 static const int32 MOTOR_MIX_MATRIX[MOTOR_NUM][3] = {
     /* { Roll,                    Pitch,                  Yaw    } */
-    { -MOTOR_MIX_ROLL_SCALE_I,  +MOTOR_MIX_PITCH_SCALE_I,  -10000 },  /* M1: å³åCW */
-    { -MOTOR_MIX_ROLL_SCALE_I,  -MOTOR_MIX_PITCH_SCALE_I,  +10000 },  /* M2: å³å‰CCW */
-    { +MOTOR_MIX_ROLL_SCALE_I,  +MOTOR_MIX_PITCH_SCALE_I,  +10000 },  /* M3: å·¦åCCW */
-    { +MOTOR_MIX_ROLL_SCALE_I,  -MOTOR_MIX_PITCH_SCALE_I,  -10000 }   /* M4: å·¦å‰CW */
+    { -MOTOR_MIX_ROLL_SCALE_I,  +MOTOR_MIX_PITCH_SCALE_I,  -10000 },  /* M1: ÓÒºóCW */
+    { -MOTOR_MIX_ROLL_SCALE_I,  -MOTOR_MIX_PITCH_SCALE_I,  +10000 },  /* M2: ÓÒÇ°CCW */
+    { +MOTOR_MIX_ROLL_SCALE_I,  +MOTOR_MIX_PITCH_SCALE_I,  +10000 },  /* M3: ×óºóCCW */
+    { +MOTOR_MIX_ROLL_SCALE_I,  -MOTOR_MIX_PITCH_SCALE_I,  -10000 }   /* M4: ×óÇ°CW */
 };
 
-/* ======================== å…¨å±€çŠ¶æ€å˜é‡ ======================== */
+/* ======================== È«¾Ö×´Ì¬±äÁ¿ ======================== */
 motor_state_t g_motor_state = {0};
 motor_mixer_input_t g_motor_cmd = {0};
-/* ======================== å†…éƒ¨è¾…åŠ©å‡½æ•° ======================== */
+/* ======================== ÄÚ²¿¸¨Öúº¯Êı ======================== */
 
 /**
- * @brief   æ•´æ•°é™å¹…
- * @param   value   è¾“å…¥å€¼
- * @param   min_val æœ€å°å€¼
- * @param   max_val æœ€å¤§å€¼
- * @return  é™å¹…åçš„å€¼
+ * @brief   ÕûÊıÏŞ·ù
+ * @param   value   ÊäÈëÖµ
+ * @param   min_val ×îĞ¡Öµ
+ * @param   max_val ×î´óÖµ
+ * @return  ÏŞ·ùºóµÄÖµ
  */
 static inline int32 clamp_i(int32 value, int32 min_val, int32 max_val)
 {
@@ -96,14 +96,14 @@ static inline int32 abs_i(int32 value)
 }
 
 /**
- * @brief   æ²¹é—¨å€¼è½¬æ¢ä¸ºPWM dutyå€¼
- * @param   throttle æ²¹é—¨é‡ï¼ˆ0~10000ï¼‰
- * @return  PWM dutyå€¼ï¼ˆ4000~8000ï¼‰
+ * @brief   ÓÍÃÅÖµ×ª»»ÎªPWM dutyÖµ
+ * @param   throttle ÓÍÃÅÁ¿£¨0~10000£©
+ * @return  PWM dutyÖµ£¨4000~8000£©
  *
- * @note    æ˜ å°„å…³ç³»ï¼š
- *          - è¾“å…¥0     â†’ duty=4000 (1000usè„‰å®½)
- *          - è¾“å…¥5000  â†’ duty=6000 (1500usè„‰å®½)
- *          - è¾“å…¥10000 â†’ duty=8000 (2000usè„‰å®½)
+ * @note    Ó³Éä¹ØÏµ£º
+ *          - ÊäÈë0     ¡ú duty=4000 (1000usÂö¿í)
+ *          - ÊäÈë5000  ¡ú duty=6000 (1500usÂö¿í)
+ *          - ÊäÈë10000 ¡ú duty=8000 (2000usÂö¿í)
  */
 static inline uint32 throttle_to_driver_value(int32 throttle)
 {
@@ -124,9 +124,9 @@ static inline uint32 throttle_to_driver_value(int32 throttle)
 }
 
 /**
- * @brief   è®¾ç½®ç”µæœºPWMè¾“å‡º
- * @param   motor   ç”µæœºç¼–å·
- * @param   duty    PWM dutyå€¼
+ * @brief   ÉèÖÃµç»úPWMÊä³ö
+ * @param   motor   µç»ú±àºÅ
+ * @param   duty    PWM dutyÖµ
  */
 static void motor_set_backend_value(motor_index_e motor, uint32 value)
 {
@@ -153,10 +153,10 @@ static void motor_backend_sync_all(void)
 #endif
 }
 
-/* ======================== å…¬å¼€æ¥å£å®ç° ======================== */
+/* ======================== ¹«¿ª½Ó¿ÚÊµÏÖ ======================== */
 
 /**
- * @brief   ç«‹å³åŒæ­¥å½“å‰å››ä¸ªç”µæœºè¾“å‡ºåˆ°åç«¯
+ * @brief   Á¢¼´Í¬²½µ±Ç°ËÄ¸öµç»úÊä³öµ½ºó¶Ë
  * @param   void
  * @return  void
  */
@@ -170,7 +170,7 @@ static void motor_backend_sync_immediate(void)
 }
 
 /**
- * @brief   æŒ‰æ—¶é—´èŠ‚æµåŒæ­¥ä¸²å£ç”µæœºè¾“å‡º
+ * @brief   °´Ê±¼ä½ÚÁ÷Í¬²½´®¿Úµç»úÊä³ö
  * @param   void
  * @return  void
  */
@@ -192,7 +192,7 @@ static void motor_backend_sync_periodic(void)
 
 void Motor_Init(void)
 {
-    /* åˆå§‹åŒ–çŠ¶æ€ */
+    /* ³õÊ¼»¯×´Ì¬ */
     g_motor_state.is_armed = 0;
     for (uint8 i = 0; i < MOTOR_NUM; i++)
     {
@@ -200,7 +200,7 @@ void Motor_Init(void)
         g_motor_state.output[i] = 0;
     }
 
-    /* åˆå§‹åŒ–4è·¯PWMï¼Œé¢‘ç‡400Hzï¼Œåˆå§‹dutyä¸ºæœ€å°æ²¹é—¨ */
+    /* ³õÊ¼»¯4Â·PWM£¬ÆµÂÊ400Hz£¬³õÊ¼dutyÎª×îĞ¡ÓÍÃÅ */
 #if (MOTOR_DRIVER_BACKEND == MOTOR_DRIVER_BACKEND_PWM)
     for (uint8 i = 0; i < MOTOR_NUM; i++)
     {
@@ -212,7 +212,7 @@ void Motor_Init(void)
     pwm_set_duty(MOTOR_PWM_CH[MOTOR_3], MOTOR_DUTY_MIN);
     pwm_set_duty(MOTOR_PWM_CH[MOTOR_4], MOTOR_DUTY_MIN);
 
-    // ç”µè°ƒä¸Šç”µè¦ç»™ä½æ²¹é—¨ä¿¡å·ä¸€æ®µæ—¶é—´
+    // µçµ÷ÉÏµçÒª¸øµÍÓÍÃÅĞÅºÅÒ»¶ÎÊ±¼ä
     system_delay_ms(3000);
 #else
     small_driver_uart_init();
@@ -224,7 +224,7 @@ void Motor_SetThrottle(motor_index_e motor, int32 throttle)
 {
     if (motor >= MOTOR_NUM) return;
 
-    /* æœªè§£é”æ—¶åªè¾“å‡ºæœ€å°æ²¹é—¨ */
+    /* Î´½âËøÊ±Ö»Êä³ö×îĞ¡ÓÍÃÅ */
     if (!g_motor_state.is_armed)
     {
         motor_set_backend_value(motor, MOTOR_OUTPUT_STOP_VALUE);
@@ -233,11 +233,11 @@ void Motor_SetThrottle(motor_index_e motor, int32 throttle)
         return;
     }
 
-    /* é™å¹…åˆ°æœ‰æ•ˆèŒƒå›´ */
+    /* ÏŞ·ùµ½ÓĞĞ§·¶Î§ */
     throttle = clamp_i(throttle, 0, MOTOR_INPUT_MAX);
     g_motor_state.output[motor] = throttle;
 
-    /* è½¬æ¢ä¸ºdutyå¹¶è¾“å‡º */
+    /* ×ª»»Îªduty²¢Êä³ö */
     uint32 duty = throttle_to_driver_value(throttle);
     motor_set_backend_value(motor, duty);
     motor_backend_sync_immediate();
@@ -265,7 +265,7 @@ void Motor_SetThrottleAll(const int32 throttle[MOTOR_NUM])
 
 void Motor_EmergencyStop(void)
 {
-    /* å¼ºåˆ¶é”å®šå¹¶åœæ­¢æ‰€æœ‰ç”µæœº */
+    /* Ç¿ÖÆËø¶¨²¢Í£Ö¹ËùÓĞµç»ú */
     g_motor_state.is_armed = 0;
 
     for (uint8 i = 0; i < MOTOR_NUM; i++)
@@ -281,9 +281,9 @@ void Motor_Mixer(const motor_mixer_input_t *input)
 {
     if (input == NULL) return;
 
-    /* SWDæ‹¨ç å¼€å…³æ²¡æœ‰å‘ä¸‹æ‹¨ ä¸è¾“å‡º*/
+    /* SWD²¦Âë¿ª¹ØÃ»ÓĞÏòÏÂ²¦ ²»Êä³ö*/
     // SWD -> rc_get_channel(RC_CH_AUX1)
-    // æ‰“åˆ°é«˜æ•°å€¼ä¸º-765 æ‰“åˆ°ä½æ•°å€¼ä¸º764
+    // ´òµ½¸ßÊıÖµÎª-765 ´òµ½µÍÊıÖµÎª764
     // if (rc_get_channel(RC_CH_AUX1) < 0)
     // {
     //     for (uint8 i = 0; i < MOTOR_NUM; i++)
@@ -295,20 +295,20 @@ void Motor_Mixer(const motor_mixer_input_t *input)
     //     return;
     // }
 
-    /* æœªè§£é”æ—¶åªè¾“å‡ºæœ€å°æ²¹é—¨->0%æ²¹é—¨ */
+    /* Î´½âËøÊ±Ö»Êä³ö×îĞ¡ÓÍÃÅ->0%ÓÍÃÅ */
     if (!g_motor_state.is_armed)
     {
         Motor_EmergencyStop();
         return;
     }
 
-    /* é™å¹…è¾“å…¥å€¼ï¼ˆæ•´æ•°èŒƒå›´ï¼‰ */
+    /* ÏŞ·ùÊäÈëÖµ£¨ÕûÊı·¶Î§£© */
     int32 throttle = clamp_i(input->throttle, 0, MOTOR_INPUT_MAX);
     int32 roll     = clamp_i(input->roll,    MOTOR_INPUT_MIN, MOTOR_INPUT_MAX);
     int32 pitch    = clamp_i(input->pitch,   MOTOR_INPUT_MIN, MOTOR_INPUT_MAX);
     int32 yaw      = clamp_i(input->yaw,     MOTOR_INPUT_MIN, MOTOR_INPUT_MAX);
 
-    /* è®¡ç®—å„ç”µæœºè¾“å‡º */
+    /* ¼ÆËã¸÷µç»úÊä³ö */
     int32 motor_out[MOTOR_NUM];
     int32 yaw_contrib[MOTOR_NUM];
     int32 yaw_scale = MOTOR_INPUT_MAX;
@@ -316,10 +316,10 @@ void Motor_Mixer(const motor_mixer_input_t *input)
     for (uint8 i = 0; i < MOTOR_NUM; i++)
     {
         /*
-         * æ··æ§å…¬å¼ï¼ˆæ•´æ•°è¿ç®—ï¼‰ï¼š
-         * output = throttle + rollÃ—mix_roll/10000 + pitchÃ—mix_pitch/10000 + yawÃ—mix_yaw/10000
+         * »ì¿Ø¹«Ê½£¨ÕûÊıÔËËã£©£º
+         * output = throttle + roll¡Ámix_roll/10000 + pitch¡Ámix_pitch/10000 + yaw¡Ámix_yaw/10000
          *
-         * å„åˆ†é‡å…ˆä¹˜åé™¤ï¼Œé¿å…ç²¾åº¦æŸå¤±
+         * ¸÷·ÖÁ¿ÏÈ³Ëºó³ı£¬±ÜÃâ¾«¶ÈËğÊ§
          */
         int32 roll_contrib  = (roll  * MOTOR_MIX_MATRIX[i][0]) / MOTOR_INPUT_MAX;
         int32 pitch_contrib = (pitch * MOTOR_MIX_MATRIX[i][1]) / MOTOR_INPUT_MAX;
@@ -363,7 +363,7 @@ void Motor_Mixer(const motor_mixer_input_t *input)
 
         g_motor_state.output[i] = motor_out[i];
 
-        /* è½¬æ¢ä¸ºdutyå¹¶è¾“å‡º */
+        /* ×ª»»Îªduty²¢Êä³ö */
         uint32 duty = throttle_to_driver_value(motor_out[i]);
         motor_set_backend_value((motor_index_e)i, duty);
     }
@@ -389,9 +389,9 @@ uint8 Motor_IsEnabled(void)
 
 void Motor_IdleStart(void)
 {
-    // /* SWDæ‹¨ç å¼€å…³æ²¡æœ‰å‘ä¸‹æ‹¨ ä¸è¾“å‡º*/
+    // /* SWD²¦Âë¿ª¹ØÃ»ÓĞÏòÏÂ²¦ ²»Êä³ö*/
     // // SWD -> rc_get_channel(RC_CH_AUX1)
-    // // æ‰“åˆ°é«˜æ•°å€¼ä¸º-765 æ‰“åˆ°ä½æ•°å€¼ä¸º764
+    // // ´òµ½¸ßÊıÖµÎª-765 ´òµ½µÍÊıÖµÎª764
     // if (rc_get_channel(RC_CH_AUX1) < 0)
     // {
     //     for (uint8 i = 0; i < MOTOR_NUM; i++)

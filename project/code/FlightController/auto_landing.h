@@ -5,52 +5,52 @@
 
 typedef struct
 {
-    uint16 initial_wait_ticks; /* è‡ªåŠ¨é™è½å‰ç½®ç­‰å¾…è®¡æ•°ï¼Œå•ä½10msã€‚ */
-    uint16 no_target_ticks; /* æ— æœ‰æ•ˆè§„åˆ’ç›®æ ‡ç´¯è®¡è®¡æ•°ï¼Œå•ä½10msã€‚ */
-    uint16 valid_target_ticks; /* é€Ÿåº¦ä¸‹å‘è¿ç»­æœ‰æ•ˆè®¡æ•°ï¼Œå•ä½10msã€‚ */
-    uint8 target_valid; /* plan_result.valid æ˜¯å¦å·²è¿ç»­æœ‰æ•ˆ200msã€‚ */
-    uint8 rotation_ready; /* å®é™…å®šå‘æœç´¢æ˜¯å¦è¾¾åˆ°360åº¦ï¼Œä»…ç”¨äºè§‚æµ‹ã€‚ */
-    uint8 triggered; /* è‡ªåŠ¨é™è½è§¦å‘é”å­˜æ ‡å¿—ã€‚ */
-    uint8 state; /* è‡ªåŠ¨é™è½çŠ¶æ€æœºçŠ¶æ€ï¼Œ0=IDLE 1=DETECT 2=ROTATE 3=TRIGGEREDã€‚ */
-    uint8 car_started; /* è½¦æ¨¡å¯åŠ¨åˆ¤å®šï¼šæœ€è¿‘200mså†…è½¦ç«¯æ—¶é—´æˆ³æ¨è¿›ã€‚ */
-    uint8 rotate_active; /* åŒæ—‹è½¬é˜¶æ®µæ˜¯å¦è¿›è¡Œä¸­ã€‚ */
-    float rotate_air_deg; /* åŒæ—‹è½¬é˜¶æ®µé£æœºç´¯è®¡æ—‹è½¬è§’ï¼Œå•ä½åº¦ã€‚ */
-    float rotate_car_deg; /* åŒæ—‹è½¬é˜¶æ®µè½¦æ¨¡ç´¯è®¡æ—‹è½¬è§’ï¼Œå•ä½åº¦ã€‚ */
+    uint16 initial_wait_ticks; /* ×Ô¶¯½µÂäÇ°ÖÃµÈ´ı¼ÆÊı£¬µ¥Î»10ms¡£ */
+    uint16 no_target_ticks; /* ÎŞÓĞĞ§¹æ»®Ä¿±êÀÛ¼Æ¼ÆÊı£¬µ¥Î»10ms¡£ */
+    uint16 valid_target_ticks; /* ËÙ¶ÈÏÂ·¢Á¬ĞøÓĞĞ§¼ÆÊı£¬µ¥Î»10ms¡£ */
+    uint8 target_valid; /* plan_result.valid ÊÇ·ñÒÑÁ¬ĞøÓĞĞ§200ms¡£ */
+    uint8 rotation_ready; /* Êµ¼Ê¶¨ÏòËÑË÷ÊÇ·ñ´ïµ½360¶È£¬½öÓÃÓÚ¹Û²â¡£ */
+    uint8 triggered; /* ×Ô¶¯½µÂä´¥·¢Ëø´æ±êÖ¾¡£ */
+    uint8 state; /* ×Ô¶¯½µÂä×´Ì¬»ú×´Ì¬£¬0=IDLE 1=DETECT 2=ROTATE 3=TRIGGERED¡£ */
+    uint8 car_started; /* ³µÄ£Æô¶¯ÅĞ¶¨£º×î½ü200msÄÚ³µ¶ËÊ±¼ä´ÁÍÆ½ø¡£ */
+    uint8 rotate_active; /* Ë«Ğı×ª½×¶ÎÊÇ·ñ½øĞĞÖĞ¡£ */
+    float rotate_air_deg; /* Ë«Ğı×ª½×¶Î·É»úÀÛ¼ÆĞı×ª½Ç£¬µ¥Î»¶È¡£ */
+    float rotate_car_deg; /* Ë«Ğı×ª½×¶Î³µÄ£ÀÛ¼ÆĞı×ª½Ç£¬µ¥Î»¶È¡£ */
 } auto_landing_debug_t;
 
 /**
- * @brief ä»¥100Hzæ›´æ–°Mode4è‡ªåŠ¨é™è½æ£€æµ‹ã€‚
- * @param æ— ã€‚
- * @return æ— ã€‚
+ * @brief ÒÔ100Hz¸üĞÂMode4×Ô¶¯½µÂä¼ì²â¡£
+ * @param ÎŞ¡£
+ * @return ÎŞ¡£
  */
 void AutoLanding_Update100Hz(void);
 
 /**
- * @brief æŸ¥è¯¢è‡ªåŠ¨é™è½è§¦å‘é”å­˜çŠ¶æ€ã€‚
- * @param æ— ã€‚
- * @return 1è¡¨ç¤ºè‡ªåŠ¨é™è½å·²è§¦å‘ï¼Œ0è¡¨ç¤ºæœªè§¦å‘ã€‚
+ * @brief ²éÑ¯×Ô¶¯½µÂä´¥·¢Ëø´æ×´Ì¬¡£
+ * @param ÎŞ¡£
+ * @return 1±íÊ¾×Ô¶¯½µÂäÒÑ´¥·¢£¬0±íÊ¾Î´´¥·¢¡£
  */
 uint8 AutoLanding_IsTriggered(void);
 
 /**
- * @brief æŸ¥è¯¢åŒæ—‹è½¬é˜¶æ®µæ˜¯å¦è¿›è¡Œä¸­ã€‚
- * @param æ— ã€‚
- * @return 1è¡¨ç¤ºé£æœºä¸è½¦æ¨¡æ­£åœ¨å„æ—‹è½¬ä¸€åœˆï¼Œ0è¡¨ç¤ºæœªåœ¨æ—‹è½¬ã€‚
+ * @brief ²éÑ¯Ë«Ğı×ª½×¶ÎÊÇ·ñ½øĞĞÖĞ¡£
+ * @param ÎŞ¡£
+ * @return 1±íÊ¾·É»úÓë³µÄ£ÕıÔÚ¸÷Ğı×ªÒ»È¦£¬0±íÊ¾Î´ÔÚĞı×ª¡£
  */
 uint8 AutoLanding_IsRotationActive(void);
 
 /**
- * @brief è·å–åŒæ—‹è½¬é˜¶æ®µä¸‹å‘è½¦æ¨¡çš„æ—‹è½¬æŒ‡ä»¤é€Ÿåº¦ã€‚
- * @param strafe_mps è½¦ä½“å³å‘é€Ÿåº¦è¾“å‡ºåœ°å€ï¼Œä¸å¯ä¸ºç©ºã€‚
- * @param forward_mps è½¦ä½“å‰å‘é€Ÿåº¦è¾“å‡ºåœ°å€ï¼Œä¸å¯ä¸ºç©ºã€‚
- * @return æ— ã€‚
+ * @brief »ñÈ¡Ë«Ğı×ª½×¶ÎÏÂ·¢³µÄ£µÄĞı×ªÖ¸ÁîËÙ¶È¡£
+ * @param strafe_mps ³µÌåÓÒÏòËÙ¶ÈÊä³öµØÖ·£¬²»¿ÉÎª¿Õ¡£
+ * @param forward_mps ³µÌåÇ°ÏòËÙ¶ÈÊä³öµØÖ·£¬²»¿ÉÎª¿Õ¡£
+ * @return ÎŞ¡£
  */
 void AutoLanding_GetRotateCommand(float *strafe_mps, float *forward_mps);
 
 /**
- * @brief è·å–è‡ªåŠ¨é™è½æ£€æµ‹çš„åªè¯»è°ƒè¯•å¿«ç…§ã€‚
- * @param debug è°ƒè¯•å¿«ç…§è¾“å‡ºåœ°å€ï¼Œä¸å¯ä¸ºç©ºã€‚
- * @return æ— ã€‚
+ * @brief »ñÈ¡×Ô¶¯½µÂä¼ì²âµÄÖ»¶Áµ÷ÊÔ¿ìÕÕ¡£
+ * @param debug µ÷ÊÔ¿ìÕÕÊä³öµØÖ·£¬²»¿ÉÎª¿Õ¡£
+ * @return ÎŞ¡£
  */
 void AutoLanding_GetDebug(auto_landing_debug_t *debug);
 

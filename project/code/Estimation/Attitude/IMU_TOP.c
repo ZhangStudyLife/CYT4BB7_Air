@@ -4,242 +4,244 @@
 #include <math.h>
 #include "../code/HW_Drivers/ICM42688_Aux/ICM42688_Aux.h"
 #include "../Height_Est/Height_Est.h"
-/* ======================== IMU å…¨å±€çŠ¶ï¿½?======================== */
-/* IMUæ»¤æ³¢æ•°æ®é€šè¿‡ g_imufilter_1000hz (IMU_Filtter.h) è®¿é—® */
-MahonyAhrs_t g_mahony_ahrs;					   /* Mahony å§¿æ€è§£ç®—å™¨çŠ¶ï¿½?*/
-MahonyAhrs_Euler_t g_euler;					   /* å½“å‰å§¿æ€æ¬§æ‹‰è§’ï¼ˆåº¦ï¿½?*/
-uint8 g_imu_ready = 0U;						   /* IMU æ˜¯å¦å®Œæˆåˆå§‹åŒ–ä¸è‡ªæ£€ */
-static imudata_t s_imu_raw_calib_1000hz = {0}; /* å½“å‰ 1kHz åŸå§‹ IMU å¿«ç…§ï¼Œä¾›æ ¡å‡†é“¾è¯»å– */
+/* ======================== IMU È«¾Ö×´Ì¬ ======================== */
+/* IMUÂË²¨Êı¾İÍ¨¹ı g_imufilter_1000hz (IMU_Filtter.h) ·ÃÎÊ */
+MahonyAhrs_t g_mahony_ahrs;                    /* Mahony ×ËÌ¬½âËãÆ÷×´Ì¬ */
+MahonyAhrs_Euler_t g_euler;                    /* µ±Ç°×ËÌ¬Å·À­½Ç£¨¶È£© */
+uint8 g_imu_ready = 0U;                        /* IMU ÊÇ·ñÍê³É³õÊ¼»¯Óë×Ô¼ì */
+static imudata_t s_imu_raw_calib_1000hz = {0}; /* µ±Ç° 1kHz Ô­Ê¼ IMU ¿ìÕÕ£¬¹©Ğ£×¼Á´¶ÁÈ¡ */
 static uint8 s_imu_initializing = 0U;
 extern uint32 tick_1000us_cnt;
-/* ======================== æœ¬åœ°å·¥å…·å‡½æ•° ======================== */
+/* ======================== ±¾µØ¹¤¾ßº¯Êı ======================== */
 static uint8 IMU_IsFiniteFloat(float value)
 {
-	if (value != value)
-	{
-		return 0U;
-	}
+    if (value != value)
+    {
+        return 0U;
+    }
 
-	if ((value > 1000000.0f) || (value < -1000000.0f))
-	{
-		return 0U;
-	}
+    if ((value > 1000000.0f) || (value < -1000000.0f))
+    {
+        return 0U;
+    }
 
-	return 1U;
+    return 1U;
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: è¯»å–å½“å‰ 1kHz å‘¨æœŸå†…ä¾›æ ¡å‡†ä½¿ç”¨çš„åŸå§‹ IMU ç‰©ç†é‡å¿«ç…§ã€‚
- * è¾“å…¥å‚æ•°:
- *   gx, gy, gz - è¾“å‡ºé™€èºä»ªåŸå§‹è§’é€Ÿåº¦ï¼Œå•ä½ dpsï¼›å·²åšç¬¦å·æ˜ å°„å¹¶æ‰£é™¤é™€èºä»ªé›¶å
- *   ax, ay, az - è¾“å‡ºåŠ é€Ÿåº¦è®¡åŸå§‹æ¯”åŠ›ï¼Œå•ä½ gï¼›ä»…åšé‡ç¨‹æ¢ç®—ä¸ç¬¦å·æ˜ å°„
- * è¾“å‡ºå‚æ•°/è¿”å›å€¼:
- *   é€šè¿‡æŒ‡é’ˆè¿”å›å½“å‰å¸§åŸå§‹ IMU å¿«ç…§ï¼›ç©ºæŒ‡é’ˆä¼šè¢«å¿½ç•¥
+ * º¯Êı¹¦ÄÜ: ¶ÁÈ¡µ±Ç° 1kHz ÖÜÆÚÄÚ¹©Ğ£×¼Ê¹ÓÃµÄÔ­Ê¼ IMU ÎïÀíÁ¿¿ìÕÕ¡£
+ * ÊäÈë²ÎÊı:
+ *   gx, gy, gz - Êä³öÍÓÂİÒÇÔ­Ê¼½ÇËÙ¶È£¬µ¥Î» dps£»ÒÑ×ö·ûºÅÓ³Éä²¢¿Û³ıÍÓÂİÒÇÁãÆ«
+ *   ax, ay, az - Êä³ö¼ÓËÙ¶È¼ÆÔ­Ê¼±ÈÁ¦£¬µ¥Î» g£»½ö×öÁ¿³Ì»»ËãÓë·ûºÅÓ³Éä
+ * Êä³ö²ÎÊı/·µ»ØÖµ:
+ *   Í¨¹ıÖ¸Õë·µ»Øµ±Ç°Ö¡Ô­Ê¼ IMU ¿ìÕÕ£»¿ÕÖ¸Õë»á±»ºöÂÔ
  */
 void IMU_GetRawSampleForCalibration(float *gx, float *gy, float *gz,
-									float *ax, float *ay, float *az)
+                                    float *ax, float *ay, float *az)
 {
-	if (gx != NULL)
-	{
-		*gx = s_imu_raw_calib_1000hz.gyrox;
-	}
-	if (gy != NULL)
-	{
-		*gy = s_imu_raw_calib_1000hz.gyroy;
-	}
-	if (gz != NULL)
-	{
-		*gz = s_imu_raw_calib_1000hz.gyroz;
-	}
-	if (ax != NULL)
-	{
-		*ax = s_imu_raw_calib_1000hz.accx;
-	}
-	if (ay != NULL)
-	{
-		*ay = s_imu_raw_calib_1000hz.accy;
-	}
-	if (az != NULL)
-	{
-		*az = s_imu_raw_calib_1000hz.accz;
-	}
+    if (gx != NULL)
+    {
+        *gx = s_imu_raw_calib_1000hz.gyrox;
+    }
+    if (gy != NULL)
+    {
+        *gy = s_imu_raw_calib_1000hz.gyroy;
+    }
+    if (gz != NULL)
+    {
+        *gz = s_imu_raw_calib_1000hz.gyroz;
+    }
+    if (ax != NULL)
+    {
+        *ax = s_imu_raw_calib_1000hz.accx;
+    }
+    if (ay != NULL)
+    {
+        *ay = s_imu_raw_calib_1000hz.accy;
+    }
+    if (az != NULL)
+    {
+        *az = s_imu_raw_calib_1000hz.accz;
+    }
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: ä¸Šç”µè¯»å–çŸ­çª—å£æ•°æ®åšåŸºç¡€å¥åº·æ£€ï¿½? * æ£€æŸ¥é¡¹  :
- *   1) æ•°æ®æ˜¯å¦æœ‰æ•ˆï¼ˆæ—  NaN/å¼‚å¸¸å€¼ï¼‰
- *   2) é™æ­¢æ—¶å¹³å‡è§’é€Ÿåº¦æ˜¯å¦åœ¨åˆç†èŒƒï¿½? *   3) åŠ é€Ÿåº¦æ¨¡é•¿å‡å€¼æ˜¯å¦æ¥ï¿½?1g
- * è¿”å›ï¿½? : 1=é€šè¿‡ï¿½?=å¤±è´¥
+ * º¯Êı¹¦ÄÜ£ºÉÏµç¶ÁÈ¡¶Ì´°¿ÚÊı¾İ£¬Ö´ĞĞ»ù´¡½¡¿µ¼ì²é¡£
+ * ¼ì²éÏî£º
+ *   1) Êı¾İÊÇ·ñÓĞĞ§£¨ÎŞ NaN/Òì³£Öµ£©
+ *   2) ¾²Ö¹Ê±Æ½¾ù½ÇËÙ¶ÈÊÇ·ñÔÚºÏÀí·¶Î§
+ *   3) ¼ÓËÙ¶ÈÄ£³¤¾ùÖµÊÇ·ñ½Ó½ü 1g
+ * ·µ»ØÖµ£º1=Í¨¹ı£¬0=Ê§°Ü
  */
 static uint8 IMU_Startup_SelfCheck(void)
 {
-	uint32 i;
-	float gyro_abs_sum = 0.0f;
-	float acc_mag_sum = 0.0f;
+    uint32 i;
+    float gyro_abs_sum = 0.0f;
+    float acc_mag_sum = 0.0f;
 
-	for (i = 0U; i < IMU_SELFTEST_SAMPLE_COUNT; i++)
-	{
-		float gyro_abs;
-		float acc_mag;
+    for (i = 0U; i < IMU_SELFTEST_SAMPLE_COUNT; i++)
+    {
+        float gyro_abs;
+        float acc_mag;
 
-		ICM42688_Get_Data();
+        ICM42688_Get_Data();
 
-		if ((0U == IMU_IsFiniteFloat(ICM42688.gyro_x)) ||
-			(0U == IMU_IsFiniteFloat(ICM42688.gyro_y)) ||
-			(0U == IMU_IsFiniteFloat(ICM42688.gyro_z)) ||
-			(0U == IMU_IsFiniteFloat(ICM42688.acc_x)) ||
-			(0U == IMU_IsFiniteFloat(ICM42688.acc_y)) ||
-			(0U == IMU_IsFiniteFloat(ICM42688.acc_z)))
-		{
-			return 0U;
-		}
+        if ((0U == IMU_IsFiniteFloat(ICM42688.gyro_x)) ||
+            (0U == IMU_IsFiniteFloat(ICM42688.gyro_y)) ||
+            (0U == IMU_IsFiniteFloat(ICM42688.gyro_z)) ||
+            (0U == IMU_IsFiniteFloat(ICM42688.acc_x)) ||
+            (0U == IMU_IsFiniteFloat(ICM42688.acc_y)) ||
+            (0U == IMU_IsFiniteFloat(ICM42688.acc_z)))
+        {
+            return 0U;
+        }
 
-		gyro_abs = sqrtf(ICM42688.gyro_x * ICM42688.gyro_x +
-						 ICM42688.gyro_y * ICM42688.gyro_y +
-						 ICM42688.gyro_z * ICM42688.gyro_z);
+        gyro_abs = sqrtf(ICM42688.gyro_x * ICM42688.gyro_x +
+                         ICM42688.gyro_y * ICM42688.gyro_y +
+                         ICM42688.gyro_z * ICM42688.gyro_z);
 
-		acc_mag = sqrtf(ICM42688.acc_x * ICM42688.acc_x +
-						ICM42688.acc_y * ICM42688.acc_y +
-						ICM42688.acc_z * ICM42688.acc_z);
+        acc_mag = sqrtf(ICM42688.acc_x * ICM42688.acc_x +
+                        ICM42688.acc_y * ICM42688.acc_y +
+                        ICM42688.acc_z * ICM42688.acc_z);
 
-		gyro_abs_sum += gyro_abs;
-		acc_mag_sum += acc_mag;
+        gyro_abs_sum += gyro_abs;
+        acc_mag_sum += acc_mag;
 
-		system_delay_us(ICM42688_SAMPLE_INTERVAL_US);
-	}
+        system_delay_us(ICM42688_SAMPLE_INTERVAL_US);
+    }
 
-	gyro_abs_sum /= (float)IMU_SELFTEST_SAMPLE_COUNT;
-	acc_mag_sum /= (float)IMU_SELFTEST_SAMPLE_COUNT;
+    gyro_abs_sum /= (float)IMU_SELFTEST_SAMPLE_COUNT;
+    acc_mag_sum /= (float)IMU_SELFTEST_SAMPLE_COUNT;
 
-	if (gyro_abs_sum > IMU_SELFTEST_GYRO_MEAN_MAX_DPS)
-	{
-		return 0U;
-	}
+    if (gyro_abs_sum > IMU_SELFTEST_GYRO_MEAN_MAX_DPS)
+    {
+        return 0U;
+    }
 
-	if ((acc_mag_sum < IMU_SELFTEST_ACC_MIN_G) || (acc_mag_sum > IMU_SELFTEST_ACC_MAX_G))
-	{
-		return 0U;
-	}
+    if ((acc_mag_sum < IMU_SELFTEST_ACC_MIN_G) || (acc_mag_sum > IMU_SELFTEST_ACC_MAX_G))
+    {
+        return 0U;
+    }
 
-	return 1U;
+    return 1U;
 }
 
-/* ======================== IMU åˆå§‹ï¿½?======================== */
+/* ======================== IMU ³õÊ¼»¯ ======================== */
 void IMU_Init_All(void)
 {
-	uint32 i;
+    uint32 i;
 
-	g_imu_ready = 0U;
-	s_imu_initializing = 1U;
-	s_imu_raw_calib_1000hz = (imudata_t){0};
+    g_imu_ready = 0U;
+    s_imu_initializing = 1U;
+    s_imu_raw_calib_1000hz = (imudata_t){0};
 
-	/* æ­¥éª¤1: ä¸Šç”µåˆå§‹ï¿½?ICM42688 é©±åŠ¨ */
-	ICM42688_Init(&ICM42688_CONFIG);
+    /* ²½Öè1£ºÉÏµç³õÊ¼»¯ ICM42688 Çı¶¯ */
+    ICM42688_Init(&ICM42688_CONFIG);
 
-	/* æ­¥éª¤2: ä¸Šç”µè‡ªæ£€ï¼ˆå¿…é¡»é™æ­¢æ”¾ç½®ï¼‰ */
-	if (0U == IMU_Startup_SelfCheck())
-	{
-		printf("IMU startup self-check failed.\r\n");
-	}
+    /* ²½Öè2: ÉÏµç×Ô¼ì£¨±ØĞë¾²Ö¹·ÅÖÃ£© */
+    if (0U == IMU_Startup_SelfCheck())
+    {
+        printf("IMU startup self-check failed.\r\n");
+    }
 
-	/* æ­¥éª¤3: åˆå§‹åŒ–ä¸Šå±‚æ»¤æ³¢ä¸å§¿æ€è§£ç®—å™¨ */
-	IMUFilter_Init();
-	MahonyAhrs_Init(&g_mahony_ahrs);
-	g_euler.roll = 0.0f;
-	g_euler.pitch = 0.0f;
-	g_euler.yaw = 0.0f;
-	g_euler.sin_roll = 0.0f;
-	g_euler.cos_roll = 1.0f;
-	g_euler.sin_pitch = 0.0f;
-	g_euler.cos_pitch = 1.0f;
+    /* ²½Öè3: ³õÊ¼»¯ÉÏ²ãÂË²¨Óë×ËÌ¬½âËãÆ÷ */
+    IMUFilter_Init();
+    MahonyAhrs_Init(&g_mahony_ahrs);
+    g_euler.roll = 0.0f;
+    g_euler.pitch = 0.0f;
+    g_euler.yaw = 0.0f;
+    g_euler.sin_roll = 0.0f;
+    g_euler.cos_roll = 1.0f;
+    g_euler.sin_pitch = 0.0f;
+    g_euler.cos_pitch = 1.0f;
 
-	/* æ­¥éª¤4: æš–æœºï¼Œä¸¢å¼ƒå‰è‹¥å¹²å¸§ç”¨äºç¨³å®šæ»¤æ³¢å™¨å†…éƒ¨çŠ¶ï¿½?*/
-	for (i = 0U; i < IMU_WARMUP_DISCARD_SAMPLES; i++)
-	{
-		IMU_Update_1000HZ();
-		system_delay_us(ICM42688_SAMPLE_INTERVAL_US);
-	}
+    /* ²½Öè4£ºÅ¯»ú£¬¶ªÆúÇ°Èô¸ÉÖ¡ÓÃÓÚÎÈ¶¨ÂË²¨Æ÷ÄÚ²¿×´Ì¬ */
+    for (i = 0U; i < IMU_WARMUP_DISCARD_SAMPLES; i++)
+    {
+        IMU_Update_1000HZ();
+        system_delay_us(ICM42688_SAMPLE_INTERVAL_US);
+    }
 
-	g_imu_ready = 1U;
-	s_imu_initializing = 0U;
+    g_imu_ready = 1U;
+    s_imu_initializing = 0U;
 }
 
 /* IMU 1kHz*/
-// 04110147 zyzå®é™…æµ‹è¯•æ‰§è¡Œä¸€æ¬¡IMU_Update_1000HZèŠ±è´¹55us
+// 04110147 zyzÊµ¼Ê²âÊÔÖ´ĞĞÒ»´ÎIMU_Update_1000HZ»¨·Ñ55us
 void IMU_Update_1000HZ(void)
 {
-	/* æ­¥éª¤1: ï¿½?ICM42688 è¯»å–ä¸€å¸§åŸå§‹ä¼ æ„Ÿå™¨æ•°æ® */
-	const float dt_s = IMU_UPDATE_DT_SEC;
-	float ahrs_gx;
-	float ahrs_gy;
-	float ahrs_gz;
-	float ahrs_ax;
-	float ahrs_ay;
-	float ahrs_az;
-	if ((0U == g_imu_ready) && (0U == s_imu_initializing))
-	{
-		return;
-	}
+    /* ²½Öè1£º´Ó ICM42688 ¶ÁÈ¡Ò»Ö¡Ô­Ê¼´«¸ĞÆ÷Êı¾İ */
+    const float dt_s = IMU_UPDATE_DT_SEC;
+    float ahrs_gx;
+    float ahrs_gy;
+    float ahrs_gz;
+    float ahrs_ax;
+    float ahrs_ay;
+    float ahrs_az;
+    if ((0U == g_imu_ready) && (0U == s_imu_initializing))
+    {
+        return;
+    }
 
-	/* 1. åŸå§‹æ•°æ® (gyroå·²å»é›¶å) */
-	ICM42688_Get_Data();
+    /* 1. Ô­Ê¼Êı¾İ (gyroÒÑÈ¥ÁãÆ«) */
+    ICM42688_Get_Data();
 
-	/* ç¼“å­˜å½“å‰å¸§åŸå§‹ IMU ç‰©ç†é‡ï¼Œä¾›æ ¡å‡†æµç¨‹ç›´æ¥è¯»å– */
-	s_imu_raw_calib_1000hz.gyrox = ICM42688.gyro_x;
-	s_imu_raw_calib_1000hz.gyroy = ICM42688.gyro_y;
-	s_imu_raw_calib_1000hz.gyroz = ICM42688.gyro_z;
-	s_imu_raw_calib_1000hz.accx = ICM42688.acc_x;
-	s_imu_raw_calib_1000hz.accy = ICM42688.acc_y;
-	s_imu_raw_calib_1000hz.accz = ICM42688.acc_z;
+    /* »º´æµ±Ç°Ö¡Ô­Ê¼ IMU ÎïÀíÁ¿£¬¹©Ğ£×¼Á÷³ÌÖ±½Ó¶ÁÈ¡ */
+    s_imu_raw_calib_1000hz.gyrox = ICM42688.gyro_x;
+    s_imu_raw_calib_1000hz.gyroy = ICM42688.gyro_y;
+    s_imu_raw_calib_1000hz.gyroz = ICM42688.gyro_z;
+    s_imu_raw_calib_1000hz.accx = ICM42688.acc_x;
+    s_imu_raw_calib_1000hz.accy = ICM42688.acc_y;
+    s_imu_raw_calib_1000hz.accz = ICM42688.acc_z;
 
-	/* 2. åŠ é€Ÿåº¦è®¡æ ¡å‡†å‰ç½®ï¼ˆä¼ æ„Ÿå™¨åæ ‡ç³»ï¼‰ */
-	float cal_ax = ICM42688.acc_x;
-	float cal_ay = ICM42688.acc_y;
-	float cal_az = ICM42688.acc_z;
-	AccelCalibration_ApplySensorCorrection(&cal_ax, &cal_ay, &cal_az);
+    /* 2. ¼ÓËÙ¶È¼ÆĞ£×¼Ç°ÖÃ£¨´«¸ĞÆ÷×ø±êÏµ£© */
+    float cal_ax = ICM42688.acc_x;
+    float cal_ay = ICM42688.acc_y;
+    float cal_az = ICM42688.acc_z;
+    AccelCalibration_ApplySensorCorrection(&cal_ax, &cal_ay, &cal_az);
 
-	/* 3. æ ¡å‡†åæ•°æ®é€å…¥æ»¤æ³¢å™¨ */
-	IMUFilter_Update(ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,
-					 cal_ax, cal_ay, cal_az);
+    /* 3. Ğ£×¼ºóÊı¾İËÍÈëÂË²¨Æ÷ */
+    IMUFilter_Update(ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,
+                     cal_ax, cal_ay, cal_az);
 
-	/* 4. æ ¡å‡†çŠ¶æ€æœº + é«˜çº§å¤„ç†ï¼ˆå½“å‰å¸§ï¼‰ */
-	IMUCalib_Update_1000HZ();
+    /* 4. Ğ£×¼×´Ì¬»ú + ¸ß¼¶´¦Àí£¨µ±Ç°Ö¡£© */
+    IMUCalib_Update_1000HZ();
 
-	/* 5. å§¿æ€è§£ç®—ç»Ÿä¸€ä½¿ç”¨ 1kHz æ»¤æ³¢ IMU è¾“å‡º */
-	ahrs_gx = g_imufilter_1000hz.gyrox;
-	ahrs_gy = g_imufilter_1000hz.gyroy;
-	ahrs_gz = g_imufilter_1000hz.gyroz;
-	ahrs_ax = g_imufilter_1000hz.accx;
-	ahrs_ay = g_imufilter_1000hz.accy;
-	ahrs_az = g_imufilter_1000hz.accz;
+    /* 5. ×ËÌ¬½âËãÍ³Ò»Ê¹ÓÃ 1kHz ÂË²¨ IMU Êä³ö */
+    ahrs_gx = g_imufilter_1000hz.gyrox;
+    ahrs_gy = g_imufilter_1000hz.gyroy;
+    ahrs_gz = g_imufilter_1000hz.gyroz;
+    ahrs_ax = g_imufilter_1000hz.accx;
+    ahrs_ay = g_imufilter_1000hz.accy;
+    ahrs_az = g_imufilter_1000hz.accz;
 
-	if ((0U != IMU_IsFiniteFloat(ahrs_gx)) &&
-		(0U != IMU_IsFiniteFloat(ahrs_gy)) &&
-		(0U != IMU_IsFiniteFloat(ahrs_gz)) &&
-		(0U != IMU_IsFiniteFloat(ahrs_ax)) &&
-		(0U != IMU_IsFiniteFloat(ahrs_ay)) &&
-		(0U != IMU_IsFiniteFloat(ahrs_az)))
-	{
-		MahonyAhrs_Update(
-			&g_mahony_ahrs,
-			ahrs_gx, ahrs_gy, ahrs_gz,
-			ahrs_ax, ahrs_ay, ahrs_az,
-			dt_s);
-	}
+    if ((0U != IMU_IsFiniteFloat(ahrs_gx)) &&
+        (0U != IMU_IsFiniteFloat(ahrs_gy)) &&
+        (0U != IMU_IsFiniteFloat(ahrs_gz)) &&
+        (0U != IMU_IsFiniteFloat(ahrs_ax)) &&
+        (0U != IMU_IsFiniteFloat(ahrs_ay)) &&
+        (0U != IMU_IsFiniteFloat(ahrs_az)))
+    {
+        MahonyAhrs_Update(
+            &g_mahony_ahrs,
+            ahrs_gx, ahrs_gy, ahrs_gz,
+            ahrs_ax, ahrs_ay, ahrs_az,
+            dt_s);
+    }
 
-	/* æ­¥éª¤5: è®¡ç®—æ¬§æ‹‰è§’ï¼ˆå•ä½: åº¦ï¼‰å¹¶ç¼“ï¿½?*/
-	g_euler = MahonyAhrs_GetEulerDegrees(&g_mahony_ahrs);
-	AccelCalibration_Update_1000HZ();
-	Height_Est_predict_1000HZ();
+    /* ²½Öè5£º¼ÆËãÅ·À­½Ç£¨µ¥Î»£º¶È£©²¢»º´æ */
+    g_euler = MahonyAhrs_GetEulerDegrees(&g_mahony_ahrs);
+    AccelCalibration_Update_1000HZ();
+    Height_Est_predict_1000HZ();
 
-	// wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw,
-	// 	g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
-	// 	g_imufilter_1000hz.accx, g_imufilter_1000hz.accy, g_imufilter_1000hz.accz,
-	// 	ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,
-	// 	ICM42688.acc_x, ICM42688.acc_y, ICM42688.acc_z);
+    // wifi_justfloat(g_euler.roll, g_euler.pitch, g_euler.yaw,
+    //  g_imufilter_1000hz.gyrox, g_imufilter_1000hz.gyroy, g_imufilter_1000hz.gyroz,
+    //  g_imufilter_1000hz.accx, g_imufilter_1000hz.accy, g_imufilter_1000hz.accz,
+    //  ICM42688.gyro_x, ICM42688.gyro_y, ICM42688.gyro_z,
+    //  ICM42688.acc_x, ICM42688.acc_y, ICM42688.acc_z);
 }
 
 uint8 IMU_Is_Ready(void)
 {
-	return g_imu_ready;
+    return g_imu_ready;
 }

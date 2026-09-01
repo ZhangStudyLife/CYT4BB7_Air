@@ -5,50 +5,50 @@
 #include "../Estimation/Height_Est/Height_Est.h"
 #include <math.h>
 
-#define CAR_PLAN_3_DEG_TO_RAD       (0.017453292519943295f) /* è§’åº¦è½¬å¼§åº¦ç³»æ•°ã€‚ */
-#define CAR_PLAN_3_RAD_TO_DEG       (57.29577951308232f) /* å¼§åº¦è½¬è§’åº¦ç³»æ•°ã€‚ */
-#define CAR_PLAN_3_MIN_DISTANCE_M   (0.20f) /* å¯ä¿¡è½¦ç¯åˆ°ä¿¡æ ‡çš„æœ€å°æ°´å¹³è·ç¦»ï¼Œå•ä½ mã€‚ */
-#define CAR_PLAN_3_MAX_DISTANCE_M   (6.00f) /* å¯ä¿¡è½¦ç¯åˆ°ä¿¡æ ‡çš„æœ€å¤§æ°´å¹³è·ç¦»ï¼Œå•ä½ mã€‚ */
-#define CAR_PLAN_3_NEAR_LAMP_DIST_PX (3.0f)  /* ä¿¡æ ‡ä¸åŒæ‘„è½¦ç¯ä¸­å¿ƒçš„è¿‘è·ç¦»é˜ˆå€¼ï¼Œå•ä½ pxã€‚ */
-#define CAR_PLAN_3_TRACK_MATCH_PX    (15.0f) /* åŸå§‹ä¿¡æ ‡çŸ­æ—¶è½¨è¿¹åŒ¹é…åŠå¾„ï¼Œå•ä½ pxã€‚ */
-#define CAR_PLAN_3_FAR_LAMP_DIST_PX  (10.0f) /* å…è®¸ä¿¡æ ‡é è¿‘è½¦ç¯å‰å¿…é¡»åˆ°è¾¾çš„å†å²è·ç¦»ï¼Œå•ä½ pxã€‚ */
-#define CAR_PLAN_3_HISTORY_TICKS     (30U)   /* 100Hz ä¸‹ä¿ç•™çº¦ 300ms çš„è¿œè·ç¦»å†å²ã€‚ */
-#define CAR_PLAN_3_GAP_TICKS         (2U)    /* 100Hz ä¸‹å…è®¸çº¦ 20ms çš„çŸ­æš‚ä¸¢å¤±ã€‚ */
-#define CAR_PLAN_3_CONFIRM_TICKS     (2U)    /* è¿ç»­åŒ¹é…ä¸¤æ¬¡åç¡®è®¤ä¿¡æ ‡è½¨è¿¹ã€‚ */
-#define CAR_PLAN_3_EDGE_MARGIN_PX    (20.0f) /* è¿›å…¥æƒ¯å¯¼ä¿æŒå‰çš„å›¾åƒè¾¹ç¼˜ä½™é‡ï¼Œå•ä½ pxã€‚ */
-#define CAR_PLAN_3_ATTITUDE_GATE_DEG (12.0f) /* å…è®¸è¿›å…¥æƒ¯å¯¼ä¿æŒçš„ Roll/Pitch æ¨¡é•¿ï¼Œå•ä½ degã€‚ */
-#define CAR_PLAN_3_COAST_MAX_MS      (400U)  /* COAST é˜¶æ®µæƒ¯å¯¼ä¿æŒæœ€é•¿æ—¶é—´ï¼Œå•ä½ msã€‚ */
-#define CAR_PLAN_3_FAR_DISTANCE_M    (1.20f) /* è¿œè·ç¦» COAST å‡†å…¥è¾¹ç•Œï¼Œå•ä½ mã€‚ */
-#define CAR_PLAN_3_FAR_COAST_MAX_MS  (520U)  /* è¿œè·ç¦» COAST æƒ¯å¯¼ä¿æŒæœ€é•¿æ—¶é—´ï¼Œå•ä½ msã€‚ */
-#define CAR_PLAN_3_AGGRESSIVE_DISTANCE_M (2.00f) /* å¼ºä¿¡ä»» COAST çš„èµ·å§‹è·ç¦»ï¼Œå•ä½ mã€‚ */
-#define CAR_PLAN_3_AGGRESSIVE_COAST_MAX_MS (960U) /* å¼ºä¿¡ä»» COAST æœ€é•¿ç›²èˆªæ—¶é—´ï¼Œå•ä½ msã€‚ */
-#define CAR_PLAN_3_COAST_STOP_DISTANCE_M (0.60f) /* COAST é¢„æµ‹è·ç¦»åˆ°è¯¥å€¼æ—¶ç«‹å³é€€å‡ºï¼Œå•ä½ mã€‚ */
-#define CAR_PLAN_3_CAR_DATA_WARN_MS  (50U)   /* è½¦æ•°æ®è¶…è¿‡è¯¥å¹´é¾„åä¸å†æ‰©å±•æƒ¯å¯¼æ—¶é—´ï¼Œå•ä½ msã€‚ */
-#define CAR_PLAN_3_CAR_DATA_STOP_MS  (100U)  /* è½¦æ•°æ®è¶…è¿‡è¯¥å¹´é¾„ååœæ­¢æƒ¯å¯¼ï¼Œå•ä½ msã€‚ */
-#define CAR_PLAN_3_IMAGE_TIMEOUT_MS   (50U)   /* ç›®æ ‡æ¥æºç›¸æœºè¶…è¿‡è¯¥æ—¶é—´æœªæ›´æ–°æ—¶æŒ‰ä¸¢å¤±å¤„ç†ï¼Œå•ä½ msã€‚ */
-#define CAR_PLAN_3_NO_VISION_TICKS   (2U)    /* è¿ç»­ä¸¤æ¬¡è§„åˆ’å‘¨æœŸæ²¡æœ‰æ–°å›¾åƒåè¿›å…¥ä¸¢å¤±åˆ¤æ–­ã€‚ */
-#define CAR_PLAN_3_INNOVATION_BASE_M (0.35f) /* ä¸–ç•Œç›¸å¯¹å‘é‡åŸºç¡€åˆ›æ–°é—¨é™ï¼Œå•ä½ mã€‚ */
-#define CAR_PLAN_3_INNOVATION_GAIN_S (0.80f) /* è½¦é€Ÿä¼ æ’­é€ æˆçš„åˆ›æ–°é—¨é™å¢ç›Šï¼Œå•ä½ sã€‚ */
-#define CAR_PLAN_3_INNOVATION_MAX_M  (1.20f) /* ä¸–ç•Œç›¸å¯¹å‘é‡æœ€å¤§åˆ›æ–°é—¨é™ï¼Œå•ä½ mã€‚ */
-#define CAR_PLAN_3_REACQUIRE_DIST_M  (0.50f) /* é‡æ•è·è¿ç»­è§‚æµ‹ä¹‹é—´çš„æœ€å¤§è·ç¦»ï¼Œå•ä½ mã€‚ */
-#define CAR_PLAN_3_AMBIGUITY_MARGIN_M (0.15f) /* æœ€ä½³ä¸æ¬¡ä½³åˆ›æ–°å°äºè¯¥å·®å€¼æ—¶æ‹’ç»æ­§ä¹‰å€™é€‰ï¼Œå•ä½ mã€‚ */
-#define CAR_PLAN_3_LAMP_ANGLE_GATE_DEG (30.0f) /* è½¦ç¯é•¿è½´ç›¸å¯¹æƒ¯å¯¼é¢„æµ‹çš„æœ€å¤§åˆ›æ–°ï¼Œå•ä½ degã€‚ */
-#define CAR_PLAN_3_DIRECTION_COS_SQ  (0.8213938f) /* ç›¸å¯¹æ–¹å‘åˆ›æ–° 25deg å¯¹åº”çš„æœ€å°ä½™å¼¦å¹³æ–¹ã€‚ */
-#define CAR_PLAN_3_OUTPUT_COS_MIN     (0.8660254f) /* é‡æ•è·é€Ÿåº¦æ–¹å‘æœ€å¤§å˜åŒ– 30deg å¯¹åº”çš„æœ€å°ä½™å¼¦ã€‚ */
-#define CAR_PLAN_3_SEARCH_FORWARD_MIN (0.20f) /* è·¯çº¿æŠ¢å åªè€ƒè™‘è½¦ä½“å‰æ–¹çº¦ 78deg å†…çš„ä¿¡æ ‡ã€‚ */
-#define CAR_PLAN_3_ROUTE_NEARER_MARGIN_M (0.35f) /* æ–°å‰å‘å€™é€‰å¿…é¡»è‡³å°‘è¿‘äºæ—§ç›®æ ‡çš„è·ç¦»ï¼Œå•ä½ mã€‚ */
-#define CAR_PLAN_3_ROUTE_NEARER_RATIO (0.80f) /* æˆ–è€…æ–°å€™é€‰è·ç¦»ä¸è¶…è¿‡æ—§ç›®æ ‡çš„ 80%ã€‚ */
-#define CAR_PLAN_3_ROUTE_STRONG_RATIO (0.60f) /* å¼ºä¼˜åŠ¿è·¯çº¿å€™é€‰ç›¸å¯¹å½“å‰ç›®æ ‡çš„æœ€å¤§è·ç¦»æ¯”ä¾‹ã€‚ */
-#define CAR_PLAN_3_ROUTE_TURN_MARGIN_DEG (25.0f) /* æ™®é€šæŠ¢å å…è®¸å¢åŠ çš„æœ€å¤§è½¬å‘è§’ï¼Œå•ä½ degã€‚ */
-#define CAR_PLAN_3_ROUTE_CONFIRM_TICKS (2U) /* æ–°è·¯çº¿å€™é€‰è¿ç»­ä¸¤æ¬¡è§‚æµ‹åæ‰å…è®¸æŠ¢å ã€‚ */
+#define CAR_PLAN_3_DEG_TO_RAD       (0.017453292519943295f) /* ½Ç¶È×ª»¡¶ÈÏµÊı¡£ */
+#define CAR_PLAN_3_RAD_TO_DEG       (57.29577951308232f) /* »¡¶È×ª½Ç¶ÈÏµÊı¡£ */
+#define CAR_PLAN_3_MIN_DISTANCE_M   (0.20f) /* ¿ÉĞÅ³µµÆµ½ĞÅ±êµÄ×îĞ¡Ë®Æ½¾àÀë£¬µ¥Î» m¡£ */
+#define CAR_PLAN_3_MAX_DISTANCE_M   (6.00f) /* ¿ÉĞÅ³µµÆµ½ĞÅ±êµÄ×î´óË®Æ½¾àÀë£¬µ¥Î» m¡£ */
+#define CAR_PLAN_3_NEAR_LAMP_DIST_PX (3.0f)  /* ĞÅ±êÓëÍ¬Éã³µµÆÖĞĞÄµÄ½ü¾àÀëãĞÖµ£¬µ¥Î» px¡£ */
+#define CAR_PLAN_3_TRACK_MATCH_PX    (15.0f) /* Ô­Ê¼ĞÅ±ê¶ÌÊ±¹ì¼£Æ¥Åä°ë¾¶£¬µ¥Î» px¡£ */
+#define CAR_PLAN_3_FAR_LAMP_DIST_PX  (10.0f) /* ÔÊĞíĞÅ±ê¿¿½ü³µµÆÇ°±ØĞëµ½´ïµÄÀúÊ·¾àÀë£¬µ¥Î» px¡£ */
+#define CAR_PLAN_3_HISTORY_TICKS     (30U)   /* 100Hz ÏÂ±£ÁôÔ¼ 300ms µÄÔ¶¾àÀëÀúÊ·¡£ */
+#define CAR_PLAN_3_GAP_TICKS         (2U)    /* 100Hz ÏÂÔÊĞíÔ¼ 20ms µÄ¶ÌÔİ¶ªÊ§¡£ */
+#define CAR_PLAN_3_CONFIRM_TICKS     (2U)    /* Á¬ĞøÆ¥ÅäÁ½´ÎºóÈ·ÈÏĞÅ±ê¹ì¼£¡£ */
+#define CAR_PLAN_3_EDGE_MARGIN_PX    (20.0f) /* ½øÈë¹ßµ¼±£³ÖÇ°µÄÍ¼Ïñ±ßÔµÓàÁ¿£¬µ¥Î» px¡£ */
+#define CAR_PLAN_3_ATTITUDE_GATE_DEG (12.0f) /* ÔÊĞí½øÈë¹ßµ¼±£³ÖµÄ Roll/Pitch Ä£³¤£¬µ¥Î» deg¡£ */
+#define CAR_PLAN_3_COAST_MAX_MS      (400U)  /* COAST ½×¶Î¹ßµ¼±£³Ö×î³¤Ê±¼ä£¬µ¥Î» ms¡£ */
+#define CAR_PLAN_3_FAR_DISTANCE_M    (1.20f) /* Ô¶¾àÀë COAST ×¼Èë±ß½ç£¬µ¥Î» m¡£ */
+#define CAR_PLAN_3_FAR_COAST_MAX_MS  (520U)  /* Ô¶¾àÀë COAST ¹ßµ¼±£³Ö×î³¤Ê±¼ä£¬µ¥Î» ms¡£ */
+#define CAR_PLAN_3_AGGRESSIVE_DISTANCE_M (2.00f) /* Ç¿ĞÅÈÎ COAST µÄÆğÊ¼¾àÀë£¬µ¥Î» m¡£ */
+#define CAR_PLAN_3_AGGRESSIVE_COAST_MAX_MS (960U) /* Ç¿ĞÅÈÎ COAST ×î³¤Ã¤º½Ê±¼ä£¬µ¥Î» ms¡£ */
+#define CAR_PLAN_3_COAST_STOP_DISTANCE_M (0.60f) /* COAST Ô¤²â¾àÀëµ½¸ÃÖµÊ±Á¢¼´ÍË³ö£¬µ¥Î» m¡£ */
+#define CAR_PLAN_3_CAR_DATA_WARN_MS  (50U)   /* ³µÊı¾İ³¬¹ı¸ÃÄêÁäºó²»ÔÙÀ©Õ¹¹ßµ¼Ê±¼ä£¬µ¥Î» ms¡£ */
+#define CAR_PLAN_3_CAR_DATA_STOP_MS  (100U)  /* ³µÊı¾İ³¬¹ı¸ÃÄêÁäºóÍ£Ö¹¹ßµ¼£¬µ¥Î» ms¡£ */
+#define CAR_PLAN_3_IMAGE_TIMEOUT_MS   (50U)   /* Ä¿±êÀ´Ô´Ïà»ú³¬¹ı¸ÃÊ±¼äÎ´¸üĞÂÊ±°´¶ªÊ§´¦Àí£¬µ¥Î» ms¡£ */
+#define CAR_PLAN_3_NO_VISION_TICKS   (2U)    /* Á¬ĞøÁ½´Î¹æ»®ÖÜÆÚÃ»ÓĞĞÂÍ¼Ïñºó½øÈë¶ªÊ§ÅĞ¶Ï¡£ */
+#define CAR_PLAN_3_INNOVATION_BASE_M (0.35f) /* ÊÀ½çÏà¶ÔÏòÁ¿»ù´¡´´ĞÂÃÅÏŞ£¬µ¥Î» m¡£ */
+#define CAR_PLAN_3_INNOVATION_GAIN_S (0.80f) /* ³µËÙ´«²¥Ôì³ÉµÄ´´ĞÂÃÅÏŞÔöÒæ£¬µ¥Î» s¡£ */
+#define CAR_PLAN_3_INNOVATION_MAX_M  (1.20f) /* ÊÀ½çÏà¶ÔÏòÁ¿×î´ó´´ĞÂÃÅÏŞ£¬µ¥Î» m¡£ */
+#define CAR_PLAN_3_REACQUIRE_DIST_M  (0.50f) /* ÖØ²¶»ñÁ¬Ğø¹Û²âÖ®¼äµÄ×î´ó¾àÀë£¬µ¥Î» m¡£ */
+#define CAR_PLAN_3_AMBIGUITY_MARGIN_M (0.15f) /* ×î¼ÑÓë´Î¼Ñ´´ĞÂĞ¡ÓÚ¸Ã²îÖµÊ±¾Ü¾øÆçÒåºòÑ¡£¬µ¥Î» m¡£ */
+#define CAR_PLAN_3_LAMP_ANGLE_GATE_DEG (30.0f) /* ³µµÆ³¤ÖáÏà¶Ô¹ßµ¼Ô¤²âµÄ×î´ó´´ĞÂ£¬µ¥Î» deg¡£ */
+#define CAR_PLAN_3_DIRECTION_COS_SQ  (0.8213938f) /* Ïà¶Ô·½Ïò´´ĞÂ 25deg ¶ÔÓ¦µÄ×îĞ¡ÓàÏÒÆ½·½¡£ */
+#define CAR_PLAN_3_OUTPUT_COS_MIN     (0.8660254f) /* ÖØ²¶»ñËÙ¶È·½Ïò×î´ó±ä»¯ 30deg ¶ÔÓ¦µÄ×îĞ¡ÓàÏÒ¡£ */
+#define CAR_PLAN_3_SEARCH_FORWARD_MIN (0.20f) /* Â·ÏßÇÀÕ¼Ö»¿¼ÂÇ³µÌåÇ°·½Ô¼ 78deg ÄÚµÄĞÅ±ê¡£ */
+#define CAR_PLAN_3_ROUTE_NEARER_MARGIN_M (0.35f) /* ĞÂÇ°ÏòºòÑ¡±ØĞëÖÁÉÙ½üÓÚ¾ÉÄ¿±êµÄ¾àÀë£¬µ¥Î» m¡£ */
+#define CAR_PLAN_3_ROUTE_NEARER_RATIO (0.80f) /* »òÕßĞÂºòÑ¡¾àÀë²»³¬¹ı¾ÉÄ¿±êµÄ 80%¡£ */
+#define CAR_PLAN_3_ROUTE_STRONG_RATIO (0.60f) /* Ç¿ÓÅÊÆÂ·ÏßºòÑ¡Ïà¶Ôµ±Ç°Ä¿±êµÄ×î´ó¾àÀë±ÈÀı¡£ */
+#define CAR_PLAN_3_ROUTE_TURN_MARGIN_DEG (25.0f) /* ÆÕÍ¨ÇÀÕ¼ÔÊĞíÔö¼ÓµÄ×î´ó×ªÏò½Ç£¬µ¥Î» deg¡£ */
+#define CAR_PLAN_3_ROUTE_CONFIRM_TICKS (2U) /* ĞÂÂ·ÏßºòÑ¡Á¬ĞøÁ½´Î¹Û²âºó²ÅÔÊĞíÇÀÕ¼¡£ */
 
-#define CAR_PLAN_3_STATE_SEARCH       (0U)    /* æ²¡æœ‰ç¡®è®¤ç›®æ ‡ã€‚ */
-#define CAR_PLAN_3_STATE_TRACK        (1U)    /* æœ‰æ–°å›¾åƒç¡®è®¤ç›®æ ‡ã€‚ */
-#define CAR_PLAN_3_STATE_COAST        (2U)    /* å›¾åƒçŸ­æ—¶ä¸¢å¤±ï¼Œä½¿ç”¨è½¦æ¨¡æƒ¯å¯¼ã€‚ */
-#define CAR_PLAN_3_ROUTE_PENDING_HOLD (2U)    /* åæ–¹æ—§ç›®æ ‡ç­‰å¾…å‰å‘è·¯çº¿äºŒæ¬¡ç¡®è®¤æ—¶ç›´è¡Œä¿æŒã€‚ */
-#define CAR_PLAN_3_COAST_LEVEL_NEAR  (0U)    /* è¿‘è·ç¦»ä¿å®ˆ COASTã€‚ */
-#define CAR_PLAN_3_COAST_LEVEL_FAR   (1U)    /* è¿œè·ç¦» COASTã€‚ */
-#define CAR_PLAN_3_COAST_LEVEL_AGGRESSIVE (2U) /* 2m ä»¥ä¸Šå¼ºä¿¡ä»» COASTã€‚ */
+#define CAR_PLAN_3_STATE_SEARCH       (0U)    /* Ã»ÓĞÈ·ÈÏÄ¿±ê¡£ */
+#define CAR_PLAN_3_STATE_TRACK        (1U)    /* ÓĞĞÂÍ¼ÏñÈ·ÈÏÄ¿±ê¡£ */
+#define CAR_PLAN_3_STATE_COAST        (2U)    /* Í¼Ïñ¶ÌÊ±¶ªÊ§£¬Ê¹ÓÃ³µÄ£¹ßµ¼¡£ */
+#define CAR_PLAN_3_ROUTE_PENDING_HOLD (2U)    /* ºó·½¾ÉÄ¿±êµÈ´ıÇ°ÏòÂ·Ïß¶ş´ÎÈ·ÈÏÊ±Ö±ĞĞ±£³Ö¡£ */
+#define CAR_PLAN_3_COAST_LEVEL_NEAR  (0U)    /* ½ü¾àÀë±£ÊØ COAST¡£ */
+#define CAR_PLAN_3_COAST_LEVEL_FAR   (1U)    /* Ô¶¾àÀë COAST¡£ */
+#define CAR_PLAN_3_COAST_LEVEL_AGGRESSIVE (2U) /* 2m ÒÔÉÏÇ¿ĞÅÈÎ COAST¡£ */
 
 typedef struct
 {
@@ -61,51 +61,51 @@ typedef struct
     float y;
 } car_plan_3_beacon_track_t;
 
-extern float g_car_yaw; /* è½¦æ¨¡ä¸–ç•Œ yawï¼Œå•ä½ degã€‚ */
-extern float g_car_vel_x; /* è½¦ä½“å³å‘å®é™…é€Ÿåº¦ï¼Œå•ä½ m/sã€‚ */
-extern float g_car_vel_y; /* è½¦ä½“å‰å‘å®é™…é€Ÿåº¦ï¼Œå•ä½ m/sã€‚ */
-extern float g_car_sync_time_ms; /* æœ€è¿‘ä¸€æ¬¡è½¦ç«¯åŒæ­¥æ—¶é—´æˆ³ï¼Œå•ä½ msã€‚ */
-extern uint32 g_car_last_update_time_ms; /* æœ€è¿‘ä¸€æ¬¡è½¦ç«¯æ•°æ®çš„æœ¬æœºæ¥æ”¶æ—¶åˆ»ï¼Œå•ä½ msã€‚ */
-extern volatile uint32 tick_1000us_cnt; /* æœ¬æœºæ¯«ç§’æ—¶åŸºã€‚ */
-extern volatile uint32 g_image_camera_rx_seq[IMAGE_CAMERA_COUNT]; /* ä¸‰è·¯ç›¸æœºçœŸå®ç»“æœæ¥æ”¶åºå·ã€‚ */
+extern float g_car_yaw; /* ³µÄ£ÊÀ½ç yaw£¬µ¥Î» deg¡£ */
+extern float g_car_vel_x; /* ³µÌåÓÒÏòÊµ¼ÊËÙ¶È£¬µ¥Î» m/s¡£ */
+extern float g_car_vel_y; /* ³µÌåÇ°ÏòÊµ¼ÊËÙ¶È£¬µ¥Î» m/s¡£ */
+extern float g_car_sync_time_ms; /* ×î½üÒ»´Î³µ¶ËÍ¬²½Ê±¼ä´Á£¬µ¥Î» ms¡£ */
+extern uint32 g_car_last_update_time_ms; /* ×î½üÒ»´Î³µ¶ËÊı¾İµÄ±¾»ú½ÓÊÕÊ±¿Ì£¬µ¥Î» ms¡£ */
+extern volatile uint32 tick_1000us_cnt; /* ±¾»úºÁÃëÊ±»ù¡£ */
+extern volatile uint32 g_image_camera_rx_seq[IMAGE_CAMERA_COUNT]; /* ÈıÂ·Ïà»úÕæÊµ½á¹û½ÓÊÕĞòºÅ¡£ */
 static car_plan_result_t s_car_plan_3_result;
 static three_camera_result_t s_car_plan_3_camera;
 static int8 s_car_plan_3_selected = -1;
-static uint8 s_car_plan_3_state = CAR_PLAN_3_STATE_SEARCH; /* ç›®æ ‡è·Ÿè¸ªçŠ¶æ€ã€‚ */
-static uint8 s_car_plan_3_confirm_count = 0U; /* æœç´¢é˜¶æ®µè¿ç»­ç¡®è®¤çš„æ–°å›¾åƒæ•°ã€‚ */
-static uint8 s_car_plan_3_reacquire_count = 0U; /* COAST é˜¶æ®µä¸‰å¸§çª—å£å†…çš„é‡æ•è·å‘½ä¸­æ•°ã€‚ */
-static uint8 s_car_plan_3_reacquire_age = 0U; /* COAST é˜¶æ®µé‡æ•è·ç¡®è®¤çª—å£å¹´é¾„ï¼Œå•ä½æ–°å›¾åƒã€‚ */
-static uint8 s_car_plan_3_no_vision_ticks = 0U; /* æœªæ”¶åˆ°å¯ä¿¡æ–°è§‚æµ‹çš„è¿ç»­è§„åˆ’å‘¨æœŸæ•°ã€‚ */
-static uint8 s_car_plan_3_coast_level = CAR_PLAN_3_COAST_LEVEL_NEAR; /* å½“å‰ COAST ç­–ç•¥ç­‰çº§ã€‚ */
-static uint8 s_car_plan_3_track_camera_mask = 0U; /* æœ€è¿‘å¯ä¿¡ç›®æ ‡çš„æ¥æºç›¸æœºä½æ©ç ã€‚ */
-static uint32 s_car_plan_3_last_update_tick = 0U; /* ä¸Šæ¬¡æƒ¯å¯¼ä¼ æ’­çš„ç³»ç»Ÿæ—¶åˆ»ï¼Œå•ä½ msã€‚ */
-static uint32 s_car_plan_3_last_accept_tick = 0U; /* ä¸Šæ¬¡æ¥çº³å›¾åƒè§‚æµ‹çš„ç³»ç»Ÿæ—¶åˆ»ï¼Œå•ä½ msã€‚ */
-static uint32 s_car_plan_3_last_camera_tick = 0U; /* ç›®æ ‡æ¥æºç›¸æœºæœ€è¿‘ä¸€æ¬¡çœŸå®æ›´æ–°æ—¶åˆ»ï¼Œå•ä½ msã€‚ */
-static uint32 s_car_plan_3_camera_seq[IMAGE_CAMERA_COUNT]; /* è§„åˆ’å™¨å·²å¤„ç†çš„å„ç›¸æœºçœŸå®ç»“æœåºå·ã€‚ */
-static uint32 s_car_plan_3_filter_camera_seq[IMAGE_CAMERA_COUNT]; /* è¿‘è½¦ç¯è¿‡æ»¤å™¨å·²å¤„ç†çš„å„ç›¸æœºåºå·ã€‚ */
-static float s_car_plan_3_track_dx_m = 0.0f; /* å½“å‰è½¦ç¯åˆ°é”å®šä¿¡æ ‡çš„ä¸–ç•Œ X ç›¸å¯¹é‡ï¼Œå•ä½ mã€‚ */
-static float s_car_plan_3_track_dy_m = 0.0f; /* å½“å‰è½¦ç¯åˆ°é”å®šä¿¡æ ‡çš„ä¸–ç•Œ Y ç›¸å¯¹é‡ï¼Œå•ä½ mã€‚ */
-static float s_car_plan_3_track_lamp_angle_deg = 0.0f; /* æœ€è¿‘å¯ä¿¡è½¦ç¯ä¸–ç•Œé•¿è½´è§’ï¼Œå•ä½ degã€‚ */
-static float s_car_plan_3_track_car_yaw_deg = 0.0f; /* æœ€è¿‘å¯ä¿¡è§‚æµ‹å¯¹åº”çš„è½¦æ¨¡ä¸–ç•Œ yawï¼Œå•ä½ degã€‚ */
-static float s_car_plan_3_track_speed_mps = 0.0f; /* æœ€è¿‘å¯ä¿¡è§„åˆ’é€Ÿåº¦æ¨¡é•¿ï¼Œå•ä½ m/sã€‚ */
-static float s_car_plan_3_pending_dx_m = 0.0f; /* å¾…ç¡®è®¤ä¿¡æ ‡çš„ä¸–ç•Œ X ç›¸å¯¹é‡ï¼Œå•ä½ mã€‚ */
-static float s_car_plan_3_pending_dy_m = 0.0f; /* å¾…ç¡®è®¤ä¿¡æ ‡çš„ä¸–ç•Œ Y ç›¸å¯¹é‡ï¼Œå•ä½ mã€‚ */
-static float s_car_plan_3_pending_lamp_angle_deg = 0.0f; /* å¾…ç¡®è®¤è½¦ç¯ä¸–ç•Œé•¿è½´è§’ï¼Œå•ä½ degã€‚ */
-static float s_car_plan_3_pending_car_yaw_deg = 0.0f; /* å¾…ç¡®è®¤è§‚æµ‹å¯¹åº”çš„è½¦æ¨¡ä¸–ç•Œ yawï¼Œå•ä½ degã€‚ */
-static uint8 s_car_plan_3_route_challenge_count = 0U; /* æ–°è¿‘ç¯è·¯çº¿å€™é€‰çš„è¿ç»­è§‚æµ‹æ•°ã€‚ */
-static uint8 s_car_plan_3_route_challenge_hold = 0U; /* åæ–¹æ—§ç›®æ ‡ç­‰å¾…å‰å‘å€™é€‰ç¡®è®¤æ—¶çš„ç›´è¡Œä¿æŒæ ‡å¿—ã€‚ */
-static uint32 s_car_plan_3_route_challenge_tick = 0U; /* æ–°è¿‘ç¯è·¯çº¿å€™é€‰æœ€è¿‘è§‚æµ‹æ—¶åˆ»ï¼Œå•ä½ msã€‚ */
-static float s_car_plan_3_route_challenge_dx_m = 0.0f; /* æ–°è¿‘ç¯è·¯çº¿å€™é€‰çš„ä¸–ç•Œ X ç›¸å¯¹é‡ï¼Œå•ä½ mã€‚ */
-static float s_car_plan_3_route_challenge_dy_m = 0.0f; /* æ–°è¿‘ç¯è·¯çº¿å€™é€‰çš„ä¸–ç•Œ Y ç›¸å¯¹é‡ï¼Œå•ä½ mã€‚ */
-static float s_car_plan_3_last_edge_margin_px = 1000.0f; /* æœ€è¿‘å¯ä¿¡è§‚æµ‹çš„æœ€å°å›¾åƒè¾¹ç¼˜ä½™é‡ï¼Œå•ä½ pxã€‚ */
-static struct image_data s_car_plan_3_filtered[IMAGE_CAMERA_COUNT]; /* å„ç›¸æœºæœ€è¿‘ä¸€æ¬¡çœŸå®æ–°å›¾åƒçš„è¿‡æ»¤ç»“æœã€‚ */
+static uint8 s_car_plan_3_state = CAR_PLAN_3_STATE_SEARCH; /* Ä¿±ê¸ú×Ù×´Ì¬¡£ */
+static uint8 s_car_plan_3_confirm_count = 0U; /* ËÑË÷½×¶ÎÁ¬ĞøÈ·ÈÏµÄĞÂÍ¼ÏñÊı¡£ */
+static uint8 s_car_plan_3_reacquire_count = 0U; /* COAST ½×¶ÎÈıÖ¡´°¿ÚÄÚµÄÖØ²¶»ñÃüÖĞÊı¡£ */
+static uint8 s_car_plan_3_reacquire_age = 0U; /* COAST ½×¶ÎÖØ²¶»ñÈ·ÈÏ´°¿ÚÄêÁä£¬µ¥Î»ĞÂÍ¼Ïñ¡£ */
+static uint8 s_car_plan_3_no_vision_ticks = 0U; /* Î´ÊÕµ½¿ÉĞÅĞÂ¹Û²âµÄÁ¬Ğø¹æ»®ÖÜÆÚÊı¡£ */
+static uint8 s_car_plan_3_coast_level = CAR_PLAN_3_COAST_LEVEL_NEAR; /* µ±Ç° COAST ²ßÂÔµÈ¼¶¡£ */
+static uint8 s_car_plan_3_track_camera_mask = 0U; /* ×î½ü¿ÉĞÅÄ¿±êµÄÀ´Ô´Ïà»úÎ»ÑÚÂë¡£ */
+static uint32 s_car_plan_3_last_update_tick = 0U; /* ÉÏ´Î¹ßµ¼´«²¥µÄÏµÍ³Ê±¿Ì£¬µ¥Î» ms¡£ */
+static uint32 s_car_plan_3_last_accept_tick = 0U; /* ÉÏ´Î½ÓÄÉÍ¼Ïñ¹Û²âµÄÏµÍ³Ê±¿Ì£¬µ¥Î» ms¡£ */
+static uint32 s_car_plan_3_last_camera_tick = 0U; /* Ä¿±êÀ´Ô´Ïà»ú×î½üÒ»´ÎÕæÊµ¸üĞÂÊ±¿Ì£¬µ¥Î» ms¡£ */
+static uint32 s_car_plan_3_camera_seq[IMAGE_CAMERA_COUNT]; /* ¹æ»®Æ÷ÒÑ´¦ÀíµÄ¸÷Ïà»úÕæÊµ½á¹ûĞòºÅ¡£ */
+static uint32 s_car_plan_3_filter_camera_seq[IMAGE_CAMERA_COUNT]; /* ½ü³µµÆ¹ıÂËÆ÷ÒÑ´¦ÀíµÄ¸÷Ïà»úĞòºÅ¡£ */
+static float s_car_plan_3_track_dx_m = 0.0f; /* µ±Ç°³µµÆµ½Ëø¶¨ĞÅ±êµÄÊÀ½ç X Ïà¶ÔÁ¿£¬µ¥Î» m¡£ */
+static float s_car_plan_3_track_dy_m = 0.0f; /* µ±Ç°³µµÆµ½Ëø¶¨ĞÅ±êµÄÊÀ½ç Y Ïà¶ÔÁ¿£¬µ¥Î» m¡£ */
+static float s_car_plan_3_track_lamp_angle_deg = 0.0f; /* ×î½ü¿ÉĞÅ³µµÆÊÀ½ç³¤Öá½Ç£¬µ¥Î» deg¡£ */
+static float s_car_plan_3_track_car_yaw_deg = 0.0f; /* ×î½ü¿ÉĞÅ¹Û²â¶ÔÓ¦µÄ³µÄ£ÊÀ½ç yaw£¬µ¥Î» deg¡£ */
+static float s_car_plan_3_track_speed_mps = 0.0f; /* ×î½ü¿ÉĞÅ¹æ»®ËÙ¶ÈÄ£³¤£¬µ¥Î» m/s¡£ */
+static float s_car_plan_3_pending_dx_m = 0.0f; /* ´ıÈ·ÈÏĞÅ±êµÄÊÀ½ç X Ïà¶ÔÁ¿£¬µ¥Î» m¡£ */
+static float s_car_plan_3_pending_dy_m = 0.0f; /* ´ıÈ·ÈÏĞÅ±êµÄÊÀ½ç Y Ïà¶ÔÁ¿£¬µ¥Î» m¡£ */
+static float s_car_plan_3_pending_lamp_angle_deg = 0.0f; /* ´ıÈ·ÈÏ³µµÆÊÀ½ç³¤Öá½Ç£¬µ¥Î» deg¡£ */
+static float s_car_plan_3_pending_car_yaw_deg = 0.0f; /* ´ıÈ·ÈÏ¹Û²â¶ÔÓ¦µÄ³µÄ£ÊÀ½ç yaw£¬µ¥Î» deg¡£ */
+static uint8 s_car_plan_3_route_challenge_count = 0U; /* ĞÂ½üµÆÂ·ÏßºòÑ¡µÄÁ¬Ğø¹Û²âÊı¡£ */
+static uint8 s_car_plan_3_route_challenge_hold = 0U; /* ºó·½¾ÉÄ¿±êµÈ´ıÇ°ÏòºòÑ¡È·ÈÏÊ±µÄÖ±ĞĞ±£³Ö±êÖ¾¡£ */
+static uint32 s_car_plan_3_route_challenge_tick = 0U; /* ĞÂ½üµÆÂ·ÏßºòÑ¡×î½ü¹Û²âÊ±¿Ì£¬µ¥Î» ms¡£ */
+static float s_car_plan_3_route_challenge_dx_m = 0.0f; /* ĞÂ½üµÆÂ·ÏßºòÑ¡µÄÊÀ½ç X Ïà¶ÔÁ¿£¬µ¥Î» m¡£ */
+static float s_car_plan_3_route_challenge_dy_m = 0.0f; /* ĞÂ½üµÆÂ·ÏßºòÑ¡µÄÊÀ½ç Y Ïà¶ÔÁ¿£¬µ¥Î» m¡£ */
+static float s_car_plan_3_last_edge_margin_px = 1000.0f; /* ×î½ü¿ÉĞÅ¹Û²âµÄ×îĞ¡Í¼Ïñ±ßÔµÓàÁ¿£¬µ¥Î» px¡£ */
+static struct image_data s_car_plan_3_filtered[IMAGE_CAMERA_COUNT]; /* ¸÷Ïà»ú×î½üÒ»´ÎÕæÊµĞÂÍ¼ÏñµÄ¹ıÂË½á¹û¡£ */
 static car_plan_3_beacon_track_t
-    s_car_plan_3_track[IMAGE_CAMERA_COUNT][IMAGE_MAX_BEACON_COUNT]; /* ä¸‰æ‘„åŸå§‹ä¿¡æ ‡çŸ­æ—¶è½¨è¿¹ã€‚ */
+    s_car_plan_3_track[IMAGE_CAMERA_COUNT][IMAGE_MAX_BEACON_COUNT]; /* ÈıÉãÔ­Ê¼ĞÅ±ê¶ÌÊ±¹ì¼£¡£ */
 
 /**
- * @brief è¿‡æ»¤çªç„¶å‡ºç°åœ¨åŒæ‘„è½¦ç¯é™„è¿‘ä¸”æ²¡æœ‰è¿œè·ç¦»è¿ç»­å†å²çš„åŸå§‹ä¿¡æ ‡ã€‚
- * @param filtered è¾“å‡ºè¿‡æ»¤åçš„ä¸‰æ‘„å›¾åƒæ•°æ®ï¼Œä¸å¾—ä¸ºç©ºã€‚
- * @return æ— ã€‚
+ * @brief ¹ıÂËÍ»È»³öÏÖÔÚÍ¬Éã³µµÆ¸½½üÇÒÃ»ÓĞÔ¶¾àÀëÁ¬ĞøÀúÊ·µÄÔ­Ê¼ĞÅ±ê¡£
+ * @param filtered Êä³ö¹ıÂËºóµÄÈıÉãÍ¼ÏñÊı¾İ£¬²»µÃÎª¿Õ¡£
+ * @return ÎŞ¡£
  */
 static void CarPlan_3_FilterNearLamp(
     struct image_data filtered[IMAGE_CAMERA_COUNT])
@@ -258,9 +258,9 @@ static void CarPlan_3_FilterNearLamp(
 }
 
 /**
- * @brief è·å–æœ¬è§„åˆ’å‘¨æœŸå†…çœŸæ­£æ›´æ–°çš„ç›¸æœºä½æ©ç ï¼Œå¹¶è®°å½•å·²å¤„ç†åºå·ã€‚
- * @param æ— ã€‚
- * @return ä½ 0-2 åˆ†åˆ«è¡¨ç¤º Frontã€Centerã€Back æ˜¯å¦äº§ç”Ÿäº†çœŸå®æ–°å›¾åƒã€‚
+ * @brief »ñÈ¡±¾¹æ»®ÖÜÆÚÄÚÕæÕı¸üĞÂµÄÏà»úÎ»ÑÚÂë£¬²¢¼ÇÂ¼ÒÑ´¦ÀíĞòºÅ¡£
+ * @param ÎŞ¡£
+ * @return Î» 0-2 ·Ö±ğ±íÊ¾ Front¡¢Center¡¢Back ÊÇ·ñ²úÉúÁËÕæÊµĞÂÍ¼Ïñ¡£
  */
 static uint8 CarPlan_3_GetNewCameraMask(void)
 {
@@ -279,9 +279,9 @@ static uint8 CarPlan_3_GetNewCameraMask(void)
 }
 
 /**
- * @brief è®¡ç®—æŒ‡å®šæ¥æºç›¸æœºå†…å·²è¿‡æ»¤ä¿¡æ ‡åˆ° 188x120 å›¾åƒè¾¹ç•Œçš„æœ€å°ä½™é‡ã€‚
- * @param camera_mask éœ€è¦æ£€æŸ¥çš„æ¥æºç›¸æœºä½æ©ç ã€‚
- * @return æœ‰æ•ˆä¿¡æ ‡çš„æœ€å°è¾¹ç¼˜ä½™é‡ï¼Œå•ä½ pxï¼›æ— æœ‰æ•ˆä¿¡æ ‡æ—¶è¿”å› 1000ã€‚
+ * @brief ¼ÆËãÖ¸¶¨À´Ô´Ïà»úÄÚÒÑ¹ıÂËĞÅ±êµ½ 188x120 Í¼Ïñ±ß½çµÄ×îĞ¡ÓàÁ¿¡£
+ * @param camera_mask ĞèÒª¼ì²éµÄÀ´Ô´Ïà»úÎ»ÑÚÂë¡£
+ * @return ÓĞĞ§ĞÅ±êµÄ×îĞ¡±ßÔµÓàÁ¿£¬µ¥Î» px£»ÎŞÓĞĞ§ĞÅ±êÊ±·µ»Ø 1000¡£
  */
 static float CarPlan_3_GetEdgeMarginPx(uint8 camera_mask)
 {
@@ -320,9 +320,9 @@ static float CarPlan_3_GetEdgeMarginPx(uint8 camera_mask)
 }
 
 /**
- * @brief åˆ¤æ–­è½¦æ¨¡é€Ÿåº¦ä¸èˆªå‘æ•°æ®æ˜¯å¦åœ¨æŒ‡å®šæ—¶é—´å†…ä¿æŒæ–°é²œã€‚
- * @param max_age_ms å…è®¸çš„æœ€å¤§æœªæ›´æ–°æ—¶é—´ï¼Œå•ä½ msã€‚
- * @return æ•°æ®æœ‰æ•ˆä¸”æœªè¶…æ—¶æ—¶è¿”å› 1ï¼Œå¦åˆ™è¿”å› 0ã€‚
+ * @brief ÅĞ¶Ï³µÄ£ËÙ¶ÈÓëº½ÏòÊı¾İÊÇ·ñÔÚÖ¸¶¨Ê±¼äÄÚ±£³ÖĞÂÏÊ¡£
+ * @param max_age_ms ÔÊĞíµÄ×î´óÎ´¸üĞÂÊ±¼ä£¬µ¥Î» ms¡£
+ * @return Êı¾İÓĞĞ§ÇÒÎ´³¬Ê±Ê±·µ»Ø 1£¬·ñÔò·µ»Ø 0¡£
  */
 static uint8 CarPlan_3_CarDataFresh(uint32 max_age_ms)
 {
@@ -333,9 +333,9 @@ static uint8 CarPlan_3_CarDataFresh(uint32 max_age_ms)
 }
 
 /**
- * @brief ä½¿ç”¨è½¦ä½“å³å‘å’Œå‰å‘é€Ÿåº¦ä¼ æ’­è½¦ç¯åˆ°é™æ­¢ä¿¡æ ‡çš„ä¸–ç•Œç›¸å¯¹å‘é‡ã€‚
- * @param dt_s æœ¬æ¬¡ä¼ æ’­æ—¶é—´ï¼Œå•ä½ sï¼ŒèŒƒå›´ 0-0.05ã€‚
- * @return æ— ã€‚
+ * @brief Ê¹ÓÃ³µÌåÓÒÏòºÍÇ°ÏòËÙ¶È´«²¥³µµÆµ½¾²Ö¹ĞÅ±êµÄÊÀ½çÏà¶ÔÏòÁ¿¡£
+ * @param dt_s ±¾´Î´«²¥Ê±¼ä£¬µ¥Î» s£¬·¶Î§ 0-0.05¡£
+ * @return ÎŞ¡£
  */
 static void CarPlan_3_Propagate(float dt_s)
 {
@@ -365,10 +365,10 @@ static void CarPlan_3_Propagate(float dt_s)
 }
 
 /**
- * @brief ä½¿ç”¨è½¦æ¨¡ yaw å˜åŒ–ä¼ æ’­è½¦ç¯çš„ä¸–ç•Œé•¿è½´è§’ã€‚
- * @param angle_deg å‚è€ƒè½¦ç¯ä¸–ç•Œé•¿è½´è§’ï¼Œå•ä½ degã€‚
- * @param yaw_deg å‚è€ƒè§‚æµ‹å¯¹åº”çš„è½¦æ¨¡ä¸–ç•Œ yawï¼Œå•ä½ degã€‚
- * @return ä¼ æ’­åˆ°å½“å‰è½¦æ¨¡ yaw çš„è½¦ç¯ä¸–ç•Œé•¿è½´è§’ï¼Œå•ä½ degã€‚
+ * @brief Ê¹ÓÃ³µÄ£ yaw ±ä»¯´«²¥³µµÆµÄÊÀ½ç³¤Öá½Ç¡£
+ * @param angle_deg ²Î¿¼³µµÆÊÀ½ç³¤Öá½Ç£¬µ¥Î» deg¡£
+ * @param yaw_deg ²Î¿¼¹Û²â¶ÔÓ¦µÄ³µÄ£ÊÀ½ç yaw£¬µ¥Î» deg¡£
+ * @return ´«²¥µ½µ±Ç°³µÄ£ yaw µÄ³µµÆÊÀ½ç³¤Öá½Ç£¬µ¥Î» deg¡£
  */
 static float CarPlan_3_PredictLampAngle(float angle_deg, float yaw_deg)
 {
@@ -386,14 +386,14 @@ static float CarPlan_3_PredictLampAngle(float angle_deg, float yaw_deg)
 }
 
 /**
- * @brief å°†ä¸–ç•Œç›¸å¯¹å‘é‡è½¬æ¢ä¸ºè½¦ä½“ç³»å•ä½é€Ÿåº¦æ–¹å‘ã€‚
- * @param dx_m è½¦ç¯åˆ°ä¿¡æ ‡çš„ä¸–ç•Œ X ç›¸å¯¹é‡ï¼Œå•ä½ mã€‚
- * @param dy_m è½¦ç¯åˆ°ä¿¡æ ‡çš„ä¸–ç•Œ Y ç›¸å¯¹é‡ï¼Œå•ä½ mã€‚
- * @param lamp_angle_deg è½¦ç¯æ¨ªè½´åœ¨ä¸–ç•Œåæ ‡ç³»ä¸­çš„æ— å‘è§’ï¼Œå•ä½ degã€‚
- * @param target_strafe è¾“å‡ºè½¦ä½“å³å‘å•ä½åˆ†é‡ï¼Œä¸å¾—ä¸ºç©ºã€‚
- * @param target_forward è¾“å‡ºè½¦ä½“å‰å‘å•ä½åˆ†é‡ï¼Œä¸å¾—ä¸ºç©ºã€‚
- * @param distance_m è¾“å‡ºè½¦ç¯åˆ°ä¿¡æ ‡è·ç¦»ï¼Œå•ä½ mï¼›ä¸å¾—ä¸ºç©ºã€‚
- * @return ç›¸å¯¹å‘é‡åœ¨æœ‰æ•ˆè·ç¦»å†…è¿”å› 1ï¼Œå¦åˆ™è¿”å› 0ã€‚
+ * @brief ½«ÊÀ½çÏà¶ÔÏòÁ¿×ª»»Îª³µÌåÏµµ¥Î»ËÙ¶È·½Ïò¡£
+ * @param dx_m ³µµÆµ½ĞÅ±êµÄÊÀ½ç X Ïà¶ÔÁ¿£¬µ¥Î» m¡£
+ * @param dy_m ³µµÆµ½ĞÅ±êµÄÊÀ½ç Y Ïà¶ÔÁ¿£¬µ¥Î» m¡£
+ * @param lamp_angle_deg ³µµÆºáÖáÔÚÊÀ½ç×ø±êÏµÖĞµÄÎŞÏò½Ç£¬µ¥Î» deg¡£
+ * @param target_strafe Êä³ö³µÌåÓÒÏòµ¥Î»·ÖÁ¿£¬²»µÃÎª¿Õ¡£
+ * @param target_forward Êä³ö³µÌåÇ°Ïòµ¥Î»·ÖÁ¿£¬²»µÃÎª¿Õ¡£
+ * @param distance_m Êä³ö³µµÆµ½ĞÅ±ê¾àÀë£¬µ¥Î» m£»²»µÃÎª¿Õ¡£
+ * @return Ïà¶ÔÏòÁ¿ÔÚÓĞĞ§¾àÀëÄÚ·µ»Ø 1£¬·ñÔò·µ»Ø 0¡£
  */
 static uint8 CarPlan_3_GetDirection(float dx_m,
                                     float dy_m,
@@ -403,19 +403,19 @@ static uint8 CarPlan_3_GetDirection(float dx_m,
                                     float *distance_m);
 
 /**
- * @brief æ£€æŸ¥å€™é€‰è½¦ç¯é•¿è½´æ˜¯å¦ç¬¦åˆè½¦æ¨¡ yaw ä¼ æ’­åçš„æ— å‘è§’é¢„æµ‹ã€‚
- * @param candidate_deg å€™é€‰è½¦ç¯ä¸–ç•Œé•¿è½´è§’ï¼Œå•ä½ degã€‚
- * @return è§’åº¦åˆ›æ–°ä¸è¶…è¿‡é—¨é™æ—¶è¿”å› 1ï¼Œå¦åˆ™è¿”å› 0ã€‚
+ * @brief ¼ì²éºòÑ¡³µµÆ³¤ÖáÊÇ·ñ·ûºÏ³µÄ£ yaw ´«²¥ºóµÄÎŞÏò½ÇÔ¤²â¡£
+ * @param candidate_deg ºòÑ¡³µµÆÊÀ½ç³¤Öá½Ç£¬µ¥Î» deg¡£
+ * @return ½Ç¶È´´ĞÂ²»³¬¹ıÃÅÏŞÊ±·µ»Ø 1£¬·ñÔò·µ»Ø 0¡£
  */
 static uint8 CarPlan_3_LampAngleConsistent(float candidate_deg);
 
 /**
- * @brief æ›´æ–°æ–°è¿‘ç¯è·¯çº¿å€™é€‰çš„è¿ç»­ç¡®è®¤ï¼Œå¹¶è¿”å›æ˜¯å¦å¯æŠ¢å å½“å‰ç›®æ ‡ã€‚
- * @param new_camera_mask æœ¬å‘¨æœŸçœŸå®æ›´æ–°çš„ç›¸æœºä½æ©ç ã€‚
- * @param current_distance_m å½“å‰ç›®æ ‡æƒ¯å¯¼é¢„æµ‹è·ç¦»ï¼Œå•ä½ mã€‚
- * @param tick_now å½“å‰ç³»ç»Ÿæ—¶åˆ»ï¼Œå•ä½ msã€‚
- * @param selected è¾“å‡ºæœ¬å‘¨æœŸå€™é€‰æ§½ä½ï¼Œä¸å¾—ä¸ºç©ºã€‚
- * @return ç¡®è®¤å¯æŠ¢å è¿”å› 1ï¼›åæ–¹æ—§ç›®æ ‡ç­‰å¾…ç›´è¡Œä¿æŒè¿”å› 2ï¼›å¦åˆ™è¿”å› 0ã€‚
+ * @brief ¸üĞÂĞÂ½üµÆÂ·ÏßºòÑ¡µÄÁ¬ĞøÈ·ÈÏ£¬²¢·µ»ØÊÇ·ñ¿ÉÇÀÕ¼µ±Ç°Ä¿±ê¡£
+ * @param new_camera_mask ±¾ÖÜÆÚÕæÊµ¸üĞÂµÄÏà»úÎ»ÑÚÂë¡£
+ * @param current_distance_m µ±Ç°Ä¿±ê¹ßµ¼Ô¤²â¾àÀë£¬µ¥Î» m¡£
+ * @param tick_now µ±Ç°ÏµÍ³Ê±¿Ì£¬µ¥Î» ms¡£
+ * @param selected Êä³ö±¾ÖÜÆÚºòÑ¡²ÛÎ»£¬²»µÃÎª¿Õ¡£
+ * @return È·ÈÏ¿ÉÇÀÕ¼·µ»Ø 1£»ºó·½¾ÉÄ¿±êµÈ´ıÖ±ĞĞ±£³Ö·µ»Ø 2£»·ñÔò·µ»Ø 0¡£
  */
 static uint8 CarPlan_3_UpdateRouteChallenge(uint8 new_camera_mask,
                                             float current_distance_m,
@@ -447,7 +447,7 @@ static uint8 CarPlan_3_UpdateRouteChallenge(uint8 new_camera_mask,
                            CAR_PLAN_3_RAD_TO_DEG;
     }
 
-    /* è·¯çº¿å±‚åªè€ƒè™‘ç¨³å®šå‰å‘ä¸”æ˜æ˜¾æ›´è¿‘çš„å€™é€‰ï¼›æ—§ç›®æ ‡åœ¨è½¦åæ—¶ç›´æ¥é€‰å‰å‘æœ€è¿‘ã€‚ */
+    /* Â·Ïß²ãÖ»¿¼ÂÇÎÈ¶¨Ç°ÏòÇÒÃ÷ÏÔ¸ü½üµÄºòÑ¡£»¾ÉÄ¿±êÔÚ³µºóÊ±Ö±½ÓÑ¡Ç°Ïò×î½ü¡£ */
     for(i = 0U; i < s_car_plan_3_camera.beacon_count; i++)
     {
         const three_camera_beacon_t *beacon = &s_car_plan_3_camera.beacon[i];
@@ -527,9 +527,9 @@ static uint8 CarPlan_3_UpdateRouteChallenge(uint8 new_camera_mask,
 }
 
 /**
- * @brief æ£€æŸ¥å€™é€‰è½¦ç¯é•¿è½´æ˜¯å¦ç¬¦åˆè½¦æ¨¡ yaw ä¼ æ’­åçš„æ— å‘è§’é¢„æµ‹ã€‚
- * @param candidate_deg å€™é€‰è½¦ç¯ä¸–ç•Œé•¿è½´è§’ï¼Œå•ä½ degã€‚
- * @return è§’åº¦åˆ›æ–°ä¸è¶…è¿‡é—¨é™æ—¶è¿”å› 1ï¼Œå¦åˆ™è¿”å› 0ã€‚
+ * @brief ¼ì²éºòÑ¡³µµÆ³¤ÖáÊÇ·ñ·ûºÏ³µÄ£ yaw ´«²¥ºóµÄÎŞÏò½ÇÔ¤²â¡£
+ * @param candidate_deg ºòÑ¡³µµÆÊÀ½ç³¤Öá½Ç£¬µ¥Î» deg¡£
+ * @return ½Ç¶È´´ĞÂ²»³¬¹ıÃÅÏŞÊ±·µ»Ø 1£¬·ñÔò·µ»Ø 0¡£
  */
 static uint8 CarPlan_3_LampAngleConsistent(float candidate_deg)
 {
@@ -554,16 +554,16 @@ static uint8 CarPlan_3_LampAngleConsistent(float candidate_deg)
 }
 
 /**
- * @brief åœ¨æœ¬æ¬¡çœŸå®æ–°å›¾åƒä¸­é€‰æ‹©æ»¡è¶³è·ç¦»å’Œè¿ç»­æ€§çº¦æŸçš„å€™é€‰ä¿¡æ ‡ã€‚
- * @param new_camera_mask æœ¬å‘¨æœŸçœŸå®æ›´æ–°çš„ç›¸æœºä½æ©ç ã€‚
- * @param use_reference éé›¶æ—¶æŒ‰å‚è€ƒä¸–ç•Œç›¸å¯¹å‘é‡é€‰æ‹©ï¼Œå¦åˆ™æŒ‰è½¦ç¯è·ç¦»é€‰æ‹©ã€‚
- * @param reference_x_m å‚è€ƒä¸–ç•Œ X ç›¸å¯¹é‡ï¼Œå•ä½ mã€‚
- * @param reference_y_m å‚è€ƒä¸–ç•Œ Y ç›¸å¯¹é‡ï¼Œå•ä½ mã€‚
- * @param gate_m ä½¿ç”¨å‚è€ƒå‘é‡æ—¶çš„æœ€å¤§åˆ›æ–°è·ç¦»ï¼Œå•ä½ mã€‚
- * @param selected è¾“å‡ºå€™é€‰æ§½ä½ï¼Œä¸å¾—ä¸ºç©ºã€‚
- * @param best_innovation_m è¾“å‡ºæœ€ä½³å€™é€‰åˆ›æ–°è·ç¦»ï¼Œå•ä½ mï¼›ä¸å¾—ä¸ºç©ºã€‚
- * @param second_innovation_m è¾“å‡ºæ¬¡ä½³å€™é€‰åˆ›æ–°è·ç¦»ï¼Œå•ä½ mï¼›ä¸å¾—ä¸ºç©ºã€‚
- * @return æ‰¾åˆ°å¯ä¿¡å€™é€‰è¿”å› 1ï¼Œå¦åˆ™è¿”å› 0ã€‚
+ * @brief ÔÚ±¾´ÎÕæÊµĞÂÍ¼ÏñÖĞÑ¡ÔñÂú×ã¾àÀëºÍÁ¬ĞøĞÔÔ¼ÊøµÄºòÑ¡ĞÅ±ê¡£
+ * @param new_camera_mask ±¾ÖÜÆÚÕæÊµ¸üĞÂµÄÏà»úÎ»ÑÚÂë¡£
+ * @param use_reference ·ÇÁãÊ±°´²Î¿¼ÊÀ½çÏà¶ÔÏòÁ¿Ñ¡Ôñ£¬·ñÔò°´³µµÆ¾àÀëÑ¡Ôñ¡£
+ * @param reference_x_m ²Î¿¼ÊÀ½ç X Ïà¶ÔÁ¿£¬µ¥Î» m¡£
+ * @param reference_y_m ²Î¿¼ÊÀ½ç Y Ïà¶ÔÁ¿£¬µ¥Î» m¡£
+ * @param gate_m Ê¹ÓÃ²Î¿¼ÏòÁ¿Ê±µÄ×î´ó´´ĞÂ¾àÀë£¬µ¥Î» m¡£
+ * @param selected Êä³öºòÑ¡²ÛÎ»£¬²»µÃÎª¿Õ¡£
+ * @param best_innovation_m Êä³ö×î¼ÑºòÑ¡´´ĞÂ¾àÀë£¬µ¥Î» m£»²»µÃÎª¿Õ¡£
+ * @param second_innovation_m Êä³ö´Î¼ÑºòÑ¡´´ĞÂ¾àÀë£¬µ¥Î» m£»²»µÃÎª¿Õ¡£
+ * @return ÕÒµ½¿ÉĞÅºòÑ¡·µ»Ø 1£¬·ñÔò·µ»Ø 0¡£
  */
 static uint8 CarPlan_3_SelectCandidate(uint8 new_camera_mask,
                                        uint8 use_reference,
@@ -679,14 +679,14 @@ static uint8 CarPlan_3_SelectCandidate(uint8 new_camera_mask,
 }
 
 /**
- * @brief å°†ä¸–ç•Œç›¸å¯¹å‘é‡è½¬æ¢ä¸ºè½¦ä½“ç³»å•ä½é€Ÿåº¦æ–¹å‘ã€‚
- * @param dx_m è½¦ç¯åˆ°ä¿¡æ ‡çš„ä¸–ç•Œ X ç›¸å¯¹é‡ï¼Œå•ä½ mã€‚
- * @param dy_m è½¦ç¯åˆ°ä¿¡æ ‡çš„ä¸–ç•Œ Y ç›¸å¯¹é‡ï¼Œå•ä½ mã€‚
- * @param lamp_angle_deg è½¦ç¯æ¨ªè½´åœ¨ä¸–ç•Œåæ ‡ç³»ä¸­çš„æ— å‘è§’ï¼Œå•ä½ degã€‚
- * @param target_strafe è¾“å‡ºè½¦ä½“å³å‘å•ä½åˆ†é‡ï¼Œä¸å¾—ä¸ºç©ºã€‚
- * @param target_forward è¾“å‡ºè½¦ä½“å‰å‘å•ä½åˆ†é‡ï¼Œä¸å¾—ä¸ºç©ºã€‚
- * @param distance_m è¾“å‡ºè½¦ç¯åˆ°ä¿¡æ ‡è·ç¦»ï¼Œå•ä½ mï¼›ä¸å¾—ä¸ºç©ºã€‚
- * @return ç›¸å¯¹å‘é‡åœ¨æœ‰æ•ˆè·ç¦»å†…è¿”å› 1ï¼Œå¦åˆ™è¿”å› 0ã€‚
+ * @brief ½«ÊÀ½çÏà¶ÔÏòÁ¿×ª»»Îª³µÌåÏµµ¥Î»ËÙ¶È·½Ïò¡£
+ * @param dx_m ³µµÆµ½ĞÅ±êµÄÊÀ½ç X Ïà¶ÔÁ¿£¬µ¥Î» m¡£
+ * @param dy_m ³µµÆµ½ĞÅ±êµÄÊÀ½ç Y Ïà¶ÔÁ¿£¬µ¥Î» m¡£
+ * @param lamp_angle_deg ³µµÆºáÖáÔÚÊÀ½ç×ø±êÏµÖĞµÄÎŞÏò½Ç£¬µ¥Î» deg¡£
+ * @param target_strafe Êä³ö³µÌåÓÒÏòµ¥Î»·ÖÁ¿£¬²»µÃÎª¿Õ¡£
+ * @param target_forward Êä³ö³µÌåÇ°Ïòµ¥Î»·ÖÁ¿£¬²»µÃÎª¿Õ¡£
+ * @param distance_m Êä³ö³µµÆµ½ĞÅ±ê¾àÀë£¬µ¥Î» m£»²»µÃÎª¿Õ¡£
+ * @return Ïà¶ÔÏòÁ¿ÔÚÓĞĞ§¾àÀëÄÚ·µ»Ø 1£¬·ñÔò·µ»Ø 0¡£
  */
 static uint8 CarPlan_3_GetDirection(float dx_m,
                                     float dy_m,
@@ -729,11 +729,11 @@ static uint8 CarPlan_3_GetDirection(float dx_m,
 }
 
 /**
- * @brief æ¥çº³ä¸€ä¸ªé€šè¿‡è¿ç»­æ€§æ£€æŸ¥çš„å›¾åƒå€™é€‰å¹¶æ›´æ–°è§„åˆ’è¾“å‡ºã€‚
- * @param selected ä¸‰æ‘„èåˆä¿¡æ ‡æ§½ä½ï¼ŒèŒƒå›´ 0 è‡³ beacon_count-1ã€‚
- * @param tick_now å½“å‰ç³»ç»Ÿæ—¶åˆ»ï¼Œå•ä½ msã€‚
- * @param route_switch éé›¶è¡¨ç¤ºå€™é€‰å·²ç»é€šè¿‡è·¯çº¿æŠ¢å çš„è¿ç»­ç¡®è®¤ã€‚
- * @return å€™é€‰æ–¹å‘æœ‰æ•ˆæ—¶è¿”å› 1ï¼Œå¦åˆ™è¿”å› 0ã€‚
+ * @brief ½ÓÄÉÒ»¸öÍ¨¹ıÁ¬ĞøĞÔ¼ì²éµÄÍ¼ÏñºòÑ¡²¢¸üĞÂ¹æ»®Êä³ö¡£
+ * @param selected ÈıÉãÈÚºÏĞÅ±ê²ÛÎ»£¬·¶Î§ 0 ÖÁ beacon_count-1¡£
+ * @param tick_now µ±Ç°ÏµÍ³Ê±¿Ì£¬µ¥Î» ms¡£
+ * @param route_switch ·ÇÁã±íÊ¾ºòÑ¡ÒÑ¾­Í¨¹ıÂ·ÏßÇÀÕ¼µÄÁ¬ĞøÈ·ÈÏ¡£
+ * @return ºòÑ¡·½ÏòÓĞĞ§Ê±·µ»Ø 1£¬·ñÔò·µ»Ø 0¡£
  */
 static uint8 CarPlan_3_AcceptCandidate(uint8 selected,
                                        uint32 tick_now,
@@ -808,9 +808,9 @@ static uint8 CarPlan_3_AcceptCandidate(uint8 selected,
 }
 
 /**
- * @brief ä½¿ç”¨å½“å‰æƒ¯å¯¼ç›¸å¯¹å‘é‡ç”Ÿæˆä¿æŒæˆ–å¹³æ»‘é€€å‡ºé˜¶æ®µçš„é€Ÿåº¦è¾“å‡ºã€‚
- * @param speed_scale æœ€è¿‘å¯ä¿¡é€Ÿåº¦çš„ç¼©æ”¾æ¯”ä¾‹ï¼ŒèŒƒå›´ 0-1ã€‚
- * @return é¢„æµ‹æ–¹å‘æœ‰æ•ˆä¸”ç¼©æ”¾æ¯”ä¾‹å¤§äºé›¶æ—¶è¿”å› 1ï¼Œå¦åˆ™è¿”å› 0ã€‚
+ * @brief Ê¹ÓÃµ±Ç°¹ßµ¼Ïà¶ÔÏòÁ¿Éú³É±£³Ö»òÆ½»¬ÍË³ö½×¶ÎµÄËÙ¶ÈÊä³ö¡£
+ * @param speed_scale ×î½ü¿ÉĞÅËÙ¶ÈµÄËõ·Å±ÈÀı£¬·¶Î§ 0-1¡£
+ * @return Ô¤²â·½ÏòÓĞĞ§ÇÒËõ·Å±ÈÀı´óÓÚÁãÊ±·µ»Ø 1£¬·ñÔò·µ»Ø 0¡£
  */
 static uint8 CarPlan_3_OutputPrediction(float speed_scale)
 {
@@ -854,9 +854,9 @@ static void CarPlan_3_ClearResult(void)
 }
 
 /**
- * @brief æ”¾å¼ƒå½“å‰ç›®æ ‡å¹¶å›åˆ°æœç´¢çŠ¶æ€ï¼ŒåŒæ—¶æ¸…ç©ºé€Ÿåº¦è¾“å‡ºã€‚
- * @param æ— ã€‚
- * @return æ— ã€‚
+ * @brief ·ÅÆúµ±Ç°Ä¿±ê²¢»Øµ½ËÑË÷×´Ì¬£¬Í¬Ê±Çå¿ÕËÙ¶ÈÊä³ö¡£
+ * @param ÎŞ¡£
+ * @return ÎŞ¡£
  */
 static void CarPlan_3_DropTarget(void)
 {
@@ -933,9 +933,9 @@ void CarPlan_3_Reset(void)
 }
 
 /**
- * @brief ä½¿ç”¨ä¸‰æ‘„ä¸–ç•Œç›¸å¯¹å‘é‡é”å®šä¿¡æ ‡ï¼Œå¹¶åœ¨è¾¹ç¼˜å§¿æ€ä¸¢å¤±æ—¶çŸ­æ—¶æƒ¯å¯¼ä¿æŒè½¦é€Ÿã€‚
- * @param result è¾“å‡ºè½¦ä½“ç³»æ¨ªå‘å’Œå‰å‘ç›®æ ‡é€Ÿåº¦ï¼›å…è®¸ä¼ å…¥ç©ºæŒ‡é’ˆã€‚
- * @return TRACK æˆ– COAST ä»æœ‰æœ‰æ•ˆç›®æ ‡é€Ÿåº¦æ—¶è¿”å› 1ï¼Œå¦åˆ™è¿”å› 0ã€‚
+ * @brief Ê¹ÓÃÈıÉãÊÀ½çÏà¶ÔÏòÁ¿Ëø¶¨ĞÅ±ê£¬²¢ÔÚ±ßÔµ×ËÌ¬¶ªÊ§Ê±¶ÌÊ±¹ßµ¼±£³Ö³µËÙ¡£
+ * @param result Êä³ö³µÌåÏµºáÏòºÍÇ°ÏòÄ¿±êËÙ¶È£»ÔÊĞí´«Èë¿ÕÖ¸Õë¡£
+ * @return TRACK »ò COAST ÈÔÓĞÓĞĞ§Ä¿±êËÙ¶ÈÊ±·µ»Ø 1£¬·ñÔò·µ»Ø 0¡£
  */
 uint8 CarPlan_3_Update(car_plan_result_t *result)
 {
@@ -988,7 +988,7 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
     }
     CarPlan_3_Propagate(dt_s);
 
-    /* æœç´¢é˜¶æ®µåªæŒ‰çœŸå®æ–°å›¾åƒç´¯è®¡ä¸‰æ¬¡è¿ç»­ç¡®è®¤ï¼Œé˜²æ­¢ç¼“å­˜æˆ–å•å¸§å‡ç‚¹å¯åŠ¨è½¦æ¨¡ã€‚ */
+    /* ËÑË÷½×¶ÎÖ»°´ÕæÊµĞÂÍ¼ÏñÀÛ¼ÆÈı´ÎÁ¬ĞøÈ·ÈÏ£¬·ÀÖ¹»º´æ»òµ¥Ö¡¼ÙµãÆô¶¯³µÄ£¡£ */
     if(s_car_plan_3_state == CAR_PLAN_3_STATE_SEARCH)
     {
         (void)SpeedPlan_Update(0U, 0.0f, 0.0f);
@@ -1118,7 +1118,7 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
     }
     if(route_ready == CAR_PLAN_3_ROUTE_PENDING_HOLD)
     {
-        /* å‰å‘å€™é€‰å°šæœªäºŒæ¬¡ç¡®è®¤æ—¶åªä¿æŒç›´è¡Œï¼Œä¸è®©åæ–¹æ—§ç›®æ ‡è§¦å‘åå‘è½¬å‘ã€‚ */
+        /* Ç°ÏòºòÑ¡ÉĞÎ´¶ş´ÎÈ·ÈÏÊ±Ö»±£³ÖÖ±ĞĞ£¬²»ÈÃºó·½¾ÉÄ¿±ê´¥·¢·´Ïò×ªÏò¡£ */
         s_car_plan_3_result.valid = 1U;
         s_car_plan_3_result.target_strafe_mps = 0.0f;
         s_car_plan_3_result.target_forward_mps = s_car_plan_3_track_speed_mps;
@@ -1143,7 +1143,7 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
         }
     }
 
-    /* TRACK ä¸­ç›´æ¥æ¥çº³è¿ç»­è§‚æµ‹ï¼›å•æ¬¡åè§‚æµ‹åªçŸ­æ—¶ä½¿ç”¨é¢„æµ‹ï¼Œä¸ç«‹å³æ”¹å˜è·¯å¾„ã€‚ */
+    /* TRACK ÖĞÖ±½Ó½ÓÄÉÁ¬Ğø¹Û²â£»µ¥´Î»µ¹Û²âÖ»¶ÌÊ±Ê¹ÓÃÔ¤²â£¬²»Á¢¼´¸Ä±äÂ·¾¶¡£ */
     if(s_car_plan_3_state == CAR_PLAN_3_STATE_TRACK)
     {
         if(candidate_valid != 0U)
@@ -1184,7 +1184,7 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
         }
         if((new_camera_mask & s_car_plan_3_track_camera_mask) != 0U)
         {
-            /* ç›®æ ‡ç›¸æœºæœ‰æ–°å›¾å´æ— åŒ¹é…å€™é€‰ï¼šç›®æ ‡å·²ç­æˆ–æ¶ˆå¤±ï¼Œç«‹å³æ”¾å¼ƒï¼Œä¸å†æƒ¯å¯¼ç›²èˆªã€‚ */
+            /* Ä¿±êÏà»úÓĞĞÂÍ¼È´ÎŞÆ¥ÅäºòÑ¡£ºÄ¿±êÒÑÃğ»òÏûÊ§£¬Á¢¼´·ÅÆú£¬²»ÔÙ¹ßµ¼Ã¤º½¡£ */
             CarPlan_3_DropTarget();
             if(result != 0)
             {
@@ -1232,7 +1232,7 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
         }
     }
 
-    /* COAST åªæ¥çº³åˆ›æ–°é—¨å†…ä¸”ä¸‰å¸§çª—å£è‡³å°‘å‘½ä¸­ä¸¤æ¬¡çš„é‡ç°ç›®æ ‡ã€‚ */
+    /* COAST Ö»½ÓÄÉ´´ĞÂÃÅÄÚÇÒÈıÖ¡´°¿ÚÖÁÉÙÃüÖĞÁ½´ÎµÄÖØÏÖÄ¿±ê¡£ */
     lost_age_ms = tick_now - s_car_plan_3_last_accept_tick;
     if(((s_car_plan_3_coast_level == CAR_PLAN_3_COAST_LEVEL_AGGRESSIVE) &&
         (lost_age_ms >= CAR_PLAN_3_AGGRESSIVE_COAST_MAX_MS)) ||
@@ -1299,7 +1299,7 @@ uint8 CarPlan_3_Update(car_plan_result_t *result)
         }
         else if(new_camera_mask != 0U)
         {
-            /* è§†è§‰å·²æ¢å¤ä½†é‡æ•è·çª—å£å†…æ— å€™é€‰ï¼šç›®æ ‡å·²æ¶ˆå¤±ï¼Œåœæ­¢ç›²èˆªå›åˆ°æœç´¢ã€‚ */
+            /* ÊÓ¾õÒÑ»Ö¸´µ«ÖØ²¶»ñ´°¿ÚÄÚÎŞºòÑ¡£ºÄ¿±êÒÑÏûÊ§£¬Í£Ö¹Ã¤º½»Øµ½ËÑË÷¡£ */
             CarPlan_3_DropTarget();
             if(result != 0)
             {

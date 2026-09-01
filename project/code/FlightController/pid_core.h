@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-/* PID D é¡¹äºŒé˜¶æ»¤æ³¢å™¨çŠ¶æ€ */
+/* PID D Ïî¶ş½×ÂË²¨Æ÷×´Ì¬ */
 typedef struct
 {
     float b0;
@@ -15,7 +15,7 @@ typedef struct
     float d2;
 } pid_biquad_t;
 
-/* PID PT3 ä½é€šæ»¤æ³¢å™¨çŠ¶æ€ */
+/* PID PT3 µÍÍ¨ÂË²¨Æ÷×´Ì¬ */
 typedef struct
 {
     float k;
@@ -33,19 +33,19 @@ typedef struct
     float dt;
 
     float i_limit;
-    float ff_smoothing_ms; /* å‰é¦ˆ PT3 å¹³æ»‘æ—¶é—´ï¼Œå•ä½ msï¼Œ0 è¡¨ç¤ºæ—è·¯ */
-    float ff_limit;        /* å‰é¦ˆé¡¹é™å¹…ç»å¯¹å€¼ï¼Œ0 è¡¨ç¤ºä¸é™åˆ¶ */
-    float output_lpf_hz;   /* è¾“å‡º PT3 ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½ Hzï¼Œ0 è¡¨ç¤ºæ—è·¯ */
-    float d_lpf_hz; /* D é¡¹ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½ Hzï¼Œ0 è¡¨ç¤ºæ—è·¯ */
+    float ff_smoothing_ms; /* Ç°À¡ PT3 Æ½»¬Ê±¼ä£¬µ¥Î» ms£¬0 ±íÊ¾ÅÔÂ· */
+    float ff_limit;        /* Ç°À¡ÏîÏŞ·ù¾ø¶ÔÖµ£¬0 ±íÊ¾²»ÏŞÖÆ */
+    float output_lpf_hz;   /* Êä³ö PT3 µÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î» Hz£¬0 ±íÊ¾ÅÔÂ· */
+    float d_lpf_hz; /* D ÏîµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î» Hz£¬0 ±íÊ¾ÅÔÂ· */
 
     float integral;
     float prev_meas;
     float prev_sp;
     uint8_t d_initialized;
-    pid_biquad_t d_lpf_filter; /* D é¡¹æ»¤æ³¢å™¨ç³»æ•°ä¸çŠ¶æ€ */
+    pid_biquad_t d_lpf_filter; /* D ÏîÂË²¨Æ÷ÏµÊıÓë×´Ì¬ */
 
-    pid_pt3_t ff_pt3_filter;     /* å‰é¦ˆ PT3 æ»¤æ³¢å™¨çŠ¶æ€ */
-    pid_pt3_t output_pt3_filter; /* è¾“å‡º PT3 æ»¤æ³¢å™¨çŠ¶æ€ */
+    pid_pt3_t ff_pt3_filter;     /* Ç°À¡ PT3 ÂË²¨Æ÷×´Ì¬ */
+    pid_pt3_t output_pt3_filter; /* Êä³ö PT3 ÂË²¨Æ÷×´Ì¬ */
 
     float error;
     float p_term;
@@ -56,7 +56,7 @@ typedef struct
     float sp_rate;
     float iterm_relax_threshold;
 
-    /* anti-windup é…ç½®ï¼šé»˜è®¤å…³é—­ï¼Œä¸å½±å“æœªå¯ç”¨çš„ PID */
+    /* anti-windup ÅäÖÃ£ºÄ¬ÈÏ¹Ø±Õ£¬²»Ó°ÏìÎ´ÆôÓÃµÄ PID */
     float output_min;
     float output_max;
     float aw_gain;
@@ -64,49 +64,49 @@ typedef struct
 } pid_t;
 
 /**
- * å‡½æ•°åŠŸèƒ½: åˆå§‹åŒ– PID æ§åˆ¶å™¨å‚æ•°å’Œ D é¡¹æ»¤æ³¢å™¨ã€‚
- * è¾“å…¥å‚æ•°:
- *   pid     - PID æ§åˆ¶å™¨å®ä¾‹æŒ‡é’ˆã€‚
- *   kp      - æ¯”ä¾‹å¢ç›Šã€‚
- *   ki      - ç§¯åˆ†å¢ç›Šã€‚
- *   kd      - å¾®åˆ†å¢ç›Šã€‚
- *   kff     - å‰é¦ˆå¢ç›Šã€‚
- *   dt      - æ§åˆ¶å‘¨æœŸï¼Œå•ä½ sã€‚
- *   i_limit - ç§¯åˆ†é™å¹…ç»å¯¹å€¼ã€‚
- *   d_lpf   - D é¡¹ä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½ Hzï¼Œ0 è¡¨ç¤ºæ—è·¯ã€‚
- * è¿”å›å€¼: æ— ã€‚
+ * º¯Êı¹¦ÄÜ: ³õÊ¼»¯ PID ¿ØÖÆÆ÷²ÎÊıºÍ D ÏîÂË²¨Æ÷¡£
+ * ÊäÈë²ÎÊı:
+ *   pid     - PID ¿ØÖÆÆ÷ÊµÀıÖ¸Õë¡£
+ *   kp      - ±ÈÀıÔöÒæ¡£
+ *   ki      - »ı·ÖÔöÒæ¡£
+ *   kd      - Î¢·ÖÔöÒæ¡£
+ *   kff     - Ç°À¡ÔöÒæ¡£
+ *   dt      - ¿ØÖÆÖÜÆÚ£¬µ¥Î» s¡£
+ *   i_limit - »ı·ÖÏŞ·ù¾ø¶ÔÖµ¡£
+ *   d_lpf   - D ÏîµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î» Hz£¬0 ±íÊ¾ÅÔÂ·¡£
+ * ·µ»ØÖµ: ÎŞ¡£
  */
 void PID_Init(pid_t *pid, float kp, float ki, float kd, float kff,
               float dt, float i_limit, float d_lpf);
 
 /**
- * å‡½æ•°åŠŸèƒ½: é…ç½® PID å‰é¦ˆå’Œè¾“å‡º PT3 æ»¤æ³¢ã€‚
- * è¾“å…¥å‚æ•°:
- *   pid             - PID æ§åˆ¶å™¨å®ä¾‹æŒ‡é’ˆã€‚
- *   ff_smoothing_ms - å‰é¦ˆå¹³æ»‘æ—¶é—´ï¼Œå•ä½ msï¼Œ0 è¡¨ç¤ºæ—è·¯ã€‚
- *   output_lpf_hz   - è¾“å‡ºä½é€šæˆªæ­¢é¢‘ç‡ï¼Œå•ä½ Hzï¼Œ0 è¡¨ç¤ºæ—è·¯ã€‚
- *   ff_limit        - å‰é¦ˆé¡¹é™å¹…ç»å¯¹å€¼ï¼Œ0 è¡¨ç¤ºä¸é™åˆ¶ã€‚
- * è¿”å›å€¼: æ— ã€‚
+ * º¯Êı¹¦ÄÜ: ÅäÖÃ PID Ç°À¡ºÍÊä³ö PT3 ÂË²¨¡£
+ * ÊäÈë²ÎÊı:
+ *   pid             - PID ¿ØÖÆÆ÷ÊµÀıÖ¸Õë¡£
+ *   ff_smoothing_ms - Ç°À¡Æ½»¬Ê±¼ä£¬µ¥Î» ms£¬0 ±íÊ¾ÅÔÂ·¡£
+ *   output_lpf_hz   - Êä³öµÍÍ¨½ØÖ¹ÆµÂÊ£¬µ¥Î» Hz£¬0 ±íÊ¾ÅÔÂ·¡£
+ *   ff_limit        - Ç°À¡ÏîÏŞ·ù¾ø¶ÔÖµ£¬0 ±íÊ¾²»ÏŞÖÆ¡£
+ * ·µ»ØÖµ: ÎŞ¡£
  */
 void PID_SetFeedforwardFilter(pid_t *pid, float ff_smoothing_ms, float output_lpf_hz, float ff_limit);
 
 /**
- * å‡½æ•°åŠŸèƒ½: ä½¿ç”¨å½“å‰è®¾å®šå€¼å’Œæµ‹é‡å€¼æ›´æ–° PID è¾“å‡ºã€‚
- * è¾“å…¥å‚æ•°:
- *   pid         - PID æ§åˆ¶å™¨å®ä¾‹æŒ‡é’ˆã€‚
- *   setpoint    - ç›®æ ‡å€¼ã€‚
- *   measurement - æµ‹é‡å€¼ã€‚
- *   dt          - æœ¬æ¬¡æ›´æ–°å‘¨æœŸï¼Œå•ä½ sï¼›è‹¥éæ­£å€¼åˆ™æ²¿ç”¨ä¸Šæ¬¡æœ‰æ•ˆå‘¨æœŸã€‚
- * è¿”å›å€¼:
- *   PID å½“å‰è¾“å‡ºå€¼ã€‚
+ * º¯Êı¹¦ÄÜ: Ê¹ÓÃµ±Ç°Éè¶¨ÖµºÍ²âÁ¿Öµ¸üĞÂ PID Êä³ö¡£
+ * ÊäÈë²ÎÊı:
+ *   pid         - PID ¿ØÖÆÆ÷ÊµÀıÖ¸Õë¡£
+ *   setpoint    - Ä¿±êÖµ¡£
+ *   measurement - ²âÁ¿Öµ¡£
+ *   dt          - ±¾´Î¸üĞÂÖÜÆÚ£¬µ¥Î» s£»Èô·ÇÕıÖµÔòÑØÓÃÉÏ´ÎÓĞĞ§ÖÜÆÚ¡£
+ * ·µ»ØÖµ:
+ *   PID µ±Ç°Êä³öÖµ¡£
  */
 float PID_Update(pid_t *pid, float setpoint, float measurement, float dt);
 
 /**
- * å‡½æ•°åŠŸèƒ½: æ¸…é›¶ PID ç§¯åˆ†é¡¹ã€D é¡¹çŠ¶æ€å’Œè°ƒè¯•è¾“å‡ºã€‚
- * è¾“å…¥å‚æ•°:
- *   pid - PID æ§åˆ¶å™¨å®ä¾‹æŒ‡é’ˆã€‚
- * è¿”å›å€¼: æ— ã€‚
+ * º¯Êı¹¦ÄÜ: ÇåÁã PID »ı·ÖÏî¡¢D Ïî×´Ì¬ºÍµ÷ÊÔÊä³ö¡£
+ * ÊäÈë²ÎÊı:
+ *   pid - PID ¿ØÖÆÆ÷ÊµÀıÖ¸Õë¡£
+ * ·µ»ØÖµ: ÎŞ¡£
  */
 void PID_Reset(pid_t *pid);
 

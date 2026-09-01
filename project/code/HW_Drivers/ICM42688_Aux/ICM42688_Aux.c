@@ -7,61 +7,61 @@
 #include "zf_driver_gpio.h"
 #include "zf_driver_spi.h"
 
-/* å‰¯ ICM42688 ä½¿ç”¨çš„ SPI æŽ§åˆ¶å™¨ */
+/* ¸± ICM42688 Ê¹ÓÃµÄ SPI ¿ØÖÆÆ÷ */
 #define ICM42688_AUX_SPI                     (SPI_1)
-/* å‰¯ ICM42688 çš„ SPI SCK å¼•è„š */
+/* ¸± ICM42688 µÄ SPI SCK Òý½Å */
 #define ICM42688_AUX_SCK_PIN                 (SPI1_CLK_P12_2)
-/* å‰¯ ICM42688 çš„ SPI MOSI å¼•è„š */
+/* ¸± ICM42688 µÄ SPI MOSI Òý½Å */
 #define ICM42688_AUX_MOSI_PIN                (SPI1_MOSI_P12_1)
-/* å‰¯ ICM42688 çš„ SPI MISO å¼•è„š */
+/* ¸± ICM42688 µÄ SPI MISO Òý½Å */
 #define ICM42688_AUX_MISO_PIN                (SPI1_MISO_P12_0)
-/* å‰¯ ICM42688 çš„ç‰‡é€‰å¼•è„š */
+/* ¸± ICM42688 µÄÆ¬Ñ¡Òý½Å */
 #define ICM42688_AUX_CS_PIN                  (P12_3)
-/* å‰¯ ICM42688 çš„ SPI é€šä¿¡é€ŸçŽ‡ */
+/* ¸± ICM42688 µÄ SPI Í¨ÐÅËÙÂÊ */
 #define ICM42688_AUX_SPI_SPEED               (10U * 1000U * 1000U)
 
-/* SPI è¯»å¯„å­˜å™¨å‘½ä»¤ä½ */
+/* SPI ¶Á¼Ä´æÆ÷ÃüÁîÎ» */
 #define ICM42688_AUX_READ_MASK               (0x80U)
-/* DEVICE_CONFIG å¯„å­˜å™¨åœ°å€ */
+/* DEVICE_CONFIG ¼Ä´æÆ÷µØÖ· */
 #define ICM42688_AUX_REG_DEVICE_CONFIG       (0x11U)
-/* TEMP_DATA1 å¯„å­˜å™¨åœ°å€ */
+/* TEMP_DATA1 ¼Ä´æÆ÷µØÖ· */
 #define ICM42688_AUX_REG_TEMP_DATA1          (0x1DU)
-/* PWR_MGMT0 å¯„å­˜å™¨åœ°å€ */
+/* PWR_MGMT0 ¼Ä´æÆ÷µØÖ· */
 #define ICM42688_AUX_REG_PWR_MGMT0           (0x4EU)
-/* GYRO_CONFIG0 å¯„å­˜å™¨åœ°å€ */
+/* GYRO_CONFIG0 ¼Ä´æÆ÷µØÖ· */
 #define ICM42688_AUX_REG_GYRO_CONFIG0        (0x4FU)
-/* ACCEL_CONFIG0 å¯„å­˜å™¨åœ°å€ */
+/* ACCEL_CONFIG0 ¼Ä´æÆ÷µØÖ· */
 #define ICM42688_AUX_REG_ACCEL_CONFIG0       (0x50U)
-/* GYRO_CONFIG1 å¯„å­˜å™¨åœ°å€ */
+/* GYRO_CONFIG1 ¼Ä´æÆ÷µØÖ· */
 #define ICM42688_AUX_REG_GYRO_CONFIG1        (0x51U)
-/* GYRO_ACCEL_CONFIG0 å¯„å­˜å™¨åœ°å€ */
+/* GYRO_ACCEL_CONFIG0 ¼Ä´æÆ÷µØÖ· */
 #define ICM42688_AUX_REG_GYRO_ACCEL_CONFIG0  (0x52U)
-/* ACCEL_CONFIG1 å¯„å­˜å™¨åœ°å€ */
+/* ACCEL_CONFIG1 ¼Ä´æÆ÷µØÖ· */
 #define ICM42688_AUX_REG_ACCEL_CONFIG1       (0x53U)
-/* WHO_AM_I å¯„å­˜å™¨åœ°å€ */
+/* WHO_AM_I ¼Ä´æÆ÷µØÖ· */
 #define ICM42688_AUX_REG_WHO_AM_I            (0x75U)
 
-/* ICM42688P çš„ WHO_AM_I æœŸæœ›å€¼ */
+/* ICM42688P µÄ WHO_AM_I ÆÚÍûÖµ */
 #define ICM42688_AUX_WHO_AM_I_EXPECTED       (0x47U)
-/* DEVICE_CONFIG çš„è½¯å¤ä½å‘½ä»¤å€¼ */
+/* DEVICE_CONFIG µÄÈí¸´Î»ÃüÁîÖµ */
 #define ICM42688_AUX_DEVICE_SOFT_RESET       (0x01U)
-/* PWR_MGMT0: é™€èžºä»ªå’ŒåŠ é€Ÿåº¦è®¡éƒ½è¿›å…¥ LN æ¨¡å¼ */
+/* PWR_MGMT0: ÍÓÂÝÒÇºÍ¼ÓËÙ¶È¼Æ¶¼½øÈë LN Ä£Ê½ */
 #define ICM42688_AUX_PWR_MGMT0_LN_MODE       (0x0FU)
-/* ä»¥ TEMP_DATA1 ä¸ºèµ·ç‚¹çš„ä¸€æ¬¡ burst è¯»å–å­—èŠ‚æ•° */
+/* ÒÔ TEMP_DATA1 ÎªÆðµãµÄÒ»´Î burst ¶ÁÈ¡×Ö½ÚÊý */
 #define ICM42688_AUX_BURST_READ_LEN          (15U)
 
-volatile icm42688_aux_raw_t g_icm42688_aux_raw = {0}; /* å‰¯ ICM42688 åŽŸå§‹ LSB æ•°æ®ç¼“å­˜ */
-volatile icm42688_aux_real_t g_icm42688_aux = {0};    /* å‰¯ ICM42688 ç‰©ç†é‡ç¼“å­˜ */
-volatile uint8 g_icm42688_aux_ready = 0U;             /* å‰¯ ICM42688 åˆå§‹åŒ–å°±ç»ªæ ‡å¿— */
-static float g_icm42688_aux_gyro_sensitivity = 0.0f;  /* å‰¯ ICM42688 é™€èžºä»ªçµæ•åº¦ï¼Œå•ä½ LSB/dps */
-static float g_icm42688_aux_acc_sensitivity = 0.0f;   /* å‰¯ ICM42688 åŠ é€Ÿåº¦è®¡çµæ•åº¦ï¼Œå•ä½ LSB/g */
+volatile icm42688_aux_raw_t g_icm42688_aux_raw = {0}; /* ¸± ICM42688 Ô­Ê¼ LSB Êý¾Ý»º´æ */
+volatile icm42688_aux_real_t g_icm42688_aux = {0};    /* ¸± ICM42688 ÎïÀíÁ¿»º´æ */
+volatile uint8 g_icm42688_aux_ready = 0U;             /* ¸± ICM42688 ³õÊ¼»¯¾ÍÐ÷±êÖ¾ */
+static float g_icm42688_aux_gyro_sensitivity = 0.0f;  /* ¸± ICM42688 ÍÓÂÝÒÇÁéÃô¶È£¬µ¥Î» LSB/dps */
+static float g_icm42688_aux_acc_sensitivity = 0.0f;   /* ¸± ICM42688 ¼ÓËÙ¶È¼ÆÁéÃô¶È£¬µ¥Î» LSB/g */
 
 /*
- * å‡½æ•°åŠŸèƒ½: é€šè¿‡ WiFi æ–‡æœ¬é“¾è·¯è¾“å‡ºä¸€è¡Œå‰¯ IMU è°ƒè¯•æ—¥å¿—ï¼›è‹¥ WiFi æœªå°±ç»ªåˆ™é€€å›ž printf
- * è¾“å…¥å‚æ•°:
- *   format - printf é£Žæ ¼æ ¼å¼ä¸²
- *   ...    - å¯å˜å‚æ•°
- * è¿”å›žå€¼: æ— 
+ * º¯Êý¹¦ÄÜ: Í¨¹ý WiFi ÎÄ±¾Á´Â·Êä³öÒ»ÐÐ¸± IMU µ÷ÊÔÈÕÖ¾£»Èô WiFi Î´¾ÍÐ÷ÔòÍË»Ø printf
+ * ÊäÈë²ÎÊý:
+ *   format - printf ·ç¸ñ¸ñÊ½´®
+ *   ...    - ¿É±ä²ÎÊý
+ * ·µ»ØÖµ: ÎÞ
  */
 static void ICM42688_Aux_LogLine(const char *format, ...)
 {
@@ -94,9 +94,9 @@ static void ICM42688_Aux_LogLine(const char *format, ...)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: å°†å‰¯ ICM42688 åŽŸå§‹ç¼“å­˜æ¸…é›¶
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›žå€¼: æ— 
+ * º¯Êý¹¦ÄÜ: ½«¸± ICM42688 Ô­Ê¼»º´æÇåÁã
+ * ÊäÈë²ÎÊý: ÎÞ
+ * ·µ»ØÖµ: ÎÞ
  */
 static void ICM42688_Aux_ClearRaw(void)
 {
@@ -111,9 +111,9 @@ static void ICM42688_Aux_ClearRaw(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: å°†å‰¯ ICM42688 ç‰©ç†é‡ç¼“å­˜æ¸…é›¶
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›žå€¼: æ— 
+ * º¯Êý¹¦ÄÜ: ½«¸± ICM42688 ÎïÀíÁ¿»º´æÇåÁã
+ * ÊäÈë²ÎÊý: ÎÞ
+ * ·µ»ØÖµ: ÎÞ
  */
 static void ICM42688_Aux_ClearReal(void)
 {
@@ -127,9 +127,9 @@ static void ICM42688_Aux_ClearReal(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: æ¸…é›¶å‰¯ ICM42688 çš„æœ¬åœ°çµæ•åº¦ç¼“å­˜
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›žå€¼: æ— 
+ * º¯Êý¹¦ÄÜ: ÇåÁã¸± ICM42688 µÄ±¾µØÁéÃô¶È»º´æ
+ * ÊäÈë²ÎÊý: ÎÞ
+ * ·µ»ØÖµ: ÎÞ
  */
 static void ICM42688_Aux_ClearSensitivity(void)
 {
@@ -138,9 +138,9 @@ static void ICM42688_Aux_ClearSensitivity(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: åˆå§‹åŒ–å‰¯ ICM42688 æ‰€åœ¨çš„ SPI1 å’Œç‰‡é€‰ GPIO
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›žå€¼: æ— 
+ * º¯Êý¹¦ÄÜ: ³õÊ¼»¯¸± ICM42688 ËùÔÚµÄ SPI1 ºÍÆ¬Ñ¡ GPIO
+ * ÊäÈë²ÎÊý: ÎÞ
+ * ·µ»ØÖµ: ÎÞ
  */
 static void ICM42688_Aux_SpiHardwareInit(void)
 {
@@ -155,11 +155,11 @@ static void ICM42688_Aux_SpiHardwareInit(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: å‘å‰¯ ICM42688 å†™å…¥ä¸€ä¸ª 8bit å¯„å­˜å™¨
- * è¾“å…¥å‚æ•°:
- *   reg_addr - å¯„å­˜å™¨åœ°å€
- *   value - éœ€è¦å†™å…¥çš„å¯„å­˜å™¨å€¼
- * è¿”å›žå€¼: æ— 
+ * º¯Êý¹¦ÄÜ: Ïò¸± ICM42688 Ð´ÈëÒ»¸ö 8bit ¼Ä´æÆ÷
+ * ÊäÈë²ÎÊý:
+ *   reg_addr - ¼Ä´æÆ÷µØÖ·
+ *   value - ÐèÒªÐ´ÈëµÄ¼Ä´æÆ÷Öµ
+ * ·µ»ØÖµ: ÎÞ
  */
 static void ICM42688_Aux_WriteReg8(uint8 reg_addr, uint8 value)
 {
@@ -172,10 +172,10 @@ static void ICM42688_Aux_WriteReg8(uint8 reg_addr, uint8 value)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: ä»Žå‰¯ ICM42688 è¯»å–ä¸€ä¸ª 8bit å¯„å­˜å™¨
- * è¾“å…¥å‚æ•°:
- *   reg_addr - å¯„å­˜å™¨åœ°å€
- * è¿”å›žå€¼: è¯»å–åˆ°çš„å¯„å­˜å™¨å€¼
+ * º¯Êý¹¦ÄÜ: ´Ó¸± ICM42688 ¶ÁÈ¡Ò»¸ö 8bit ¼Ä´æÆ÷
+ * ÊäÈë²ÎÊý:
+ *   reg_addr - ¼Ä´æÆ÷µØÖ·
+ * ·µ»ØÖµ: ¶ÁÈ¡µ½µÄ¼Ä´æÆ÷Öµ
  */
 static uint8 ICM42688_Aux_ReadReg8(uint8 reg_addr)
 {
@@ -190,11 +190,11 @@ static uint8 ICM42688_Aux_ReadReg8(uint8 reg_addr)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: å†™å…¥å¯„å­˜å™¨åŽç«‹å³è¯»å›žæ ¡éªŒï¼Œç¡®è®¤é…ç½®å·²ç»ç”Ÿæ•ˆ
- * è¾“å…¥å‚æ•°:
- *   reg_addr - å¯„å­˜å™¨åœ°å€
- *   expected - æœŸæœ›å†™å…¥çš„å¯„å­˜å™¨å€¼
- * è¿”å›žå€¼: 1=å†™å…¥å¹¶æ ¡éªŒæˆåŠŸï¼Œ0=æ ¡éªŒå¤±è´¥
+ * º¯Êý¹¦ÄÜ: Ð´Èë¼Ä´æÆ÷ºóÁ¢¼´¶Á»ØÐ£Ñé£¬È·ÈÏÅäÖÃÒÑ¾­ÉúÐ§
+ * ÊäÈë²ÎÊý:
+ *   reg_addr - ¼Ä´æÆ÷µØÖ·
+ *   expected - ÆÚÍûÐ´ÈëµÄ¼Ä´æÆ÷Öµ
+ * ·µ»ØÖµ: 1=Ð´Èë²¢Ð£Ñé³É¹¦£¬0=Ð£ÑéÊ§°Ü
  */
 static uint8 ICM42688_Aux_WriteVerifyReg8(uint8 reg_addr, uint8 expected)
 {
@@ -203,12 +203,12 @@ static uint8 ICM42688_Aux_WriteVerifyReg8(uint8 reg_addr, uint8 expected)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: å°½åŠ›å†™å…¥å¹¶è¯»å–ä¸€æ¬¡å¯„å­˜å™¨ï¼Œè‹¥è¯»å›žä¸ä¸€è‡´åˆ™æ‰“å°å‘Šè­¦ä½†ä¸åˆ¤åˆå§‹åŒ–å¤±è´¥
- * è¾“å…¥å‚æ•°:
- *   reg_addr - å¯„å­˜å™¨åœ°å€
- *   expected - æœŸæœ›å†™å…¥çš„å¯„å­˜å™¨å€¼
- *   reg_name - å¯„å­˜å™¨åç§°å­—ç¬¦ä¸²
- * è¿”å›žå€¼: æ— 
+ * º¯Êý¹¦ÄÜ: ¾¡Á¦Ð´Èë²¢¶ÁÈ¡Ò»´Î¼Ä´æÆ÷£¬Èô¶Á»Ø²»Ò»ÖÂÔò´òÓ¡¸æ¾¯µ«²»ÅÐ³õÊ¼»¯Ê§°Ü
+ * ÊäÈë²ÎÊý:
+ *   reg_addr - ¼Ä´æÆ÷µØÖ·
+ *   expected - ÆÚÍûÐ´ÈëµÄ¼Ä´æÆ÷Öµ
+ *   reg_name - ¼Ä´æÆ÷Ãû³Æ×Ö·û´®
+ * ·µ»ØÖµ: ÎÞ
  */
 static void ICM42688_Aux_WriteBestEffortReg8(uint8 reg_addr, uint8 expected, const char *reg_name)
 {
@@ -227,11 +227,11 @@ static void ICM42688_Aux_WriteBestEffortReg8(uint8 reg_addr, uint8 expected, con
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: æŒ‰ä¸»é©±åŠ¨è§„åˆ™ç”Ÿæˆå‰¯ ICM42688 çš„ GYRO_CONFIG0ï¼Œå¹¶ç¼“å­˜é™€èžºä»ªçµæ•åº¦
- * è¾“å…¥å‚æ•°:
- *   gyro_fsr - é™€èžºä»ªé‡ç¨‹é…ç½®
- *   gyro_odr - é™€èžºä»ªè¾“å‡ºé€ŸçŽ‡é…ç½®
- * è¿”å›žå€¼: GYRO_CONFIG0 å¯„å­˜å™¨å€¼
+ * º¯Êý¹¦ÄÜ: °´Ö÷Çý¶¯¹æÔòÉú³É¸± ICM42688 µÄ GYRO_CONFIG0£¬²¢»º´æÍÓÂÝÒÇÁéÃô¶È
+ * ÊäÈë²ÎÊý:
+ *   gyro_fsr - ÍÓÂÝÒÇÁ¿³ÌÅäÖÃ
+ *   gyro_odr - ÍÓÂÝÒÇÊä³öËÙÂÊÅäÖÃ
+ * ·µ»ØÖµ: GYRO_CONFIG0 ¼Ä´æÆ÷Öµ
  */
 static uint8 ICM42688_Aux_BuildGyroConfig0(GYRO_FSR gyro_fsr, GYRO_ODR gyro_odr)
 {
@@ -319,11 +319,11 @@ static uint8 ICM42688_Aux_BuildGyroConfig0(GYRO_FSR gyro_fsr, GYRO_ODR gyro_odr)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: æŒ‰ä¸»é©±åŠ¨è§„åˆ™ç”Ÿæˆå‰¯ ICM42688 çš„ ACCEL_CONFIG0ï¼Œå¹¶ç¼“å­˜åŠ é€Ÿåº¦è®¡çµæ•åº¦
- * è¾“å…¥å‚æ•°:
- *   acc_fsr - åŠ é€Ÿåº¦è®¡é‡ç¨‹é…ç½®
- *   acc_odr - åŠ é€Ÿåº¦è®¡è¾“å‡ºé€ŸçŽ‡é…ç½®
- * è¿”å›žå€¼: ACCEL_CONFIG0 å¯„å­˜å™¨å€¼
+ * º¯Êý¹¦ÄÜ: °´Ö÷Çý¶¯¹æÔòÉú³É¸± ICM42688 µÄ ACCEL_CONFIG0£¬²¢»º´æ¼ÓËÙ¶È¼ÆÁéÃô¶È
+ * ÊäÈë²ÎÊý:
+ *   acc_fsr - ¼ÓËÙ¶È¼ÆÁ¿³ÌÅäÖÃ
+ *   acc_odr - ¼ÓËÙ¶È¼ÆÊä³öËÙÂÊÅäÖÃ
+ * ·µ»ØÖµ: ACCEL_CONFIG0 ¼Ä´æÆ÷Öµ
  */
 static uint8 ICM42688_Aux_BuildAccelConfig0(ACC_FSR acc_fsr, ACC_ODR acc_odr)
 {
@@ -395,11 +395,11 @@ static uint8 ICM42688_Aux_BuildAccelConfig0(ACC_FSR acc_fsr, ACC_ODR acc_odr)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: æŒ‰ä¸»é©±åŠ¨è§„åˆ™ç”Ÿæˆå‰¯ ICM42688 çš„ GYRO_ACCEL_CONFIG0
- * è¾“å…¥å‚æ•°:
- *   gyro_bandwidth_factor - é™€èžºä»ªæ•°å­—æ»¤æ³¢å¸¦å®½å› å­
- *   acc_bandwidth_factor - åŠ é€Ÿåº¦è®¡æ•°å­—æ»¤æ³¢å¸¦å®½å› å­
- * è¿”å›žå€¼: GYRO_ACCEL_CONFIG0 å¯„å­˜å™¨å€¼
+ * º¯Êý¹¦ÄÜ: °´Ö÷Çý¶¯¹æÔòÉú³É¸± ICM42688 µÄ GYRO_ACCEL_CONFIG0
+ * ÊäÈë²ÎÊý:
+ *   gyro_bandwidth_factor - ÍÓÂÝÒÇÊý×ÖÂË²¨´ø¿íÒò×Ó
+ *   acc_bandwidth_factor - ¼ÓËÙ¶È¼ÆÊý×ÖÂË²¨´ø¿íÒò×Ó
+ * ·µ»ØÖµ: GYRO_ACCEL_CONFIG0 ¼Ä´æÆ÷Öµ
  */
 static uint8 ICM42688_Aux_BuildGyroAccelConfig0(Bandwidth_Factor gyro_bandwidth_factor,
                                                 Bandwidth_Factor acc_bandwidth_factor)
@@ -480,10 +480,10 @@ static uint8 ICM42688_Aux_BuildGyroAccelConfig0(Bandwidth_Factor gyro_bandwidth_
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: æŒ‰ä¸»é©±åŠ¨è§„åˆ™ç”Ÿæˆå‰¯ ICM42688 çš„ä¸€é˜¶/äºŒé˜¶/ä¸‰é˜¶æ»¤æ³¢é˜¶æ•°é…ç½®
- * è¾“å…¥å‚æ•°:
- *   filter_order - æ•°å­—æ»¤æ³¢å™¨é˜¶æ•°
- * è¿”å›žå€¼: GYRO_CONFIG1 æˆ– ACCEL_CONFIG1 å¯„å­˜å™¨å€¼
+ * º¯Êý¹¦ÄÜ: °´Ö÷Çý¶¯¹æÔòÉú³É¸± ICM42688 µÄÒ»½×/¶þ½×/Èý½×ÂË²¨½×ÊýÅäÖÃ
+ * ÊäÈë²ÎÊý:
+ *   filter_order - Êý×ÖÂË²¨Æ÷½×Êý
+ * ·µ»ØÖµ: GYRO_CONFIG1 »ò ACCEL_CONFIG1 ¼Ä´æÆ÷Öµ
  */
 static uint8 ICM42688_Aux_BuildFilterOrderConfig(Filter_Order filter_order)
 {
@@ -507,9 +507,9 @@ static uint8 ICM42688_Aux_BuildFilterOrderConfig(Filter_Order filter_order)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: æŒ‰ä¸» ICM42688_CONFIG ç”Ÿæˆå¹¶å†™å…¥å‰¯ ICM42688 çš„å®Œæ•´è¿è¡Œé…ç½®
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›žå€¼: 1=é…ç½®æˆåŠŸï¼Œ0=é…ç½®å¤±è´¥
+ * º¯Êý¹¦ÄÜ: °´Ö÷ ICM42688_CONFIG Éú³É²¢Ð´Èë¸± ICM42688 µÄÍêÕûÔËÐÐÅäÖÃ
+ * ÊäÈë²ÎÊý: ÎÞ
+ * ·µ»ØÖµ: 1=ÅäÖÃ³É¹¦£¬0=ÅäÖÃÊ§°Ü
  */
 static uint8 ICM42688_Aux_ApplyMainConfig(void)
 {
@@ -538,7 +538,7 @@ static uint8 ICM42688_Aux_ApplyMainConfig(void)
         return 0U;
     }
 
-    /* è¿™ä¸‰é¡¹ä¿æŒæŒ‰ä¸»é©±åŠ¨åŒæ ·çš„ç¼–ç åŽ»å†™ï¼Œä½†ä¸å†ç”¨å¼ºæ ¡éªŒå¡æ­»åˆå§‹åŒ–ã€‚ */
+    /* ÕâÈýÏî±£³Ö°´Ö÷Çý¶¯Í¬ÑùµÄ±àÂëÈ¥Ð´£¬µ«²»ÔÙÓÃÇ¿Ð£Ñé¿¨ËÀ³õÊ¼»¯¡£ */
     ICM42688_Aux_WriteBestEffortReg8(ICM42688_AUX_REG_GYRO_ACCEL_CONFIG0,
                                      gyro_accel_config0,
                                      "GYRO_ACCEL_CONFIG0");
@@ -553,10 +553,10 @@ static uint8 ICM42688_Aux_ApplyMainConfig(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: å°†å‰¯ ICM42688 åŽŸå§‹ LSB æ•°æ®æ¢ç®—æˆä¸Žä¸»é©±åŠ¨ä¸€è‡´çš„ç‰©ç†é‡ç¼“å­˜
- * è¾“å…¥å‚æ•°:
- *   raw - æœ¬æ¬¡é‡‡æ ·å¾—åˆ°çš„åŽŸå§‹æ•°æ®
- * è¿”å›žå€¼: æ— 
+ * º¯Êý¹¦ÄÜ: ½«¸± ICM42688 Ô­Ê¼ LSB Êý¾Ý»»Ëã³ÉÓëÖ÷Çý¶¯Ò»ÖÂµÄÎïÀíÁ¿»º´æ
+ * ÊäÈë²ÎÊý:
+ *   raw - ±¾´Î²ÉÑùµÃµ½µÄÔ­Ê¼Êý¾Ý
+ * ·µ»ØÖµ: ÎÞ
  */
 static void ICM42688_Aux_UpdateReal(icm42688_aux_raw_t *raw)
 {
@@ -594,10 +594,10 @@ static void ICM42688_Aux_UpdateReal(icm42688_aux_raw_t *raw)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: è¿žç»­è¯»å–å‰¯ ICM42688 çš„æ¸©åº¦ã€åŠ é€Ÿåº¦å’Œè§’é€Ÿåº¦åŽŸå§‹å¯„å­˜å™¨
- * è¾“å…¥å‚æ•°:
- *   raw - è¾“å‡ºçš„åŽŸå§‹æ•°æ®ç¼“å­˜æŒ‡é’ˆ
- * è¿”å›žå€¼: æ— 
+ * º¯Êý¹¦ÄÜ: Á¬Ðø¶ÁÈ¡¸± ICM42688 µÄÎÂ¶È¡¢¼ÓËÙ¶ÈºÍ½ÇËÙ¶ÈÔ­Ê¼¼Ä´æÆ÷
+ * ÊäÈë²ÎÊý:
+ *   raw - Êä³öµÄÔ­Ê¼Êý¾Ý»º´æÖ¸Õë
+ * ·µ»ØÖµ: ÎÞ
  */
 static void ICM42688_Aux_ReadBurst(icm42688_aux_raw_t *raw)
 {
@@ -625,26 +625,26 @@ static void ICM42688_Aux_ReadBurst(icm42688_aux_raw_t *raw)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: åˆå§‹åŒ– SPI1 å‰¯ ICM42688ï¼Œå¹¶æŒ‰ä¸» ICM42688_CONFIG å¯¹é½è¿è¡Œé…ç½®
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›žå€¼: 1=åˆå§‹åŒ–æˆåŠŸï¼Œ0=åˆå§‹åŒ–å¤±è´¥
+ * º¯Êý¹¦ÄÜ: ³õÊ¼»¯ SPI1 ¸± ICM42688£¬²¢°´Ö÷ ICM42688_CONFIG ¶ÔÆëÔËÐÐÅäÖÃ
+ * ÊäÈë²ÎÊý: ÎÞ
+ * ·µ»ØÖµ: 1=³õÊ¼»¯³É¹¦£¬0=³õÊ¼»¯Ê§°Ü
  */
 uint8 ICM42688_Aux_Init(void)
 {
     uint8 who_am_i;
 
-    /* å…ˆæ¸…ç©ºè¿è¡ŒçŠ¶æ€ï¼Œé¿å…åˆå§‹åŒ–å¤±è´¥æ—¶ç•™ä¸‹è„æ•°æ®ã€‚ */
+    /* ÏÈÇå¿ÕÔËÐÐ×´Ì¬£¬±ÜÃâ³õÊ¼»¯Ê§°ÜÊ±ÁôÏÂÔàÊý¾Ý¡£ */
     g_icm42688_aux_ready = 0U;
     ICM42688_Aux_ClearRaw();
     ICM42688_Aux_ClearReal();
     ICM42688_Aux_ClearSensitivity();
     ICM42688_Aux_SpiHardwareInit();
 
-    /* æŒ‰èŠ¯ç‰‡æ‰‹å†Œæ‰§è¡Œè½¯å¤ä½ï¼Œå¹¶ç­‰å¾…å¤ä½ç”Ÿæ•ˆã€‚ */
+    /* °´Ð¾Æ¬ÊÖ²áÖ´ÐÐÈí¸´Î»£¬²¢µÈ´ý¸´Î»ÉúÐ§¡£ */
     ICM42688_Aux_WriteReg8(ICM42688_AUX_REG_DEVICE_CONFIG, ICM42688_AUX_DEVICE_SOFT_RESET);
     system_delay_ms(2);
 
-    /* å…ˆç¡®è®¤å‰¯ IMU èº«ä»½ï¼Œå†å†™æœ€å°å¿…é¡»å¯„å­˜å™¨ã€‚ */
+    /* ÏÈÈ·ÈÏ¸± IMU Éí·Ý£¬ÔÙÐ´×îÐ¡±ØÐë¼Ä´æÆ÷¡£ */
     who_am_i = ICM42688_Aux_ReadReg8(ICM42688_AUX_REG_WHO_AM_I);
     if (who_am_i != ICM42688_AUX_WHO_AM_I_EXPECTED)
     {
@@ -659,7 +659,7 @@ uint8 ICM42688_Aux_Init(void)
         return 0U;
     }
 
-    /* æœ€åŽæ‹‰èµ·é™€èžºä»ªå’ŒåŠ é€Ÿåº¦è®¡åˆ° LN æ¨¡å¼ï¼Œå¹¶ç»™å¯åŠ¨æ—¶é—´ã€‚ */
+    /* ×îºóÀ­ÆðÍÓÂÝÒÇºÍ¼ÓËÙ¶È¼Æµ½ LN Ä£Ê½£¬²¢¸øÆô¶¯Ê±¼ä¡£ */
     ICM42688_Aux_WriteReg8(ICM42688_AUX_REG_PWR_MGMT0, ICM42688_AUX_PWR_MGMT0_LN_MODE);
     system_delay_ms(50);
 
@@ -668,10 +668,10 @@ uint8 ICM42688_Aux_Init(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: åœ¨ 1kHz è°ƒåº¦ä¸­è¯»å–ä¸€æ¬¡å‰¯ ICM42688 åŽŸå§‹å¯„å­˜å™¨å¹¶åˆ·æ–°åŽŸå§‹/ç‰©ç†é‡ç¼“å­˜
- * è¾“å…¥å‚æ•°:
- *   tick_us - å½“å‰ 1kHz è°ƒåº¦æ—¶é—´æˆ³ï¼Œå•ä½ us
- * è¿”å›žå€¼: æ— 
+ * º¯Êý¹¦ÄÜ: ÔÚ 1kHz µ÷¶ÈÖÐ¶ÁÈ¡Ò»´Î¸± ICM42688 Ô­Ê¼¼Ä´æÆ÷²¢Ë¢ÐÂÔ­Ê¼/ÎïÀíÁ¿»º´æ
+ * ÊäÈë²ÎÊý:
+ *   tick_us - µ±Ç° 1kHz µ÷¶ÈÊ±¼ä´Á£¬µ¥Î» us
+ * ·µ»ØÖµ: ÎÞ
  */
 void ICM42688_Aux_Update_1000Hz(uint32 tick_us)
 {
@@ -684,7 +684,7 @@ void ICM42688_Aux_Update_1000Hz(uint32 tick_us)
         return;
     }
 
-    /* åªæ›´æ–°å‰¯ IMU çš„ç‹¬ç«‹åŽŸå§‹ç¼“å­˜ï¼Œä¸å‚ä¸Žä»»ä½•ä¸»é“¾ç®—æ³•ã€‚ */
+    /* Ö»¸üÐÂ¸± IMU µÄ¶ÀÁ¢Ô­Ê¼»º´æ£¬²»²ÎÓëÈÎºÎÖ÷Á´Ëã·¨¡£ */
     ICM42688_Aux_ReadBurst(&raw_sample);
     raw_sample.tick_us = tick_us;
 

@@ -30,11 +30,11 @@
 #include "ICM42688.h"
 
 /*
- * ICM42688 é»˜è®¤é…ç½®ï¼ˆ1kHzï¼‰
- * 1) é™€èžºä»ªé‡ç¨‹ 2000dpsï¼Œé€‚åˆé£žæŽ§å¿«é€ŸæœºåŠ¨åœºæ™¯
- * 2) åŠ é€Ÿåº¦é‡ç¨‹ 16gï¼Œè¦†ç›–å¸¸è§åŠ¨æ€èŒƒå›´
- * 3) AAF æŠ—æ··å  + UI ä½Žå»¶è¿Ÿè¾“å‡ºï¼Œä¸»è¦æ»¤æ³¢ç”±è½¯ä»¶å®Œæˆ
- * 4) ä¸Šç”µåŽè¿›å…¥ LNï¼ˆLow Noiseï¼‰æ¨¡å¼
+ * ICM42688 Ä¬ÈÏÅäÖÃ£¨1kHz£©
+ * 1) ÍÓÂÝÒÇÁ¿³Ì 2000dps£¬ÊÊºÏ·É¿Ø¿ìËÙ»ú¶¯³¡¾°
+ * 2) ¼ÓËÙ¶ÈÁ¿³Ì 16g£¬¸²¸Ç³£¼û¶¯Ì¬·¶Î§
+ * 3) AAF ¿¹»ìµþ + UI µÍÑÓ³ÙÊä³ö£¬Ö÷ÒªÂË²¨ÓÉÈí¼þÍê³É
+ * 4) ÉÏµçºó½øÈë LN£¨Low Noise£©Ä£Ê½
  */
 ICM42688_CONFIG_STRUCT ICM42688_CONFIG = {
     GYRO_2000DPS,
@@ -49,12 +49,12 @@ ICM42688_CONFIG_STRUCT ICM42688_CONFIG = {
 };
 
 float Gyro_Sensitivity, Acc_Sensitivity;
-ICM42688_RAW_DATA ICM42688_RAW;      /* åŽŸå§‹ LSB æ•°æ® */
-ICM42688_real_data ICM42688;         /* æ¢ç®—åŽçš„ç‰©ç†é‡ */
+ICM42688_RAW_DATA ICM42688_RAW;      /* Ô­Ê¼ LSB Êý¾Ý */
+ICM42688_real_data ICM42688;         /* »»ËãºóµÄÎïÀíÁ¿ */
 float ICM42688_Bias_gyro_x = 0, ICM42688_Bias_gyro_y = 0, ICM42688_Bias_gyro_z = 0;
 uint8 ICM42688_Bias_Init_Flag = 0;
 
-/* åˆå§‹åŒ– SPI ä¸Žç‰‡é€‰ GPIO */
+/* ³õÊ¼»¯ SPI ÓëÆ¬Ñ¡ GPIO */
 static void ICM42688_SPI_HardWare_Init(void)
 {
     spi_init(ICM42688_SPI, SPI_MODE0, ICM42688_SPEED,
@@ -62,7 +62,7 @@ static void ICM42688_SPI_HardWare_Init(void)
     gpio_init(ICM42688_CS_Pin, GPO, 1, GPO_PUSH_PULL);
 }
 
-/* å‘é€å¹¶æŽ¥æ”¶ 16bit SPI æ•°æ® */
+/* ·¢ËÍ²¢½ÓÊÕ 16bit SPI Êý¾Ý */
 static uint16_t SPI_Transfer_16bit(uint16_t dout)
 {
     uint16_t return_data;
@@ -75,8 +75,8 @@ static uint16_t SPI_Transfer_16bit(uint16_t dout)
 }
 
 /*
- * è¿žç»­è¯»å–åŠ é€Ÿåº¦ä¸Žé™€èžºä»ªåŽŸå§‹å€¼
- * æ•°æ®é¡ºåºï¼šax ay az gx gy gz
+ * Á¬Ðø¶ÁÈ¡¼ÓËÙ¶ÈÓëÍÓÂÝÒÇÔ­Ê¼Öµ
+ * Êý¾ÝË³Ðò£ºax ay az gx gy gz
  */
 static void ICM42688_Read_Burst(ICM42688_RAW_DATA *raw)
 {
@@ -102,7 +102,7 @@ static void ICM42688_Read_Burst(ICM42688_RAW_DATA *raw)
     raw->gyro_z_lsb = (int16)(((uint16)rx_buf[11] << 8) | rx_buf[12]);
 }
 
-/* è¯»å–å¹¶æ ¡éªŒèŠ¯ç‰‡ ID */
+/* ¶ÁÈ¡²¢Ð£ÑéÐ¾Æ¬ ID */
 static void Find_ICM42688(void)
 {
     SPI_Transfer_16bit(WHO_AM_I);
@@ -115,7 +115,7 @@ static void Find_ICM42688(void)
     }
 }
 
-/* é…ç½®é™€èžºä»ªé‡ç¨‹ä¸Žè¾“å‡ºé€ŸçŽ‡ */
+/* ÅäÖÃÍÓÂÝÒÇÁ¿³ÌÓëÊä³öËÙÂÊ */
 static void ICM42688_SET_GYRO(GYRO_FSR gyro_fsr, GYRO_ODR gyro_odr)
 {
     uint8 WRITE_GYRO_CONFIG0 = 0x4F;
@@ -209,7 +209,7 @@ static void ICM42688_SET_GYRO(GYRO_FSR gyro_fsr, GYRO_ODR gyro_odr)
     }
 }
 
-/* é…ç½®åŠ é€Ÿåº¦è®¡é‡ç¨‹ä¸Žè¾“å‡ºé€ŸçŽ‡ */
+/* ÅäÖÃ¼ÓËÙ¶È¼ÆÁ¿³ÌÓëÊä³öËÙÂÊ */
 static void ICM42688_SET_ACC(ACC_FSR acc_fsr, ACC_ODR acc_odr)
 {
     uint8 WRITE_ACCEL_CONFIG0 = 0x50;
@@ -288,15 +288,15 @@ static void ICM42688_SET_ACC(ACC_FSR acc_fsr, ACC_ODR acc_odr)
 }
 
 /**
- * å‡½æ•°åŠŸèƒ½: é…ç½® 1kHz é‡‡æ ·ä½¿ç”¨çš„é™€èžºä»ªä¸ŽåŠ é€Ÿåº¦è®¡æŠ—æ··å æ»¤æ³¢å™¨ã€‚
- * è¾“å…¥å‚æ•°: æ— ã€‚
- * è¿”å›žå€¼: æ— ã€‚
+ * º¯Êý¹¦ÄÜ: ÅäÖÃ 1kHz ²ÉÑùÊ¹ÓÃµÄÍÓÂÝÒÇÓë¼ÓËÙ¶È¼Æ¿¹»ìµþÂË²¨Æ÷¡£
+ * ÊäÈë²ÎÊý: ÎÞ¡£
+ * ·µ»ØÖµ: ÎÞ¡£
  */
 static void ICM42688_SET_AAF(void)
 {
     uint8 gyro_config_static2;
 
-    /* Bank1ï¼šé™€èžºä»ª AAF 258Hzï¼Œå¹¶å¯ç”¨èŠ¯ç‰‡æœºæ¢°è°æŒ¯é™·æ³¢ã€‚ */
+    /* Bank1£ºÍÓÂÝÒÇ AAF 258Hz£¬²¢ÆôÓÃÐ¾Æ¬»úÐµÐ³ÕñÏÝ²¨¡£ */
     SPI_Transfer_16bit(0x7601U);
     gyro_config_static2 = (uint8)SPI_Transfer_16bit(0x8B00U);
     SPI_Transfer_16bit((uint16_t)(0x0B00U | (gyro_config_static2 & 0xFCU)));
@@ -304,7 +304,7 @@ static void ICM42688_SET_AAF(void)
     SPI_Transfer_16bit(0x0D24U);
     SPI_Transfer_16bit(0x0EA0U);
 
-    /* Bank2ï¼šåŠ é€Ÿåº¦è®¡ AAF 213Hzã€‚ */
+    /* Bank2£º¼ÓËÙ¶È¼Æ AAF 213Hz¡£ */
     SPI_Transfer_16bit(0x7602U);
     SPI_Transfer_16bit(0x030AU);
     SPI_Transfer_16bit(0x0419U);
@@ -313,7 +313,7 @@ static void ICM42688_SET_AAF(void)
     SPI_Transfer_16bit(0x7600U);
 }
 
-/* é…ç½®é™€èžºä»ª/åŠ é€Ÿåº¦è®¡æ•°å­—æ»¤æ³¢å™¨ */
+/* ÅäÖÃÍÓÂÝÒÇ/¼ÓËÙ¶È¼ÆÊý×ÖÂË²¨Æ÷ */
 static void ICM42688_SET_FILTER(Bandwidth_Factor Gyro_Bandwidth_Factor,
                                 Filter_Order Gyro_Filter_Order,
                                 Bandwidth_Factor Acc_Bandwidth_Factor,
@@ -425,14 +425,14 @@ static void ICM42688_SET_FILTER(Bandwidth_Factor Gyro_Bandwidth_Factor,
     SPI_Transfer_16bit(((uint16)WRITE_ACCEL_CONFIG1 << 8 | Acc_Filter_Ord_Config));
 }
 
-/* å¤ä½ ICM42688ï¼ˆè½¯å¤ä½è·¯å¾„ï¼‰ */
+/* ¸´Î» ICM42688£¨Èí¸´Î»Â·¾¶£© */
 static void Rest_ICM42688(void)
 {
     uint8 WRITE_PWR_MGMT0 = 0X4E;
     SPI_Transfer_16bit(((uint16)WRITE_PWR_MGMT0 << 8 | 0X00));
 }
 
-/* è¿›å…¥ Low Noise æ¨¡å¼ï¼ˆé™€èžºä»ª + åŠ é€Ÿåº¦è®¡ï¼‰ */
+/* ½øÈë Low Noise Ä£Ê½£¨ÍÓÂÝÒÇ + ¼ÓËÙ¶È¼Æ£© */
 static void Set_ICM42688_LN_Mode(void)
 {
     uint8 WRITE_PWR_MGMT0 = 0X4E;
@@ -440,10 +440,10 @@ static void Set_ICM42688_LN_Mode(void)
 }
 
 /*
- * èŽ·å–ä¸€æ¬¡ä¼ æ„Ÿå™¨æ•°æ®
- * - é™€èžºä»ªå•ä½ï¼šdps
- * - åŠ é€Ÿåº¦å•ä½ï¼šg
- * - è‹¥å·²å®Œæˆé›¶åæ ‡å®šï¼Œåˆ™è‡ªåŠ¨æ‰£é™¤é™€èžºä»ªé›¶å
+ * »ñÈ¡Ò»´Î´«¸ÐÆ÷Êý¾Ý
+ * - ÍÓÂÝÒÇµ¥Î»£ºdps
+ * - ¼ÓËÙ¶Èµ¥Î»£ºg
+ * - ÈôÒÑÍê³ÉÁãÆ«±ê¶¨£¬Ôò×Ô¶¯¿Û³ýÍÓÂÝÒÇÁãÆ«
  */
 void ICM42688_Get_Data(void)
 {
@@ -481,9 +481,9 @@ void ICM42688_Get_Data(void)
 }
 
 /*
- * é™€èžºä»ªé™æ€é›¶åæ ‡å®š
- * - æ ‡å®šæœŸé—´éœ€ä¿æŒè®¾å¤‡é™æ­¢
- * - times æœ€å°é™åˆ¶ä¸º 500
+ * ÍÓÂÝÒÇ¾²Ì¬ÁãÆ«±ê¶¨
+ * - ±ê¶¨ÆÚ¼äÐè±£³ÖÉè±¸¾²Ö¹
+ * - times ×îÐ¡ÏÞÖÆÎª 500
  */
 void ICM42688_Bias_Init(uint32 times)
 {
@@ -545,7 +545,7 @@ void ICM42688_GetGyroBiasDps(float *bx, float *by, float *bz, uint8 *enable)
     }
 }
 
-/* åˆå§‹åŒ– ICM42688 å¹¶åŠ è½½é…ç½® */
+/* ³õÊ¼»¯ ICM42688 ²¢¼ÓÔØÅäÖÃ */
 void ICM42688_Init(ICM42688_CONFIG_STRUCT *ICM42688_CONFIG)
 {
     ICM42688_SPI_HardWare_Init();
@@ -565,7 +565,7 @@ void ICM42688_Init(ICM42688_CONFIG_STRUCT *ICM42688_CONFIG)
     Set_ICM42688_LN_Mode();
     system_delay_ms(500);
 
-    /* æ¸…é›¶è½¯ä»¶ä¾§é›¶åçŠ¶æ€ */
+    /* ÇåÁãÈí¼þ²àÁãÆ«×´Ì¬ */
     ICM42688_Bias_Init_Flag = 0;
     ICM42688_Bias_gyro_x = 0;
     ICM42688_Bias_gyro_y = 0;

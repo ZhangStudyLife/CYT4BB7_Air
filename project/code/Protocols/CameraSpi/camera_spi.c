@@ -48,12 +48,12 @@
 #define CAMERA_SPI_IRQ_SRC                  scb_6_interrupt_IRQn
 #define CAMERA_SPI_CPU_IRQ                  CPUIntIdx5_IRQn
 #define CAMERA_SPI_PERI_FREQ                CY_INITIAL_TARGET_PERI_FREQ
-/* ä¸‹è¡Œå­—èŠ‚8å¤ç”¨ä¸ºå‚æ•°å†™é”ï¼š0å…è®¸SETï¼Œ1ç¦æ­¢SETï¼›GETä¸å—å½±å“ã€‚ */
+/* ÏÂĞĞ×Ö½Ú8¸´ÓÃÎª²ÎÊıĞ´Ëø£º0ÔÊĞíSET£¬1½ûÖ¹SET£»GET²»ÊÜÓ°Ïì¡£ */
 #define CAMERA_SPI_DOWNLINK_PARAM_WRITE_LOCK_OFFSET (8U)
 #define CAMERA_SPI_PARAM_WRITE_ALLOWED      (0U)
 #define CAMERA_SPI_PARAM_WRITE_LOCKED       (1U)
 
-/* 2BL3å‚æ•°å‘½ä»¤ä¸ACKåè®®å›ºå®šå­—æ®µã€‚ */
+/* 2BL3²ÎÊıÃüÁîÓëACKĞ­Òé¹Ì¶¨×Ö¶Î¡£ */
 #define CAMERA_SPI_PARAM_MAGIC              (0xC3U)
 #define CAMERA_SPI_PARAM_ACK_MAGIC          (0x3CU)
 #define CAMERA_SPI_PARAM_VERSION            (1U)
@@ -65,7 +65,7 @@
 #define CAMERA_SPI_PARAM_EXP_MAX_CYCLES \
     ((CAMERA_SPI_PARAM_EXP_TIMEOUT_US + CAMERA_SPI_UPDATE_PERIOD_US - 1U) / \
      CAMERA_SPI_UPDATE_PERIOD_US)
-/* GETä¸ä¸€è‡´æ—¶ä½¿ç”¨ä¸åŒäº‹åŠ¡å·å¤è¯»ï¼Œé¿å…2BL3è¿”å›åŒä¸€äº‹åŠ¡çš„ç¼“å­˜ACKã€‚ */
+/* GET²»Ò»ÖÂÊ±Ê¹ÓÃ²»Í¬ÊÂÎñºÅ¸´¶Á£¬±ÜÃâ2BL3·µ»ØÍ¬Ò»ÊÂÎñµÄ»º´æACK¡£ */
 #define CAMERA_SPI_PARAM_GET_MISMATCH_ATTEMPTS (3U)
 #define CAMERA_SPI_PARAM_PREFLIGHT_TXN_MASK (0x40000000UL)
 #define CAMERA_SPI_PARAM_ROLLBACK_TXN_MASK  (0x80000000UL)
@@ -196,9 +196,9 @@ static uint8 s_initialized;
 static uint8 s_active;
 static uint8 s_active_board;
 static uint8 s_flight_state;
-/* æ ¸0åŒæ­¥çš„å‚æ•°å†™é”ï¼Œ1è¡¨ç¤ºå½“å‰ç¦æ­¢2BL3å‚æ•°SETã€‚ */
+/* ºË0Í¬²½µÄ²ÎÊıĞ´Ëø£¬1±íÊ¾µ±Ç°½ûÖ¹2BL3²ÎÊıSET¡£ */
 static uint8 s_param_write_locked;
-/* æ ¸0åŒæ­¥è¿‡æ¥çš„ 2BL3 å›¾ä¼ å‘é€æ¨¡å¼ */
+/* ºË0Í¬²½¹ıÀ´µÄ 2BL3 Í¼´«·¢ËÍÄ£Ê½ */
 static uint8 s_image_send_enable;
 static uint8 s_bl3_screen_enable;
 static uint8 s_bl3_horizon_enable;
@@ -208,13 +208,13 @@ static uint8 s_cycle_pending_mask;
 static uint32 s_active_poll_count;
 static uint32 s_active_start_cycles;
 static uint32 s_transfer_timeout_cycles;
-static uint8 s_snapshot_fresh_mask;                                              /* å°šæœªè¢«å¿«ç…§æ¶ˆè´¹çš„çœŸå®æ–°ç»“æœæ©ç ã€‚ */
-static uint8 s_snapshot_changed_mask;                                            /* å°šæœªè¢«å¿«ç…§æ¶ˆè´¹çš„ç»“æœçŠ¶æ€å˜åŒ–æ©ç ã€‚ */
+static uint8 s_snapshot_fresh_mask;                                              /* ÉĞÎ´±»¿ìÕÕÏû·ÑµÄÕæÊµĞÂ½á¹ûÑÚÂë¡£ */
+static uint8 s_snapshot_changed_mask;                                            /* ÉĞÎ´±»¿ìÕÕÏû·ÑµÄ½á¹û×´Ì¬±ä»¯ÑÚÂë¡£ */
 static uint32 s_log_seq;
 static ipc_attitude_data_t s_attitude;
-/* ä¸¤é¢—2BL3å¹¿æ’­å‚æ•°äº‹åŠ¡çŠ¶æ€ï¼Œä»…ç”±æ ¸1çš„100Hzä¸»å¾ªç¯è®¿é—®ã€‚ */
+/* Á½¿Å2BL3¹ã²¥²ÎÊıÊÂÎñ×´Ì¬£¬½öÓÉºË1µÄ100HzÖ÷Ñ­»··ÃÎÊ¡£ */
 static camera_spi_param_transaction_t s_param_transaction;
-/* æœ€è¿‘ä¸€æ¬¡å·²è¢«ä¸Šå±‚æ¶ˆè´¹çš„æˆåŠŸSETå›æ»šå¿«ç…§ï¼Œç”¨äºå¤„ç†è¿Ÿåˆ°å–æ¶ˆã€‚ */
+/* ×î½üÒ»´ÎÒÑ±»ÉÏ²ãÏû·ÑµÄ³É¹¦SET»Ø¹ö¿ìÕÕ£¬ÓÃÓÚ´¦Àí³Ùµ½È¡Ïû¡£ */
 static camera_spi_param_rollback_cache_t s_param_rollback_cache;
 
 static void camera_spi_write_u16_be(uint8 *buffer, uint16 value)
@@ -502,7 +502,7 @@ static void camera_spi_clear_board_targets(camera_spi_board_state_t *board)
     }
 }
 
-/* æ¸…é™¤å¤±å»æ–°é²œåº¦çš„å›¾åƒç›®æ ‡ï¼Œé¿å…æ§åˆ¶å±‚ç»§ç»­ä½¿ç”¨æ—§æ•°æ®ã€‚ */
+/* Çå³ıÊ§È¥ĞÂÏÊ¶ÈµÄÍ¼ÏñÄ¿±ê£¬±ÜÃâ¿ØÖÆ²ã¼ÌĞøÊ¹ÓÃ¾ÉÊı¾İ¡£ */
 static void camera_spi_invalidate_board_targets(camera_spi_board_state_t *board)
 {
     if(board == NULL)
@@ -515,7 +515,7 @@ static void camera_spi_invalidate_board_targets(camera_spi_board_state_t *board)
     camera_spi_clear_board_targets(board);
 }
 
-/* æ¯ä¸ªå›ºå®šé‡‡é›†å‘¨æœŸæ›´æ–°é“¾è·¯å’Œå›¾åƒæ–°é²œåº¦ï¼Œè¶…æ—¶ååªéš”ç¦»å¯¹åº”å›¾åƒæ¿ã€‚ */
+/* Ã¿¸ö¹Ì¶¨²É¼¯ÖÜÆÚ¸üĞÂÁ´Â·ºÍÍ¼ÏñĞÂÏÊ¶È£¬³¬Ê±ºóÖ»¸ôÀë¶ÔÓ¦Í¼Ïñ°å¡£ */
 static void camera_spi_update_freshness(void)
 {
     uint8 board_id;
@@ -623,7 +623,7 @@ static void camera_spi_parse_image_payload(uint8 board_id, const uint8 *data)
     }
 }
 
-/* è§£æ2BL3ä¸»å¾ªç¯åº”ç”¨å‚æ•°åç”Ÿæˆçš„20å­—èŠ‚ACKã€‚ */
+/* ½âÎö2BL3Ö÷Ñ­»·Ó¦ÓÃ²ÎÊıºóÉú³ÉµÄ20×Ö½ÚACK¡£ */
 static uint8 camera_spi_parse_param_ack(uint8 board_id, const uint8 *data)
 {
     uint8 board_mask = (uint8)(1U << board_id);
@@ -780,7 +780,7 @@ static uint8 camera_spi_parse_response(uint8 board_id)
     return CAMERA_SPI_ERR_OK;
 }
 
-/* å°†ä¸¤æ¿å‚æ•°äº‹åŠ¡ç½®ä¸ºå®Œæˆæ€ï¼Œç­‰å¾…æ ¸1 IPCå±‚è¯»å–ã€‚ */
+/* ½«Á½°å²ÎÊıÊÂÎñÖÃÎªÍê³ÉÌ¬£¬µÈ´ıºË1 IPC²ã¶ÁÈ¡¡£ */
 static void camera_spi_param_complete(uint8 status, uint32 actual_bits)
 {
     s_param_transaction.final_status =
@@ -790,7 +790,7 @@ static void camera_spi_param_complete(uint8 status, uint32 actual_bits)
     s_param_transaction.state = CAMERA_SPI_PARAM_COMPLETE;
 }
 
-/* è¿›å…¥å›æ»šæ€ï¼Œå‘å·²æˆåŠŸæˆ–å°šæœªç¡®è®¤å†™å…¥ç»“æœçš„æ¿å‘é€å„è‡ªçœŸå®æ—§å€¼ã€‚ */
+/* ½øÈë»Ø¹öÌ¬£¬ÏòÒÑ³É¹¦»òÉĞÎ´È·ÈÏĞ´Èë½á¹ûµÄ°å·¢ËÍ¸÷×ÔÕæÊµ¾ÉÖµ¡£ */
 static void camera_spi_param_start_rollback(uint8 board_mask)
 {
     s_param_transaction.state = CAMERA_SPI_PARAM_ROLLBACK;
@@ -802,8 +802,8 @@ static void camera_spi_param_start_rollback(uint8 board_mask)
     s_param_transaction.board_status[1] = IPC_REMOTE_PARAM_STATUS_TIMEOUT;
 }
 
-/* æ¯è½®ä¸¤æ¿SPIç»“æŸåæ±‡æ€»ACKï¼›æ™®é€šå‚æ•°ç­‰å¾…12å‘¨æœŸï¼Œæ›å…‰å’ŒæŒä¹…åŒ–å‘½ä»¤ç­‰å¾…80å‘¨æœŸã€‚ */
-/* æœªæ”¶åˆ°ACKçš„æ¿æ¯è½®éƒ½è¯·æ±‚ACKï¼Œé¿å…ä»æœºä¸»å¾ªç¯é”™è¿‡é¦–ä¸ªè¯·æ±‚å¸§ã€‚ */
+/* Ã¿ÂÖÁ½°åSPI½áÊøºó»ã×ÜACK£»ÆÕÍ¨²ÎÊıµÈ´ı12ÖÜÆÚ£¬ÆØ¹âºÍ³Ö¾Ã»¯ÃüÁîµÈ´ı80ÖÜÆÚ¡£ */
+/* Î´ÊÕµ½ACKµÄ°åÃ¿ÂÖ¶¼ÇëÇóACK£¬±ÜÃâ´Ó»úÖ÷Ñ­»·´í¹ıÊ×¸öÇëÇóÖ¡¡£ */
 static void camera_spi_param_schedule_next(void)
 {
     uint8 pending_mask;
@@ -1121,7 +1121,7 @@ static void camera_spi_start_transfer(uint8 board_id)
     }
 }
 
-/* ä¸­æ­¢å½“å‰ä¼ è¾“å¹¶å¤ä½SCBï¼Œå•æ¿å¼‚å¸¸ä¸å¾—é˜»å¡æ ¸å¿ƒ1ä¸»å¾ªç¯ã€‚ */
+/* ÖĞÖ¹µ±Ç°´«Êä²¢¸´Î»SCB£¬µ¥°åÒì³£²»µÃ×èÈûºËĞÄ1Ö÷Ñ­»·¡£ */
 static void camera_spi_abort_active(uint8 error)
 {
     if(s_active == 0U)
@@ -1138,7 +1138,7 @@ static void camera_spi_abort_active(uint8 error)
     s_active = 0U;
 }
 
-/* ä½¿ç”¨DWTçœŸå®æ—¶é—´å’Œè½®è¯¢æ¬¡æ•°åŒé‡åˆ¤æ–­ä¼ è¾“è¶…æ—¶ã€‚ */
+/* Ê¹ÓÃDWTÕæÊµÊ±¼äºÍÂÖÑ¯´ÎÊıË«ÖØÅĞ¶Ï´«Êä³¬Ê±¡£ */
 static uint8 camera_spi_active_timed_out(void)
 {
     uint32 elapsed_cycles = DWT->CYCCNT - s_active_start_cycles;
@@ -1153,7 +1153,7 @@ static uint8 camera_spi_active_timed_out(void)
     return 0U;
 }
 
-/* æ¨è¿›å½“å‰å¼‚æ­¥ä¼ è¾“ï¼›æœªå®Œæˆæ—¶ç«‹å³è¿”å›ï¼Œä¸åœ¨100Hzä»»åŠ¡å†…å¿™ç­‰ã€‚ */
+/* ÍÆ½øµ±Ç°Òì²½´«Êä£»Î´Íê³ÉÊ±Á¢¼´·µ»Ø£¬²»ÔÚ100HzÈÎÎñÄÚÃ¦µÈ¡£ */
 static void camera_spi_finish_active(void)
 {
     uint32 status;
@@ -1225,7 +1225,7 @@ static void camera_spi_publish_log(void)
     ipc_camera_spi_log_publish(&log);
 }
 
-/* å®Œæˆä¸€è½®ä¸¤æ¿é‡‡é›†å¹¶ç»Ÿä¸€æ¨è¿›å‚æ•°äº‹åŠ¡åŠçŠ¶æ€å‘å¸ƒã€‚ */
+/* Íê³ÉÒ»ÂÖÁ½°å²É¼¯²¢Í³Ò»ÍÆ½ø²ÎÊıÊÂÎñ¼°×´Ì¬·¢²¼¡£ */
 static void camera_spi_complete_cycle(void)
 {
     s_cycle_active = 0U;
@@ -1235,8 +1235,8 @@ static void camera_spi_complete_cycle(void)
 }
 
 /*
- * éé˜»å¡æ¨è¿›Camera SPIçŠ¶æ€æœºã€‚
- * è¿”å›1è¡¨ç¤ºä»æœ‰ç¡¬ä»¶ä¼ è¾“å¾…å®Œæˆï¼Œè¿”å›0è¡¨ç¤ºå½“å‰è½®æ¬¡å·²ç»æ”¶æ•›ã€‚
+ * ·Ç×èÈûÍÆ½øCamera SPI×´Ì¬»ú¡£
+ * ·µ»Ø1±íÊ¾ÈÔÓĞÓ²¼ş´«Êä´ıÍê³É£¬·µ»Ø0±íÊ¾µ±Ç°ÂÖ´ÎÒÑ¾­ÊÕÁ²¡£
  */
 uint8 CameraSpi_Service(void)
 {
@@ -1332,7 +1332,7 @@ void CameraSpi_Init(void)
     camera_spi_init_scb();
     camera_spi_init_irq();
 
-    /* ä½¿ç”¨DWTå‘¨æœŸè®¡æ•°å™¨æä¾›ä¸ä¾èµ–ä¸»å¾ªç¯é€Ÿåº¦çš„SPIç¡¬è¶…æ—¶ã€‚ */
+    /* Ê¹ÓÃDWTÖÜÆÚ¼ÆÊıÆ÷Ìá¹©²»ÒÀÀµÖ÷Ñ­»·ËÙ¶ÈµÄSPIÓ²³¬Ê±¡£ */
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
     DWT->LAR = CAMERA_SPI_DWT_UNLOCK_KEY;
     DWT->CYCCNT = 0U;
@@ -1370,9 +1370,9 @@ void CameraSpi_Update(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½: å°†ä¸¤å—å›¾åƒæ¿çš„æœ€æ–°ç»“æœå¤åˆ¶åˆ°ä¸‰æ‘„æ•°ç»„ï¼Œå¹¶æ¶ˆè´¹æœ¬è½®ç»“æœå˜åŒ–æ ‡å¿—ã€‚
- * è¾“å…¥å‚æ•°: cameraä¸ºä¸‰æ‘„ç»“æœæ•°ç»„ï¼›fresh_maskè¾“å‡ºçœŸå®æ–°ç®—æ³•ç»“æœå¯¹åº”çš„æ‘„åƒå¤´ä½æ©ç ã€‚
- * è¿”å›å€¼: æœ¬è½®ç»“æœå†…å®¹å‘ç”Ÿå˜åŒ–çš„æ‘„åƒå¤´ä½æ©ç ï¼ŒåŒ…å«æ–°ç»“æœå’Œè¶…æ—¶æ¸…ç©ºã€‚
+ * º¯Êı¹¦ÄÜ: ½«Á½¿éÍ¼Ïñ°åµÄ×îĞÂ½á¹û¸´ÖÆµ½ÈıÉãÊı×é£¬²¢Ïû·Ñ±¾ÂÖ½á¹û±ä»¯±êÖ¾¡£
+ * ÊäÈë²ÎÊı: cameraÎªÈıÉã½á¹ûÊı×é£»fresh_maskÊä³öÕæÊµĞÂËã·¨½á¹û¶ÔÓ¦µÄÉãÏñÍ·Î»ÑÚÂë¡£
+ * ·µ»ØÖµ: ±¾ÂÖ½á¹ûÄÚÈİ·¢Éú±ä»¯µÄÉãÏñÍ·Î»ÑÚÂë£¬°üº¬ĞÂ½á¹ûºÍ³¬Ê±Çå¿Õ¡£
  */
 uint8 CameraSpi_GetSnapshot(struct image_data camera[IMAGE_CAMERA_COUNT],
                             uint8 *fresh_mask)
@@ -1420,7 +1420,7 @@ uint8 CameraSpi_RemoteParamBoardsOnline(void)
             (s_boards[1].online != 0U)) ? 1U : 0U;
 }
 
-/* å¯åŠ¨åŒæ—¶å‘å¾€ä¸¤é¢—2BL3çš„SET/GETå‚æ•°äº‹åŠ¡ã€‚ */
+/* Æô¶¯Í¬Ê±·¢ÍùÁ½¿Å2BL3µÄSET/GET²ÎÊıÊÂÎñ¡£ */
 uint8 CameraSpi_RemoteParamStart(uint8 op,
                                  uint8 type,
                                  uint16 param_id,
@@ -1459,7 +1459,7 @@ uint8 CameraSpi_RemoteParamStart(uint8 op,
     return 1U;
 }
 
-/* è¯»å–å¹¶æ¶ˆè´¹ä¸¤æ¿å‚æ•°äº‹åŠ¡æœ€ç»ˆç»“æœã€‚ */
+/* ¶ÁÈ¡²¢Ïû·ÑÁ½°å²ÎÊıÊÂÎñ×îÖÕ½á¹û¡£ */
 uint8 CameraSpi_RemoteParamTakeResult(camera_spi_remote_param_result_t *result)
 {
     if((result == NULL) || (s_param_transaction.state != CAMERA_SPI_PARAM_COMPLETE))
@@ -1487,7 +1487,7 @@ uint8 CameraSpi_RemoteParamTakeResult(camera_spi_remote_param_result_t *result)
     return 1U;
 }
 
-/* å–æ¶ˆæŒ‡å®šäº‹åŠ¡ï¼›å·²ç»ä¸‹å‘SETæ—¶å¿…é¡»å…ˆæ¢å¤ä¸¤æ¿å„è‡ªçš„çœŸå®æ—§å€¼ã€‚ */
+/* È¡ÏûÖ¸¶¨ÊÂÎñ£»ÒÑ¾­ÏÂ·¢SETÊ±±ØĞëÏÈ»Ö¸´Á½°å¸÷×ÔµÄÕæÊµ¾ÉÖµ¡£ */
 uint8 CameraSpi_RemoteParamCancel(uint32 transaction)
 {
     uint8 rollback_mask;

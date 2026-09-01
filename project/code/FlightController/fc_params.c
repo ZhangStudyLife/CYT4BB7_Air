@@ -1,23 +1,23 @@
 /*****************************************************************************
- * æ–‡ä»¶: fc_params.c
- * æ¨¡å—: é£æ§ - å‚æ•°ç®¡ç†å®ç°
- * èŒè´£: ç®¡ç†é»˜è®¤å‚æ•°ã€è¿è¡Œæ—¶å‚æ•°ä»¥åŠ Flash æŒä¹…åŒ–
+ * ÎÄ¼ş: fc_params.c
+ * Ä£¿é: ·É¿Ø - ²ÎÊı¹ÜÀíÊµÏÖ
+ * Ö°Ôğ: ¹ÜÀíÄ¬ÈÏ²ÎÊı¡¢ÔËĞĞÊ±²ÎÊıÒÔ¼° Flash ³Ö¾Ã»¯
  *****************************************************************************/
 
 #include "fc_params.h"
 
 #include <string.h>
 
-/* é£æ§å‚æ•°å…¨å±€å®ä¾‹ï¼šé›†ä¸­ä¿å­˜æ§åˆ¶å‘¨æœŸã€æ²¹é—¨åŸºå‡†å’Œå„æ§åˆ¶ç¯ PID å‚æ•° */
+/* ·É¿Ø²ÎÊıÈ«¾ÖÊµÀı£º¼¯ÖĞ±£´æ¿ØÖÆÖÜÆÚ¡¢ÓÍÃÅ»ù×¼ºÍ¸÷¿ØÖÆ»· PID ²ÎÊı */
 fc_params_t g_fc_params;
-/* 2BL3 å›¾ä¼ å‘é€å¼€å…³ï¼š0=å…³é—­ï¼Œ1=ä»…éé£è¡Œå‘é€ï¼Œ2=å§‹ç»ˆå‘é€ */
+/* 2BL3 Í¼´«·¢ËÍ¿ª¹Ø£º0=¹Ø±Õ£¬1=½ö·Ç·ÉĞĞ·¢ËÍ£¬2=Ê¼ÖÕ·¢ËÍ */
 volatile uint8_t g_2bl3_image_send_enable = 2U;
 /*
- * å‡½æ•°å: fc_params_fill_defaults
- * åŠŸèƒ½: å‘ç›®æ ‡å‚æ•°ç»“æ„ä½“å†™å…¥ç¼–è¯‘æœŸé»˜è®¤å€¼
- * è¾“å…¥å‚æ•°:
- *   params - ç›®æ ‡å‚æ•°ç»“æ„ä½“æŒ‡é’ˆ
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: fc_params_fill_defaults
+ * ¹¦ÄÜ: ÏòÄ¿±ê²ÎÊı½á¹¹ÌåĞ´Èë±àÒëÆÚÄ¬ÈÏÖµ
+ * ÊäÈë²ÎÊı:
+ *   params - Ä¿±ê²ÎÊı½á¹¹ÌåÖ¸Õë
+ * ·µ»ØÖµ: ÎŞ
  */
 static void fc_params_fill_defaults(fc_params_t *params)
 {
@@ -28,7 +28,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
 
     memset(params, 0, sizeof(*params));
 
-    /* ===== æ§åˆ¶å‘¨æœŸå‚æ•° ===== */
+    /* ===== ¿ØÖÆÖÜÆÚ²ÎÊı ===== */
     params->gyro_dt = 0.001f;   /* 1kHz */
     params->angle_dt = 0.002f;  /* 500Hz */
     params->pos_xy_dt = 0.02f;  /* 50Hz */
@@ -36,19 +36,19 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->vel_xy_dt = 0.01f;  /* 100Hz */
     params->vel_z_dt = 0.01f;   /* 100Hz */
 
-    /* ===== æ²¹é—¨ä¸æœºæ¢°é…å¹³å‚æ•° ===== */
-    params->base_throttle = 4000;         /* æ‚¬åœæ²¹é—¨ */
-    params->roll_mech_trim_deg = 0.5f;    /* Roll æœºæ¢°é…å¹³è§’ */
-    params->pitch_mech_trim_deg = -1.5f;   /* Pitch æœºæ¢°é…å¹³è§’ */
+    /* ===== ÓÍÃÅÓë»úĞµÅäÆ½²ÎÊı ===== */
+    params->base_throttle = 4000;         /* ĞüÍ£ÓÍÃÅ */
+    params->roll_mech_trim_deg = 0.5f;    /* Roll »úĞµÅäÆ½½Ç */
+    params->pitch_mech_trim_deg = -1.5f;   /* Pitch »úĞµÅäÆ½½Ç */
 
-    /* ===== Roll/Pitch å‰é¦ˆä¸è¾“å‡ºæ»¤æ³¢å‚æ•° ===== */
+    /* ===== Roll/Pitch Ç°À¡ÓëÊä³öÂË²¨²ÎÊı ===== */
     params->gyro_ff_smoothing_ms = 8.0f;
     params->gyro_ff_limit = 200.0f;
     params->angle_ff_smoothing_ms = 10.0f;
     params->angle_ff_limit_dps = 150.0f;
     params->angle_output_lpf_hz = 50.0f;
 
-    /* ===== Roll è½´è§’é€Ÿåº¦ç¯å‚æ•° ===== */
+    /* ===== Roll Öá½ÇËÙ¶È»·²ÎÊı ===== */
     params->roll_gyro_kp = 6.8f;
     params->roll_gyro_ki = 0.14f;
     params->roll_gyro_kd = 0.020f;
@@ -56,7 +56,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->roll_gyro_i_limit = 2000.0f;
     params->roll_gyro_d_lpf = 60.0f;
 
-    /* ===== Pitch è½´è§’é€Ÿåº¦ç¯å‚æ•° ===== */
+    /* ===== Pitch Öá½ÇËÙ¶È»·²ÎÊı ===== */
     params->pitch_gyro_kp = 6.8f;
     params->pitch_gyro_ki = 0.18f;
     params->pitch_gyro_kd = 0.014f;
@@ -64,7 +64,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pitch_gyro_i_limit = 2000.0f;
     params->pitch_gyro_d_lpf = 60.0f;
 
-    /* ===== Yaw è½´è§’é€Ÿåº¦ç¯å‚æ•° ===== */
+    /* ===== Yaw Öá½ÇËÙ¶È»·²ÎÊı ===== */
     params->yaw_gyro_kp = 13.0f;
     params->yaw_gyro_ki = 4.8f;
     params->yaw_gyro_kd = 0.0f;
@@ -72,7 +72,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->yaw_gyro_i_limit = 2000.0f;
     params->yaw_gyro_d_lpf = 30.0f;
 
-    /* ===== Roll è½´è§’åº¦ç¯å‚æ•° ===== */
+    /* ===== Roll Öá½Ç¶È»·²ÎÊı ===== */
     params->roll_angle_kp = 8.2f;
     params->roll_angle_ki = 0.0f;
     params->roll_angle_kd = 0.0f;
@@ -80,7 +80,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->roll_angle_i_limit = 80.0f;
     params->roll_angle_d_lpf = 15.0f;
 
-    /* ===== Pitch è½´è§’åº¦ç¯å‚æ•° ===== */
+    /* ===== Pitch Öá½Ç¶È»·²ÎÊı ===== */
     params->pitch_angle_kp = 7.5f;
     params->pitch_angle_ki = 0.0f;
     params->pitch_angle_kd = 0.0f;
@@ -88,7 +88,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pitch_angle_i_limit = 80.0f;
     params->pitch_angle_d_lpf = 15.0f;
 
-    /* ===== Yaw è½´è§’åº¦ç¯å‚æ•° ===== */
+    /* ===== Yaw Öá½Ç¶È»·²ÎÊı ===== */
     params->yaw_angle_kp = 3.0f;
     params->yaw_angle_ki = 0.0f;
     params->yaw_angle_kd = 0.0f;
@@ -96,7 +96,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->yaw_angle_i_limit = 0.0f;
     params->yaw_angle_d_lpf = 0.0f;
 
-    /* ===== Z è½´ä½ç½®ç¯å‚æ•° ===== */
+    /* ===== Z ÖáÎ»ÖÃ»·²ÎÊı ===== */
     params->pos_z_kp = 1.6f;
     params->pos_z_ki = 0.0f;
     params->pos_z_kd = 0.0f;
@@ -104,7 +104,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->pos_z_i_limit = 0.0f;
     params->pos_z_d_lpf = 0.0f;
 
-    /* ===== Z è½´é€Ÿåº¦ç¯å‚æ•° ===== */
+    /* ===== Z ÖáËÙ¶È»·²ÎÊı ===== */
     params->vel_z_kp = 600.0f;
     params->vel_z_ki = 60.0f;
     params->vel_z_kd =0.0f;
@@ -112,7 +112,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->vel_z_i_limit = 1000.0f;
     params->vel_z_d_lpf = 0.0f;
 
-    /* ===== æ¨¡å¼ 1 ç›´æ¥å›¾åƒ PD ä¸è§’åº¦å‰é¦ˆå‚æ•° ===== */
+    /* ===== Ä£Ê½ 1 Ö±½ÓÍ¼Ïñ PD Óë½Ç¶ÈÇ°À¡²ÎÊı ===== */
     params->mode1_img_kp = 0.28f;
     params->mode1_img_kd = 0.18f;
     params->mode1_img_d_lpf_hz = 1.0f;
@@ -123,10 +123,10 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode1_car_turn_accel_ff = 3.4f;
     params->mode1_car_turn_accel_lpf_hz = 2.9f;
 
-    /* ===== ä½ç½®ä¼°è®¡å‚æ•° ===== */
+    /* ===== Î»ÖÃ¹À¼Æ²ÎÊı ===== */
     params->pos_est_k_flow = 0.5f;
 
-    /* ===== æ¨¡å¼ 2 ç›´æ¥å›¾åƒ PD ä¸è§’åº¦å‰é¦ˆå‚æ•° ===== */
+    /* ===== Ä£Ê½ 2 Ö±½ÓÍ¼Ïñ PD Óë½Ç¶ÈÇ°À¡²ÎÊı ===== */
     params->mode2_img_kp = 0.28f;
     params->mode2_img_kd = 0.18f;
     params->mode2_img_d_lpf_hz = 1.0f;
@@ -137,7 +137,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode2_car_turn_accel_ff = 3.4f;
     params->mode2_car_turn_accel_lpf_hz = 2.9f;
 
-    /* ===== æ¨¡å¼ 4 ç›´æ¥å›¾åƒ PD ä¸è§’åº¦å‰é¦ˆå‚æ•° ===== */
+    /* ===== Ä£Ê½ 4 Ö±½ÓÍ¼Ïñ PD Óë½Ç¶ÈÇ°À¡²ÎÊı ===== */
     params->mode4_img_kp = 0.28f;
     params->mode4_img_kd = 0.18f;
     params->mode4_img_d_lpf_hz = 1.0f;
@@ -148,7 +148,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode4_car_turn_accel_ff = 3.4f;
     params->mode4_car_turn_accel_lpf_hz = 2.9f;
 
-    /* ===== æ¨¡å¼ 5 ç›´æ¥å›¾åƒ PD ä¸è§’åº¦å‰é¦ˆå‚æ•° ===== */
+    /* ===== Ä£Ê½ 5 Ö±½ÓÍ¼Ïñ PD Óë½Ç¶ÈÇ°À¡²ÎÊı ===== */
     params->mode5_img_kp = 0.28f;
     params->mode5_img_kd = 0.18f;
     params->mode5_img_d_lpf_hz = 1.0f;
@@ -159,7 +159,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode5_car_turn_accel_ff = 3.4f;
     params->mode5_car_turn_accel_lpf_hz = 2.9f;
 
-    /* ===== æ¨¡å¼ 7 é€Ÿåº¦ç¯å‚æ•° ===== */
+    /* ===== Ä£Ê½ 7 ËÙ¶È»·²ÎÊı ===== */
     params->mode7_vel_x_kp = 0.2f;
     params->mode7_vel_x_ki = 0.0f;
     params->mode7_vel_x_kd = 0.0f;
@@ -173,7 +173,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode7_vel_y_i_limit = 3.0f;
     params->mode7_vel_y_d_lpf = 10.0f;
 
-    /* ===== æ¨¡å¼ 8 å›¾åƒä½ç½®ç¯å‚æ•° ===== */
+    /* ===== Ä£Ê½ 8 Í¼ÏñÎ»ÖÃ»·²ÎÊı ===== */
     params->mode8_img_x_kp = 2.4f;
     params->mode8_img_x_ki = 0.0f;
     params->mode8_img_x_kd = 0.0f;
@@ -201,7 +201,7 @@ static void fc_params_fill_defaults(fc_params_t *params)
     params->mode8_kp_car_x = 50.0f;
     params->mode8_kp_car_y = 65.0f;
 
-    /* ===== å„æ¨¡å¼èˆªå‘æ§åˆ¶ ===== */
+    /* ===== ¸÷Ä£Ê½º½Ïò¿ØÖÆ ===== */
     params->yaw_change_mode1 = 0.0f;
     params->yaw_change_mode2 = 0.0f;
     params->yaw_change_mode4 = 0.0f;
@@ -211,10 +211,10 @@ static void fc_params_fill_defaults(fc_params_t *params)
 }
 
 /*
- * å‡½æ•°å: FC_Params_Init
- * åŠŸèƒ½: åˆå§‹åŒ–é£æ§å‚æ•°é»˜è®¤å€¼
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: FC_Params_Init
+ * ¹¦ÄÜ: ³õÊ¼»¯·É¿Ø²ÎÊıÄ¬ÈÏÖµ
+ * ÊäÈë²ÎÊı: ÎŞ
+ * ·µ»ØÖµ: ÎŞ
  */
 void FC_Params_Init(void)
 {

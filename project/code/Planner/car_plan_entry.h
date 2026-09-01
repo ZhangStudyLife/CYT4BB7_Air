@@ -3,30 +3,30 @@
 
 #include "zf_common_typedef.h"
 
-#define CAR_PLAN_COUNT (4U) /* è½¦æ¨¡é€Ÿåº¦è§„åˆ’ç®—æ³•æ•°é‡ã€‚ */
+#define CAR_PLAN_COUNT (4U) /* ³µÄ£ËÙ¶È¹æ»®Ëã·¨ÊıÁ¿¡£ */
 
 typedef struct
 {
     uint8 valid;
-    float target_strafe_mps; /* è½¦ä½“å³å‘ç›®æ ‡é€Ÿåº¦ï¼Œå•ä½m/sã€‚ */
-    float target_forward_mps; /* è½¦ä½“å‰å‘ç›®æ ‡é€Ÿåº¦ï¼Œå•ä½m/sã€‚ */
+    float target_strafe_mps; /* ³µÌåÓÒÏòÄ¿±êËÙ¶È£¬µ¥Î»m/s¡£ */
+    float target_forward_mps; /* ³µÌåÇ°ÏòÄ¿±êËÙ¶È£¬µ¥Î»m/s¡£ */
 } car_plan_result_t;
 
-extern float Car_Speed; /* è½¦æ¨¡å¸¸è§„è§„åˆ’é€Ÿåº¦ï¼Œå•ä½m/sï¼Œå¯ç”±è½¦æœºé€šè¿‡AirCommä¿®æ”¹ã€‚ */
-extern float Car_Speed_Fast; /* è½¦æ¨¡å¿«é€Ÿè§„åˆ’é€Ÿåº¦ï¼Œå•ä½m/sï¼Œå¯ç”±è½¦æœºé€šè¿‡AirCommä¿®æ”¹ã€‚ */
-extern int32 Car_Plan_Mode; /* ä¸‹å‘è½¦æ¨¡çš„è§„åˆ’ç®—æ³•ç¼–å·ï¼ŒèŒƒå›´1è‡³4ã€‚ */
+extern float Car_Speed; /* ³µÄ£³£¹æ¹æ»®ËÙ¶È£¬µ¥Î»m/s£¬¿ÉÓÉ³µ»úÍ¨¹ıAirCommĞŞ¸Ä¡£ */
+extern float Car_Speed_Fast; /* ³µÄ£¿ìËÙ¹æ»®ËÙ¶È£¬µ¥Î»m/s£¬¿ÉÓÉ³µ»úÍ¨¹ıAirCommĞŞ¸Ä¡£ */
+extern int32 Car_Plan_Mode; /* ÏÂ·¢³µÄ£µÄ¹æ»®Ëã·¨±àºÅ£¬·¶Î§1ÖÁ4¡£ */
 
 /**
- * @brief å¤ä½å››å¥—è½¦æ¨¡é€Ÿåº¦è§„åˆ’ç®—æ³•åŠå…¶è¾“å‡ºç»“æœã€‚
- * @param æ— ã€‚
- * @return æ— ã€‚
+ * @brief ¸´Î»ËÄÌ×³µÄ£ËÙ¶È¹æ»®Ëã·¨¼°ÆäÊä³ö½á¹û¡£
+ * @param ÎŞ¡£
+ * @return ÎŞ¡£
  */
 void CarPlanEntry_Reset(void);
 
 /**
- * @brief ä¾æ¬¡è¿è¡Œå››å¥—è§„åˆ’ç®—æ³•å¹¶è¾“å‡ºå½“å‰é€‰ä¸­ç®—æ³•çš„ç»“æœã€‚
- * @param result å½“å‰é€‰ä¸­ç®—æ³•çš„é€Ÿåº¦è§„åˆ’ç»“æœï¼›å…è®¸ä¼ å…¥ç©ºæŒ‡é’ˆã€‚
- * @return æ— ã€‚
+ * @brief ÒÀ´ÎÔËĞĞËÄÌ×¹æ»®Ëã·¨²¢Êä³öµ±Ç°Ñ¡ÖĞËã·¨µÄ½á¹û¡£
+ * @param result µ±Ç°Ñ¡ÖĞËã·¨µÄËÙ¶È¹æ»®½á¹û£»ÔÊĞí´«Èë¿ÕÖ¸Õë¡£
+ * @return ÎŞ¡£
  */
 void CarPlanEntry_Update(car_plan_result_t *result);
 

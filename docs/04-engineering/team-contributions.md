@@ -1,19 +1,19 @@
-# 团队成员与贡献
+# �Ŷӳ�Ա�빱��
 
-> 状态：成员姓名、GitHub 账号和贡献范围待确认后填写。
+> ״̬����Ա������GitHub �˺ź͹��׷�Χ��ȷ�Ϻ���д��
 
-## 文档目标
+## �ĵ�Ŀ��
 
-公开说明团队成员、模块负责人、主要贡献和协作边界。
+����˵���Ŷӳ�Ա��ģ�鸺���ˡ���Ҫ���׺�Э���߽硣
 
-## 内容提纲
+## �������
 
-- 团队成员真实姓名
-- GitHub 账号
-- 负责模块
-- 核心设计与实现贡献
-- 硬件制作、装配与测试贡献
-- 联调、比赛和文档贡献
-- 外部开源项目与第三方代码致谢
+- �Ŷӳ�Ա��ʵ����
+- GitHub �˺�
+- ����ģ��
+- ���������ʵ�ֹ���
+- Ӳ��������װ������Թ���
+- �������������ĵ�����
+- �ⲿ��Դ��Ŀ�������������л
 
-[返回 Air 总文档](../../README.md) · [返回母仓库 README](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/README.md)
+[���� Air ���ĵ�](../../README.md) �� [����ĸ�ֿ� README](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/README.md)

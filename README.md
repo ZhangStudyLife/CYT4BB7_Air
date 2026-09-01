@@ -1,76 +1,76 @@
-# CYT4BB7 Air é£æ§
+# CYT4BB7 Air ·É¿Ø
 
-> è¿™æ˜¯ç¬¬ 21 å±Šå…¨å›½å¤§å­¦ç”Ÿæ™ºèƒ½æ±½è½¦ç«èµ›â€œé£è·ƒé›·åŒºâ€é¡¹ç›®çš„ç©ºä¸­æ§åˆ¶ç«¯å­ä»“åº“ã€‚
+> ÕâÊÇµÚ 21 ½ìÈ«¹ú´óÑ§ÉúÖÇÄÜÆû³µ¾ºÈü¡°·ÉÔ¾À×Çø¡±ÏîÄ¿µÄ¿ÕÖĞ¿ØÖÆ¶Ë×Ó²Ö¿â¡£
 
-> **ä»“åº“å…³ç³»å…ˆè¯´æ¸…æ¥šï¼š**æœ¬ä»“åº“çš„æ¯ä»“åº“æ˜¯ [HDUASC-SmartCar-21st-FlyOverMinefield](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield)ã€‚æ€»ä»“åº“å›ºå®šçš„ Air ç‰ˆæœ¬å¯ä»¥ä»æ¯ä»“åº“è¿›å…¥ï¼›æƒ³çœ‹ Air å­ä»“åº“è‡ªå·±çš„æœ€æ–°æ–‡æ¡£å’Œæäº¤ï¼Œè¯·ä»¥æœ¬ä»“åº“å½“å‰åˆ†æ”¯ä¸ºå‡†ã€‚
+> **²Ö¿â¹ØÏµÏÈËµÇå³ş£º**±¾²Ö¿âµÄÄ¸²Ö¿âÊÇ [HDUASC-SmartCar-21st-FlyOverMinefield](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield)¡£×Ü²Ö¿â¹Ì¶¨µÄ Air °æ±¾¿ÉÒÔ´ÓÄ¸²Ö¿â½øÈë£»Ïë¿´ Air ×Ó²Ö¿â×Ô¼ºµÄ×îĞÂÎÄµµºÍÌá½»£¬ÇëÒÔ±¾²Ö¿âµ±Ç°·ÖÖ§Îª×¼¡£
 
-PCB æºæ–‡ä»¶ã€æ¿å¡ç…§ç‰‡å’Œç¡¬ä»¶è¿­ä»£è®°å½•ä¸åœ¨è¿™é‡Œç»´æŠ¤ï¼Œè¯·ç›´æ¥å‰å¾€æ¯ä»“åº“çš„[ç¡¬ä»¶ PCB æ€»æ–‡æ¡£](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/hardware/README.md)ã€‚è¿™é‡Œæœ€å¤šä¿ç•™ç¡¬ä»¶å¼•è„šå’Œè½¯ä»¶ä½¿ç”¨æ–¹å¼ï¼Œä¸å¤åˆ¶ä¸€ä»½ PCB æ–‡ä»¶ã€‚
+PCB Ô´ÎÄ¼ş¡¢°å¿¨ÕÕÆ¬ºÍÓ²¼şµü´ú¼ÇÂ¼²»ÔÚÕâÀïÎ¬»¤£¬ÇëÖ±½ÓÇ°ÍùÄ¸²Ö¿âµÄ[Ó²¼ş PCB ×ÜÎÄµµ](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/hardware/README.md)¡£ÕâÀï×î¶à±£ÁôÓ²¼şÒı½ÅºÍÈí¼şÊ¹ÓÃ·½Ê½£¬²»¸´ÖÆÒ»·İ PCB ÎÄ¼ş¡£
 
-## å…ˆçœ‹è¿™é‡Œ
+## ÏÈ¿´ÕâÀï
 
-- [å¾…å¡«å†™ï¼šAir é£æ§æˆ–æ¯”èµ›ç³»ç»Ÿæ¼”ç¤ºè§†é¢‘]
-- [æ¯ä»“åº“æ€» README](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/README.md)
-- [CarPlan3 ä¸Šä½æœºè°ƒè¯•è§†é¢‘](https://www.bilibili.com/video/BV1Rm4m6fEMv/)
+- [´ıÌîĞ´£ºAir ·É¿Ø»ò±ÈÈüÏµÍ³ÑİÊ¾ÊÓÆµ]
+- [Ä¸²Ö¿â×Ü README](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/README.md)
+- [CarPlan3 ÉÏÎ»»úµ÷ÊÔÊÓÆµ](https://www.bilibili.com/video/BV1Rm4m6fEMv/)
 
-å¦‚æœç¬¬ä¸€æ¬¡æ¥è§¦è¿™ä¸ªé¡¹ç›®ï¼Œå»ºè®®å…ˆçœ‹æ¯ä»“åº“çš„æ¯”èµ›èƒŒæ™¯å’Œæ•´ä½“æ–¹æ¡ˆï¼Œå†å›åˆ°è¿™é‡ŒæŒ‰ä¸‹é¢çš„é˜…è¯»è·¯çº¿ç†è§£ Airã€‚ä¸è¦ä¸€ä¸Šæ¥å°±ä»æŸä¸ª `.c` æ–‡ä»¶å¼€å§‹çœ‹ï¼Œå¾ˆå®¹æ˜“åªçœ‹è§å±€éƒ¨å®ç°ï¼Œå´ä¸çŸ¥é“å®ƒåœ¨ç©ºåœ°ååŒç³»ç»Ÿé‡Œè´Ÿè´£ä»€ä¹ˆã€‚
+Èç¹ûµÚÒ»´Î½Ó´¥Õâ¸öÏîÄ¿£¬½¨ÒéÏÈ¿´Ä¸²Ö¿âµÄ±ÈÈü±³¾°ºÍÕûÌå·½°¸£¬ÔÙ»Øµ½ÕâÀï°´ÏÂÃæµÄÔÄ¶ÁÂ·ÏßÀí½â Air¡£²»ÒªÒ»ÉÏÀ´¾Í´ÓÄ³¸ö `.c` ÎÄ¼ş¿ªÊ¼¿´£¬ºÜÈİÒ×Ö»¿´¼û¾Ö²¿ÊµÏÖ£¬È´²»ÖªµÀËüÔÚ¿ÕµØĞ­Í¬ÏµÍ³Àï¸ºÔğÊ²Ã´¡£
 
-## æŒ‰ç›®æ ‡é˜…è¯»
+## °´Ä¿±êÔÄ¶Á
 
-| æˆ‘æƒ³äº†è§£ | å»ºè®®å…¥å£ |
+| ÎÒÏëÁË½â | ½¨ÒéÈë¿Ú |
 | --- | --- |
-| PCBã€æ¿å¡å’Œç¡¬ä»¶è¿­ä»£ | æ¯ä»“åº“çš„[ç¡¬ä»¶ PCB æ€»æ–‡æ¡£](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/hardware/README.md) |
-| åŒæ ¸é£æ§å¦‚ä½•è¿è¡Œ | [è½¯ä»¶æ¶æ„](docs/01-flight-control/software-architecture.md) |
-| IMUã€å§¿æ€è§£ç®—å’Œæ»¤æ³¢ | [IMU ä¸å§¿æ€ä¼°è®¡](docs/01-flight-control/imu-and-attitude.md) |
-| å››è·¯ TOF å®šé«˜ | [é«˜åº¦ä¼°è®¡ä¸æ§åˆ¶](docs/01-flight-control/height-estimation-and-control.md) |
-| é¥æ§å™¨å’Œ CRSF é£è¡Œæ¨¡å¼ | [é¥æ§å™¨ä¸é£è¡Œæ¨¡å¼](docs/01-flight-control/rc-and-flight-modes.md) |
-| Air å’Œ Car æ€ä¹ˆé€šä¿¡ | [AirComm ç©ºåœ°é€šä¿¡](docs/02-communication/aircomm.md) |
-| å›¾åƒæ¿å’ŒåŒæ ¸ IPC | [Camera SPI ä¸åŒæ ¸ IPC](docs/02-communication/camera-spi-and-ipc.md) |
-| WiFi SPI æ€ä¹ˆå‘æ—¥å¿— | [WiFi SPI è°ƒè¯•](docs/02-communication/wifi-spi-debugging.md) |
-| å¤šæ‘„åƒå¤´å’Œç›¸æœºæ¨¡å‹ | [ç›¸æœºæ¨¡å‹æ ‡å®š](docs/03-competition/camera-model-calibration.md) |
-| CarPlan3 å’Œä¸Šä½æœºè”è°ƒ | [CarPlan3 è°ƒè¯•æµç¨‹](docs/03-competition/car-plan3-debug-workflow.md) |
-| ä»£ç ç›®å½•å’Œæ¨¡å—è¾¹ç•Œ | [ä»“åº“ç»“æ„](docs/04-engineering/repository-structure.md) |
-| å·²çŸ¥é—®é¢˜å’Œæ’æŸ¥è®°å½• | [æ•…éšœæ’æŸ¥ç´¢å¼•](docs/04-engineering/troubleshooting.md) |
+| PCB¡¢°å¿¨ºÍÓ²¼şµü´ú | Ä¸²Ö¿âµÄ[Ó²¼ş PCB ×ÜÎÄµµ](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/hardware/README.md) |
+| Ë«ºË·É¿ØÈçºÎÔËĞĞ | [Èí¼ş¼Ü¹¹](docs/01-flight-control/software-architecture.md) |
+| IMU¡¢×ËÌ¬½âËãºÍÂË²¨ | [IMU Óë×ËÌ¬¹À¼Æ](docs/01-flight-control/imu-and-attitude.md) |
+| ËÄÂ· TOF ¶¨¸ß | [¸ß¶È¹À¼ÆÓë¿ØÖÆ](docs/01-flight-control/height-estimation-and-control.md) |
+| Ò£¿ØÆ÷ºÍ CRSF ·ÉĞĞÄ£Ê½ | [Ò£¿ØÆ÷Óë·ÉĞĞÄ£Ê½](docs/01-flight-control/rc-and-flight-modes.md) |
+| Air ºÍ Car ÔõÃ´Í¨ĞÅ | [AirComm ¿ÕµØÍ¨ĞÅ](docs/02-communication/aircomm.md) |
+| Í¼Ïñ°åºÍË«ºË IPC | [Camera SPI ÓëË«ºË IPC](docs/02-communication/camera-spi-and-ipc.md) |
+| WiFi SPI ÔõÃ´·¢ÈÕÖ¾ | [WiFi SPI µ÷ÊÔ](docs/02-communication/wifi-spi-debugging.md) |
+| ¶àÉãÏñÍ·ºÍÏà»úÄ£ĞÍ | [Ïà»úÄ£ĞÍ±ê¶¨](docs/03-competition/camera-model-calibration.md) |
+| CarPlan3 ºÍÉÏÎ»»úÁªµ÷ | [CarPlan3 µ÷ÊÔÁ÷³Ì](docs/03-competition/car-plan3-debug-workflow.md) |
+| ´úÂëÄ¿Â¼ºÍÄ£¿é±ß½ç | [²Ö¿â½á¹¹](docs/04-engineering/repository-structure.md) |
+| ÒÑÖªÎÊÌâºÍÅÅ²é¼ÇÂ¼ | [¹ÊÕÏÅÅ²éË÷Òı](docs/04-engineering/troubleshooting.md) |
 
-## æ¨èé˜…è¯»è·¯çº¿
+## ÍÆ¼öÔÄ¶ÁÂ·Ïß
 
-### åªæƒ³ç†è§£é£æ§
+### Ö»ÏëÀí½â·É¿Ø
 
-[è½¯ä»¶æ¶æ„](docs/01-flight-control/software-architecture.md) -> [IMU ä¸å§¿æ€ä¼°è®¡](docs/01-flight-control/imu-and-attitude.md) -> [é«˜åº¦ä¼°è®¡ä¸æ§åˆ¶](docs/01-flight-control/height-estimation-and-control.md) -> [é¥æ§å™¨ä¸é£è¡Œæ¨¡å¼](docs/01-flight-control/rc-and-flight-modes.md)
+[Èí¼ş¼Ü¹¹](docs/01-flight-control/software-architecture.md) -> [IMU Óë×ËÌ¬¹À¼Æ](docs/01-flight-control/imu-and-attitude.md) -> [¸ß¶È¹À¼ÆÓë¿ØÖÆ](docs/01-flight-control/height-estimation-and-control.md) -> [Ò£¿ØÆ÷Óë·ÉĞĞÄ£Ê½](docs/01-flight-control/rc-and-flight-modes.md)
 
-### æƒ³ç†è§£ç©ºåœ°ååŒ
+### ÏëÀí½â¿ÕµØĞ­Í¬
 
-[è½¯ä»¶æ¶æ„](docs/01-flight-control/software-architecture.md) -> [AirComm](docs/02-communication/aircomm.md) -> [Camera SPI ä¸åŒæ ¸ IPC](docs/02-communication/camera-spi-and-ipc.md) -> [WiFi SPI è°ƒè¯•](docs/02-communication/wifi-spi-debugging.md)
+[Èí¼ş¼Ü¹¹](docs/01-flight-control/software-architecture.md) -> [AirComm](docs/02-communication/aircomm.md) -> [Camera SPI ÓëË«ºË IPC](docs/02-communication/camera-spi-and-ipc.md) -> [WiFi SPI µ÷ÊÔ](docs/02-communication/wifi-spi-debugging.md)
 
-### æƒ³ç†è§£å›¾åƒåˆ°è½¦æ¨¡é€Ÿåº¦
+### ÏëÀí½âÍ¼Ïñµ½³µÄ£ËÙ¶È
 
-[Camera SPI ä¸åŒæ ¸ IPC](docs/02-communication/camera-spi-and-ipc.md) -> [ç›¸æœºæ¨¡å‹æ ‡å®š](docs/03-competition/camera-model-calibration.md) -> [CarPlan3 è°ƒè¯•æµç¨‹](docs/03-competition/car-plan3-debug-workflow.md) -> æ¯ä»“åº“çš„ [Car ç«¯å·¥ç¨‹](https://github.com/choumouing/CYT4bb7_Car/)
+[Camera SPI ÓëË«ºË IPC](docs/02-communication/camera-spi-and-ipc.md) -> [Ïà»úÄ£ĞÍ±ê¶¨](docs/03-competition/camera-model-calibration.md) -> [CarPlan3 µ÷ÊÔÁ÷³Ì](docs/03-competition/car-plan3-debug-workflow.md) -> Ä¸²Ö¿âµÄ [Car ¶Ë¹¤³Ì](https://github.com/choumouing/CYT4bb7_Car/)
 
-## ä»£ç ç›®å½•åœ°å›¾
+## ´úÂëÄ¿Â¼µØÍ¼
 
 ```text
-project/user/                 ä¸¤ä¸ªæ ¸å¿ƒçš„å…¥å£å’Œä¸»å¾ªç¯è°ƒåº¦
-project/code/Estimation/      IMUã€å§¿æ€ã€é«˜åº¦å’Œä½ç½®ä¼°è®¡
-project/code/FlightController/é£è¡Œæ¨¡å¼ã€å§¿æ€/ä½ç½®æ§åˆ¶å’Œè‡ªåŠ¨é™è½
-project/code/Planner/         ç›¸æœºæ¨¡å‹ã€ä¸‰æ‘„èåˆå’Œ CarPlan3/4
-project/code/Protocols/       AirCommã€Camera SPIã€WiFi SPI ç­‰é€šä¿¡
-project/code/IPC/             åŒæ ¸ä¹‹é—´çš„ image_data å’Œå‚æ•°å¿«ç…§
-project/code/Image/           å›¾åƒç»“æœç»“æ„ä½“åŠæœ‰æ•ˆæ€§åˆ¤æ–­
-libraries/                    èŠ¯ç‰‡ã€é€é£åº“å’Œå¤–è®¾é©±åŠ¨
-doc/                          æ—©æœŸè®¾è®¡ç¨¿å’Œå…·ä½“æ•…éšœåŸå§‹è®°å½•
-docs/                         é¢å‘å¼€æºé˜…è¯»æ•´ç†åçš„æ­£å¼æ–‡æ¡£
+project/user/                 Á½¸öºËĞÄµÄÈë¿ÚºÍÖ÷Ñ­»·µ÷¶È
+project/code/Estimation/      IMU¡¢×ËÌ¬¡¢¸ß¶ÈºÍÎ»ÖÃ¹À¼Æ
+project/code/FlightController/·ÉĞĞÄ£Ê½¡¢×ËÌ¬/Î»ÖÃ¿ØÖÆºÍ×Ô¶¯½µÂä
+project/code/Planner/         Ïà»úÄ£ĞÍ¡¢ÈıÉãÈÚºÏºÍ CarPlan3/4
+project/code/Protocols/       AirComm¡¢Camera SPI¡¢WiFi SPI µÈÍ¨ĞÅ
+project/code/IPC/             Ë«ºËÖ®¼äµÄ image_data ºÍ²ÎÊı¿ìÕÕ
+project/code/Image/           Í¼Ïñ½á¹û½á¹¹Ìå¼°ÓĞĞ§ĞÔÅĞ¶Ï
+libraries/                    Ğ¾Æ¬¡¢Öğ·É¿âºÍÍâÉèÇı¶¯
+doc/                          ÔçÆÚÉè¼Æ¸åºÍ¾ßÌå¹ÊÕÏÔ­Ê¼¼ÇÂ¼
+docs/                         ÃæÏò¿ªÔ´ÔÄ¶ÁÕûÀíºóµÄÕıÊ½ÎÄµµ
 ```
 
-ä»£ç é˜…è¯»æ—¶ï¼Œå»ºè®®ä» [`project/user/main_cm7_0.c`](project/user/main_cm7_0.c) å¼€å§‹ï¼Œå†æ ¹æ®ç›®æ ‡è¿›å…¥ `Estimation`ã€`FlightController`ã€`Planner` æˆ– `Protocols`ã€‚`docs/` æ˜¯è§£é‡Šæ€è·¯å’Œå®éªŒè¿‡ç¨‹çš„å…¥å£ï¼Œ`doc/` é‡Œçš„å†…å®¹æ›´åå†å²è®°å½•ï¼›ä¸¤è€…ä¸è¦æ··ä¸ºåŒä¸€å¥—æœ€ç»ˆè§„èŒƒã€‚
+´úÂëÔÄ¶ÁÊ±£¬½¨Òé´Ó [`project/user/main_cm7_0.c`](project/user/main_cm7_0.c) ¿ªÊ¼£¬ÔÙ¸ù¾İÄ¿±ê½øÈë `Estimation`¡¢`FlightController`¡¢`Planner` »ò `Protocols`¡£`docs/` ÊÇ½âÊÍË¼Â·ºÍÊµÑé¹ı³ÌµÄÈë¿Ú£¬`doc/` ÀïµÄÄÚÈİ¸üÆ«ÀúÊ·¼ÇÂ¼£»Á½Õß²»Òª»ìÎªÍ¬Ò»Ì××îÖÕ¹æ·¶¡£
 
-## æ–‡æ¡£çŠ¶æ€
+## ÎÄµµ×´Ì¬
 
-- `docs/01-flight-control` åˆ° `docs/04-engineering` æ˜¯é¢å‘å¼€æºé˜…è¯»çš„æ­£å¼å…¥å£ï¼Œç¡¬ä»¶ç›¸å…³å†…å®¹ç»Ÿä¸€è·³è½¬æ¯ä»“åº“ã€‚
-- `doc/` ä¿ç•™æ—©æœŸé€šä¿¡è®¾è®¡å’Œæ•…éšœåŸå§‹è®°å½•ï¼Œåç»­åªé€šè¿‡æ­£å¼æ–‡æ¡£å»ºç«‹è·³è½¬ï¼Œä¸éšæ„åˆ é™¤å†å²ææ–™ã€‚
-- æ–‡æ¡£ä¸­çš„å‚æ•°ã€æ³¢å½¢å’Œåˆ†æç»“è®ºåº”ä¸å¯¹åº” Git æäº¤å’Œæºç ç‰ˆæœ¬ä¸€èµ·ç†è§£ã€‚
-- [å¾…å¡«å†™ï¼šå“ªäº›æ¨¡å—æ˜¯æœ€ç»ˆæ¯”èµ›ç‰ˆæœ¬ï¼Œå“ªäº›æ¨¡å—åªæ˜¯å®éªŒç‰ˆæœ¬ã€‚]
+- `docs/01-flight-control` µ½ `docs/04-engineering` ÊÇÃæÏò¿ªÔ´ÔÄ¶ÁµÄÕıÊ½Èë¿Ú£¬Ó²¼şÏà¹ØÄÚÈİÍ³Ò»Ìø×ªÄ¸²Ö¿â¡£
+- `doc/` ±£ÁôÔçÆÚÍ¨ĞÅÉè¼ÆºÍ¹ÊÕÏÔ­Ê¼¼ÇÂ¼£¬ºóĞøÖ»Í¨¹ıÕıÊ½ÎÄµµ½¨Á¢Ìø×ª£¬²»ËæÒâÉ¾³ıÀúÊ·²ÄÁÏ¡£
+- ÎÄµµÖĞµÄ²ÎÊı¡¢²¨ĞÎºÍ·ÖÎö½áÂÛÓ¦Óë¶ÔÓ¦ Git Ìá½»ºÍÔ´Âë°æ±¾Ò»ÆğÀí½â¡£
+- [´ıÌîĞ´£ºÄÄĞ©Ä£¿éÊÇ×îÖÕ±ÈÈü°æ±¾£¬ÄÄĞ©Ä£¿éÖ»ÊÇÊµÑé°æ±¾¡£]
 
-## è¿”å›è·¯å¾„
+## ·µ»ØÂ·¾¶
 
-- [è¿”å›æ¯ä»“åº“æ€» README](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/README.md)
-- [è¿”å›æ¯ä»“åº“ç¡¬ä»¶ PCB æ€»æ–‡æ¡£](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/hardware/README.md)
-- [æŸ¥çœ‹ Air å­ä»“åº“æœ€æ–°ä»£ç ](https://github.com/ZhangStudyLife/CYT4BB7_Air/tree/national-2026)
+- [·µ»ØÄ¸²Ö¿â×Ü README](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/README.md)
+- [·µ»ØÄ¸²Ö¿âÓ²¼ş PCB ×ÜÎÄµµ](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/hardware/README.md)
+- [²é¿´ Air ×Ó²Ö¿â×îĞÂ´úÂë](https://github.com/ZhangStudyLife/CYT4BB7_Air/tree/national-2026)

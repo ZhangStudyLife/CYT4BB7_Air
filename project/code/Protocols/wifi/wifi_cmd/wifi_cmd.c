@@ -1,7 +1,7 @@
 /*****************************************************************************
- * æ–‡ä»¶: wifi_cmd.c
- * æ¨¡å—: WiFi å‘½ä»¤åŸºç¡€å±‚
- * èŒè´£: è´Ÿè´£ wifi_spi åˆå§‹åŒ–ã€UDP socket å»ºç«‹ã€æ–‡æœ¬å‘½ä»¤æ”¶å‘ä¸å‘½ä»¤è·¯ç”±
+ * ÎÄ¼ş: wifi_cmd.c
+ * Ä£¿é: WiFi ÃüÁî»ù´¡²ã
+ * Ö°Ôğ: ¸ºÔğ wifi_spi ³õÊ¼»¯¡¢UDP socket ½¨Á¢¡¢ÎÄ±¾ÃüÁîÊÕ·¢ÓëÃüÁîÂ·ÓÉ
  *****************************************************************************/
 
 #include "wifi_cmd.h"
@@ -21,25 +21,25 @@
 
 static uint8 s_wifi_cmd_text_tx_active = 0U;
 
-static uint8 s_wifi_cmd_use_udp_flush = 1U;    /* å½“å‰é“¾è·¯æ˜¯å¦ä½¿ç”¨UDPç«‹å³å‘é€å‘½ä»¤ï¼š1=UDPï¼Œ0=TCP */
-static uint8 s_wifi_cmd_flush_pending = 0U;    /* æ˜¯å¦å­˜åœ¨å¾…è§¦å‘çš„UDPç«‹å³å‘é€è¯·æ±‚ï¼š1-å¾…è§¦å‘ï¼Œ0-æ— è¯·æ±‚ */
+static uint8 s_wifi_cmd_use_udp_flush = 1U;    /* µ±Ç°Á´Â·ÊÇ·ñÊ¹ÓÃUDPÁ¢¼´·¢ËÍÃüÁî£º1=UDP£¬0=TCP */
+static uint8 s_wifi_cmd_flush_pending = 0U;    /* ÊÇ·ñ´æÔÚ´ı´¥·¢µÄUDPÁ¢¼´·¢ËÍÇëÇó£º1-´ı´¥·¢£¬0-ÎŞÇëÇó */
 
-/* WiFi æ–‡æœ¬æ¥æ”¶çŠ¶æ€ */
-static uint8 s_wifi_cmd_ready = 0U;            /* WiFi é“¾è·¯å°±ç»ªæ ‡å¿— */
-static char s_wifi_cmd_line[WIFI_CMD_LINE_MAX] = {0}; /* å½“å‰æ¥æ”¶ä¸­çš„æ–‡æœ¬è¡Œ */
-static uint16 s_wifi_cmd_line_len = 0U;        /* å½“å‰æ–‡æœ¬è¡Œé•¿åº¦ */
-static uint8 s_wifi_cmd_line_overflow = 0U;    /* å½“å‰æ–‡æœ¬è¡Œæ˜¯å¦æº¢å‡º */
-static uint8 s_wifi_cmd_line_invalid = 0U;     /* å½“å‰æ–‡æœ¬è¡Œæ˜¯å¦åŒ…å«éæ³•å­—ç¬¦ */
-static uint8 s_wifi_cmd_line_expect_lf = 0U;   /* å½“å‰æ˜¯å¦å·²æ”¶åˆ° CRï¼Œç­‰å¾… LF */
+/* WiFi ÎÄ±¾½ÓÊÕ×´Ì¬ */
+static uint8 s_wifi_cmd_ready = 0U;            /* WiFi Á´Â·¾ÍĞ÷±êÖ¾ */
+static char s_wifi_cmd_line[WIFI_CMD_LINE_MAX] = {0}; /* µ±Ç°½ÓÊÕÖĞµÄÎÄ±¾ĞĞ */
+static uint16 s_wifi_cmd_line_len = 0U;        /* µ±Ç°ÎÄ±¾ĞĞ³¤¶È */
+static uint8 s_wifi_cmd_line_overflow = 0U;    /* µ±Ç°ÎÄ±¾ĞĞÊÇ·ñÒç³ö */
+static uint8 s_wifi_cmd_line_invalid = 0U;     /* µ±Ç°ÎÄ±¾ĞĞÊÇ·ñ°üº¬·Ç·¨×Ö·û */
+static uint8 s_wifi_cmd_line_expect_lf = 0U;   /* µ±Ç°ÊÇ·ñÒÑÊÕµ½ CR£¬µÈ´ı LF */
 
 /*
- * å‡½æ•°å: wifi_cmd_is_space_char
- * åŠŸèƒ½: åˆ¤æ–­å­—ç¬¦æ˜¯å¦ä¸ºç©ºç™½åˆ†éš”ç¬¦
- * è¾“å…¥å‚æ•°:
- *   ch - å¾…åˆ¤æ–­å­—ç¬¦
- * è¿”å›å€¼:
- *   1 - ç©ºç™½å­—ç¬¦
- *   0 - éç©ºç™½å­—ç¬¦
+ * º¯ÊıÃû: wifi_cmd_is_space_char
+ * ¹¦ÄÜ: ÅĞ¶Ï×Ö·ûÊÇ·ñÎª¿Õ°×·Ö¸ô·û
+ * ÊäÈë²ÎÊı:
+ *   ch - ´ıÅĞ¶Ï×Ö·û
+ * ·µ»ØÖµ:
+ *   1 - ¿Õ°××Ö·û
+ *   0 - ·Ç¿Õ°××Ö·û
  */
 static uint8 wifi_cmd_is_space_char(char ch)
 {
@@ -47,12 +47,12 @@ static uint8 wifi_cmd_is_space_char(char ch)
 }
 
 /*
- * å‡½æ•°å: wifi_cmd_ascii_tolower
- * åŠŸèƒ½: å°†å•ä¸ª ASCII å­—ç¬¦è½¬æ¢ä¸ºå°å†™
- * è¾“å…¥å‚æ•°:
- *   ch - å¾…è½¬æ¢å­—ç¬¦
- * è¿”å›å€¼:
- *   è½¬æ¢åçš„å­—ç¬¦
+ * º¯ÊıÃû: wifi_cmd_ascii_tolower
+ * ¹¦ÄÜ: ½«µ¥¸ö ASCII ×Ö·û×ª»»ÎªĞ¡Ğ´
+ * ÊäÈë²ÎÊı:
+ *   ch - ´ı×ª»»×Ö·û
+ * ·µ»ØÖµ:
+ *   ×ª»»ºóµÄ×Ö·û
  */
 static char wifi_cmd_ascii_tolower(char ch)
 {
@@ -65,10 +65,10 @@ static char wifi_cmd_ascii_tolower(char ch)
 }
 
 /*
- * å‡½æ•°å: wifi_cmd_reset_line_state
- * åŠŸèƒ½: é‡ç½®æ–‡æœ¬å‘½ä»¤æ¥æ”¶çŠ¶æ€æœº
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: wifi_cmd_reset_line_state
+ * ¹¦ÄÜ: ÖØÖÃÎÄ±¾ÃüÁî½ÓÊÕ×´Ì¬»ú
+ * ÊäÈë²ÎÊı: ÎŞ
+ * ·µ»ØÖµ: ÎŞ
  */
 static void wifi_cmd_reset_line_state(void)
 {
@@ -116,11 +116,11 @@ static uint8 wifi_cmd_finish_pending_flush(void)
 }
 
 /*
- * å‡½æ•°å: wifi_cmd_dispatch_line
- * åŠŸèƒ½: æ ¹æ®é¦– token å°†å®Œæ•´æ–‡æœ¬å‘½ä»¤è·¯ç”±åˆ°å…·ä½“æ¨¡å—
- * è¾“å…¥å‚æ•°:
- *   line - å®Œæ•´æ–‡æœ¬å‘½ä»¤ï¼Œå‡½æ•°å†…éƒ¨å¯åŸåœ°ä¿®æ”¹
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: wifi_cmd_dispatch_line
+ * ¹¦ÄÜ: ¸ù¾İÊ× token ½«ÍêÕûÎÄ±¾ÃüÁîÂ·ÓÉµ½¾ßÌåÄ£¿é
+ * ÊäÈë²ÎÊı:
+ *   line - ÍêÕûÎÄ±¾ÃüÁî£¬º¯ÊıÄÚ²¿¿ÉÔ­µØĞŞ¸Ä
+ * ·µ»ØÖµ: ÎŞ
  */
 static void wifi_cmd_dispatch_line(char *line)
 {
@@ -162,11 +162,11 @@ static void wifi_cmd_dispatch_line(char *line)
 }
 
 /*
- * å‡½æ•°å: wifi_cmd_feed_byte
- * åŠŸèƒ½: å‘æ–‡æœ¬å‘½ä»¤çŠ¶æ€æœºå–‚å…¥å•å­—èŠ‚
- * è¾“å…¥å‚æ•°:
- *   ch - æ–°æ”¶åˆ°çš„å­—èŠ‚
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: wifi_cmd_feed_byte
+ * ¹¦ÄÜ: ÏòÎÄ±¾ÃüÁî×´Ì¬»úÎ¹Èëµ¥×Ö½Ú
+ * ÊäÈë²ÎÊı:
+ *   ch - ĞÂÊÕµ½µÄ×Ö½Ú
+ * ·µ»ØÖµ: ÎŞ
  */
 static void wifi_cmd_feed_byte(char ch)
 {
@@ -269,7 +269,7 @@ void wifi_cmd_Init(void)
     }
 }
 
-// 04110316 zyzå®é™…æµ‹è¯•èŠ±è´¹88us
+// 04110316 zyzÊµ¼Ê²âÊÔ»¨·Ñ88us
 void wifi_cmd_Poll(void)
 {
     uint8 rx_buffer[WIFI_CMD_RX_BUFFER_SIZE];
@@ -281,7 +281,7 @@ void wifi_cmd_Poll(void)
         return;
     }
 
-    /* æ¨è¿›éé˜»å¡å‘é€çŠ¶æ€æœºï¼Œç¡®ä¿å‘é€åœ¨ä¸»å¾ªç¯ä¸­æŒç»­æ¨è¿› */
+    /* ÍÆ½ø·Ç×èÈû·¢ËÍ×´Ì¬»ú£¬È·±£·¢ËÍÔÚÖ÷Ñ­»·ÖĞ³ÖĞøÍÆ½ø */
     wifi_spi_send_poll();
 
     if (FC_START_CRSF_Get_State() == FC_START_CRSF_STATE_FLYING)
@@ -297,7 +297,7 @@ void wifi_cmd_Poll(void)
         return;
     }
 
-    /* å‘é€å®Œæˆåå†è§¦å‘UDPç«‹å³å‘é€ï¼Œé¿å…ä¸å‘é€äº‹åŠ¡é‡å  */
+    /* ·¢ËÍÍê³ÉºóÔÙ´¥·¢UDPÁ¢¼´·¢ËÍ£¬±ÜÃâÓë·¢ËÍÊÂÎñÖØµş */
     if ((0U != s_wifi_cmd_flush_pending) && (0U == wifi_spi_is_busy()))
     {
         if (0U != wifi_cmd_FlushNow())
@@ -306,7 +306,7 @@ void wifi_cmd_Poll(void)
         }
     }
 
-    /* ä»…åœ¨éé£è¡ŒçŠ¶æ€ä¸‹è½®è¯¢ */
+    /* ½öÔÚ·Ç·ÉĞĞ×´Ì¬ÏÂÂÖÑ¯ */
     (void)wifi_justfloat_Poll();
 
     read_len = wifi_spi_read_buffer(rx_buffer, (uint32)sizeof(rx_buffer));
@@ -332,9 +332,9 @@ uint8 wifi_cmd_IsRawBusy(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šå‘ WiFi SPI å‘é€ä¸€æ®µåŸå§‹äºŒè¿›åˆ¶æ•°æ®ï¼Œä½†ä¸ç«‹å³è§¦å‘ UDP å‘åŒ…ã€‚
- * è¾“å…¥å‚æ•°ï¼šbuffer-å¾…å‘é€æ•°æ®é¦–åœ°å€ï¼›len-å¾…å‘é€é•¿åº¦ï¼Œå•ä½å­—èŠ‚ã€‚
- * è¿”å›å€¼ï¼š1-å†™å…¥æˆåŠŸï¼›0-å†™å…¥å¤±è´¥ã€‚
+ * º¯Êı¹¦ÄÜ£ºÏò WiFi SPI ·¢ËÍÒ»¶ÎÔ­Ê¼¶ş½øÖÆÊı¾İ£¬µ«²»Á¢¼´´¥·¢ UDP ·¢°ü¡£
+ * ÊäÈë²ÎÊı£ºbuffer-´ı·¢ËÍÊı¾İÊ×µØÖ·£»len-´ı·¢ËÍ³¤¶È£¬µ¥Î»×Ö½Ú¡£
+ * ·µ»ØÖµ£º1-Ğ´Èë³É¹¦£»0-Ğ´ÈëÊ§°Ü¡£
  */
 uint8 wifi_cmd_SendBufferNoFlush(const uint8 *buffer, uint32 len)
 {
@@ -350,9 +350,9 @@ uint8 wifi_cmd_SendBufferNoFlush(const uint8 *buffer, uint32 len)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šç«‹å³è§¦å‘ä¸€æ¬¡ UDP å‘åŒ…ï¼Œå°†å½“å‰å‘é€ç¼“å†²åŒºæ•°æ®æ•´ä½“é€å‡ºã€‚
- * è¾“å…¥å‚æ•°ï¼šæ— ã€‚
- * è¿”å›å€¼ï¼š1-è§¦å‘æˆåŠŸï¼›0-è§¦å‘å¤±è´¥ã€‚
+ * º¯Êı¹¦ÄÜ£ºÁ¢¼´´¥·¢Ò»´Î UDP ·¢°ü£¬½«µ±Ç°·¢ËÍ»º³åÇøÊı¾İÕûÌåËÍ³ö¡£
+ * ÊäÈë²ÎÊı£ºÎŞ¡£
+ * ·µ»ØÖµ£º1-´¥·¢³É¹¦£»0-´¥·¢Ê§°Ü¡£
  */
 uint8 wifi_cmd_FlushNow(void)
 {
@@ -370,9 +370,9 @@ uint8 wifi_cmd_FlushNow(void)
 }
 
 /*
- * å‡½æ•°åŠŸèƒ½ï¼šæäº¤ä¸€æ®µåŸå§‹äºŒè¿›åˆ¶æ•°æ®åˆ°éé˜»å¡å‘é€é“¾è·¯ï¼Œå¹¶åœ¨åç»­è½®è¯¢ä¸­è§¦å‘ UDP å‘åŒ…ã€‚
- * è¾“å…¥å‚æ•°ï¼šbuffer-å¾…å‘é€æ•°æ®é¦–åœ°å€ï¼›len-å¾…å‘é€é•¿åº¦ï¼Œå•ä½å­—èŠ‚ã€‚
- * è¿”å›å€¼ï¼š1-æäº¤æˆåŠŸï¼›0-æäº¤å¤±è´¥ã€‚
+ * º¯Êı¹¦ÄÜ£ºÌá½»Ò»¶ÎÔ­Ê¼¶ş½øÖÆÊı¾İµ½·Ç×èÈû·¢ËÍÁ´Â·£¬²¢ÔÚºóĞøÂÖÑ¯ÖĞ´¥·¢ UDP ·¢°ü¡£
+ * ÊäÈë²ÎÊı£ºbuffer-´ı·¢ËÍÊı¾İÊ×µØÖ·£»len-´ı·¢ËÍ³¤¶È£¬µ¥Î»×Ö½Ú¡£
+ * ·µ»ØÖµ£º1-Ìá½»³É¹¦£»0-Ìá½»Ê§°Ü¡£
  */
 uint8 wifi_cmd_SendBuffer(const uint8 *buffer, uint32 len)
 {

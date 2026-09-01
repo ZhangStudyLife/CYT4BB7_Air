@@ -10,8 +10,8 @@ typedef struct
     float y_cm;
 } pix_to_distance_result_t;
 
-// ç»è¿‡æˆ‘çš„å®é™…æµ‹è¯• , ç®—æ³•PixToDistance_UpdateProjectionCenter2_100Hzæœ€å¥½
-// ä¹Ÿå°±æ˜¯æŠ•å½±ç‚¹åƒç´ å’Œè½¦ç¯èåˆåæ ‡åƒç´ ç›¸å‡,ç„¶åå†è¿›è¡Œæ‹Ÿåˆ
+// ¾­¹ıÎÒµÄÊµ¼Ê²âÊÔ , Ëã·¨PixToDistance_UpdateProjectionCenter2_100Hz×îºÃ
+// Ò²¾ÍÊÇÍ¶Ó°µãÏñËØºÍ³µµÆÈÚºÏ×ø±êÏñËØÏà¼õ,È»ºóÔÙ½øĞĞÄâºÏ
 extern pix_to_distance_result_t g_car_lamp_fused_distance;
 extern pix_to_distance_result_t g_car_lamp_fused_distance_projectioncenter;
 extern pix_to_distance_result_t g_car_lamp_fused_distance_projectioncenter_2;

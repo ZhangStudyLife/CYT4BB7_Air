@@ -2,7 +2,7 @@
 
 #include <math.h>
 
-/* æœ¬åœ°å·®å¼‚å±‚: Mahony è§£ç®—å‰å¯¹ Z è½´é™€èºè¾“å…¥æ–½åŠ å¯¹ç§°æ­»åŒºï¼Œå•ä½ dps */
+/* ±¾µØ²îÒì²ã: Mahony ½âËãÇ°¶Ô Z ÖáÍÓÂİÊäÈëÊ©¼Ó¶Ô³ÆËÀÇø£¬µ¥Î» dps */
 #define MAHONY_GYRO_Z_DEADBAND_DPS  0.2f
 
 static float Mahony_Clamp(float value, float min_value, float max_value)
@@ -21,13 +21,13 @@ static float Mahony_Clamp(float value, float min_value, float max_value)
 }
 
 /*
- * å‡½æ•°å: Mahony_ApplyDeadband
- * åŠŸèƒ½: å¯¹è¾“å…¥é‡æ–½åŠ å¯¹ç§°æ­»åŒºï¼Œå°äºç­‰äºæ­»åŒºé˜ˆå€¼æ—¶ç›´æ¥å½’é›¶
- * è¾“å…¥å‚æ•°:
- *   value    - è¾“å…¥å€¼
- *   deadband - æ­»åŒºé˜ˆå€¼ï¼Œè¦æ±‚ä¸ºéè´Ÿ
- * è¿”å›å€¼:
- *   æ­»åŒºå¤„ç†åçš„ç»“æœ
+ * º¯ÊıÃû: Mahony_ApplyDeadband
+ * ¹¦ÄÜ: ¶ÔÊäÈëÁ¿Ê©¼Ó¶Ô³ÆËÀÇø£¬Ğ¡ÓÚµÈÓÚËÀÇøãĞÖµÊ±Ö±½Ó¹éÁã
+ * ÊäÈë²ÎÊı:
+ *   value    - ÊäÈëÖµ
+ *   deadband - ËÀÇøãĞÖµ£¬ÒªÇóÎª·Ç¸º
+ * ·µ»ØÖµ:
+ *   ËÀÇø´¦ÀíºóµÄ½á¹û
  */
 static float Mahony_ApplyDeadband(float value, float deadband)
 {
@@ -146,7 +146,7 @@ static void Mahony_UpdateStaticState(MahonyAhrs_t *ahrs, float gyro_abs_dps, flo
 {
     float acc_err_g = fabsf(accel_mag - 1.0f);
 
-    /* æœ¬åœ°å·®å¼‚å±‚: è¯¥é™æ­¢åˆ¤å®šä¾›æœºä½“ä¾§é€»è¾‘ä½¿ç”¨ï¼Œä¸å‚ä¸ iNav ä¸» AHRS å…¬å¼æœ¬èº« */
+    /* ±¾µØ²îÒì²ã: ¸Ã¾²Ö¹ÅĞ¶¨¹©»úÌå²àÂß¼­Ê¹ÓÃ£¬²»²ÎÓë iNav Ö÷ AHRS ¹«Ê½±¾Éí */
 
     if ((gyro_abs_dps < MAHONY_STATIC_GYRO_DPS_TH) &&
         (accel_mag > MAHONY_ACCEL_MIN_MAGNITUDE) &&
@@ -353,18 +353,18 @@ void MahonyAhrs_Update(MahonyAhrs_t *ahrs,
 
     ahrs->elapsed_time_s += dt;
 
-    /* å…ˆç»Ÿè®¡å½“å‰åŠ é€Ÿåº¦æ¨¡é•¿ä¸é™æ­¢çŠ¶æ€ï¼Œå†å†³å®šåç»­æƒé‡ä¸ bias å­¦ä¹  */
+    /* ÏÈÍ³¼Æµ±Ç°¼ÓËÙ¶ÈÄ£³¤Óë¾²Ö¹×´Ì¬£¬ÔÙ¾ö¶¨ºóĞøÈ¨ÖØÓë bias Ñ§Ï° */
 
-    // ç®—æ¨¡é•¿
+    // ËãÄ£³¤
     accel_mag = Mahony_VectorMagnitude(accel_x, accel_y, accel_z);
     ahrs->accel_magnitude = accel_mag;
     ahrs->acc_weight_nearness = 0.0f;
     ahrs->acc_weight_rate_ignore = 0.0f;
     ahrs->acc_weight_final = 0.0f;
 
-    // æ¨¡é•¿å’Œé™€èºç»å¯¹å€¼ç”¨äºé™æ­¢åˆ¤å®š
+    // Ä£³¤ºÍÍÓÂİ¾ø¶ÔÖµÓÃÓÚ¾²Ö¹ÅĞ¶¨
     gyro_abs_dps = Mahony_VectorMagnitude(gyro_x, gyro_y, gyro_z);
-    // æ›´æ–°é™æ­¢çŠ¶æ€
+    // ¸üĞÂ¾²Ö¹×´Ì¬
     Mahony_UpdateStaticState(ahrs, gyro_abs_dps, accel_mag);
 
     measured_gx = gyro_x * DEGREES_TO_RADIANS;
@@ -533,7 +533,7 @@ void MahonyAhrs_GetEuler(const MahonyAhrs_t *ahrs,
     float q2 = ahrs->q2;
     float q3 = ahrs->q3;
     float sin_pitch;
-    
+
 
     *roll = atan2f(2.0f * (q0 * q1 + q2 * q3),
                    1.0f - 2.0f * (q1 * q1 + q2 * q2));

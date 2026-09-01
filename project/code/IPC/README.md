@@ -52,4 +52,4 @@ column: 0..8
 
 The table commands are `0x2100=save`, `0x2101=reload`, and `0x2102=restore defaults`. They accept only `SET int32 1`. Camera SPI sends them to both 2BL3 boards without parameter preflight or rollback; success requires two valid ACKs. Ordinary scalar and cell writes retain dual-board preflight, readback verification, and rollback.
 
-[è¿”å› Air æ€»æ–‡æ¡£](../../../README.md) Â· [è¿”å›æ¯ä»“åº“ README](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/README.md)
+[·µ»Ø Air ×ÜÎÄµµ](../../../README.md) ¡¤ [·µ»ØÄ¸²Ö¿â README](https://github.com/ZhangStudyLife/HDUASC-SmartCar-21st-FlyOverMinefield/blob/national-2026/README.md)

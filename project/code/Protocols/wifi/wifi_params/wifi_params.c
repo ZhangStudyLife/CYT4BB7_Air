@@ -1,7 +1,7 @@
 /*****************************************************************************
- * æ–‡ä»¶: wifi_params.c
- * æ¨¡å—: WiFi å‚æ•°è°ƒèŠ‚
- * èŒè´£: å¤„ç†é£æ§å‚æ•°æŸ¥è¯¢ã€ä¿®æ”¹ã€ä¿å­˜ã€åŠ è½½ä¸å¾…æœºæ€é¥æµ‹å¼€å…³å‘½ä»¤
+ * ÎÄ¼ş: wifi_params.c
+ * Ä£¿é: WiFi ²ÎÊıµ÷½Ú
+ * Ö°Ôğ: ´¦Àí·É¿Ø²ÎÊı²éÑ¯¡¢ĞŞ¸Ä¡¢±£´æ¡¢¼ÓÔØÓë´ı»úÌ¬Ò£²â¿ª¹ØÃüÁî
  *****************************************************************************/
 
 #include "wifi_params.h"
@@ -16,21 +16,21 @@
 #include "Protocols/wifi/wifi_cmd/wifi_cmd.h"
 #include "Protocols/wifi/wifi_justfloat/wifi_justfloat.h"
 
-/* WiFi å‚æ•°å€¼ç±»å‹ï¼šåŒºåˆ† float å‚æ•°ä¸ int32 å‚æ•° */
+/* WiFi ²ÎÊıÖµÀàĞÍ£ºÇø·Ö float ²ÎÊıÓë int32 ²ÎÊı */
 typedef enum
 {
-    WIFI_PARAMS_VALUE_FLOAT = 0,  /* float å‚æ•° */
-    WIFI_PARAMS_VALUE_INT32 = 1   /* int32 å‚æ•° */
+    WIFI_PARAMS_VALUE_FLOAT = 0,  /* float ²ÎÊı */
+    WIFI_PARAMS_VALUE_INT32 = 1   /* int32 ²ÎÊı */
 } wifi_params_value_type_e;
 
-/* WiFi å‚æ•°ç™½åå•è¡¨é¡¹ï¼šæè¿°å‚æ•°åã€ç›®æ ‡åœ°å€ã€ç±»å‹å’Œå®‰å…¨èŒƒå›´ */
+/* WiFi ²ÎÊı°×Ãûµ¥±íÏî£ºÃèÊö²ÎÊıÃû¡¢Ä¿±êµØÖ·¡¢ÀàĞÍºÍ°²È«·¶Î§ */
 typedef struct
 {
-    const char *name;                    /* å‚æ•°å */
-    void *value_ptr;                     /* å‚æ•°åœ°å€ */
-    wifi_params_value_type_e value_type; /* å‚æ•°ç±»å‹ */
-    float min_value;                     /* æœ€å°å…è®¸å€¼ */
-    float max_value;                     /* æœ€å¤§å…è®¸å€¼ */
+    const char *name;                    /* ²ÎÊıÃû */
+    void *value_ptr;                     /* ²ÎÊıµØÖ· */
+    wifi_params_value_type_e value_type; /* ²ÎÊıÀàĞÍ */
+    float min_value;                     /* ×îĞ¡ÔÊĞíÖµ */
+    float max_value;                     /* ×î´óÔÊĞíÖµ */
 } wifi_params_entry_t;
 
 #define WIFI_PARAMS_FLOAT_ITEM(param_name, member, min_v, max_v) \
@@ -39,7 +39,7 @@ typedef struct
 #define WIFI_PARAMS_INT_ITEM(param_name, member, min_v, max_v) \
     { (param_name), (void *)&g_fc_params.member, WIFI_PARAMS_VALUE_INT32, (float)(min_v), (float)(max_v) }
 
-/* WiFi å‚æ•°ç™½åå•è¡¨ï¼šåªå…è®¸ä¿®æ”¹æ˜¾å¼å¼€æ”¾çš„é£æ§å‚æ•° */
+/* WiFi ²ÎÊı°×Ãûµ¥±í£ºÖ»ÔÊĞíĞŞ¸ÄÏÔÊ½¿ª·ÅµÄ·É¿Ø²ÎÊı */
 static const wifi_params_entry_t s_wifi_params_table[] =
 {
     WIFI_PARAMS_INT_ITEM("base_throttle", base_throttle, 0, 6000),
@@ -142,17 +142,17 @@ static const wifi_params_entry_t s_wifi_params_table[] =
     WIFI_PARAMS_FLOAT_ITEM("mode8_vel_y_d_lpf", mode8_vel_y_d_lpf, 0.0f, 500.0f)
 };
 
-static wifi_params_diag_t s_wifi_params_diag = {0}; /* æœ€è¿‘ä¸€æ¬¡å‚æ•°å‘½ä»¤å¤„ç†è¯Šæ–­ */
+static wifi_params_diag_t s_wifi_params_diag = {0}; /* ×î½üÒ»´Î²ÎÊıÃüÁî´¦ÀíÕï¶Ï */
 
 /*
- * å‡½æ•°å: wifi_params_set_diag
- * åŠŸèƒ½: æ›´æ–°æœ€è¿‘ä¸€æ¬¡å‘½ä»¤å¤„ç†è¯Šæ–­
- * è¾“å…¥å‚æ•°:
- *   command_code - å‘½ä»¤ç 
- *   result_code  - ç»“æœç 
- *   param_index  - å‚æ•°ç´¢å¼•
- *   value        - ç›¸å…³å‚æ•°å€¼
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: wifi_params_set_diag
+ * ¹¦ÄÜ: ¸üĞÂ×î½üÒ»´ÎÃüÁî´¦ÀíÕï¶Ï
+ * ÊäÈë²ÎÊı:
+ *   command_code - ÃüÁîÂë
+ *   result_code  - ½á¹ûÂë
+ *   param_index  - ²ÎÊıË÷Òı
+ *   value        - Ïà¹Ø²ÎÊıÖµ
+ * ·µ»ØÖµ: ÎŞ
  */
 static void wifi_params_set_diag(uint8_t command_code, uint8_t result_code, uint16_t param_index, float value)
 {
@@ -163,12 +163,12 @@ static void wifi_params_set_diag(uint8_t command_code, uint8_t result_code, uint
 }
 
 /*
- * å‡½æ•°å: wifi_params_is_edit_allowed
- * åŠŸèƒ½: åˆ¤æ–­å½“å‰æ˜¯å¦å…è®¸æ‰§è¡Œå‚æ•°è¯»å†™å’Œå¾…æœºæ€é¥æµ‹å¼€å…³æ“ä½œ
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›å€¼:
- *   1 - å…è®¸
- *   0 - ä¸å…è®¸
+ * º¯ÊıÃû: wifi_params_is_edit_allowed
+ * ¹¦ÄÜ: ÅĞ¶Ïµ±Ç°ÊÇ·ñÔÊĞíÖ´ĞĞ²ÎÊı¶ÁĞ´ºÍ´ı»úÌ¬Ò£²â¿ª¹Ø²Ù×÷
+ * ÊäÈë²ÎÊı: ÎŞ
+ * ·µ»ØÖµ:
+ *   1 - ÔÊĞí
+ *   0 - ²»ÔÊĞí
  */
 static uint8_t wifi_params_is_edit_allowed(void)
 {
@@ -181,14 +181,14 @@ static uint8_t wifi_params_is_edit_allowed(void)
 }
 
 /*
- * å‡½æ•°å: wifi_params_parse_float
- * åŠŸèƒ½: è§£ææµ®ç‚¹å­—ç¬¦ä¸²å¹¶è¿‡æ»¤ NaN/Inf
- * è¾“å…¥å‚æ•°:
- *   text  - å¾…è§£æå­—ç¬¦ä¸²
- *   value - è¾“å‡ºæµ®ç‚¹å€¼æŒ‡é’ˆ
- * è¿”å›å€¼:
- *   1 - è§£ææˆåŠŸ
- *   0 - è§£æå¤±è´¥
+ * º¯ÊıÃû: wifi_params_parse_float
+ * ¹¦ÄÜ: ½âÎö¸¡µã×Ö·û´®²¢¹ıÂË NaN/Inf
+ * ÊäÈë²ÎÊı:
+ *   text  - ´ı½âÎö×Ö·û´®
+ *   value - Êä³ö¸¡µãÖµÖ¸Õë
+ * ·µ»ØÖµ:
+ *   1 - ½âÎö³É¹¦
+ *   0 - ½âÎöÊ§°Ü
  */
 static uint8_t wifi_params_parse_float(const char *text, float *value)
 {
@@ -216,14 +216,14 @@ static uint8_t wifi_params_parse_float(const char *text, float *value)
 }
 
 /*
- * å‡½æ•°å: wifi_params_parse_int32
- * åŠŸèƒ½: è§£ææ•´æ•°å­—ç¬¦ä¸²å¹¶è¿‡æ»¤éæ³•å°¾éƒ¨
- * è¾“å…¥å‚æ•°:
- *   text  - å¾…è§£æå­—ç¬¦ä¸²
- *   value - è¾“å‡ºæ•´æ•°å€¼æŒ‡é’ˆ
- * è¿”å›å€¼:
- *   1 - è§£ææˆåŠŸ
- *   0 - è§£æå¤±è´¥
+ * º¯ÊıÃû: wifi_params_parse_int32
+ * ¹¦ÄÜ: ½âÎöÕûÊı×Ö·û´®²¢¹ıÂË·Ç·¨Î²²¿
+ * ÊäÈë²ÎÊı:
+ *   text  - ´ı½âÎö×Ö·û´®
+ *   value - Êä³öÕûÊıÖµÖ¸Õë
+ * ·µ»ØÖµ:
+ *   1 - ½âÎö³É¹¦
+ *   0 - ½âÎöÊ§°Ü
  */
 static uint8_t wifi_params_parse_int32(const char *text, int32_t *value)
 {
@@ -246,12 +246,12 @@ static uint8_t wifi_params_parse_int32(const char *text, int32_t *value)
 }
 
 /*
- * å‡½æ•°å: wifi_params_find_entry
- * åŠŸèƒ½: æ ¹æ®å‚æ•°åæŸ¥æ‰¾ç™½åå•è¡¨é¡¹
- * è¾“å…¥å‚æ•°:
- *   name - å‚æ•°å
- * è¿”å›å€¼:
- *   åŒ¹é…åˆ°çš„è¡¨é¡¹æŒ‡é’ˆï¼Œæœªæ‰¾åˆ°æ—¶è¿”å› NULL
+ * º¯ÊıÃû: wifi_params_find_entry
+ * ¹¦ÄÜ: ¸ù¾İ²ÎÊıÃû²éÕÒ°×Ãûµ¥±íÏî
+ * ÊäÈë²ÎÊı:
+ *   name - ²ÎÊıÃû
+ * ·µ»ØÖµ:
+ *   Æ¥Åäµ½µÄ±íÏîÖ¸Õë£¬Î´ÕÒµ½Ê±·µ»Ø NULL
  */
 static const wifi_params_entry_t *wifi_params_find_entry(const char *name)
 {
@@ -274,12 +274,12 @@ static const wifi_params_entry_t *wifi_params_find_entry(const char *name)
 }
 
 /*
- * å‡½æ•°å: wifi_params_entry_index
- * åŠŸèƒ½: è®¡ç®—ç™½åå•è¡¨é¡¹çš„ 1 åŸºå‚æ•°ç´¢å¼•
- * è¾“å…¥å‚æ•°:
- *   entry - ç™½åå•è¡¨é¡¹æŒ‡é’ˆ
- * è¿”å›å€¼:
- *   å‚æ•°ç´¢å¼•ï¼Œå¤±è´¥æ—¶è¿”å› 0
+ * º¯ÊıÃû: wifi_params_entry_index
+ * ¹¦ÄÜ: ¼ÆËã°×Ãûµ¥±íÏîµÄ 1 »ù²ÎÊıË÷Òı
+ * ÊäÈë²ÎÊı:
+ *   entry - °×Ãûµ¥±íÏîÖ¸Õë
+ * ·µ»ØÖµ:
+ *   ²ÎÊıË÷Òı£¬Ê§°ÜÊ±·µ»Ø 0
  */
 static uint16_t wifi_params_entry_index(const wifi_params_entry_t *entry)
 {
@@ -302,11 +302,11 @@ static uint16_t wifi_params_entry_index(const wifi_params_entry_t *entry)
 }
 
 /*
- * å‡½æ•°å: wifi_params_entry_count
- * åŠŸèƒ½: è·å–ç™½åå•å‚æ•°æ€»æ•°
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›å€¼:
- *   ç™½åå•å‚æ•°æ€»æ•°
+ * º¯ÊıÃû: wifi_params_entry_count
+ * ¹¦ÄÜ: »ñÈ¡°×Ãûµ¥²ÎÊı×ÜÊı
+ * ÊäÈë²ÎÊı: ÎŞ
+ * ·µ»ØÖµ:
+ *   °×Ãûµ¥²ÎÊı×ÜÊı
  */
 static uint16_t wifi_params_entry_count(void)
 {
@@ -314,12 +314,12 @@ static uint16_t wifi_params_entry_count(void)
 }
 
 /*
- * å‡½æ•°å: wifi_params_entry_read_as_float
- * åŠŸèƒ½: å°†è¡¨é¡¹å½“å‰å€¼ç»Ÿä¸€è¯»å–ä¸º float
- * è¾“å…¥å‚æ•°:
- *   entry - ç™½åå•è¡¨é¡¹æŒ‡é’ˆ
- * è¿”å›å€¼:
- *   å½“å‰å‚æ•°å€¼ï¼Œå¤±è´¥æ—¶è¿”å› 0
+ * º¯ÊıÃû: wifi_params_entry_read_as_float
+ * ¹¦ÄÜ: ½«±íÏîµ±Ç°ÖµÍ³Ò»¶ÁÈ¡Îª float
+ * ÊäÈë²ÎÊı:
+ *   entry - °×Ãûµ¥±íÏîÖ¸Õë
+ * ·µ»ØÖµ:
+ *   µ±Ç°²ÎÊıÖµ£¬Ê§°ÜÊ±·µ»Ø 0
  */
 static float wifi_params_entry_read_as_float(const wifi_params_entry_t *entry)
 {
@@ -337,14 +337,14 @@ static float wifi_params_entry_read_as_float(const wifi_params_entry_t *entry)
 }
 
 /*
- * å‡½æ•°å: wifi_params_entry_write_value
- * åŠŸèƒ½: å¯¹è¡¨é¡¹æ‰§è¡ŒèŒƒå›´æ£€æŸ¥å¹¶å†™å…¥è¿è¡Œæ—¶å‚æ•°
- * è¾“å…¥å‚æ•°:
- *   entry - ç™½åå•è¡¨é¡¹æŒ‡é’ˆ
- *   value - å¾…å†™å…¥å€¼
- * è¿”å›å€¼:
- *   1 - å†™å…¥æˆåŠŸ
- *   0 - å†™å…¥å¤±è´¥
+ * º¯ÊıÃû: wifi_params_entry_write_value
+ * ¹¦ÄÜ: ¶Ô±íÏîÖ´ĞĞ·¶Î§¼ì²é²¢Ğ´ÈëÔËĞĞÊ±²ÎÊı
+ * ÊäÈë²ÎÊı:
+ *   entry - °×Ãûµ¥±íÏîÖ¸Õë
+ *   value - ´ıĞ´ÈëÖµ
+ * ·µ»ØÖµ:
+ *   1 - Ğ´Èë³É¹¦
+ *   0 - Ğ´ÈëÊ§°Ü
  */
 static uint8_t wifi_params_entry_write_value(const wifi_params_entry_t *entry, float value)
 {
@@ -371,13 +371,13 @@ static uint8_t wifi_params_entry_write_value(const wifi_params_entry_t *entry, f
 }
 
 /*
- * å‡½æ•°å: wifi_params_send_value_line
- * åŠŸèƒ½: æŒ‰ç»Ÿä¸€æ ¼å¼å›ä¼ ä¸€æ¡å‚æ•°å€¼æ–‡æœ¬
- * è¾“å…¥å‚æ•°:
- *   entry - éœ€è¦å›ä¼ çš„å‚æ•°è¡¨é¡¹
- * è¿”å›å€¼:
- *   1 - å‘é€æˆåŠŸ
- *   0 - å‘é€å¤±è´¥
+ * º¯ÊıÃû: wifi_params_send_value_line
+ * ¹¦ÄÜ: °´Í³Ò»¸ñÊ½»Ø´«Ò»Ìõ²ÎÊıÖµÎÄ±¾
+ * ÊäÈë²ÎÊı:
+ *   entry - ĞèÒª»Ø´«µÄ²ÎÊı±íÏî
+ * ·µ»ØÖµ:
+ *   1 - ·¢ËÍ³É¹¦
+ *   0 - ·¢ËÍÊ§°Ü
  */
 static uint8_t wifi_params_send_value_line(const wifi_params_entry_t *entry)
 {
@@ -395,15 +395,15 @@ static uint8_t wifi_params_send_value_line(const wifi_params_entry_t *entry)
 }
 
 /*
- * å‡½æ•°å: wifi_params_reply_error
- * åŠŸèƒ½: å‘é€å‚æ•°å‘½ä»¤é”™è¯¯å›åŒ…å¹¶æ›´æ–°è¯Šæ–­ä¿¡æ¯
- * è¾“å…¥å‚æ•°:
- *   command_code - å‘½ä»¤ç 
- *   result_code  - ç»“æœç 
- *   param_index  - å‚æ•°ç´¢å¼•
- *   value        - ç›¸å…³å€¼
- *   reason       - é”™è¯¯åŸå› æ–‡æœ¬
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: wifi_params_reply_error
+ * ¹¦ÄÜ: ·¢ËÍ²ÎÊıÃüÁî´íÎó»Ø°ü²¢¸üĞÂÕï¶ÏĞÅÏ¢
+ * ÊäÈë²ÎÊı:
+ *   command_code - ÃüÁîÂë
+ *   result_code  - ½á¹ûÂë
+ *   param_index  - ²ÎÊıË÷Òı
+ *   value        - Ïà¹ØÖµ
+ *   reason       - ´íÎóÔ­ÒòÎÄ±¾
+ * ·µ»ØÖµ: ÎŞ
  */
 static void wifi_params_reply_error(uint8_t command_code, uint8_t result_code, uint16_t param_index, float value, const char *reason)
 {
@@ -412,10 +412,10 @@ static void wifi_params_reply_error(uint8_t command_code, uint8_t result_code, u
 }
 
 /*
- * å‡½æ•°å: wifi_params_process_ping
- * åŠŸèƒ½: å¤„ç† ping å‘½ä»¤
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: wifi_params_process_ping
+ * ¹¦ÄÜ: ´¦Àí ping ÃüÁî
+ * ÊäÈë²ÎÊı: ÎŞ
+ * ·µ»ØÖµ: ÎŞ
  */
 static void wifi_params_process_ping(void)
 {
@@ -424,13 +424,13 @@ static void wifi_params_process_ping(void)
 }
 
 /*
- * å‡½æ•°å: wifi_params_process_help_topic
- * åŠŸèƒ½: è¾“å‡ºæŒ‡å®šä¸»é¢˜å¸®åŠ©
- * è¾“å…¥å‚æ•°:
- *   topic - å¸®åŠ©ä¸»é¢˜
- * è¿”å›å€¼:
- *   1 - å·²å¤„ç†
- *   0 - æœªçŸ¥ä¸»é¢˜
+ * º¯ÊıÃû: wifi_params_process_help_topic
+ * ¹¦ÄÜ: Êä³öÖ¸¶¨Ö÷Ìâ°ïÖú
+ * ÊäÈë²ÎÊı:
+ *   topic - °ïÖúÖ÷Ìâ
+ * ·µ»ØÖµ:
+ *   1 - ÒÑ´¦Àí
+ *   0 - Î´ÖªÖ÷Ìâ
  */
 static uint8_t wifi_params_process_help_topic(const char *topic)
 {
@@ -441,135 +441,135 @@ static uint8_t wifi_params_process_help_topic(const char *topic)
 
     if (0 == wifi_cmd_ascii_stricmp(topic, "ping"))
     {
-        (void)wifi_cmd_SendLine("ä¸»é¢˜: ping");
-        (void)wifi_cmd_SendLine("ç”¨æ³•: ping");
-        (void)wifi_cmd_SendLine("åŠŸèƒ½: æ£€æŸ¥å½“å‰ UDP é“¾è·¯æ˜¯å¦ç•…é€š");
-        (void)wifi_cmd_SendLine("é™åˆ¶: ä»»æ„çŠ¶æ€éƒ½å…è®¸æ‰§è¡Œ");
-        (void)wifi_cmd_SendLine("ç¤ºä¾‹: ping");
-        (void)wifi_cmd_SendLine("æˆåŠŸå›åŒ…: OK ping");
+        (void)wifi_cmd_SendLine("Ö÷Ìâ: ping");
+        (void)wifi_cmd_SendLine("ÓÃ·¨: ping");
+        (void)wifi_cmd_SendLine("¹¦ÄÜ: ¼ì²éµ±Ç° UDP Á´Â·ÊÇ·ñ³©Í¨");
+        (void)wifi_cmd_SendLine("ÏŞÖÆ: ÈÎÒâ×´Ì¬¶¼ÔÊĞíÖ´ĞĞ");
+        (void)wifi_cmd_SendLine("Ê¾Àı: ping");
+        (void)wifi_cmd_SendLine("³É¹¦»Ø°ü: OK ping");
         (void)wifi_cmd_SendLine("OK help ping");
         return 1U;
     }
 
     if (0 == wifi_cmd_ascii_stricmp(topic, "help"))
     {
-        (void)wifi_cmd_SendLine("ä¸»é¢˜: help");
-        (void)wifi_cmd_SendLine("ç”¨æ³•1: help");
-        (void)wifi_cmd_SendLine("ç”¨æ³•2: help <å‘½ä»¤>");
-        (void)wifi_cmd_SendLine("ç”¨æ³•3: <å‘½ä»¤> --help");
-        (void)wifi_cmd_SendLine("åŠŸèƒ½: è¾“å‡ºæ€»å¸®åŠ©æˆ–å‘½ä»¤çš„è¯¦ç»†å¸®åŠ©");
-        (void)wifi_cmd_SendLine("ç¤ºä¾‹1: help imu");
-        (void)wifi_cmd_SendLine("ç¤ºä¾‹2: imu help");
+        (void)wifi_cmd_SendLine("Ö÷Ìâ: help");
+        (void)wifi_cmd_SendLine("ÓÃ·¨1: help");
+        (void)wifi_cmd_SendLine("ÓÃ·¨2: help <ÃüÁî>");
+        (void)wifi_cmd_SendLine("ÓÃ·¨3: <ÃüÁî> --help");
+        (void)wifi_cmd_SendLine("¹¦ÄÜ: Êä³ö×Ü°ïÖú»òÃüÁîµÄÏêÏ¸°ïÖú");
+        (void)wifi_cmd_SendLine("Ê¾Àı1: help imu");
+        (void)wifi_cmd_SendLine("Ê¾Àı2: imu help");
         (void)wifi_cmd_SendLine("OK help help");
         return 1U;
     }
 
     if (0 == wifi_cmd_ascii_stricmp(topic, "imu"))
     {
-        (void)wifi_cmd_SendLine("ä¸»é¢˜: imu");
-        (void)wifi_cmd_SendLine("ç”¨æ³•1: imu help");
-        (void)wifi_cmd_SendLine("ç”¨æ³•2: imu status");
-        (void)wifi_cmd_SendLine("ç”¨æ³•3: imu start gyro");
-        (void)wifi_cmd_SendLine("ç”¨æ³•4: imu start accel");
-        (void)wifi_cmd_SendLine("ç”¨æ³•5: imu start accel_man");
-        (void)wifi_cmd_SendLine("ç”¨æ³•6: imu acc collect / imu acc stop");
-        (void)wifi_cmd_SendLine("ç”¨æ³•7: imu flash");
-        (void)wifi_cmd_SendLine("åŠŸèƒ½: è®¿é—® IMU æ ¡å‡†å‘½ä»¤é›†");
-        (void)wifi_cmd_SendLine("è¯´æ˜: æ›´è¯¦ç»†è¯´æ˜è¯·æ‰§è¡Œ imu help");
+        (void)wifi_cmd_SendLine("Ö÷Ìâ: imu");
+        (void)wifi_cmd_SendLine("ÓÃ·¨1: imu help");
+        (void)wifi_cmd_SendLine("ÓÃ·¨2: imu status");
+        (void)wifi_cmd_SendLine("ÓÃ·¨3: imu start gyro");
+        (void)wifi_cmd_SendLine("ÓÃ·¨4: imu start accel");
+        (void)wifi_cmd_SendLine("ÓÃ·¨5: imu start accel_man");
+        (void)wifi_cmd_SendLine("ÓÃ·¨6: imu acc collect / imu acc stop");
+        (void)wifi_cmd_SendLine("ÓÃ·¨7: imu flash");
+        (void)wifi_cmd_SendLine("¹¦ÄÜ: ·ÃÎÊ IMU Ğ£×¼ÃüÁî¼¯");
+        (void)wifi_cmd_SendLine("ËµÃ÷: ¸üÏêÏ¸ËµÃ÷ÇëÖ´ĞĞ imu help");
         (void)wifi_cmd_SendLine("OK help imu");
         return 1U;
     }
 
     if (0 == wifi_cmd_ascii_stricmp(topic, "get"))
     {
-        (void)wifi_cmd_SendLine("ä¸»é¢˜: get");
-        (void)wifi_cmd_SendLine("ç”¨æ³•: get <å‚æ•°å>");
-        (void)wifi_cmd_SendLine("åŠŸèƒ½: è¯»å–ç™½åå•å‚æ•°çš„å½“å‰å€¼");
-        (void)wifi_cmd_SendLine("é™åˆ¶: ä»…å¾…æœºä¸”æœªè§£é”æ—¶å…è®¸æ‰§è¡Œ");
-        (void)wifi_cmd_SendLine("è¯´æ˜: å‚æ•°åä¸åŒºåˆ†å¤§å°å†™");
-        (void)wifi_cmd_SendLine("ç¤ºä¾‹: get base_throttle");
-        (void)wifi_cmd_SendLine("æˆåŠŸå›åŒ…: OK base_throttle=3500");
+        (void)wifi_cmd_SendLine("Ö÷Ìâ: get");
+        (void)wifi_cmd_SendLine("ÓÃ·¨: get <²ÎÊıÃû>");
+        (void)wifi_cmd_SendLine("¹¦ÄÜ: ¶ÁÈ¡°×Ãûµ¥²ÎÊıµÄµ±Ç°Öµ");
+        (void)wifi_cmd_SendLine("ÏŞÖÆ: ½ö´ı»úÇÒÎ´½âËøÊ±ÔÊĞíÖ´ĞĞ");
+        (void)wifi_cmd_SendLine("ËµÃ÷: ²ÎÊıÃû²»Çø·Ö´óĞ¡Ğ´");
+        (void)wifi_cmd_SendLine("Ê¾Àı: get base_throttle");
+        (void)wifi_cmd_SendLine("³É¹¦»Ø°ü: OK base_throttle=3500");
         (void)wifi_cmd_SendLine("OK help get");
         return 1U;
     }
 
     if (0 == wifi_cmd_ascii_stricmp(topic, "set"))
     {
-        (void)wifi_cmd_SendLine("ä¸»é¢˜: set");
-        (void)wifi_cmd_SendLine("ç”¨æ³•: set <å‚æ•°å> <æ•°å€¼>");
-        (void)wifi_cmd_SendLine("åŠŸèƒ½: ä¿®æ”¹ RAM å‚æ•°å¹¶ç«‹å³é‡è½½æ§åˆ¶å™¨");
-        (void)wifi_cmd_SendLine("é™åˆ¶: ä»…å¾…æœºä¸”æœªè§£é”æ—¶å…è®¸æ‰§è¡Œ");
-        (void)wifi_cmd_SendLine("è¯´æ˜1: å‚æ•°åä¸åŒºåˆ†å¤§å°å†™");
-        (void)wifi_cmd_SendLine("è¯´æ˜2: æ–­ç”µä¸ä¼šä¿å­˜ï¼Œéœ€è¦å†æ‰§è¡Œ save");
-        (void)wifi_cmd_SendLine("ç¤ºä¾‹: set roll_angle_kp 5.5");
-        (void)wifi_cmd_SendLine("æˆåŠŸå›åŒ…: OK set roll_angle_kp=5.5");
+        (void)wifi_cmd_SendLine("Ö÷Ìâ: set");
+        (void)wifi_cmd_SendLine("ÓÃ·¨: set <²ÎÊıÃû> <ÊıÖµ>");
+        (void)wifi_cmd_SendLine("¹¦ÄÜ: ĞŞ¸Ä RAM ²ÎÊı²¢Á¢¼´ÖØÔØ¿ØÖÆÆ÷");
+        (void)wifi_cmd_SendLine("ÏŞÖÆ: ½ö´ı»úÇÒÎ´½âËøÊ±ÔÊĞíÖ´ĞĞ");
+        (void)wifi_cmd_SendLine("ËµÃ÷1: ²ÎÊıÃû²»Çø·Ö´óĞ¡Ğ´");
+        (void)wifi_cmd_SendLine("ËµÃ÷2: ¶Ïµç²»»á±£´æ£¬ĞèÒªÔÙÖ´ĞĞ save");
+        (void)wifi_cmd_SendLine("Ê¾Àı: set roll_angle_kp 5.5");
+        (void)wifi_cmd_SendLine("³É¹¦»Ø°ü: OK set roll_angle_kp=5.5");
         (void)wifi_cmd_SendLine("OK help set");
         return 1U;
     }
 
     if (0 == wifi_cmd_ascii_stricmp(topic, "save"))
     {
-        (void)wifi_cmd_SendLine("ä¸»é¢˜: save");
-        (void)wifi_cmd_SendLine("ç”¨æ³•: save");
-        (void)wifi_cmd_SendLine("åŠŸèƒ½: å°†å½“å‰å‚æ•°æ°¸ä¹…ä¿å­˜åˆ° Flash");
-        (void)wifi_cmd_SendLine("é™åˆ¶: ä»…å¾…æœºä¸”æœªè§£é”æ—¶å…è®¸æ‰§è¡Œ");
-        (void)wifi_cmd_SendLine("è¯´æ˜: save ä¿å­˜çš„æ˜¯å½“å‰ RAM å‚æ•°");
-        (void)wifi_cmd_SendLine("ç¤ºä¾‹: save");
-        (void)wifi_cmd_SendLine("æˆåŠŸå›åŒ…: OK save");
+        (void)wifi_cmd_SendLine("Ö÷Ìâ: save");
+        (void)wifi_cmd_SendLine("ÓÃ·¨: save");
+        (void)wifi_cmd_SendLine("¹¦ÄÜ: ½«µ±Ç°²ÎÊıÓÀ¾Ã±£´æµ½ Flash");
+        (void)wifi_cmd_SendLine("ÏŞÖÆ: ½ö´ı»úÇÒÎ´½âËøÊ±ÔÊĞíÖ´ĞĞ");
+        (void)wifi_cmd_SendLine("ËµÃ÷: save ±£´æµÄÊÇµ±Ç° RAM ²ÎÊı");
+        (void)wifi_cmd_SendLine("Ê¾Àı: save");
+        (void)wifi_cmd_SendLine("³É¹¦»Ø°ü: OK save");
         (void)wifi_cmd_SendLine("OK help save");
         return 1U;
     }
 
     if (0 == wifi_cmd_ascii_stricmp(topic, "load"))
     {
-        (void)wifi_cmd_SendLine("ä¸»é¢˜: load");
-        (void)wifi_cmd_SendLine("ç”¨æ³•: load");
-        (void)wifi_cmd_SendLine("åŠŸèƒ½: ä» Flash è¯»å–ä¸Šæ¬¡ä¿å­˜çš„å‚æ•°");
-        (void)wifi_cmd_SendLine("é™åˆ¶: ä»…å¾…æœºä¸”æœªè§£é”æ—¶å…è®¸æ‰§è¡Œ");
-        (void)wifi_cmd_SendLine("è¯´æ˜: æˆåŠŸåä¼šé‡æ–°è£…è½½æ§åˆ¶å™¨å‚æ•°");
-        (void)wifi_cmd_SendLine("ç¤ºä¾‹: load");
-        (void)wifi_cmd_SendLine("æˆåŠŸå›åŒ…: OK load");
+        (void)wifi_cmd_SendLine("Ö÷Ìâ: load");
+        (void)wifi_cmd_SendLine("ÓÃ·¨: load");
+        (void)wifi_cmd_SendLine("¹¦ÄÜ: ´Ó Flash ¶ÁÈ¡ÉÏ´Î±£´æµÄ²ÎÊı");
+        (void)wifi_cmd_SendLine("ÏŞÖÆ: ½ö´ı»úÇÒÎ´½âËøÊ±ÔÊĞíÖ´ĞĞ");
+        (void)wifi_cmd_SendLine("ËµÃ÷: ³É¹¦ºó»áÖØĞÂ×°ÔØ¿ØÖÆÆ÷²ÎÊı");
+        (void)wifi_cmd_SendLine("Ê¾Àı: load");
+        (void)wifi_cmd_SendLine("³É¹¦»Ø°ü: OK load");
         (void)wifi_cmd_SendLine("OK help load");
         return 1U;
     }
 
     if (0 == wifi_cmd_ascii_stricmp(topic, "start"))
     {
-        (void)wifi_cmd_SendLine("ä¸»é¢˜: start");
-        (void)wifi_cmd_SendLine("ç”¨æ³•: start");
-        (void)wifi_cmd_SendLine("åŠŸèƒ½: æ¢å¤å¾…æœºçŠ¶æ€ä¸‹çš„ JustFloat é¥æµ‹å‘é€");
-        (void)wifi_cmd_SendLine("é™åˆ¶: ä»…å¾…æœºä¸”æœªè§£é”æ—¶å…è®¸æ‰§è¡Œ");
-        (void)wifi_cmd_SendLine("è¯´æ˜: é£è¡Œä¸­é¥æµ‹æœ¬æ¥å°±å§‹ç»ˆå…è®¸å‘é€");
-        (void)wifi_cmd_SendLine("ç¤ºä¾‹: start");
-        (void)wifi_cmd_SendLine("æˆåŠŸå›åŒ…: OK start telemetry=on");
+        (void)wifi_cmd_SendLine("Ö÷Ìâ: start");
+        (void)wifi_cmd_SendLine("ÓÃ·¨: start");
+        (void)wifi_cmd_SendLine("¹¦ÄÜ: »Ö¸´´ı»ú×´Ì¬ÏÂµÄ JustFloat Ò£²â·¢ËÍ");
+        (void)wifi_cmd_SendLine("ÏŞÖÆ: ½ö´ı»úÇÒÎ´½âËøÊ±ÔÊĞíÖ´ĞĞ");
+        (void)wifi_cmd_SendLine("ËµÃ÷: ·ÉĞĞÖĞÒ£²â±¾À´¾ÍÊ¼ÖÕÔÊĞí·¢ËÍ");
+        (void)wifi_cmd_SendLine("Ê¾Àı: start");
+        (void)wifi_cmd_SendLine("³É¹¦»Ø°ü: OK start telemetry=on");
         (void)wifi_cmd_SendLine("OK help start");
         return 1U;
     }
 
     if (0 == wifi_cmd_ascii_stricmp(topic, "stop"))
     {
-        (void)wifi_cmd_SendLine("ä¸»é¢˜: stop");
-        (void)wifi_cmd_SendLine("ç”¨æ³•: stop");
-        (void)wifi_cmd_SendLine("åŠŸèƒ½: åœæ­¢å¾…æœºçŠ¶æ€ä¸‹çš„ JustFloat é¥æµ‹å‘é€");
-        (void)wifi_cmd_SendLine("é™åˆ¶: ä»…å¾…æœºä¸”æœªè§£é”æ—¶å…è®¸æ‰§è¡Œ");
-        (void)wifi_cmd_SendLine("è¯´æ˜: ä¸å½±å“ imu/list/get/set ç­‰æ–‡æœ¬å‘½ä»¤å›åŒ…");
-        (void)wifi_cmd_SendLine("ç¤ºä¾‹: stop");
-        (void)wifi_cmd_SendLine("æˆåŠŸå›åŒ…: OK stop telemetry=off");
+        (void)wifi_cmd_SendLine("Ö÷Ìâ: stop");
+        (void)wifi_cmd_SendLine("ÓÃ·¨: stop");
+        (void)wifi_cmd_SendLine("¹¦ÄÜ: Í£Ö¹´ı»ú×´Ì¬ÏÂµÄ JustFloat Ò£²â·¢ËÍ");
+        (void)wifi_cmd_SendLine("ÏŞÖÆ: ½ö´ı»úÇÒÎ´½âËøÊ±ÔÊĞíÖ´ĞĞ");
+        (void)wifi_cmd_SendLine("ËµÃ÷: ²»Ó°Ïì imu/list/get/set µÈÎÄ±¾ÃüÁî»Ø°ü");
+        (void)wifi_cmd_SendLine("Ê¾Àı: stop");
+        (void)wifi_cmd_SendLine("³É¹¦»Ø°ü: OK stop telemetry=off");
         (void)wifi_cmd_SendLine("OK help stop");
         return 1U;
     }
 
     if (0 == wifi_cmd_ascii_stricmp(topic, "list"))
     {
-        (void)wifi_cmd_SendLine("ä¸»é¢˜: list");
-        (void)wifi_cmd_SendLine("ç”¨æ³•: list");
-        (void)wifi_cmd_SendLine("åŠŸèƒ½: è¾“å‡ºå…¨éƒ¨ç™½åå•å‚æ•°å’Œå½“å‰å€¼");
-        (void)wifi_cmd_SendLine("é™åˆ¶: ä»…å¾…æœºä¸”æœªè§£é”æ—¶å…è®¸æ‰§è¡Œ");
-        (void)wifi_cmd_SendLine("è¯´æ˜: ç¬¬ä¸€è¡Œä¼šå…ˆè¿”å›å‚æ•°æ€»æ•°é‡");
-        (void)wifi_cmd_SendLine("ç¤ºä¾‹: list");
-        (void)wifi_cmd_SendLine("å›åŒ…1: OK list begin count=N");
-        (void)wifi_cmd_SendLine("å›åŒ…2: å‚æ•°å=æ•°å€¼");
-        (void)wifi_cmd_SendLine("å›åŒ…3: OK list end");
+        (void)wifi_cmd_SendLine("Ö÷Ìâ: list");
+        (void)wifi_cmd_SendLine("ÓÃ·¨: list");
+        (void)wifi_cmd_SendLine("¹¦ÄÜ: Êä³öÈ«²¿°×Ãûµ¥²ÎÊıºÍµ±Ç°Öµ");
+        (void)wifi_cmd_SendLine("ÏŞÖÆ: ½ö´ı»úÇÒÎ´½âËøÊ±ÔÊĞíÖ´ĞĞ");
+        (void)wifi_cmd_SendLine("ËµÃ÷: µÚÒ»ĞĞ»áÏÈ·µ»Ø²ÎÊı×ÜÊıÁ¿");
+        (void)wifi_cmd_SendLine("Ê¾Àı: list");
+        (void)wifi_cmd_SendLine("»Ø°ü1: OK list begin count=N");
+        (void)wifi_cmd_SendLine("»Ø°ü2: ²ÎÊıÃû=ÊıÖµ");
+        (void)wifi_cmd_SendLine("»Ø°ü3: OK list end");
         (void)wifi_cmd_SendLine("OK help list");
         return 1U;
     }
@@ -578,11 +578,11 @@ static uint8_t wifi_params_process_help_topic(const char *topic)
 }
 
 /*
- * å‡½æ•°å: wifi_params_process_help
- * åŠŸèƒ½: è¾“å‡ºæ€»å¸®åŠ©æˆ–æŒ‡å®šä¸»é¢˜å¸®åŠ©
- * è¾“å…¥å‚æ•°:
- *   topic - ä¸ºç©ºæ—¶è¾“å‡ºæ€»å¸®åŠ©ï¼Œéç©ºæ—¶è¾“å‡ºæŒ‡å®šä¸»é¢˜å¸®åŠ©
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: wifi_params_process_help
+ * ¹¦ÄÜ: Êä³ö×Ü°ïÖú»òÖ¸¶¨Ö÷Ìâ°ïÖú
+ * ÊäÈë²ÎÊı:
+ *   topic - Îª¿ÕÊ±Êä³ö×Ü°ïÖú£¬·Ç¿ÕÊ±Êä³öÖ¸¶¨Ö÷Ìâ°ïÖú
+ * ·µ»ØÖµ: ÎŞ
  */
 static void wifi_params_process_help(const char *topic)
 {
@@ -599,27 +599,27 @@ static void wifi_params_process_help(const char *topic)
         return;
     }
 
-    (void)wifi_cmd_SendLine("ä¸»é¢˜: æ€»å¸®åŠ©");
-    (void)wifi_cmd_SendLine("ç”¨æ³•1: help");
-    (void)wifi_cmd_SendLine("ç”¨æ³•2: help <å‘½ä»¤>");
-    (void)wifi_cmd_SendLine("ç”¨æ³•3: <å‘½ä»¤> --help");
-    (void)wifi_cmd_SendLine("å‘½ä»¤1: ping help get set save load");
-    (void)wifi_cmd_SendLine("å‘½ä»¤2: start stop list");
-    (void)wifi_cmd_SendLine("å‘½ä»¤3: imu help / imu status / imu start ...");
-    (void)wifi_cmd_SendLine("è¯´æ˜1: å‘½ä»¤å­—å’Œå‚æ•°åä¸åŒºåˆ†å¤§å°å†™");
-    (void)wifi_cmd_SendLine("è¯´æ˜2: æ–‡æœ¬å‘½ä»¤å¿…é¡»ä»¥ CRLF ç»“æŸ");
-    (void)wifi_cmd_SendLine("è¯´æ˜3: start/stop åªæ§åˆ¶å¾…æœºé¥æµ‹");
-    (void)wifi_cmd_SendLine("ç¤ºä¾‹1: help imu");
-    (void)wifi_cmd_SendLine("ç¤ºä¾‹2: imu help");
+    (void)wifi_cmd_SendLine("Ö÷Ìâ: ×Ü°ïÖú");
+    (void)wifi_cmd_SendLine("ÓÃ·¨1: help");
+    (void)wifi_cmd_SendLine("ÓÃ·¨2: help <ÃüÁî>");
+    (void)wifi_cmd_SendLine("ÓÃ·¨3: <ÃüÁî> --help");
+    (void)wifi_cmd_SendLine("ÃüÁî1: ping help get set save load");
+    (void)wifi_cmd_SendLine("ÃüÁî2: start stop list");
+    (void)wifi_cmd_SendLine("ÃüÁî3: imu help / imu status / imu start ...");
+    (void)wifi_cmd_SendLine("ËµÃ÷1: ÃüÁî×ÖºÍ²ÎÊıÃû²»Çø·Ö´óĞ¡Ğ´");
+    (void)wifi_cmd_SendLine("ËµÃ÷2: ÎÄ±¾ÃüÁî±ØĞëÒÔ CRLF ½áÊø");
+    (void)wifi_cmd_SendLine("ËµÃ÷3: start/stop Ö»¿ØÖÆ´ı»úÒ£²â");
+    (void)wifi_cmd_SendLine("Ê¾Àı1: help imu");
+    (void)wifi_cmd_SendLine("Ê¾Àı2: imu help");
     (void)wifi_cmd_SendLine("OK help");
 }
 
 /*
- * å‡½æ•°å: wifi_params_process_get
- * åŠŸèƒ½: å¤„ç†å•å‚æ•°æŸ¥è¯¢å‘½ä»¤
- * è¾“å…¥å‚æ•°:
- *   name - å‚æ•°å
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: wifi_params_process_get
+ * ¹¦ÄÜ: ´¦Àíµ¥²ÎÊı²éÑ¯ÃüÁî
+ * ÊäÈë²ÎÊı:
+ *   name - ²ÎÊıÃû
+ * ·µ»ØÖµ: ÎŞ
  */
 static void wifi_params_process_get(const char *name)
 {
@@ -647,12 +647,12 @@ static void wifi_params_process_get(const char *name)
 }
 
 /*
- * å‡½æ•°å: wifi_params_process_set
- * åŠŸèƒ½: å¤„ç†å‚æ•°ä¿®æ”¹å‘½ä»¤
- * è¾“å…¥å‚æ•°:
- *   name       - å‚æ•°å
- *   value_text - å‚æ•°å€¼æ–‡æœ¬
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: wifi_params_process_set
+ * ¹¦ÄÜ: ´¦Àí²ÎÊıĞŞ¸ÄÃüÁî
+ * ÊäÈë²ÎÊı:
+ *   name       - ²ÎÊıÃû
+ *   value_text - ²ÎÊıÖµÎÄ±¾
+ * ·µ»ØÖµ: ÎŞ
  */
 static void wifi_params_process_set(const char *name, const char *value_text)
 {
@@ -664,7 +664,7 @@ static void wifi_params_process_set(const char *name, const char *value_text)
 
     if (0U == wifi_params_is_edit_allowed())
     {
-        wifi_params_reply_error(WIFI_PARAMS_COMMAND_SET, WIFI_PARAMS_RESULT_ERR_STATE, 0U, 0.0f, "set ä»…å…è®¸å¾…æœºä¸”æœªè§£é”æ—¶æ‰§è¡Œ");
+        wifi_params_reply_error(WIFI_PARAMS_COMMAND_SET, WIFI_PARAMS_RESULT_ERR_STATE, 0U, 0.0f, "set ½öÔÊĞí´ı»úÇÒÎ´½âËøÊ±Ö´ĞĞ");
         return;
     }
 
@@ -672,7 +672,7 @@ static void wifi_params_process_set(const char *name, const char *value_text)
     if (NULL == entry)
     {
         wifi_params_set_diag(WIFI_PARAMS_COMMAND_SET, WIFI_PARAMS_RESULT_ERR_UNKNOWN_PARAM, 0U, 0.0f);
-        (void)wifi_cmd_SendLine("ERR set æœªçŸ¥å‚æ•°: %s", (NULL != name) ? name : "(null)");
+        (void)wifi_cmd_SendLine("ERR set Î´Öª²ÎÊı: %s", (NULL != name) ? name : "(null)");
         return;
     }
 
@@ -681,7 +681,7 @@ static void wifi_params_process_set(const char *name, const char *value_text)
         if (0U == wifi_params_parse_int32(value_text, &int_value))
         {
             wifi_params_set_diag(WIFI_PARAMS_COMMAND_SET, WIFI_PARAMS_RESULT_ERR_FORMAT, wifi_params_entry_index(entry), 0.0f);
-            (void)wifi_cmd_SendLine("ERR set æ ¼å¼é”™è¯¯: set %s <æ•´æ•°>", entry->name);
+            (void)wifi_cmd_SendLine("ERR set ¸ñÊ½´íÎó: set %s <ÕûÊı>", entry->name);
             return;
         }
 
@@ -690,13 +690,13 @@ static void wifi_params_process_set(const char *name, const char *value_text)
     else if (0U == wifi_params_parse_float(value_text, &value))
     {
         wifi_params_set_diag(WIFI_PARAMS_COMMAND_SET, WIFI_PARAMS_RESULT_ERR_FORMAT, wifi_params_entry_index(entry), 0.0f);
-        (void)wifi_cmd_SendLine("ERR set æ ¼å¼é”™è¯¯: set %s <æ•°å€¼>", entry->name);
+        (void)wifi_cmd_SendLine("ERR set ¸ñÊ½´íÎó: set %s <ÊıÖµ>", entry->name);
         return;
     }
 
     if (0U == wifi_params_entry_write_value(entry, value))
     {
-        wifi_params_reply_error(WIFI_PARAMS_COMMAND_SET, WIFI_PARAMS_RESULT_ERR_RANGE, wifi_params_entry_index(entry), value, "set æ•°å€¼è¶…å‡ºå…è®¸èŒƒå›´");
+        wifi_params_reply_error(WIFI_PARAMS_COMMAND_SET, WIFI_PARAMS_RESULT_ERR_RANGE, wifi_params_entry_index(entry), value, "set ÊıÖµ³¬³öÔÊĞí·¶Î§");
         return;
     }
 
@@ -708,10 +708,10 @@ static void wifi_params_process_set(const char *name, const char *value_text)
 }
 
 /*
- * å‡½æ•°å: wifi_params_process_save
- * åŠŸèƒ½: å¤„ç†å‚æ•°ä¿å­˜å‘½ä»¤
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: wifi_params_process_save
+ * ¹¦ÄÜ: ´¦Àí²ÎÊı±£´æÃüÁî
+ * ÊäÈë²ÎÊı: ÎŞ
+ * ·µ»ØÖµ: ÎŞ
  */
 static void wifi_params_process_save(void)
 {
@@ -732,10 +732,10 @@ static void wifi_params_process_save(void)
 }
 
 /*
- * å‡½æ•°å: wifi_params_process_load
- * åŠŸèƒ½: å¤„ç†å‚æ•°åŠ è½½å‘½ä»¤
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: wifi_params_process_load
+ * ¹¦ÄÜ: ´¦Àí²ÎÊı¼ÓÔØÃüÁî
+ * ÊäÈë²ÎÊı: ÎŞ
+ * ·µ»ØÖµ: ÎŞ
  */
 static void wifi_params_process_load(void)
 {
@@ -757,10 +757,10 @@ static void wifi_params_process_load(void)
 }
 
 /*
- * å‡½æ•°å: wifi_params_process_start
- * åŠŸèƒ½: æ¢å¤å¾…æœºæ€é¥æµ‹
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: wifi_params_process_start
+ * ¹¦ÄÜ: »Ö¸´´ı»úÌ¬Ò£²â
+ * ÊäÈë²ÎÊı: ÎŞ
+ * ·µ»ØÖµ: ÎŞ
  */
 static void wifi_params_process_start(void)
 {
@@ -776,10 +776,10 @@ static void wifi_params_process_start(void)
 }
 
 /*
- * å‡½æ•°å: wifi_params_process_stop
- * åŠŸèƒ½: åœæ­¢å¾…æœºæ€é¥æµ‹
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: wifi_params_process_stop
+ * ¹¦ÄÜ: Í£Ö¹´ı»úÌ¬Ò£²â
+ * ÊäÈë²ÎÊı: ÎŞ
+ * ·µ»ØÖµ: ÎŞ
  */
 static void wifi_params_process_stop(void)
 {
@@ -795,10 +795,10 @@ static void wifi_params_process_stop(void)
 }
 
 /*
- * å‡½æ•°å: wifi_params_process_list
- * åŠŸèƒ½: è¾“å‡ºå…¨éƒ¨ç™½åå•å‚æ•°
- * è¾“å…¥å‚æ•°: æ— 
- * è¿”å›å€¼: æ— 
+ * º¯ÊıÃû: wifi_params_process_list
+ * ¹¦ÄÜ: Êä³öÈ«²¿°×Ãûµ¥²ÎÊı
+ * ÊäÈë²ÎÊı: ÎŞ
+ * ·µ»ØÖµ: ÎŞ
  */
 static void wifi_params_process_list(void)
 {

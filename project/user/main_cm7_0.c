@@ -11,48 +11,48 @@
 
 volatile uint32 tick_1000us_cnt = 0U;
 volatile uint16 g_tick_1000HZ = 0U;
-static uint16 s_air_comm_beep_tick = 200U; /* ç©ºåœ°ä¸²å£æ–­è”èœ‚é¸£å™¨çš„100HzèŠ‚æ‹è®¡æ•° */
+static uint16 s_air_comm_beep_tick = 200U; /* ¿ÕµØ´®¿Ú¶ÏÁª·äÃùÆ÷µÄ100Hz½ÚÅÄ¼ÆÊı */
 
-#define AIR_RUN_DATA_CRITICAL_COUNT       (17U) /* é£è¡ŒæœŸé—´ä¸‹å‘çš„å…³é”®æ•°æ®æ•°é‡ */
-#define AIR_RUN_DATA_DIAGNOSTIC_COUNT     (52U) /* å¸¸æ€ä¸‹å‘çš„å®Œæ•´è¯Šæ–­æ•°æ®æ•°é‡ */
-#define AIR_RUN_CRITICAL_STATE            (0U)  /* é£æœºè¿è¡ŒçŠ¶æ€ */
-#define AIR_RUN_CRITICAL_CRSF_CH0         (1U)  /* CRSFæ ‡å‡†åŒ–é€šé“0 */
-#define AIR_RUN_CRITICAL_CRSF_CH1         (2U)  /* CRSFæ ‡å‡†åŒ–é€šé“1 */
-#define AIR_RUN_CRITICAL_CRSF_CH2         (3U)  /* CRSFæ ‡å‡†åŒ–é€šé“2 */
-#define AIR_RUN_CRITICAL_CRSF_CH3         (4U)  /* CRSFæ ‡å‡†åŒ–é€šé“3 */
-#define AIR_RUN_CRITICAL_CRSF_CH4         (5U)  /* CRSFæ ‡å‡†åŒ–é€šé“4 */
-#define AIR_RUN_CRITICAL_CRSF_CH5         (6U)  /* CRSFæ ‡å‡†åŒ–é€šé“5 */
-#define AIR_RUN_CRITICAL_CRSF_CH6         (7U)  /* CRSFæ ‡å‡†åŒ–é€šé“6 */
-#define AIR_RUN_CRITICAL_CRSF_CH7         (8U)  /* CRSFæ ‡å‡†åŒ–é€šé“7 */
-#define AIR_RUN_CRITICAL_CRSF_CH8         (9U)  /* CRSFæ ‡å‡†åŒ–é€šé“8 */
-#define AIR_RUN_CRITICAL_YAW_TARGET       (10U) /* é£æœºyawç›®æ ‡è§’ï¼Œå•ä½deg */
-#define AIR_RUN_CRITICAL_PLAN_VALID       (11U) /* è½¦æ¨¡è§„åˆ’ç»“æœæœ‰æ•ˆæ ‡å¿— */
-#define AIR_RUN_CRITICAL_PLAN_STRAFE      (12U) /* è½¦æ¨¡è§„åˆ’æ¨ªç§»é€Ÿåº¦ï¼Œå•ä½m/s */
-#define AIR_RUN_CRITICAL_PLAN_FORWARD     (13U) /* è½¦æ¨¡è§„åˆ’å‰è¿›é€Ÿåº¦ï¼Œå•ä½m/s */
-#define AIR_RUN_CRITICAL_BEACON_LOST      (14U) /* ä¿¡æ ‡ä¸¢å¤±æ ‡å¿— */
-#define AIR_RUN_CRITICAL_SYNC_TIME        (15U) /* é£æœºåŒæ­¥æ—¶é—´ï¼Œå•ä½ms */
-#define AIR_RUN_CRITICAL_VACUUM_ENABLE    (16U) /* é£æœºå…è®¸è½¦æ¨¡å¼€å¯è´Ÿå‹çš„æ ‡å¿— */
+#define AIR_RUN_DATA_CRITICAL_COUNT       (17U) /* ·ÉĞĞÆÚ¼äÏÂ·¢µÄ¹Ø¼üÊı¾İÊıÁ¿ */
+#define AIR_RUN_DATA_DIAGNOSTIC_COUNT     (52U) /* ³£Ì¬ÏÂ·¢µÄÍêÕûÕï¶ÏÊı¾İÊıÁ¿ */
+#define AIR_RUN_CRITICAL_STATE            (0U)  /* ·É»úÔËĞĞ×´Ì¬ */
+#define AIR_RUN_CRITICAL_CRSF_CH0         (1U)  /* CRSF±ê×¼»¯Í¨µÀ0 */
+#define AIR_RUN_CRITICAL_CRSF_CH1         (2U)  /* CRSF±ê×¼»¯Í¨µÀ1 */
+#define AIR_RUN_CRITICAL_CRSF_CH2         (3U)  /* CRSF±ê×¼»¯Í¨µÀ2 */
+#define AIR_RUN_CRITICAL_CRSF_CH3         (4U)  /* CRSF±ê×¼»¯Í¨µÀ3 */
+#define AIR_RUN_CRITICAL_CRSF_CH4         (5U)  /* CRSF±ê×¼»¯Í¨µÀ4 */
+#define AIR_RUN_CRITICAL_CRSF_CH5         (6U)  /* CRSF±ê×¼»¯Í¨µÀ5 */
+#define AIR_RUN_CRITICAL_CRSF_CH6         (7U)  /* CRSF±ê×¼»¯Í¨µÀ6 */
+#define AIR_RUN_CRITICAL_CRSF_CH7         (8U)  /* CRSF±ê×¼»¯Í¨µÀ7 */
+#define AIR_RUN_CRITICAL_CRSF_CH8         (9U)  /* CRSF±ê×¼»¯Í¨µÀ8 */
+#define AIR_RUN_CRITICAL_YAW_TARGET       (10U) /* ·É»úyawÄ¿±ê½Ç£¬µ¥Î»deg */
+#define AIR_RUN_CRITICAL_PLAN_VALID       (11U) /* ³µÄ£¹æ»®½á¹ûÓĞĞ§±êÖ¾ */
+#define AIR_RUN_CRITICAL_PLAN_STRAFE      (12U) /* ³µÄ£¹æ»®ºáÒÆËÙ¶È£¬µ¥Î»m/s */
+#define AIR_RUN_CRITICAL_PLAN_FORWARD     (13U) /* ³µÄ£¹æ»®Ç°½øËÙ¶È£¬µ¥Î»m/s */
+#define AIR_RUN_CRITICAL_BEACON_LOST      (14U) /* ĞÅ±ê¶ªÊ§±êÖ¾ */
+#define AIR_RUN_CRITICAL_SYNC_TIME        (15U) /* ·É»úÍ¬²½Ê±¼ä£¬µ¥Î»ms */
+#define AIR_RUN_CRITICAL_VACUUM_ENABLE    (16U) /* ·É»úÔÊĞí³µÄ£¿ªÆô¸ºÑ¹µÄ±êÖ¾ */
 
-float g_car_vel_x = 0.0f; // è¿™ä¸ªæ˜¯è½¦çš„é€Ÿåº¦ è¿™ä¸ªå˜é‡å¤§äº0 , è½¦å¾€å³
-float g_car_vel_y = 0.0f; // è¿™ä¸ªæ˜¯è½¦çš„é€Ÿåº¦ è¿™ä¸ªå˜é‡å¤§äº0 , è½¦å¾€å‰
+float g_car_vel_x = 0.0f; // Õâ¸öÊÇ³µµÄËÙ¶È Õâ¸ö±äÁ¿´óÓÚ0 , ³µÍùÓÒ
+float g_car_vel_y = 0.0f; // Õâ¸öÊÇ³µµÄËÙ¶È Õâ¸ö±äÁ¿´óÓÚ0 , ³µÍùÇ°
 float g_car_vel_target_x = 0.0f;
 float g_car_vel_target_y = 0.0f;
 float g_car_yaw = 0.0f; /* Car yaw angle, unit: deg */
 float g_car_yaw_rate_dps = 0.0f; /* 10Hz low-pass car yaw rate, unit: deg/s */
 float g_car_sync_time_ms = 0.0f; /* Last car-side sync timestamp, unit: ms */
-uint32 g_car_last_update_time_ms = 0U; /* æœ€è¿‘ä¸€æ¬¡æ”¶åˆ°æ–°è½¦ç«¯æ—¶é—´æˆ³çš„é£æœºæœ¬æœºæ—¶åˆ»ï¼Œå•ä½ms */
-float g_car_yaw_target_deg = 0.0f; /* è½¦ç«¯yawæ§åˆ¶ç›®æ ‡è§’(ç»SPI data[2])ï¼Œå•ä½deg */
-float g_car_large_turn_state = 0.0f; /* è½¦ç«¯å¤§è§’åº¦çŠ¶æ€æœº(ç»SPI data[7]): 0æ­£å¸¸ 1åˆ¹è½¦ 2åŸåœ°è½¬ 3é€€å‡º */
+uint32 g_car_last_update_time_ms = 0U; /* ×î½üÒ»´ÎÊÕµ½ĞÂ³µ¶ËÊ±¼ä´ÁµÄ·É»ú±¾»úÊ±¿Ì£¬µ¥Î»ms */
+float g_car_yaw_target_deg = 0.0f; /* ³µ¶Ëyaw¿ØÖÆÄ¿±ê½Ç(¾­SPI data[2])£¬µ¥Î»deg */
+float g_car_large_turn_state = 0.0f; /* ³µ¶Ë´ó½Ç¶È×´Ì¬»ú(¾­SPI data[7]): 0Õı³£ 1É²³µ 2Ô­µØ×ª 3ÍË³ö */
 static car_plan_result_t s_air_run_car_plan;
 
-#define CAR_PLAN_DEBUG_PERIOD_MS          (5U)  /* è§„åˆ’è°ƒè¯•JustFloatå‘é€å‘¨æœŸï¼Œå•ä½msã€‚ */
-#define CAR_PLAN_DEBUG_FLOAT_COUNT        (63U) /* CarPlan3 V2è°ƒè¯•åè®®ç”¨æˆ·floatæ•°é‡ã€‚ */
-#define CAR_PLAN_DEBUG_PROTOCOL_VERSION   (3.0f) /* CarPlan3å…¨å±€åæ ‡è°ƒè¯•åè®®ç‰ˆæœ¬ã€‚ */
-#define MODE1245_DEBUG_FLOAT_COUNT        (30U) /* Mode1/2/4/5é£æœºæ§åˆ¶è°ƒè¯•æ•°æ®æ•°é‡ã€‚ */
-#define CAMERA_MODEL_CALIBRATION_LOG_FLOAT_COUNT (63U) /* ç›¸æœºæ¨¡å‹æ ‡å®šæ—¥å¿—ç”¨æˆ·floatæ•°é‡ã€‚ */
-#define SPEED_PLANNING_DEBUG_FLOAT_COUNT  (19U) /* é€Ÿåº¦è§„åˆ’è°ƒè¯•ç”¨æˆ·floatæ•°é‡ã€‚ */
-#define HEIGHT_CONTROL_DEBUG_FLOAT_COUNT  (64U) /* é«˜åº¦æ§åˆ¶è°ƒè¯•ç”¨æˆ·floatæ•°é‡ã€‚ */
-#define YAW_AUTO_LANDING_DEBUG_FLOAT_COUNT (79U) /* èˆªå‘æœç´¢å’Œè‡ªåŠ¨é™è½è°ƒè¯•ç”¨æˆ·floatæ•°é‡ã€‚ */
+#define CAR_PLAN_DEBUG_PERIOD_MS          (5U)  /* ¹æ»®µ÷ÊÔJustFloat·¢ËÍÖÜÆÚ£¬µ¥Î»ms¡£ */
+#define CAR_PLAN_DEBUG_FLOAT_COUNT        (63U) /* CarPlan3 V2µ÷ÊÔĞ­ÒéÓÃ»§floatÊıÁ¿¡£ */
+#define CAR_PLAN_DEBUG_PROTOCOL_VERSION   (3.0f) /* CarPlan3È«¾Ö×ø±êµ÷ÊÔĞ­Òé°æ±¾¡£ */
+#define MODE1245_DEBUG_FLOAT_COUNT        (30U) /* Mode1/2/4/5·É»ú¿ØÖÆµ÷ÊÔÊı¾İÊıÁ¿¡£ */
+#define CAMERA_MODEL_CALIBRATION_LOG_FLOAT_COUNT (63U) /* Ïà»úÄ£ĞÍ±ê¶¨ÈÕÖ¾ÓÃ»§floatÊıÁ¿¡£ */
+#define SPEED_PLANNING_DEBUG_FLOAT_COUNT  (19U) /* ËÙ¶È¹æ»®µ÷ÊÔÓÃ»§floatÊıÁ¿¡£ */
+#define HEIGHT_CONTROL_DEBUG_FLOAT_COUNT  (64U) /* ¸ß¶È¿ØÖÆµ÷ÊÔÓÃ»§floatÊıÁ¿¡£ */
+#define YAW_AUTO_LANDING_DEBUG_FLOAT_COUNT (79U) /* º½ÏòËÑË÷ºÍ×Ô¶¯½µÂäµ÷ÊÔÓÃ»§floatÊıÁ¿¡£ */
 
 #if (MODE1245_DEBUG_FLOAT_COUNT > (WIFI_JUSTFLOAT_MAX_FLOAT_NUM - 1U))
 #error "Mode1/2/4/5 debug channels exceed JustFloat protocol capacity"
@@ -84,9 +84,9 @@ _Static_assert(sizeof(CarPlanWifiJustFloatPacket) ==
                "JustFloat packet layout error");
 
 /**
- * @brief ä»¥200Hzç»„è£…å¹¶å‘é€è½¦æ¨¡è§„åˆ’è°ƒè¯•JustFloatæ•°æ®ã€‚
- * @param æ— ã€‚
- * @return æ— ã€‚
+ * @brief ÒÔ200Hz×é×°²¢·¢ËÍ³µÄ£¹æ»®µ÷ÊÔJustFloatÊı¾İ¡£
+ * @param ÎŞ¡£
+ * @return ÎŞ¡£
  */
 static void car_plan_debug_200hz(void)
 {
@@ -108,7 +108,7 @@ static void car_plan_debug_200hz(void)
     CarPlan_3_GetDebug(&plan_debug);
     CarPlan_3_GetResult(&plan_result);
 
-    /* I1-I30: Front/Center/Backï¼Œå„ä¸¤ä¸ªä¿¡æ ‡(x,y,area)å’Œä¸€ä¸ªè½¦ç¯(x,y,angle,length)ã€‚ */
+    /* I1-I30: Front/Center/Back£¬¸÷Á½¸öĞÅ±ê(x,y,area)ºÍÒ»¸ö³µµÆ(x,y,angle,length)¡£ */
     for (camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
     {
         for (beacon = 0U; beacon < 2U; beacon++)
@@ -147,7 +147,7 @@ static void car_plan_debug_200hz(void)
         }
     }
 
-    /* I31-I46: å››ä¸ªCarPlan3å…¨å±€èåˆä¿¡æ ‡(x_m,y_m,area,camera_mask)ã€‚ */
+    /* I31-I46: ËÄ¸öCarPlan3È«¾ÖÈÚºÏĞÅ±ê(x_m,y_m,area,camera_mask)¡£ */
     for (beacon = 0U; beacon < CAR_PLAN_3_DEBUG_BEACON_COUNT; beacon++)
     {
         const car_plan_3_debug_beacon_t *item = &plan_debug.beacon[beacon];
@@ -156,7 +156,7 @@ static void car_plan_debug_200hz(void)
         data[index++] = item->area;
         data[index++] = (float)item->camera_mask;
     }
-    /* I47-I50: CarPlan3å…¨å±€èåˆè½¦ç¯(x_m,y_m,angle,camera_mask)ã€‚ */
+    /* I47-I50: CarPlan3È«¾ÖÈÚºÏ³µµÆ(x_m,y_m,angle,camera_mask)¡£ */
     if (plan_debug.car_lamp.valid != 0U)
     {
         data[index++] = plan_debug.car_lamp.center_x;
@@ -171,7 +171,7 @@ static void car_plan_debug_200hz(void)
         data[index++] = IMAGE_DATA_INVALID_VALUE;
         data[index++] = 0.0f;
     }
-    /* I51-I63: CarPlan3æœ‰æ•ˆçŠ¶æ€ã€è½¦çŠ¶æ€ã€é£æœºçŠ¶æ€ã€é€‰ä¸­æ§½ä½ã€æ ‡è®°å’Œåè®®ç‰ˆæœ¬ã€‚ */
+    /* I51-I63: CarPlan3ÓĞĞ§×´Ì¬¡¢³µ×´Ì¬¡¢·É»ú×´Ì¬¡¢Ñ¡ÖĞ²ÛÎ»¡¢±ê¼ÇºÍĞ­Òé°æ±¾¡£ */
     data[index++] = (plan_result.valid != 0U) ? 1.0f : 0.0f;
     data[index++] = g_car_yaw;
     data[index++] = g_car_vel_x;
@@ -190,9 +190,9 @@ static void car_plan_debug_200hz(void)
 }
 
 /**
- * @brief ä»¥200Hzå‘é€ç›¸æœºæ¨¡å‹æ ‡å®šæ—¥å¿—ã€‚
- * @param æ— ã€‚
- * @return æ— ã€‚
+ * @brief ÒÔ200Hz·¢ËÍÏà»úÄ£ĞÍ±ê¶¨ÈÕÖ¾¡£
+ * @param ÎŞ¡£
+ * @return ÎŞ¡£
  */
 static void camera_model_calibration_log_200hz(void)
 {
@@ -211,7 +211,7 @@ static void camera_model_calibration_log_200hz(void)
     last_tick_ms = tick_now;
     CarPlan_3_GetDebug(&plan_debug);
 
-    /* I1-I36: Front/Center/Backå„å››ä¸ªåŸå§‹ä¿¡æ ‡(x,y,area)ã€‚ */
+    /* I1-I36: Front/Center/Back¸÷ËÄ¸öÔ­Ê¼ĞÅ±ê(x,y,area)¡£ */
     for (camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
     {
         for (beacon = 0U; beacon < IMAGE_MAX_BEACON_COUNT; beacon++)
@@ -232,7 +232,7 @@ static void camera_model_calibration_log_200hz(void)
         }
     }
 
-    /* I37-I48: Front/Center/Backå„ä¸€ä¸ªåŸå§‹è½¦ç¯(cx,cy,angle,length)ã€‚ */
+    /* I37-I48: Front/Center/Back¸÷Ò»¸öÔ­Ê¼³µµÆ(cx,cy,angle,length)¡£ */
     for (camera = 0U; camera < (uint8)IMAGE_CAMERA_COUNT; camera++)
     {
         const car_lamp_data *item = &image_data[camera].car_lamp_data[0];
@@ -252,7 +252,7 @@ static void camera_model_calibration_log_200hz(void)
         }
     }
 
-    /* I49-I55: è½¦ç«¯yaw/yaw_rateå’Œé£æœºæ¬§æ‹‰è§’ã€é«˜åº¦åŠé«˜åº¦æœ‰æ•ˆæ ‡å¿—ã€‚ */
+    /* I49-I55: ³µ¶Ëyaw/yaw_rateºÍ·É»úÅ·À­½Ç¡¢¸ß¶È¼°¸ß¶ÈÓĞĞ§±êÖ¾¡£ */
     data[index++] = g_car_yaw;
     data[index++] = g_car_yaw_rate_dps;
     data[index++] = g_euler.roll;
@@ -261,7 +261,7 @@ static void camera_model_calibration_log_200hz(void)
     data[index++] = g_tof_fused_height_mm;
     data[index++] = (float)g_tof_fused_valid;
 
-    /* I56-I59: Three_Cameraèåˆè½¦ç¯(x_m,y_m,angle,camera_mask)ã€‚ */
+    /* I56-I59: Three_CameraÈÚºÏ³µµÆ(x_m,y_m,angle,camera_mask)¡£ */
     if (plan_debug.car_lamp.valid != 0U)
     {
         data[index++] = plan_debug.car_lamp.center_x;
@@ -277,7 +277,7 @@ static void camera_model_calibration_log_200hz(void)
         data[index++] = 0.0f;
     }
 
-    /* I60-I63: ç¬¬ä¸€ä¸ªæœ‰æ•ˆThree_Cameraèåˆä¿¡æ ‡(x_m,y_m,area,camera_mask)ã€‚ */
+    /* I60-I63: µÚÒ»¸öÓĞĞ§Three_CameraÈÚºÏĞÅ±ê(x_m,y_m,area,camera_mask)¡£ */
     for (beacon = 0U; beacon < CAR_PLAN_3_DEBUG_BEACON_COUNT; beacon++)
     {
         if (plan_debug.beacon[beacon].valid != 0U)
@@ -304,9 +304,9 @@ static void camera_model_calibration_log_200hz(void)
 }
 
 /**
- * @brief é€Ÿåº¦è§„åˆ’è°ƒè¯•200hzã€‚
- * @param æ— ã€‚
- * @return æ— ã€‚
+ * @brief ËÙ¶È¹æ»®µ÷ÊÔ200hz¡£
+ * @param ÎŞ¡£
+ * @return ÎŞ¡£
  */
 static void speed_planning_debug_200hz(void)
 {
@@ -328,7 +328,7 @@ static void speed_planning_debug_200hz(void)
     CarPlan_3_GetDebug(&plan_debug);
     CarPlan_3_GetResult(&plan_result);
 
-    /* è¯»å–å½“å‰é£è¡Œæ¨¡å¼ä¸‹å·²ç»è®¡ç®—å¥½çš„è½¦ä½“ç³»åŠ é€Ÿåº¦ã€‚ */
+    /* ¶ÁÈ¡µ±Ç°·ÉĞĞÄ£Ê½ÏÂÒÑ¾­¼ÆËãºÃµÄ³µÌåÏµ¼ÓËÙ¶È¡£ */
     switch (mode)
     {
         case FC_START_CRSF_FLIGHT_MODE_1:
@@ -351,7 +351,7 @@ static void speed_planning_debug_200hz(void)
             break;
     }
 
-    /* I1-I8ï¼šé£æœºå½“å‰/ç›®æ ‡æ¬§æ‹‰è§’å’Œè½¦æ¨¡yaw/yawrateã€‚ */
+    /* I1-I8£º·É»úµ±Ç°/Ä¿±êÅ·À­½ÇºÍ³µÄ£yaw/yawrate¡£ */
     data[0] = g_euler.roll;
     data[1] = g_euler.pitch;
     data[2] = g_euler.yaw;
@@ -361,7 +361,7 @@ static void speed_planning_debug_200hz(void)
     data[6] = g_car_yaw;
     data[7] = g_car_yaw_rate_dps;
 
-    /* I9-I10ï¼šCarPlan3å½“å‰é€‰ä¸­çš„ç›®æ ‡ä¿¡æ ‡åæ ‡ã€‚ */
+    /* I9-I10£ºCarPlan3µ±Ç°Ñ¡ÖĞµÄÄ¿±êĞÅ±ê×ø±ê¡£ */
     if ((plan_debug.selected_target_id >= 0) &&
         (plan_debug.selected_target_id < (int8)CAR_PLAN_3_DEBUG_BEACON_COUNT) &&
         (plan_debug.beacon[(uint8)plan_debug.selected_target_id].valid != 0U))
@@ -377,7 +377,7 @@ static void speed_planning_debug_200hz(void)
         data[9] = IMAGE_DATA_INVALID_VALUE;
     }
 
-    /* I11-I19ï¼šCarPlan3è½¦æ¨¡åæ ‡ã€ç›®æ ‡é€Ÿåº¦ã€åŠ é€Ÿåº¦ã€CH8å’Œå®é™…é€Ÿåº¦ã€‚ */
+    /* I11-I19£ºCarPlan3³µÄ£×ø±ê¡¢Ä¿±êËÙ¶È¡¢¼ÓËÙ¶È¡¢CH8ºÍÊµ¼ÊËÙ¶È¡£ */
     data[10] = (plan_debug.car_lamp.valid != 0U) ?
                    plan_debug.car_lamp.center_x : IMAGE_DATA_INVALID_VALUE;
     data[11] = (plan_debug.car_lamp.valid != 0U) ?
@@ -394,9 +394,9 @@ static void speed_planning_debug_200hz(void)
 }
 
 /**
- * @brief ä»¥200Hzå‘é€Mode4é«˜åº¦æ§åˆ¶è°ƒè¯•æ•°æ®ã€‚
- * @param æ— ã€‚
- * @return æ— ã€‚
+ * @brief ÒÔ200Hz·¢ËÍMode4¸ß¶È¿ØÖÆµ÷ÊÔÊı¾İ¡£
+ * @param ÎŞ¡£
+ * @return ÎŞ¡£
  */
 static void height_control_debug_200hz(void)
 {
@@ -420,7 +420,7 @@ static void height_control_debug_200hz(void)
     tof = VL53L1X_GetData();
     FC_Loop_GetHeightDebug(&height_debug);
 
-    /* I1-I12: ç›®æ ‡/å®é™…æ¬§æ‹‰è§’å’Œç›®æ ‡/å®é™…è§’é€Ÿåº¦ã€‚ */
+    /* I1-I12: Ä¿±ê/Êµ¼ÊÅ·À­½ÇºÍÄ¿±ê/Êµ¼Ê½ÇËÙ¶È¡£ */
     data[0] = roll_angle_target;
     data[1] = pitch_angle_target;
     data[2] = yaw_angle_target;
@@ -434,7 +434,7 @@ static void height_control_debug_200hz(void)
     data[10] = g_imufilter_1000hz.gyroy;
     data[11] = g_imufilter_1000hz.gyroz;
 
-    /* I13-I20: å››è·¯TOFåŸå§‹è·ç¦»å’Œå§¿æ€è§£è€¦é«˜åº¦ï¼Œå•ä½mmã€‚ */
+    /* I13-I20: ËÄÂ·TOFÔ­Ê¼¾àÀëºÍ×ËÌ¬½âñî¸ß¶È£¬µ¥Î»mm¡£ */
     data[12] = (float)tof->distance_mm[0];
     data[13] = (float)tof->distance_mm[1];
     data[14] = (float)tof->distance_mm[2];
@@ -444,7 +444,7 @@ static void height_control_debug_200hz(void)
     data[18] = g_tof3_height_mm;
     data[19] = g_tof4_height_mm;
 
-    /* I21-I27: é«˜åº¦ä¼°è®¡ã€å‚å‘åŠ é€Ÿåº¦ã€ç›®æ ‡å’Œæµ‹é‡è´¨é‡ã€‚ */
+    /* I21-I27: ¸ß¶È¹À¼Æ¡¢´¹Ïò¼ÓËÙ¶È¡¢Ä¿±êºÍ²âÁ¿ÖÊÁ¿¡£ */
     data[20] = g_tof_fused_height_mm;
     data[21] = g_height_fused_vz_mps;
     data[22] = g_height_acc_up_mps2;
@@ -453,7 +453,7 @@ static void height_control_debug_200hz(void)
     data[25] = (float)g_tof_fused_valid;
     data[26] = g_height_meas_health;
 
-    /* I28-I35: é«˜åº¦ä½ç½®ç¯å’Œé€Ÿåº¦ç¯å¿…è¦åˆ†é‡ã€‚ */
+    /* I28-I35: ¸ß¶ÈÎ»ÖÃ»·ºÍËÙ¶È»·±ØÒª·ÖÁ¿¡£ */
     data[27] = height_debug.pos_error_m;
     data[28] = height_debug.pos_p_mps;
     data[29] = height_debug.vel_error_mps;
@@ -463,7 +463,7 @@ static void height_control_debug_200hz(void)
     data[33] = height_debug.vel_pid_output_pwm;
     data[34] = height_debug.height_control_output_pwm;
 
-    /* I36-I42: æ‚¬åœæ²¹é—¨å­¦ä¹ ã€å€¾è§’è¡¥å¿å’Œé€å…¥æ··æ§çš„å››é¡¹è¾“å…¥ã€‚ */
+    /* I36-I42: ĞüÍ£ÓÍÃÅÑ§Ï°¡¢Çã½Ç²¹³¥ºÍËÍÈë»ì¿ØµÄËÄÏîÊäÈë¡£ */
     data[35] = height_debug.hover_throttle_pwm;
     data[36] = height_debug.hover_learn_step_pwm;
     data[37] = height_debug.tilt_comp_hover_pwm;
@@ -472,37 +472,37 @@ static void height_control_debug_200hz(void)
     data[40] = (float)g_motor_cmd.roll;
     data[41] = (float)g_motor_cmd.yaw;
 
-    /* I43-I58: é«˜åº¦ä¼°è®¡å™¨è¾“å…¥å¿«ç…§å’Œå†…éƒ¨è¯Šæ–­çŠ¶æ€ã€‚ */
-    data[42] = (float)g_height_tof_sample_seq; /* I43: æœ€è¿‘æ¶ˆè´¹çš„TOFå¿«ç…§åºå·ã€‚ */
-    data[43] = (float)g_height_tof_fresh_mask; /* I44: æœ€è¿‘æ¶ˆè´¹å¿«ç…§çš„æ–°é²œé€šé“æ©ç ã€‚ */
-    data[44] = (float)g_height_tof_valid_mask; /* I45: æœ€è¿‘æ¶ˆè´¹å¿«ç…§çš„é©±åŠ¨æœ‰æ•ˆé€šé“æ©ç ã€‚ */
-    data[45] = (float)g_height_meas_valid; /* I46: æœ¬æ¬¡è§‚æµ‹æ˜¯å¦é€šè¿‡å¥åº·åº¦é—¨é™ã€‚ */
-    data[46] = (float)g_height_inlier_count; /* I47: æœ¬æ¬¡èåˆå†…ç‚¹æ•°é‡ã€‚ */
-    data[47] = g_height_meas_mm; /* I48: å®é™…è§‚æµ‹é«˜åº¦ï¼Œå•ä½mmã€‚ */
-    data[48] = g_height_residual_m; /* I49: TOFè§‚æµ‹ç›¸å¯¹ä¼°è®¡é«˜åº¦æ®‹å·®ï¼Œå•ä½mã€‚ */
-    data[49] = g_height_measurement_dt_s; /* I50: ä¸¤æ¬¡æœ‰æ•ˆTOFè§‚æµ‹é—´éš”ï¼Œå•ä½sã€‚ */
-    data[50] = g_height_inst_v_mps; /* I51: TOFä¿®æ­£äº§ç”Ÿçš„ç¬æ—¶å‚å‘é€Ÿåº¦ï¼Œå•ä½m/sã€‚ */
-    data[51] = g_height_acc_lpf_mps2; /* I52: ä¼°è®¡å™¨å†…éƒ¨ä½é€šå‚å‘åŠ é€Ÿåº¦ï¼Œå•ä½m/s^2ã€‚ */
-    data[52] = g_height_observer_v_mps; /* I53: é€Ÿåº¦ä½é€šå‰çš„è§‚å¯Ÿå™¨é€Ÿåº¦ï¼Œå•ä½m/sã€‚ */
-    data[53] = (float)g_height_miss_count; /* I54: è¿ç»­æ— æœ‰æ•ˆè§‚æµ‹è®¡æ•°ã€‚ */
-    data[54] = g_height_measurement_age_ms; /* I55: æœ€è¿‘æœ‰æ•ˆTOFè§‚æµ‹å¹´é¾„ï¼Œå•ä½msã€‚ */
-    data[55] = g_height_tof_alpha; /* I56: æœ¬æ¬¡TOFé«˜åº¦ä¿®æ­£æƒé‡ã€‚ */
-    data[56] = (float)tof->fresh_mask; /* I57: é©±åŠ¨ç¼“å­˜å½“å‰æ–°é²œæ©ç ï¼Œç”¨äºå’ŒI44å¯¹ç…§ã€‚ */
-    data[57] = (float)tof->sample_seq; /* I58: é©±åŠ¨æœ€æ–°å¿«ç…§åºå·ï¼Œç”¨äºå’ŒI43å¯¹ç…§ã€‚ */
-    data[58] = g_height_safe_upper_mm; /* I59: ç‹¬ç«‹å®‰å…¨ä¸Šç•Œï¼Œå•ä½mmã€‚ */
-    data[59] = g_height_safe_lower_mm; /* I60: ç‹¬ç«‹å®‰å…¨ä¸‹ç•Œï¼Œå•ä½mmã€‚ */
-    data[60] = g_height_safe_brake_distance_mm; /* I61: ä¸Šå‡åŠ¨æ€åˆ¶åŠ¨è·ç¦»ï¼Œå•ä½mmã€‚ */
-    data[61] = (float)g_height_dropout_mode; /* I62: æ‰æµ‹çŠ¶æ€ï¼Œ0æ­£å¸¸/1ç¦æ­¢çˆ¬å‡/2å—æ§ä¸‹é™ã€‚ */
-    data[62] = (float)g_height_pollution_active; /* I63: çº¿ç¼†æ±¡æŸ“é”å­˜çŠ¶æ€ã€‚ */
-    data[63] = (float)g_height_safety_valid; /* I64: å®‰å…¨è¾“å‡ºæ˜¯å¦å·²åˆå§‹åŒ–ã€‚ */
+    /* I43-I58: ¸ß¶È¹À¼ÆÆ÷ÊäÈë¿ìÕÕºÍÄÚ²¿Õï¶Ï×´Ì¬¡£ */
+    data[42] = (float)g_height_tof_sample_seq; /* I43: ×î½üÏû·ÑµÄTOF¿ìÕÕĞòºÅ¡£ */
+    data[43] = (float)g_height_tof_fresh_mask; /* I44: ×î½üÏû·Ñ¿ìÕÕµÄĞÂÏÊÍ¨µÀÑÚÂë¡£ */
+    data[44] = (float)g_height_tof_valid_mask; /* I45: ×î½üÏû·Ñ¿ìÕÕµÄÇı¶¯ÓĞĞ§Í¨µÀÑÚÂë¡£ */
+    data[45] = (float)g_height_meas_valid; /* I46: ±¾´Î¹Û²âÊÇ·ñÍ¨¹ı½¡¿µ¶ÈÃÅÏŞ¡£ */
+    data[46] = (float)g_height_inlier_count; /* I47: ±¾´ÎÈÚºÏÄÚµãÊıÁ¿¡£ */
+    data[47] = g_height_meas_mm; /* I48: Êµ¼Ê¹Û²â¸ß¶È£¬µ¥Î»mm¡£ */
+    data[48] = g_height_residual_m; /* I49: TOF¹Û²âÏà¶Ô¹À¼Æ¸ß¶È²Ğ²î£¬µ¥Î»m¡£ */
+    data[49] = g_height_measurement_dt_s; /* I50: Á½´ÎÓĞĞ§TOF¹Û²â¼ä¸ô£¬µ¥Î»s¡£ */
+    data[50] = g_height_inst_v_mps; /* I51: TOFĞŞÕı²úÉúµÄË²Ê±´¹ÏòËÙ¶È£¬µ¥Î»m/s¡£ */
+    data[51] = g_height_acc_lpf_mps2; /* I52: ¹À¼ÆÆ÷ÄÚ²¿µÍÍ¨´¹Ïò¼ÓËÙ¶È£¬µ¥Î»m/s^2¡£ */
+    data[52] = g_height_observer_v_mps; /* I53: ËÙ¶ÈµÍÍ¨Ç°µÄ¹Û²ìÆ÷ËÙ¶È£¬µ¥Î»m/s¡£ */
+    data[53] = (float)g_height_miss_count; /* I54: Á¬ĞøÎŞÓĞĞ§¹Û²â¼ÆÊı¡£ */
+    data[54] = g_height_measurement_age_ms; /* I55: ×î½üÓĞĞ§TOF¹Û²âÄêÁä£¬µ¥Î»ms¡£ */
+    data[55] = g_height_tof_alpha; /* I56: ±¾´ÎTOF¸ß¶ÈĞŞÕıÈ¨ÖØ¡£ */
+    data[56] = (float)tof->fresh_mask; /* I57: Çı¶¯»º´æµ±Ç°ĞÂÏÊÑÚÂë£¬ÓÃÓÚºÍI44¶ÔÕÕ¡£ */
+    data[57] = (float)tof->sample_seq; /* I58: Çı¶¯×îĞÂ¿ìÕÕĞòºÅ£¬ÓÃÓÚºÍI43¶ÔÕÕ¡£ */
+    data[58] = g_height_safe_upper_mm; /* I59: ¶ÀÁ¢°²È«ÉÏ½ç£¬µ¥Î»mm¡£ */
+    data[59] = g_height_safe_lower_mm; /* I60: ¶ÀÁ¢°²È«ÏÂ½ç£¬µ¥Î»mm¡£ */
+    data[60] = g_height_safe_brake_distance_mm; /* I61: ÉÏÉı¶¯Ì¬ÖÆ¶¯¾àÀë£¬µ¥Î»mm¡£ */
+    data[61] = (float)g_height_dropout_mode; /* I62: µô²â×´Ì¬£¬0Õı³£/1½ûÖ¹ÅÀÉı/2ÊÜ¿ØÏÂ½µ¡£ */
+    data[62] = (float)g_height_pollution_active; /* I63: ÏßÀÂÎÛÈ¾Ëø´æ×´Ì¬¡£ */
+    data[63] = (float)g_height_safety_valid; /* I64: °²È«Êä³öÊÇ·ñÒÑ³õÊ¼»¯¡£ */
 
     (void)wifi_justfloat_Array(data, HEIGHT_CONTROL_DEBUG_FLOAT_COUNT);
 }
 
 /**
- * @brief ä»¥200Hzå‘é€å½“å‰Mode1/2/4/5æ— äººæœºæ§åˆ¶è°ƒè¯•æ•°æ®ã€‚
- * @param æ— ã€‚
- * @return æ— ã€‚
+ * @brief ÒÔ200Hz·¢ËÍµ±Ç°Mode1/2/4/5ÎŞÈË»ú¿ØÖÆµ÷ÊÔÊı¾İ¡£
+ * @param ÎŞ¡£
+ * @return ÎŞ¡£
  */
 static void mode1245_wifi_debug_200hz(void)
 {
@@ -619,9 +619,9 @@ static void mode1245_wifi_debug_200hz(void)
 }
 
 /**
- * @brief ä»¥200Hzå‘é€èˆªå‘æœç´¢ã€CarPlan3å’Œè‡ªåŠ¨é™è½è°ƒè¯•æ•°æ®ã€‚
- * @param æ— ã€‚
- * @return æ— ã€‚
+ * @brief ÒÔ200Hz·¢ËÍº½ÏòËÑË÷¡¢CarPlan3ºÍ×Ô¶¯½µÂäµ÷ÊÔÊı¾İ¡£
+ * @param ÎŞ¡£
+ * @return ÎŞ¡£
  */
 static void yaw_auto_landing_debug_200hz(void)
 {
@@ -669,7 +669,7 @@ static void yaw_auto_landing_debug_200hz(void)
     YawAlign_GetDebug(&yaw_debug);
     AutoLanding_GetDebug(&landing_debug);
 
-    /* I1-I13: é£è¡ŒçŠ¶æ€ã€èˆªå‘æ§åˆ¶é‡å’Œè½¦ç«¯èˆªå‘æ•°æ®ã€‚ */
+    /* I1-I13: ·ÉĞĞ×´Ì¬¡¢º½Ïò¿ØÖÆÁ¿ºÍ³µ¶Ëº½ÏòÊı¾İ¡£ */
     data[index++] = (float)FC_START_CRSF_Get_State();
     data[index++] = (float)mode;
     data[index++] = yaw_mode;
@@ -684,7 +684,7 @@ static void yaw_auto_landing_debug_200hz(void)
     data[index++] = g_car_sync_time_ms;
     data[index++] = (float)(tick_now - g_car_last_update_time_ms);
 
-    /* I14-I22: CarPlan3ç»“æœã€é€‰ä¸­ç›®æ ‡å’Œèåˆè½¦ç¯ã€‚ */
+    /* I14-I22: CarPlan3½á¹û¡¢Ñ¡ÖĞÄ¿±êºÍÈÚºÏ³µµÆ¡£ */
     data[index++] = (float)plan_result.valid;
     data[index++] = plan_result.target_strafe_mps;
     data[index++] = plan_result.target_forward_mps;
@@ -695,7 +695,7 @@ static void yaw_auto_landing_debug_200hz(void)
     data[index++] = plan_debug.car_lamp.angle_deg;
     data[index++] = (float)plan_debug.car_lamp.camera_mask;
 
-    /* I23-I42: å››ä¸ªCarPlan3èåˆä¿¡æ ‡çš„æœ‰æ•ˆæ€§ã€åæ ‡ã€é¢ç§¯å’Œç›¸æœºæ©ç ã€‚ */
+    /* I23-I42: ËÄ¸öCarPlan3ÈÚºÏĞÅ±êµÄÓĞĞ§ĞÔ¡¢×ø±ê¡¢Ãæ»ıºÍÏà»úÑÚÂë¡£ */
     for (beacon = 0U; beacon < CAR_PLAN_3_DEBUG_BEACON_COUNT; beacon++)
     {
         data[index++] = (float)plan_debug.beacon[beacon].valid;
@@ -705,7 +705,7 @@ static void yaw_auto_landing_debug_200hz(void)
         data[index++] = (float)plan_debug.beacon[beacon].camera_mask;
     }
 
-    /* I43-I62: YawAlignçŠ¶æ€åŠå½“å‰ã€é”å®šã€å€™é€‰ä¿¡æ ‡ã€‚ */
+    /* I43-I62: YawAlign×´Ì¬¼°µ±Ç°¡¢Ëø¶¨¡¢ºòÑ¡ĞÅ±ê¡£ */
     data[index++] = (float)yaw_debug.locked;
     data[index++] = (float)yaw_debug.candidate_frames;
     data[index++] = (float)yaw_debug.lost_frames;
@@ -727,21 +727,21 @@ static void yaw_auto_landing_debug_200hz(void)
     data[index++] = yaw_debug.candidate_beacon.y;
     data[index++] = yaw_debug.candidate_beacon.area;
 
-    /* I63-I74: è‡ªåŠ¨é™è½çŠ¶æ€æœºã€å…¥å£æ¡ä»¶ä¸åŒæ—‹è½¬é˜¶æ®µã€‚ */
-    data[index++] = (float)landing_debug.initial_wait_ticks; /* I63 å‰ç½®ç­‰å¾…è®¡æ•°ã€‚ */
-    data[index++] = (float)landing_debug.no_target_ticks; /* I64 æ— é€Ÿåº¦ä¸‹å‘è®¡æ•°ã€‚ */
-    data[index++] = (float)landing_debug.valid_target_ticks; /* I65 è¿ç»­æœ‰æ•ˆè®¡æ•°ã€‚ */
-    data[index++] = (float)landing_debug.target_valid; /* I66 è¿ç»­æœ‰æ•ˆ200msç¡®è®¤ã€‚ */
-    data[index++] = (float)landing_debug.rotation_ready; /* I67 æœç´¢è¾¾åˆ°360åº¦è§‚æµ‹ã€‚ */
-    data[index++] = (float)landing_debug.triggered; /* I68 é™è½å·²è§¦å‘ã€‚ */
-    data[index++] = (float)landing_debug.state; /* I69 çŠ¶æ€æœº0=IDLE 1=DETECT 2=ROTATE 3=TRIGGEREDã€‚ */
-    data[index++] = (float)landing_debug.car_started; /* I70 è½¦æ¨¡å¯åŠ¨åˆ¤å®šã€‚ */
-    data[index++] = (float)Car_Plan_Mode; /* I71 å½“å‰è§„åˆ’ç®—æ³•ç¼–å·ã€‚ */
-    data[index++] = (float)landing_debug.rotate_active; /* I72 åŒæ—‹è½¬é˜¶æ®µè¿›è¡Œä¸­ã€‚ */
-    data[index++] = landing_debug.rotate_air_deg; /* I73 é£æœºç´¯è®¡æ—‹è½¬è§’ã€‚ */
-    data[index++] = landing_debug.rotate_car_deg; /* I74 è½¦æ¨¡ç´¯è®¡æ—‹è½¬è§’ã€‚ */
+    /* I63-I74: ×Ô¶¯½µÂä×´Ì¬»ú¡¢Èë¿ÚÌõ¼şÓëË«Ğı×ª½×¶Î¡£ */
+    data[index++] = (float)landing_debug.initial_wait_ticks; /* I63 Ç°ÖÃµÈ´ı¼ÆÊı¡£ */
+    data[index++] = (float)landing_debug.no_target_ticks; /* I64 ÎŞËÙ¶ÈÏÂ·¢¼ÆÊı¡£ */
+    data[index++] = (float)landing_debug.valid_target_ticks; /* I65 Á¬ĞøÓĞĞ§¼ÆÊı¡£ */
+    data[index++] = (float)landing_debug.target_valid; /* I66 Á¬ĞøÓĞĞ§200msÈ·ÈÏ¡£ */
+    data[index++] = (float)landing_debug.rotation_ready; /* I67 ËÑË÷´ïµ½360¶È¹Û²â¡£ */
+    data[index++] = (float)landing_debug.triggered; /* I68 ½µÂäÒÑ´¥·¢¡£ */
+    data[index++] = (float)landing_debug.state; /* I69 ×´Ì¬»ú0=IDLE 1=DETECT 2=ROTATE 3=TRIGGERED¡£ */
+    data[index++] = (float)landing_debug.car_started; /* I70 ³µÄ£Æô¶¯ÅĞ¶¨¡£ */
+    data[index++] = (float)Car_Plan_Mode; /* I71 µ±Ç°¹æ»®Ëã·¨±àºÅ¡£ */
+    data[index++] = (float)landing_debug.rotate_active; /* I72 Ë«Ğı×ª½×¶Î½øĞĞÖĞ¡£ */
+    data[index++] = landing_debug.rotate_air_deg; /* I73 ·É»úÀÛ¼ÆĞı×ª½Ç¡£ */
+    data[index++] = landing_debug.rotate_car_deg; /* I74 ³µÄ£ÀÛ¼ÆĞı×ª½Ç¡£ */
 
-    /* I75-I79: æœç´¢çŠ¶æ€ã€æ–¹å‘ã€å®é™…æ—‹è½¬è§’ã€çº¿ç¼†æ‰­è½¬è§’å’Œå½“å‰yawè§’åº¦ç¯Kpã€‚ */
+    /* I75-I79: ËÑË÷×´Ì¬¡¢·½Ïò¡¢Êµ¼ÊĞı×ª½Ç¡¢ÏßÀÂÅ¤×ª½ÇºÍµ±Ç°yaw½Ç¶È»·Kp¡£ */
     data[index++] = (float)yaw_debug.search_active;
     data[index++] = (float)yaw_debug.search_direction;
     data[index++] = yaw_debug.search_rotation_deg;
@@ -752,10 +752,10 @@ static void yaw_auto_landing_debug_200hz(void)
 }
 
 /**
- * @brief æ¥æ”¶å¹¶ä¿å­˜å°è½¦å®æ—¶è¿è¡Œæ•°æ®ã€‚
- * @param data å°è½¦å‘é€çš„floatæ•°æ®æ•°ç»„ã€‚
- * @param count æ•°ç»„ä¸­çš„floatæ•°é‡ï¼Œå½“å‰åè®®å›ºå®šä¸º11ã€‚
- * @return æ— ã€‚
+ * @brief ½ÓÊÕ²¢±£´æĞ¡³µÊµÊ±ÔËĞĞÊı¾İ¡£
+ * @param data Ğ¡³µ·¢ËÍµÄfloatÊı¾İÊı×é¡£
+ * @param count Êı×éÖĞµÄfloatÊıÁ¿£¬µ±Ç°Ğ­Òé¹Ì¶¨Îª11¡£
+ * @return ÎŞ¡£
  */
 static void on_car_data(const float *data, uint8 count)
 {
@@ -769,7 +769,7 @@ static void on_car_data(const float *data, uint8 count)
         g_car_vel_target_x = data[5];
         g_car_vel_target_y = data[6];
         g_car_large_turn_state = data[7];
-        /* ä»…åœ¨è½¦ç«¯æ—¶é—´æˆ³æ¨è¿›æ—¶åˆ·æ–°æ•°æ®æ–°é²œæ—¶åˆ»ã€‚ */
+        /* ½öÔÚ³µ¶ËÊ±¼ä´ÁÍÆ½øÊ±Ë¢ĞÂÊı¾İĞÂÏÊÊ±¿Ì¡£ */
         if (data[10] != g_car_sync_time_ms)
         {
             g_car_sync_time_ms = data[10];
@@ -779,9 +779,9 @@ static void on_car_data(const float *data, uint8 count)
 }
 
 /**
- * @brief æŒ‰é£æœºçŠ¶æ€ä»¥200Hzå‘é€ç¼“å­˜çš„è§„åˆ’ç»“æœæˆ–å®Œæ•´è¯Šæ–­æ•°æ®ã€‚
- * @param æ— ã€‚
- * @return æ— ã€‚
+ * @brief °´·É»ú×´Ì¬ÒÔ200Hz·¢ËÍ»º´æµÄ¹æ»®½á¹û»òÍêÕûÕï¶ÏÊı¾İ¡£
+ * @param ÎŞ¡£
+ * @return ÎŞ¡£
  */
 static void send_air_run_data_200hz(void)
 {
@@ -799,7 +799,7 @@ static void send_air_run_data_200hz(void)
     plan_forward_mps = (car_plan_send_valid != 0U) ? s_air_run_car_plan.target_forward_mps : 0.0f;
     if(AutoLanding_IsRotationActive() != 0U)
     {
-        /* è‡ªåŠ¨é™è½åŒæ—‹è½¬é˜¶æ®µï¼šè¦†ç›–ä¸‹å‘é€Ÿåº¦ä¸ºæ—‹è½¬æŒ‡ä»¤ï¼Œè½¦æ¨¡éšä¹‹æ—‹è½¬ä¸€åœˆã€‚ */
+        /* ×Ô¶¯½µÂäË«Ğı×ª½×¶Î£º¸²¸ÇÏÂ·¢ËÙ¶ÈÎªĞı×ªÖ¸Áî£¬³µÄ£ËæÖ®Ğı×ªÒ»È¦¡£ */
         AutoLanding_GetRotateCommand(&plan_strafe_mps, &plan_forward_mps);
         car_plan_send_valid = 1U;
     }
@@ -895,9 +895,9 @@ static void send_air_run_data_200hz(void)
 }
 
 /**
- * @brief æ‰§è¡Œä¸€æ¬¡Core 0é«˜é€Ÿä»»åŠ¡ï¼Œå¹¶åœ¨å†…éƒ¨å®Œæˆ500Hzé£æ§åˆ†é¢‘ã€‚
- * @param æ— ã€‚
- * @return æ— ã€‚
+ * @brief Ö´ĞĞÒ»´ÎCore 0¸ßËÙÈÎÎñ£¬²¢ÔÚÄÚ²¿Íê³É500Hz·É¿Ø·ÖÆµ¡£
+ * @param ÎŞ¡£
+ * @return ÎŞ¡£
  */
 static void core0_run_fast_loop_step(void)
 {
@@ -917,19 +917,19 @@ static void core0_run_fast_loop_step(void)
 
     FC_Loop_1000Hz();
     air_comm_air_poll();
-    // yaw_auto_landing_debug_200hz(); /* è‡ªåŠ¨é™è½è¯Šæ–­æ—¥å¿—ï¼Œä¸´æ—¶æ›¿ä»£CarPlan3æ—¥å¿—ã€‚ */
-    car_plan_debug_200hz(); /* ä¸´æ—¶å…³é—­åŸCarPlan3è°ƒè¯•æ—¥å¿—ã€‚ */
-    // mode1245_wifi_debug_200hz(); /* ä¸´æ—¶å…³é—­Mode1/2/4/5è°ƒè¯•ï¼Œæ”¹å‘ç›¸æœºæ¨¡å‹æ ‡å®šæ—¥å¿—ã€‚ */
-    // camera_model_calibration_log_200hz(); /* ä¸´æ—¶å…³é—­ç›¸æœºæ¨¡å‹æ ‡å®šæ—¥å¿—ï¼Œæ”¹å‘é€Ÿåº¦è§„åˆ’è°ƒè¯•æ—¥å¿—ã€‚ */
-    // speed_planning_debug_200hz(); /* ä¸´æ—¶å…³é—­é€Ÿåº¦è§„åˆ’æ—¥å¿—ï¼Œæ”¹å‘Mode4é«˜åº¦æ§åˆ¶æ—¥å¿—ã€‚ */
-    // height_control_debug_200hz(); /* ä¸´æ—¶å…³é—­Mode4é«˜åº¦æ§åˆ¶æ—¥å¿—ï¼Œæ”¹å‘èˆªå‘æœç´¢å’Œè‡ªåŠ¨é™è½æ—¥å¿—ã€‚ */
+    // yaw_auto_landing_debug_200hz(); /* ×Ô¶¯½µÂäÕï¶ÏÈÕÖ¾£¬ÁÙÊ±Ìæ´úCarPlan3ÈÕÖ¾¡£ */
+    car_plan_debug_200hz(); /* ÁÙÊ±¹Ø±ÕÔ­CarPlan3µ÷ÊÔÈÕÖ¾¡£ */
+    // mode1245_wifi_debug_200hz(); /* ÁÙÊ±¹Ø±ÕMode1/2/4/5µ÷ÊÔ£¬¸Ä·¢Ïà»úÄ£ĞÍ±ê¶¨ÈÕÖ¾¡£ */
+    // camera_model_calibration_log_200hz(); /* ÁÙÊ±¹Ø±ÕÏà»úÄ£ĞÍ±ê¶¨ÈÕÖ¾£¬¸Ä·¢ËÙ¶È¹æ»®µ÷ÊÔÈÕÖ¾¡£ */
+    // speed_planning_debug_200hz(); /* ÁÙÊ±¹Ø±ÕËÙ¶È¹æ»®ÈÕÖ¾£¬¸Ä·¢Mode4¸ß¶È¿ØÖÆÈÕÖ¾¡£ */
+    // height_control_debug_200hz(); /* ÁÙÊ±¹Ø±ÕMode4¸ß¶È¿ØÖÆÈÕÖ¾£¬¸Ä·¢º½ÏòËÑË÷ºÍ×Ô¶¯½µÂäÈÕÖ¾¡£ */
     // yaw_auto_landing_debug_200hz();
 }
 
 /**
- * @brief åœ¨100Hzæ§½ä½ç»´æŠ¤å›¾åƒè¾“å‡ºã€å±å¹•åˆ·æ–°å’Œå‚æ•°å†™è®¸å¯ã€‚
- * @param æ— ã€‚
- * @return æ— ã€‚
+ * @brief ÔÚ100Hz²ÛÎ»Î¬»¤Í¼ÏñÊä³ö¡¢ÆÁÄ»Ë¢ĞÂºÍ²ÎÊıĞ´Ğí¿É¡£
+ * @param ÎŞ¡£
+ * @return ÎŞ¡£
  */
 static void core0_update_ipc_state_100hz(void)
 {
@@ -1002,9 +1002,9 @@ static void core0_update_ipc_state_100hz(void)
 }
 
 /**
- * @brief ä»¥100Hzæ›´æ–°ä¿¡æ ‡ä¸è½¦æ¨¡è§„åˆ’ï¼Œå¹¶ç¼“å­˜ä¾›200Hzå‘é€ä»»åŠ¡ä½¿ç”¨ã€‚
- * @param æ— ã€‚
- * @return æ— ã€‚
+ * @brief ÒÔ100Hz¸üĞÂĞÅ±êÓë³µÄ£¹æ»®£¬²¢»º´æ¹©200Hz·¢ËÍÈÎÎñÊ¹ÓÃ¡£
+ * @param ÎŞ¡£
+ * @return ÎŞ¡£
  */
 static void core0_plan_update_100hz(void)
 {
@@ -1018,9 +1018,9 @@ static void core0_plan_update_100hz(void)
 }
 
 /**
- * @brief æ‰§è¡Œå½“å‰1mså¢™é’Ÿå¯¹åº”çš„ä½é¢‘ä»»åŠ¡æ§½ä½ã€‚
- * @param slot å½“å‰æ§½ä½ç¼–å·ï¼ŒèŒƒå›´ä¸º0è‡³9ã€‚
- * @return æ— ã€‚
+ * @brief Ö´ĞĞµ±Ç°1msÇ½ÖÓ¶ÔÓ¦µÄµÍÆµÈÎÎñ²ÛÎ»¡£
+ * @param slot µ±Ç°²ÛÎ»±àºÅ£¬·¶Î§Îª0ÖÁ9¡£
+ * @return ÎŞ¡£
  */
 static void core0_run_slow_slot(uint8 slot)
 {
@@ -1109,7 +1109,7 @@ static void core0_run_slow_slot(uint8 slot)
                 FC_START_CRSF_Trigger_Emergency_Stop();
             }
 
-            /* 1kHzå‡ºç°æ–°ç§¯å‹æ—¶ç›´æ¥æ”¾å¼ƒä½ä¼˜å…ˆçº§CRSFå§¿æ€å›ä¼ ã€‚ */
+            /* 1kHz³öÏÖĞÂ»ıÑ¹Ê±Ö±½Ó·ÅÆúµÍÓÅÏÈ¼¶CRSF×ËÌ¬»Ø´«¡£ */
             if (g_tick_1000HZ == 0U)
             {
                 crsf_send_10hz();
@@ -1130,12 +1130,12 @@ int main(void)
     SCB_DisableDCache();
     Beep_Init();
     pit_ms_init(PIT_CH2, 10);
-    /* å‰¯ IMU åˆå§‹åŒ–æ—¥å¿—èµ° WiFi æ–‡æœ¬é“¾è·¯ï¼Œæ‰€ä»¥ wifi_cmd_Init å¿…é¡»æ—©äº ICM42688_Aux_Initã€‚ */
+    /* ¸± IMU ³õÊ¼»¯ÈÕÖ¾×ß WiFi ÎÄ±¾Á´Â·£¬ËùÒÔ wifi_cmd_Init ±ØĞëÔçÓÚ ICM42688_Aux_Init¡£ */
     wifi_cmd_Init();
     TOF_Init();
     // LC302_Init();
     IMU_Init_All();
-    // (void)ICM42688_Aux_Init();           //å¯¹æ¯”ç”¨çš„é™€èºä»ªå…³æ‰
+    // (void)ICM42688_Aux_Init();           //¶Ô±ÈÓÃµÄÍÓÂİÒÇ¹Øµô
     // (void)BMI088_Init();
     crsf_init();
     AccelCalibration_Init();
